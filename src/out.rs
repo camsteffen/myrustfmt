@@ -3,9 +3,6 @@ use tracing::instrument;
 
 struct Out {
     out: String,
-    // is_breaking: bool,
-    // is_breaking_next: bool,
-    pending_fallback: bool,
     allow_break: bool,
     last_line_start: usize,
     max_width: Option<usize>,
@@ -16,9 +13,6 @@ pub fn format_tree(tree: &Vec<FormatTreeNode>, max_width: usize) -> String {
     let mut out = Out {
         out: String::new(),
         allow_break: true,
-        pending_fallback: false,
-        // is_breaking: false,
-        // is_breaking_next: false,
         last_line_start: 0,
         max_width: Some(max_width),
         indent: 0,
@@ -158,37 +152,34 @@ impl Out {
             // }
             FormatTreeNode::WrapIndent(left, right) => {
                 self.token_list(left)?;
-                self.fallback(
-                    false,
-                    &[
-                        // one line
-                        &|this| {
-                            this.token(" ")?;
-                            this.with_no_breaks(|this| this.token_list(right))?;
-                            Ok(())
-                        },
-                        // wrap with one line
-                        &|this| {
-                            this.increment_indent();
-                            this.newline_indent()?;
-                            this.with_no_breaks(|this| this.token_list(right))?;
-                            Ok(())
-                        },
-                        // allow breaks
-                        &|this| {
-                            this.token(" ")?;
-                            this.token_list(right)?;
-                            Ok(())
-                        },
-                        // wrap and allow breaks
-                        &|this| {
-                            this.increment_indent();
-                            this.newline_indent()?;
-                            this.token_list(right)?;
-                            Ok(())
-                        },
-                    ],
-                )?;
+                self.fallback(&[
+                    // one line
+                    &|this| {
+                        this.token(" ")?;
+                        this.with_no_breaks(|this| this.token_list(right))?;
+                        Ok(())
+                    },
+                    // wrap with one line
+                    &|this| {
+                        this.increment_indent();
+                        this.newline_indent()?;
+                        this.with_no_breaks(|this| this.token_list(right))?;
+                        Ok(())
+                    },
+                    // allow breaks
+                    &|this| {
+                        this.token(" ")?;
+                        this.token_list(right)?;
+                        Ok(())
+                    },
+                    // wrap and allow breaks
+                    &|this| {
+                        this.increment_indent();
+                        this.newline_indent()?;
+                        this.token_list(right)?;
+                        Ok(())
+                    },
+                ])?;
                 Ok(())
             }
         }
@@ -201,24 +192,12 @@ impl Out {
         result
     }
 
-    fn fallback(
-        &mut self,
-        high_precedence: bool,
-        funcs: &[&dyn Fn(&mut Out) -> OutResult],
-    ) -> OutResult {
-        if self.pending_fallback && !high_precedence {
-            self.checkpoint(funcs[0])
+    fn fallback(&mut self, funcs: &[&dyn Fn(&mut Out) -> OutResult]) -> OutResult {
+        if funcs.iter().any(|func| self.checkpoint(func).is_ok()) {
+            Ok(())
         } else {
-            let [head @ .., tail] = funcs else {
-                panic!("funcs is empty")
-            };
-            self.pending_fallback = true;
-            let success = head.iter().any(|func| self.checkpoint(func).is_ok());
-            self.pending_fallback = false;
-            if success {
-                return Ok(());
-            }
-            self.checkpoint(tail)
+            // TODO is this appropriate?
+            Err(OutError::TooWide)
         }
     }
 
@@ -227,78 +206,72 @@ impl Out {
         if list.is_empty() {
             // nada
         } else {
-            self.fallback(
-                false,
-                &[
-                    // all in one line
-                    &|this| {
-                        let [head @ .., tail] = list.as_slice() else {
-                            unreachable!()
-                        };
-                        if kind.should_pad_contents() {
-                            this.token(" ")?;
-                        }
-                        for item in head {
-                            this.node(item)?;
-                            this.token(", ")?;
-                        }
-                        this.node(tail)?;
-                        if kind.should_pad_contents() {
-                            this.token(" ")?;
-                        }
-                        this.token(kind.ending_brace())?;
-                        Ok(())
-                    },
-                    // block indent and wrapping as needed
-                    &|this| {
-                        this.increment_indent();
+            self.fallback(&[
+                // all in one line
+                &|this| {
+                    let [head @ .., tail] = list.as_slice() else {
+                        unreachable!()
+                    };
+                    if kind.should_pad_contents() {
+                        this.token(" ")?;
+                    }
+                    for item in head {
+                        this.node(item)?;
+                        this.token(", ")?;
+                    }
+                    this.node(tail)?;
+                    if kind.should_pad_contents() {
+                        this.token(" ")?;
+                    }
+                    this.token(kind.ending_brace())?;
+                    Ok(())
+                },
+                // block indent and wrapping as needed
+                &|this| {
+                    this.increment_indent();
+                    this.newline_indent()?;
+                    let [head, tail @ ..] = list.as_slice() else {
+                        unreachable!()
+                    };
+                    this.node(head)?;
+                    this.token(",")?;
+                    for item in tail {
+                        this.fallback(&[
+                            // continue on the same line
+                            &|this| {
+                                this.token(" ")?;
+                                this.node(item)?;
+                                this.token(",")?;
+                                Ok(())
+                            },
+                            // wrap to the next line
+                            &|this| {
+                                this.newline_indent()?;
+                                this.node(item)?;
+                                this.token(",")?;
+                                Ok(())
+                            },
+                        ])?;
+                    }
+                    this.decrement_indent();
+                    this.newline_indent()?;
+                    this.token(kind.ending_brace())?;
+                    Ok(())
+                },
+                // all on separate lines
+                &|this| {
+                    this.increment_indent();
+                    for item in list {
                         this.newline_indent()?;
-                        let [head, tail @ ..] = list.as_slice() else {
-                            unreachable!()
-                        };
-                        this.node(head)?;
+                        this.node(item)?;
                         this.token(",")?;
-                        for item in tail {
-                            this.fallback(
-                                true,
-                                &[
-                                    // continue on the same line
-                                    &|this| {
-                                        this.token(" ")?;
-                                        this.node(item)?;
-                                        this.token(",")?;
-                                        Ok(())
-                                    },
-                                    // wrap to the next line
-                                    &|this| {
-                                        this.newline_indent()?;
-                                        this.node(item)?;
-                                        this.token(",")?;
-                                        Ok(())
-                                    },
-                                ],
-                            )?;
-                        }
-                        this.decrement_indent();
-                        this.newline_indent()?;
-                        this.token(kind.ending_brace())?;
-                        Ok(())
-                    },
-                    // all on separate lines
-                    &|this| {
-                        this.increment_indent();
-                        for item in list {
-                            this.newline_indent()?;
-                            this.node(item)?;
-                            this.token(",")?;
-                        }
-                        this.decrement_indent();
-                        this.newline_indent()?;
-                        this.token(kind.ending_brace())?;
-                        Ok(())
-                    },
-                ],
-            )?;
+                    }
+                    this.decrement_indent();
+                    this.newline_indent()?;
+                    this.token(kind.ending_brace())?;
+                    Ok(())
+                },
+            ])?;
         }
         /*
         if self.is_breaking {
@@ -390,6 +363,7 @@ struct NewlineNotAllowedError;
 #[derive(Debug)]
 struct TooWideError;
 
+#[derive(Clone, Copy)]
 enum OutError {
     NewlineNotAllowed,
     TooWide,

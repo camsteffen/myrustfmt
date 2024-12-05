@@ -3,87 +3,8 @@ use myrustfmt::out::format_tree;
 use tracing::{info, instrument};
 use tracing_test::traced_test;
 
-/*
-#[test]
-fn test_1() {
-    let tree = vec![
-        FormatTreeNode::Token("let"),
-        FormatTreeNode::Space,
-        FormatTreeNode::Token("asdfasdf"),
-        FormatTreeNode::Space,
-        FormatTreeNode::Token("="),
-        FormatTreeNode::SpaceOrWrapIndent,
-        FormatTreeNode::BreakSooner(vec![
-            FormatTreeNode::List(
-                ListKind::SquareBraces,
-                vec![
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("bbbbb"),
-                    FormatTreeNode::Token("ccccc"),
-                ],
-            ),
-            FormatTreeNode::Token(";"),
-        ]),
-    ];
-
-    assert_eq!(
-        format_tree(&tree, 1000),
-        "let asdfasdf = [aaaaa, bbbbb, ccccc];"
-    );
-    assert_eq!(
-        format_tree(&tree, 18),
-        "
-let asdfasdf = [
-    aaaaa,
-    bbbbb,
-    ccccc,
-];"
-        .trim()
-    );
-    assert_eq!(
-        format_tree(&tree, 15),
-        "
-let asdfasdf =
-    [
-        aaaaa,
-        bbbbb,
-        ccccc,
-    ];"
-        .trim()
-    );
-}
-
- */
-
 #[test]
 fn long_list_of_short_items() {
-    /*
-    let tree = vec![
-        FormatTreeNode::Token("let"),
-        FormatTreeNode::Space,
-        FormatTreeNode::Token("asdfasdf"),
-        FormatTreeNode::Space,
-        FormatTreeNode::Token("="),
-        FormatTreeNode::SpaceOrWrapIndent,
-        FormatTreeNode::BreakSooner(vec![
-            FormatTreeNode::List(
-                ListKind::SquareBraces,
-                vec![
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("aaaaa"),
-                ],
-            ),
-            FormatTreeNode::Token(";"),
-        ]),
-    ];
-
-     */
     let tree = vec![FormatTreeNode::WrapIndent(
         vec![
             FormatTreeNode::Token("let"),
