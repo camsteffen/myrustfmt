@@ -35,15 +35,6 @@ pub fn format_tree(tree: &Vec<FormatTreeNode>, max_width: usize) -> String {
     out.out
 }
 
-macro_rules! return_if_ok {
-    ($e:expr) => {{
-        match $e {
-            Ok(val) => return Ok(val),
-            Err(e) => e,
-        }
-    }};
-}
-
 const INDENT_WIDTH: usize = 4;
 
 impl Out {
@@ -67,89 +58,14 @@ impl Out {
         result
     }
 
-    // fn token_list_with_retries(
-    //     &mut self,
-    //     list: &Vec<FormatTreeNode>,
-    //     allow_breaking: bool,
-    // ) -> Result<(), TooWideError> {
-    //     let has_break_sooner = list
-    //         .iter()
-    //         .any(|node| matches!(node, FormatTreeNode::BreakSooner(_)));
-    //     let with_is_breaking_next = |this: &mut Out, is_breaking_next| {
-    //         this.checkpoint(|this| {
-    //             this.with_is_breaking_next(is_breaking_next, |this| this.token_list(list))
-    //         })
-    //     };
-    //     let with_is_breaking = |this: &mut Out, is_breaking| {
-    //         this.with_is_breaking(is_breaking, |this| {
-    //             let TooWideError = return_if_ok!(with_is_breaking_next(this, false));
-    //             if has_break_sooner {
-    //                 let TooWideError = return_if_ok!(with_is_breaking_next(this, true));
-    //             }
-    //             Err(TooWideError)
-    //         })
-    //     };
-    //     let TooWideError = return_if_ok!(with_is_breaking(self, false));
-    //     if allow_breaking && list.iter().any(|node| node.can_break()) {
-    //         let TooWideError = return_if_ok!(with_is_breaking(self, true));
-    //     }
-    //     Err(TooWideError)
-    // }
 
-    // #[instrument(skip(self, f))]
-    // fn with_is_breaking<T>(&mut self, is_breaking: bool, f: impl FnOnce(&mut Out) -> T) -> T {
-    //     let is_breaking_prev = std::mem::replace(&mut self.is_breaking, is_breaking);
-    //     let result = f(self);
-    //     self.is_breaking = is_breaking_prev;
-    //     result
-    // }
-
-    // #[instrument(skip(self, f))]
-    // fn with_is_breaking_next<T>(
-    //     &mut self,
-    //     is_breaking_next: bool,
-    //     f: impl FnOnce(&mut Out) -> T,
-    // ) -> T {
-    //     let is_breaking_next_prev = std::mem::replace(&mut self.is_breaking_next, is_breaking_next);
-    //     let result = f(self);
-    //     self.is_breaking_next = is_breaking_next_prev;
-    //     result
-    // }
 
     // #[instrument(skip(self), ret)]
     fn node(&mut self, node: &FormatTreeNode) -> OutResult {
         match node {
             FormatTreeNode::Token(token) => self.token(token),
             FormatTreeNode::List(kind, list) => self.list(kind, list),
-            // FormatTreeNode::MaybeBlock(list) => {
-            //     if self.is_breaking {
-            //         self.increment_indent();
-            //         self.newline_indent()?;
-            //         self.token_list(list)?;
-            //         self.decrement_indent();
-            //         self.newline_indent()?;
-            //     } else {
-            //         self.token_list(list)?;
-            //     }
-            //     Ok(())
-            // }
             FormatTreeNode::Space => self.token(" "),
-            // FormatTreeNode::SpaceOrWrapIndent => {
-            //     if self.is_breaking {
-            //         self.increment_indent();
-            //         self.newline_indent()?;
-            //     } else {
-            //         self.token(" ")?;
-            //     }
-            //     Ok(())
-            // }
-            // FormatTreeNode::BreakSooner(list) => {
-            //     self.token_list_with_retries(list, self.is_breaking_next)
-            // }
-            // FIXME these are the same
-            // FormatTreeNode::BreakLater(list) => {
-            //     self.token_list_with_retries(list, self.is_breaking_next)
-            // }
             FormatTreeNode::WrapIndent(left, right) => {
                 self.token_list(left)?;
                 self.fallback(&[
@@ -192,6 +108,8 @@ impl Out {
         result
     }
 
+    // TODO static dispatch
+    //  fallback_chain(|| initial).or_else(|| another_try).result()
     fn fallback(&mut self, funcs: &[&dyn Fn(&mut Out) -> OutResult]) -> OutResult {
         if funcs.iter().any(|func| self.checkpoint(func).is_ok()) {
             Ok(())
@@ -273,33 +191,6 @@ impl Out {
                 },
             ])?;
         }
-        /*
-        if self.is_breaking {
-            if !list.is_empty() {
-                self.increment_indent();
-                for item in list {
-                    self.newline_indent()?;
-                    self.node(item)?;
-                    self.token(",")?;
-                }
-                self.decrement_indent();
-                self.newline_indent()?;
-            }
-        } else if let [head @ .., tail] = list.as_slice() {
-            if kind.should_pad_contents() {
-                self.token(" ")?;
-            }
-            for item in head {
-                self.node(item)?;
-                self.token(", ")?;
-            }
-            self.node(tail)?;
-            if kind.should_pad_contents() {
-                self.token(" ")?;
-            }
-        }
-        self.token(kind.ending_brace())?;
-         */
         Ok(())
     }
 
