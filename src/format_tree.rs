@@ -1,12 +1,10 @@
+
+
 #[derive(Debug)]
 pub enum FormatTreeNode {
     Token(&'static str),
     List(ListKind, Vec<FormatTreeNode>),
-    // MaybeBlock(Vec<FormatTreeNode>),
     Space,
-    // SpaceOrWrapIndent,
-    // BreakSooner(Vec<FormatTreeNode>),
-    // BreakLater(Vec<FormatTreeNode>),
     WrapIndent(Vec<FormatTreeNode>, Vec<FormatTreeNode>),
 }
 
@@ -14,12 +12,14 @@ pub enum FormatTreeNode {
 pub enum ListKind {
     CurlyBraces,
     SquareBraces,
+    Parethesis,
 }
 
 impl ListKind {
     pub fn starting_brace(self) -> &'static str {
         match self {
             ListKind::CurlyBraces => "{",
+            ListKind::Parethesis => "(",
             ListKind::SquareBraces => "[",
         }
     }
@@ -27,6 +27,7 @@ impl ListKind {
     pub fn ending_brace(self) -> &'static str {
         match self {
             ListKind::CurlyBraces => "}",
+            ListKind::Parethesis => ")",
             ListKind::SquareBraces => "]"
         }
     }

@@ -1,7 +1,7 @@
 use crate::format_tree::{FormatTreeNode, ListKind};
 use tracing::instrument;
 
-struct Out {
+pub struct Out {
     out: String,
     allow_break: bool,
     last_line_start: usize,
@@ -10,13 +10,7 @@ struct Out {
 }
 
 pub fn format_tree(tree: &Vec<FormatTreeNode>, max_width: usize) -> String {
-    let mut out = Out {
-        out: String::new(),
-        allow_break: true,
-        last_line_start: 0,
-        max_width: Some(max_width),
-        indent: 0,
-    };
+    let mut out = Out::new(max_width);
     match out.token_list(tree) {
         Ok(()) => {}
         Err(_) => {
@@ -37,25 +31,37 @@ pub fn format_tree(tree: &Vec<FormatTreeNode>, max_width: usize) -> String {
 
 const INDENT_WIDTH: usize = 4;
 
+pub struct OutSnapshot {
+    len: usize,
+    indent: usize,
+    last_line_start: usize,
+}
+
 impl Out {
+    pub fn new(max_width: usize) -> Out {
+        Out {
+            out: String::new(),
+            allow_break: true,
+            last_line_start: 0,
+            max_width: Some(max_width),
+            indent: 0,
+        }
+    }
+    
+    pub fn finish(self) -> String {
+        self.out
+    }
+    
     fn token_list(&mut self, list: &Vec<FormatTreeNode>) -> OutResult {
         list.iter().try_for_each(|node| self.node(node))
     }
 
-    fn checkpoint(&mut self, f: impl FnOnce(&mut Out) -> OutResult) -> OutResult {
-        let len_prev = self.out.len();
-        let Out {
-            indent: indent_prev,
-            last_line_start: last_line_start_prev,
-            ..
-        } = *self;
-        let result = f(self);
-        if let Err(_) = result {
-            self.indent = indent_prev;
-            self.last_line_start = last_line_start_prev;
-            self.out.truncate(len_prev);
+    pub fn snapshot(&self) -> OutSnapshot {
+        OutSnapshot {
+            len: self.out.len(),
+            indent: self.indent,
+            last_line_start: self.last_line_start,
         }
-        result
     }
 
 
@@ -107,11 +113,27 @@ impl Out {
         self.allow_break = allow_break_prev;
         result
     }
+    
+    fn restore(&mut self, snapshot: &OutSnapshot) {
+        self.indent = snapshot.indent;
+        self.last_line_start = snapshot.last_line_start;
+        self.out.truncate(snapshot.len);
+    }
 
     // TODO static dispatch
     //  fallback_chain(|| initial).or_else(|| another_try).result()
+    //  fallback_chain(|c| { c.next(|| ..); c.next(|| ..); })
     fn fallback(&mut self, funcs: &[&dyn Fn(&mut Out) -> OutResult]) -> OutResult {
-        if funcs.iter().any(|func| self.checkpoint(func).is_ok()) {
+        let snapshot = self.snapshot();
+        if funcs.iter().any(|func| {
+            match func(self) {
+                Ok(()) => true,
+                Err(_) => {
+                    self.restore(&snapshot);
+                    false
+                },
+            }
+        }) {
             Ok(())
         } else {
             // TODO is this appropriate?
@@ -119,7 +141,7 @@ impl Out {
         }
     }
 
-    fn list(&mut self, kind: &ListKind, list: &Vec<FormatTreeNode>) -> OutResult {
+    pub fn list(&mut self, kind: &ListKind, list: &Vec<FormatTreeNode>) -> OutResult {
         self.token(kind.starting_brace())?;
         if list.is_empty() {
             // nada
@@ -194,7 +216,7 @@ impl Out {
         Ok(())
     }
 
-    fn token(&mut self, token: &str) -> OutResult {
+    pub fn token(&mut self, token: &str) -> OutResult {
         self.reserve(token.len())?;
         self.out.push_str(token);
         Ok(())
@@ -246,7 +268,7 @@ impl Out {
     }
 }
 
-type OutResult<T = ()> = Result<T, OutError>;
+pub type OutResult<T = ()> = Result<T, OutError>;
 
 #[derive(Debug)]
 struct NewlineNotAllowedError;
