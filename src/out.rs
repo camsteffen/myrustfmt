@@ -1,32 +1,17 @@
-use crate::format_tree::{FormatTreeNode, ListKind};
 use tracing::instrument;
+
+pub enum Constraint {
+    SingleLine,
+    SingleLineLimitWidth { pos: usize },
+}
 
 pub struct Out {
     out: String,
-    allow_break: bool,
+    // allow_break: bool,
     last_line_start: usize,
     max_width: Option<usize>,
     indent: usize,
-}
-
-pub fn format_tree(tree: &Vec<FormatTreeNode>, max_width: usize) -> String {
-    let mut out = Out::new(max_width);
-    match out.token_list(tree) {
-        Ok(()) => {}
-        Err(_) => {
-            todo!("no good");
-            out.out.clear();
-            out.last_line_start = 0;
-            out.max_width = None;
-            match out.token_list(tree) {
-                Ok(()) => {}
-                Err(_) => {
-                    unreachable!("too wide error with no max width")
-                }
-            }
-        }
-    }
-    out.out
+    constraints: Vec<Constraint>,
 }
 
 const INDENT_WIDTH: usize = 4;
@@ -41,19 +26,20 @@ impl Out {
     pub fn new(max_width: usize) -> Out {
         Out {
             out: String::new(),
-            allow_break: true,
+            // allow_break: true,
             last_line_start: 0,
             max_width: Some(max_width),
             indent: 0,
+            constraints: Vec::new(),
         }
     }
-    
+
     pub fn finish(self) -> String {
         self.out
     }
-    
-    fn token_list(&mut self, list: &Vec<FormatTreeNode>) -> OutResult {
-        list.iter().try_for_each(|node| self.node(node))
+
+    pub fn len(&self) -> usize {
+        self.out.len()
     }
 
     pub fn snapshot(&self) -> OutSnapshot {
@@ -64,8 +50,21 @@ impl Out {
         }
     }
 
+    pub fn restore(&mut self, snapshot: &OutSnapshot) {
+        self.indent = snapshot.indent;
+        self.last_line_start = snapshot.last_line_start;
+        self.out.truncate(snapshot.len);
+    }
 
+    pub fn push_constraint(&mut self, constraint: Constraint) {
+        self.constraints.push(constraint);
+    }
 
+    pub fn pop_constraint(&mut self) {
+        self.constraints.pop();
+    }
+
+    /*
     // #[instrument(skip(self), ret)]
     fn node(&mut self, node: &FormatTreeNode) -> OutResult {
         match node {
@@ -113,25 +112,18 @@ impl Out {
         self.allow_break = allow_break_prev;
         result
     }
-    
-    fn restore(&mut self, snapshot: &OutSnapshot) {
-        self.indent = snapshot.indent;
-        self.last_line_start = snapshot.last_line_start;
-        self.out.truncate(snapshot.len);
-    }
+     */
 
     // TODO static dispatch
     //  fallback_chain(|| initial).or_else(|| another_try).result()
     //  fallback_chain(|c| { c.next(|| ..); c.next(|| ..); })
     fn fallback(&mut self, funcs: &[&dyn Fn(&mut Out) -> OutResult]) -> OutResult {
         let snapshot = self.snapshot();
-        if funcs.iter().any(|func| {
-            match func(self) {
-                Ok(()) => true,
-                Err(_) => {
-                    self.restore(&snapshot);
-                    false
-                },
+        if funcs.iter().any(|func| match func(self) {
+            Ok(()) => true,
+            Err(_) => {
+                self.restore(&snapshot);
+                false
             }
         }) {
             Ok(())
@@ -141,111 +133,53 @@ impl Out {
         }
     }
 
-    pub fn list(&mut self, kind: &ListKind, list: &Vec<FormatTreeNode>) -> OutResult {
-        self.token(kind.starting_brace())?;
-        if list.is_empty() {
-            // nada
-        } else {
-            self.fallback(&[
-                // all in one line
-                &|this| {
-                    let [head @ .., tail] = list.as_slice() else {
-                        unreachable!()
-                    };
-                    if kind.should_pad_contents() {
-                        this.token(" ")?;
-                    }
-                    for item in head {
-                        this.node(item)?;
-                        this.token(", ")?;
-                    }
-                    this.node(tail)?;
-                    if kind.should_pad_contents() {
-                        this.token(" ")?;
-                    }
-                    this.token(kind.ending_brace())?;
-                    Ok(())
-                },
-                // block indent and wrapping as needed
-                &|this| {
-                    this.increment_indent();
-                    this.newline_indent()?;
-                    let [head, tail @ ..] = list.as_slice() else {
-                        unreachable!()
-                    };
-                    this.node(head)?;
-                    this.token(",")?;
-                    for item in tail {
-                        this.fallback(&[
-                            // continue on the same line
-                            &|this| {
-                                this.token(" ")?;
-                                this.node(item)?;
-                                this.token(",")?;
-                                Ok(())
-                            },
-                            // wrap to the next line
-                            &|this| {
-                                this.newline_indent()?;
-                                this.node(item)?;
-                                this.token(",")?;
-                                Ok(())
-                            },
-                        ])?;
-                    }
-                    this.decrement_indent();
-                    this.newline_indent()?;
-                    this.token(kind.ending_brace())?;
-                    Ok(())
-                },
-                // all on separate lines
-                &|this| {
-                    this.increment_indent();
-                    for item in list {
-                        this.newline_indent()?;
-                        this.node(item)?;
-                        this.token(",")?;
-                    }
-                    this.decrement_indent();
-                    this.newline_indent()?;
-                    this.token(kind.ending_brace())?;
-                    Ok(())
-                },
-            ])?;
-        }
-        Ok(())
-    }
-
+    /**
+     * A "token" must 1) fit in one line and 2) not contain comments
+     */
     pub fn token(&mut self, token: &str) -> OutResult {
+        for constraint in &self.constraints {
+            match constraint {
+                Constraint::SingleLine => {}
+                Constraint::SingleLineLimitWidth { pos } => {
+                    if token.len() > pos - self.out.len() {
+                        return Err(OutError::TooWide);
+                    }
+                }
+            }
+        }
         self.reserve(token.len())?;
         self.out.push_str(token);
         Ok(())
     }
 
-    fn newline_indent(&mut self) -> OutResult {
+    pub fn newline_indent(&mut self) -> OutResult {
         self.newline()?;
         self.indent()?;
         Ok(())
     }
 
-    fn newline(&mut self) -> Result<(), NewlineNotAllowedError> {
-        if !self.allow_break {
-            return Err(NewlineNotAllowedError);
+    pub fn newline(&mut self) -> Result<(), NewlineNotAllowedError> {
+        for constraint in &self.constraints {
+            match constraint {
+                Constraint::SingleLine | Constraint::SingleLineLimitWidth { .. } => {
+                    return Err(NewlineNotAllowedError);
+                }
+            }
         }
         self.out.push('\n');
         self.last_line_start = self.out.len();
         Ok(())
     }
 
-    fn increment_indent(&mut self) {
+    pub fn increment_indent(&mut self) {
         self.indent += INDENT_WIDTH;
     }
 
-    fn decrement_indent(&mut self) {
+    pub fn decrement_indent(&mut self) {
         self.indent -= INDENT_WIDTH;
     }
 
-    fn indent(&mut self) -> Result<(), TooWideError> {
+    pub fn indent(&mut self) -> Result<(), TooWideError> {
         self.reserve(self.indent)?;
         self.out.extend(std::iter::repeat_n(' ', self.indent));
         Ok(())
@@ -254,11 +188,10 @@ impl Out {
     #[instrument(skip(self), ret, fields(out = self.out))]
     fn reserve(&mut self, len: usize) -> Result<(), TooWideError> {
         if let Some(max_width) = self.max_width {
-            if max_width - self.last_line_width() < len {
+            if len > max_width - self.last_line_width() {
                 return Err(TooWideError);
             }
         }
-        self.out.reserve(len);
         Ok(())
     }
 
@@ -276,8 +209,8 @@ struct NewlineNotAllowedError;
 #[derive(Debug)]
 struct TooWideError;
 
-#[derive(Clone, Copy)]
-enum OutError {
+#[derive(Clone, Copy, Debug)]
+pub enum OutError {
     NewlineNotAllowed,
     TooWide,
 }

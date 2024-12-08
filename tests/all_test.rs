@@ -1,47 +1,48 @@
-use myrustfmt::format_tree::{FormatTreeNode, ListKind};
-use myrustfmt::out::format_tree;
+#![feature(rustc_private)]
+
+use myrustfmt::withparser::format_str;
 use tracing::{info, instrument};
 use tracing_test::traced_test;
 
 #[test]
 fn long_list_of_short_items() {
-    let tree = vec![FormatTreeNode::WrapIndent(
-        vec![
-            FormatTreeNode::Token("let"),
-            FormatTreeNode::Space,
-            FormatTreeNode::Token("asdfasdf"),
-            FormatTreeNode::Space,
-            FormatTreeNode::Token("="),
-        ],
-        vec![
-            FormatTreeNode::List(
-                ListKind::SquareBraces,
-                vec![
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("aaaaa"),
-                    FormatTreeNode::Token("aaaaa"),
-                ],
-            ),
-            FormatTreeNode::Token(";"),
-        ],
-    )];
-
+    let source = "fn main() { let asdfasdf = [aaaaa, aaaaa, aaaaa, aaaaa, aaaaa, aaaaa, aaaaa, aaaaa]; }";
     assert_eq!(
-        format_tree(&tree, 40),
+        format_str(source, 44),
         "
-let asdfasdf = [
-    aaaaa, aaaaa, aaaaa, aaaaa, aaaaa,
-    aaaaa, aaaaa, aaaaa,
-];"
+fn main() {
+    let asdfasdf = [
+        aaaaa, aaaaa, aaaaa, aaaaa, aaaaa,
+        aaaaa, aaaaa, aaaaa,
+    ];
+}"
         .trim()
     );
 }
 
+
+#[traced_test]
+#[test]
+fn long_list_of_slightly_long_items() {
+    let source = "fn main() { let asdfasdf = [aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa]; }";
+    assert_eq!(
+        format_str(source, 44),
+        "
+fn main() {
+    let asdfasdf = [
+        aaaaaaaaaaa,
+        aaaaaaaaaaa,
+        aaaaaaaaaaa,
+        aaaaaaaaaaa,
+        aaaaaaaaaaa,
+        aaaaaaaaaaa,
+    ];
+}"
+            .trim()
+    );
+}
+
+/*
 #[traced_test]
 #[test]
 fn test_list_formats() {
@@ -173,3 +174,4 @@ fn test() {
 
 
  */
+*/
