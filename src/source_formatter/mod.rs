@@ -120,12 +120,11 @@ impl<'a> SourceFormatter<'a> {
      */
     pub fn token_expect(&mut self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
-        if !self.source[self.pos.to_usize()..].starts_with(token) {
+        if !self.remaining_source().starts_with(token) {
             panic!(
                 "expected token \"{}\", found \"{}\"",
                 token,
-                &self.source
-                    [self.pos.to_usize()..(self.pos.to_usize() + 10).min(self.source.len())]
+                &self.remaining_source()[..10.min(self.remaining_source().len())]
             );
         }
         self.token_unchecked(token)?;
@@ -135,7 +134,7 @@ impl<'a> SourceFormatter<'a> {
     /** Write a token that may be next in source, or otherwise is missing */
     pub fn token_maybe_missing(&mut self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
-        if self.source[self.pos.to_usize()..].starts_with(token) {
+        if self.remaining_source().starts_with(token) {
             self.token_unchecked(token)
         } else {
             self.token_missing(token)
@@ -184,7 +183,7 @@ impl<'a> SourceFormatter<'a> {
     fn handle_whitespace_and_comments(&mut self) -> bool {
         let mut len = 0;
         let mut len_without_trailing_whitespace = 0;
-        for token in rustc_lexer::tokenize(&self.source[self.pos.to_usize()..]) {
+        for token in rustc_lexer::tokenize(self.remaining_source()) {
             match token.kind {
                 |TokenKind::LineComment { .. }| TokenKind::BlockComment { .. } => {
                     len += token.len as usize;
@@ -211,8 +210,7 @@ impl<'a> SourceFormatter<'a> {
     }
     
     fn copy(&mut self, len: usize) {
-        let segment = &self.source
-            [self.pos.to_usize()..self.pos.to_usize() + len];
+        let segment = &self.remaining_source()[..len];
         self.out.write_unchecked(segment);
         self.pos = self.pos + BytePos::from_usize(len);
     }
@@ -220,7 +218,11 @@ impl<'a> SourceFormatter<'a> {
     pub fn debug_pos(&self) {
         info!(
             "{:?}",
-            self.source[self.pos.to_usize()..].chars().next().unwrap()
+            self.remaining_source().chars().next().unwrap()
         );
+    }
+    
+    fn remaining_source(&self) -> &'a str {
+        &self.source[self.pos.to_usize()..]
     }
 }
