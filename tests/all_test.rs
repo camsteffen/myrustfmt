@@ -1,12 +1,13 @@
 #![feature(rustc_private)]
 
-use myrustfmt::withparser::format_str;
+use myrustfmt::formatter::format_str;
 use tracing::{info, instrument};
 use tracing_test::traced_test;
 
 #[test]
 fn long_list_of_short_items() {
-    let source = "fn main() { let asdfasdf = [aaaaa, aaaaa, aaaaa, aaaaa, aaaaa, aaaaa, aaaaa, aaaaa]; }";
+    let source =
+        "fn main() { let asdfasdf = [aaaaa, aaaaa, aaaaa, aaaaa, aaaaa, aaaaa, aaaaa, aaaaa]; }";
     assert_eq!(
         format_str(source, 44),
         "
@@ -19,7 +20,6 @@ fn main() {
         .trim()
     );
 }
-
 
 #[traced_test]
 #[test]
@@ -38,22 +38,23 @@ fn main() {
         aaaaaaaaaaa,
     ];
 }"
-            .trim()
+        .trim()
     );
 }
 
 #[traced_test]
 #[test]
 fn test_list_formats() {
-    let source = "fn main() {let asdfasdf = [aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa];}";
+    let source =
+        "fn main() {let asdfasdf = [aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa];}";
 
-//     assert_eq!(
-//         format_str(source, 100),
-//         "
-// fn main() {
-//     let asdfasdf = [aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa];
-// }".trim()
-//     );
+    //     assert_eq!(
+    //         format_str(source, 100),
+    //         "
+    // fn main() {
+    //     let asdfasdf = [aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa];
+    // }".trim()
+    //     );
     assert_eq!(
         format_str(source, 68),
         "
@@ -69,7 +70,8 @@ fn main() {
 #[traced_test]
 #[test]
 fn assign_wrap_long_list() {
-    let source = "fn main() {let asdfasdfasdfasf=[aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa];}";
+    let source =
+        "fn main() {let asdfasdfasdfasf=[aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa];}";
     assert_eq!(
         format_str(source, 26),
         "
@@ -82,14 +84,15 @@ fn main() {
             aaaaaaaaaaa,
         ];
 }"
-            .trim()
+        .trim()
     );
 }
 
 #[traced_test]
 #[test]
 fn assign_wrap() {
-    let source = "fn main() {let asdfasdf = [aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa];}";
+    let source =
+        "fn main() {let asdfasdf = [aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa];}";
     assert_eq!(
         format_str(source, 72),
         "
@@ -97,6 +100,6 @@ fn main() {
     let asdfasdf =
         [aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa];
 }"
-            .trim()
+        .trim()
     );
 }

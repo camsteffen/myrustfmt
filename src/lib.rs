@@ -18,6 +18,5 @@ extern crate thin_vec;
 #[allow(unused_extern_crates)]
 extern crate rustc_driver;
 
-
-pub mod out;
-pub mod withparser;
+pub mod formatter;
+pub mod writer;
