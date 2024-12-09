@@ -1,4 +1,6 @@
 mod ast;
+mod list;
+mod fallback_chain;
 
 use crate::writer::{Constraint, ConstraintError, ConstraintWriter, WriterSnapshot};
 use rustc_data_structures::sync::Lrc;
@@ -31,39 +33,6 @@ struct Formatter<'a> {
     out: ConstraintWriter,
     source: &'a str,
     pos: BytePos,
-}
-
-#[must_use]
-struct FallbackChain<'a, 'b> {
-    debug_name: &'static str,
-    out: &'b mut Formatter<'a>,
-    snapshot: FormatterSnapshot,
-    result: Option<FormatResult>,
-}
-
-impl<'a> FallbackChain<'a, '_> {
-    fn next(
-        mut self,
-        debug_name: &'static str,
-        f: impl FnOnce(&mut Formatter<'a>) -> FormatResult,
-    ) -> Self {
-        if matches!(self.result, None | Some(Err(_))) {
-            let result = f(self.out);
-            match result {
-                Ok(_) => info!("{}: {} succeeded", self.debug_name, debug_name),
-                Err(e) => info!("{}: {} failed: {e:?}", self.debug_name, debug_name),
-            }
-            if let Err(_) = result {
-                self.out.restore(&self.snapshot);
-            }
-            self.result = Some(result);
-        }
-        self
-    }
-
-    fn result(self) -> FormatResult {
-        self.result.expect("fallback chain cannot be empty")
-    }
 }
 
 impl<'a> Formatter<'a> {
@@ -105,16 +74,6 @@ impl<'a> Formatter<'a> {
         self.finally(f, |this| this.out.pop_constraint())
     }
 
-    fn fallback_chain(&mut self, debug_name: &'static str) -> FallbackChain<'a, '_> {
-        let snapshot = self.snapshot();
-        FallbackChain {
-            debug_name,
-            out: self,
-            snapshot,
-            result: None,
-        }
-    }
-
     fn with_width_limit(
         &mut self,
         width_limit: usize,
@@ -128,85 +87,12 @@ impl<'a> Formatter<'a> {
         result
     }
 
-    fn list<T>(
-        &mut self,
-        kind: ListKind,
-        list: &[T],
-        format_item: impl Fn(&mut Formatter<'a>, &T) -> FormatResult,
-    ) -> FormatResult {
-        self.token_unchecked(kind.starting_brace())?;
-        if list.is_empty() {
-            self.token_unchecked(kind.ending_brace())?;
-            return Ok(());
-        }
-        self.fallback_chain("list")
-            .next("single line", |this| {
-                let [head, tail @ ..] = list else {
-                    unreachable!()
-                };
-                this.optional_space(kind.should_pad_contents())?;
-                format_item(this, head)?;
-                for item in tail {
-                    this.token_unchecked(",")?;
-                    this.space()?;
-                    format_item(this, item)?;
-                }
-                this.optional_space(kind.should_pad_contents())?;
-                this.token_unchecked(kind.ending_brace())?;
-                Ok(())
-            })
-            .next("wrapping to fit", |this| {
-                let format_item = |this: &mut Formatter<'a>, item: &T| {
-                    this.with_width_limit(10, |this| format_item(this, item))
-                };
-                this.out.increment_indent();
-                this.newline_indent()?;
-                let [head, tail @ ..] = list else {
-                    unreachable!()
-                };
-                format_item(this, head)?;
-                this.token_unchecked(",")?;
-                for item in tail {
-                    this.fallback_chain("list item")
-                        .next("same line", |this| {
-                            this.space()?;
-                            format_item(this, item)?;
-                            this.token_unchecked(",")?;
-                            Ok(())
-                        })
-                        .next("wrap", |this| {
-                            this.newline_indent()?;
-                            format_item(this, item)?;
-                            this.token_unchecked(",")?;
-                            Ok(())
-                        })
-                        .result()?;
-                }
-                this.out.decrement_indent();
-                this.newline_indent()?;
-                this.token_unchecked(kind.ending_brace())?;
-                Ok(())
-            })
-            .next("separate lines", |this| {
-                this.out.increment_indent();
-                for item in list {
-                    this.newline_indent()?;
-                    format_item(this, item)?;
-                    this.token_unchecked(",")?;
-                }
-                this.out.decrement_indent();
-                this.newline_indent()?;
-                this.token_unchecked(kind.ending_brace())?;
-                Ok(())
-            })
-            .result()?;
-        Ok(())
-    }
-
     fn newline_indent(&mut self) -> FormatResult {
         self.skip_whitespace_and_comments();
-        self.out.newline().map_err(|e| self.err(e))?;
-        self.out.indent().map_err(|e| self.err(e))?;
+        self.out
+            .newline()
+            .map_err(|e| self.lift_constraint_err(e))?;
+        self.out.indent().map_err(|e| self.lift_constraint_err(e))?;
         Ok(())
     }
 
@@ -229,7 +115,9 @@ impl<'a> Formatter<'a> {
     }
 
     fn token_unchecked(&mut self, token: &str) -> FormatResult {
-        self.out.token(&token).map_err(|e| self.err(e))?;
+        self.out
+            .token(&token)
+            .map_err(|e| self.lift_constraint_err(e))?;
         self.pos = self.pos + BytePos::from_usize(token.len());
         Ok(())
     }
@@ -253,7 +141,7 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
-    fn err(&self, out_err: impl Into<ConstraintError>) -> FormatError {
+    fn lift_constraint_err(&self, out_err: impl Into<ConstraintError>) -> FormatError {
         FormatError {
             kind: out_err.into(),
             pos: self.pos,
@@ -261,7 +149,7 @@ impl<'a> Formatter<'a> {
     }
 
     fn space(&mut self) -> FormatResult {
-        self.out.token(" ").map_err(|e| self.err(e))?;
+        self.out.token(" ").map_err(|e| self.lift_constraint_err(e))?;
         self.skip_whitespace_and_comments();
         Ok(())
     }
@@ -283,12 +171,6 @@ impl<'a> Formatter<'a> {
     fn no_space(&mut self) {
         self.skip_whitespace_and_comments();
     }
-}
-
-enum TokenIsWhitespace {
-    Yes,
-    No,
-    Eof,
 }
 
 pub fn format_str(source: &str, max_width: usize) -> String {
@@ -335,37 +217,4 @@ fn dcx(source_map: Lrc<SourceMap>) -> DiagCtxt {
     );
 
     DiagCtxt::new(emitter)
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum ListKind {
-    CurlyBraces,
-    SquareBraces,
-    Parethesis,
-}
-
-impl ListKind {
-    pub fn starting_brace(self) -> &'static str {
-        match self {
-            ListKind::CurlyBraces => "{",
-            ListKind::Parethesis => "(",
-            ListKind::SquareBraces => "[",
-        }
-    }
-
-    pub fn ending_brace(self) -> &'static str {
-        match self {
-            ListKind::CurlyBraces => "}",
-            ListKind::Parethesis => ")",
-            ListKind::SquareBraces => "]",
-        }
-    }
-
-    pub fn should_pad_contents(self) -> bool {
-        match self {
-            ListKind::CurlyBraces => true,
-            ListKind::SquareBraces => false,
-            ListKind::Parethesis => false,
-        }
-    }
 }

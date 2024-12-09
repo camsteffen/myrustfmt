@@ -1,6 +1,7 @@
 use rustc_ast::ast;
 
-use crate::formatter::{FormatResult, Formatter, ListKind};
+use crate::formatter::{FormatResult, Formatter };
+use crate::formatter::list::ListKind;
 
 impl<'a> Formatter<'a> {
     pub fn expr(&mut self, expr: &ast::Expr) -> FormatResult {
