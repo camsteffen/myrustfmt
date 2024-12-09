@@ -1,10 +1,7 @@
-use tracing::info;
 use crate::out::{Constraint, Out, OutError, OutSnapshot};
-use rustc_ast::{
-    ast, 
-};
-use rustc_data_structures::sync::{Lrc};
-use rustc_errors::emitter::{stderr_destination,  HumanEmitter};
+use rustc_ast::ast;
+use rustc_data_structures::sync::Lrc;
+use rustc_errors::emitter::{stderr_destination, HumanEmitter};
 use rustc_errors::{ColorConfig, DiagCtxt};
 use rustc_lexer::TokenKind;
 use rustc_session::parse::ParseSess;
@@ -12,8 +9,9 @@ use rustc_span::edition::Edition;
 use rustc_span::symbol::Ident;
 use rustc_span::{
     source_map::{FilePathMapping, SourceMap},
-    BytePos, FileName, Pos, Span, 
+    BytePos, FileName, Pos, Span,
 };
+use tracing::info;
 
 struct ParseTreeSnapshot {
     out_snapshot: OutSnapshot,
@@ -43,9 +41,12 @@ struct FallbackChain<'a, 'b> {
     result: Option<ParseResult>,
 }
 
-// #[cfg(target_os = "x86_64")]
 impl<'a> FallbackChain<'a, '_> {
-    fn next(mut self, debug_name: &'static str, f: impl FnOnce(&mut ParseTree<'a>) -> ParseResult) -> Self {
+    fn next(
+        mut self,
+        debug_name: &'static str,
+        f: impl FnOnce(&mut ParseTree<'a>) -> ParseResult,
+    ) -> Self {
         if matches!(self.result, None | Some(Err(_))) {
             let result = f(self.out);
             match result {
@@ -73,7 +74,7 @@ impl<'a> ParseTree<'a> {
         }
         Ok(())
     }
-    
+
     fn snapshot(&self) -> ParseTreeSnapshot {
         ParseTreeSnapshot {
             out_snapshot: self.out.snapshot(),
@@ -92,9 +93,7 @@ impl<'a> ParseTree<'a> {
             ast::ItemKind::Use(_) => todo!(),
             ast::ItemKind::Static(_) => todo!(),
             ast::ItemKind::Const(_) => todo!(),
-            ast::ItemKind::Fn(fn_) => {
-                self.fn_(fn_, item)
-            }
+            ast::ItemKind::Fn(fn_) => self.fn_(fn_, item),
             ast::ItemKind::Mod(_, _) => todo!(),
             ast::ItemKind::ForeignMod(_) => todo!(),
             ast::ItemKind::GlobalAsm(_) => todo!(),
@@ -129,13 +128,13 @@ impl<'a> ParseTree<'a> {
 
     fn block(&mut self, block: &ast::Block) -> ParseResult {
         self.token("{", block.span.lo())?;
-        if let [first_stmt, rest_stmts @ ..] = &block.stmts[..] {
+        if !block.stmts.is_empty() {
             self.out.increment_indent();
-            self.newline_indent()?;
-            self.stmt(first_stmt)?;
-            for stmt in rest_stmts {
+            let stmt_indent = self.out.current_indent();
+            for stmt in &block.stmts {
                 self.newline_indent()?;
                 self.stmt(stmt)?;
+                self.out.set_indent(stmt_indent);
             }
             self.out.decrement_indent();
             self.newline_indent()?;
@@ -155,6 +154,21 @@ impl<'a> ParseTree<'a> {
         }
     }
 
+    fn finally<R>(
+        &mut self,
+        f: impl FnOnce(&mut ParseTree<'a>) -> R,
+        finally: impl FnOnce(&mut ParseTree<'a>),
+    ) -> R {
+        let result = f(self);
+        finally(self);
+        result
+    }
+
+    fn with_no_breaks(&mut self, f: impl FnOnce(&mut ParseTree<'a>) -> ParseResult) -> ParseResult {
+        self.out.push_constraint(Constraint::SingleLine);
+        self.finally(f, |this| this.out.pop_constraint())
+    }
+
     fn local(&mut self, local: &ast::Local) -> ParseResult {
         let ast::Local {
             pat,
@@ -169,18 +183,52 @@ impl<'a> ParseTree<'a> {
         match kind {
             ast::LocalKind::Decl => {
                 self.no_space();
+                self.token_unchecked(";")?;
+                Ok(())
             }
             ast::LocalKind::Init(expr) => {
                 self.space()?;
                 self.token_unchecked("=")?;
-                self.space()?;
-                self.expr(expr)?;
-                self.no_space();
+                self.fallback_chain("local init")
+                    .next("same line and no breaks", |this| {
+                        this.with_no_breaks(|this| {
+                            this.space()?;
+                            this.expr(expr)?;
+                            this.no_space();
+                            this.token_unchecked(";")?;
+                            Ok(())
+                        })
+                    })
+                    .next("wrap and indent then one line and no breaks", |this| {
+                        this.out.increment_indent();
+                        this.newline_indent()?;
+                        this.with_no_breaks(|this| {
+                            this.expr(expr)?;
+                            this.no_space();
+                            this.token_unchecked(";")?;
+                            Ok(())
+                        })
+                    })
+                    .next("same line", |this| {
+                        this.space()?;
+                        this.expr(expr)?;
+                        this.no_space();
+                        this.token_unchecked(";")?;
+                        Ok(())
+                    })
+                    .next("wrap and indent", |this| {
+                        this.out.increment_indent();
+                        this.newline_indent()?;
+                        this.expr(expr)?;
+                        this.no_space();
+                        this.token_unchecked(";")?;
+                        Ok(())
+                    })
+                    .result()?;
+                Ok(())
             }
             ast::LocalKind::InitElse(_, _) => todo!(),
         }
-        self.token_unchecked(";")?;
-        Ok(())
     }
 
     fn expr(&mut self, expr: &ast::Expr) -> ParseResult {
@@ -343,9 +391,15 @@ impl<'a> ParseTree<'a> {
             result: None,
         }
     }
-    
-    fn with_width_limit(&mut self, width_limit: usize, f: impl FnOnce(&mut ParseTree<'a>) -> ParseResult) -> ParseResult {
-        self.out.push_constraint(Constraint::SingleLineLimitWidth { pos: self.out.len() + width_limit });
+
+    fn with_width_limit(
+        &mut self,
+        width_limit: usize,
+        f: impl FnOnce(&mut ParseTree<'a>) -> ParseResult,
+    ) -> ParseResult {
+        self.out.push_constraint(Constraint::SingleLineLimitWidth {
+            pos: self.out.len() + width_limit,
+        });
         let result = f(self);
         self.out.pop_constraint();
         result
@@ -364,25 +418,23 @@ impl<'a> ParseTree<'a> {
         }
         self.fallback_chain("list")
             .next("single line", |this| {
-                let [head @ .., tail] = list else {
+                let [head, tail @ ..] = list else {
                     unreachable!()
                 };
                 this.optional_space(kind.should_pad_contents())?;
-                for item in head {
-                    format_item(this, item)?;
+                format_item(this, head)?;
+                for item in tail {
                     this.token_unchecked(",")?;
                     this.space()?;
+                    format_item(this, item)?;
                 }
-                format_item(this, tail)?;
                 this.optional_space(kind.should_pad_contents())?;
                 this.token_unchecked(kind.ending_brace())?;
                 Ok(())
             })
             .next("wrapping to fit", |this| {
                 let format_item = |this: &mut ParseTree<'a>, item: &T| {
-                    this.with_width_limit(10, |this| {
-                        format_item(this, item)
-                    })
+                    this.with_width_limit(10, |this| format_item(this, item))
                 };
                 this.out.increment_indent();
                 this.newline_indent()?;
@@ -530,7 +582,7 @@ impl<'a> ParseTree<'a> {
         }
         Ok(())
     }
-    
+
     fn err(&self, out_err: OutError) -> ParseError {
         ParseError {
             kind: out_err,
@@ -578,7 +630,7 @@ pub fn format_str(source: &str, max_width: usize) -> String {
         pos: BytePos(0),
     };
     match parse_tree.crate_(&crate_) {
-        Ok(()) => { }
+        Ok(()) => {}
         Err(e) => todo!("failed to format: {e:?}"),
     }
     parse_tree.out.finish()

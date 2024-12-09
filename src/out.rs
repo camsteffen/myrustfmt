@@ -41,6 +41,14 @@ impl Out {
     pub fn len(&self) -> usize {
         self.out.len()
     }
+    
+    pub fn current_indent(&self) -> usize {
+        self.indent
+    }
+    
+    pub fn set_indent(&mut self, indent: usize) {
+        self.indent = indent;
+    }
 
     pub fn snapshot(&self) -> OutSnapshot {
         OutSnapshot {
