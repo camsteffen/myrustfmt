@@ -2,6 +2,7 @@ use crate::constraint_writer::{
     ConstraintError, ConstraintWriter, NewlineNotAllowedError, TooWideError, WriterSnapshot,
 };
 use crate::constraints::Constraints;
+use crate::source_reader::SourceReader;
 use rustc_data_structures::sync::Lrc;
 use rustc_errors::emitter::{HumanEmitter, stderr_destination};
 use rustc_errors::{ColorConfig, DiagCtxt};
@@ -29,18 +30,16 @@ pub struct FormatError {
 }
 
 pub struct SourceFormatter<'a> {
+    source: SourceReader<'a>,
     out: ConstraintWriter,
-    source: &'a str,
-    pos: BytePos,
     next_is_whitespace_or_comments: bool,
 }
 
 impl<'a> SourceFormatter<'a> {
     pub fn new(source: &'a str, constraints: Constraints) -> SourceFormatter<'a> {
         SourceFormatter {
+            source: SourceReader::new(source),
             out: ConstraintWriter::new(constraints),
-            source,
-            pos: BytePos(0),
             next_is_whitespace_or_comments: true,
         }
     }
@@ -56,12 +55,12 @@ impl<'a> SourceFormatter<'a> {
     pub fn snapshot(&self) -> SourceFormatterSnapshot {
         SourceFormatterSnapshot {
             writer_snapshot: self.out.snapshot(),
-            pos: self.pos,
+            pos: self.source.pos,
         }
     }
 
     pub fn restore(&mut self, snapshot: &SourceFormatterSnapshot) {
-        self.pos = snapshot.pos;
+        self.source.pos = snapshot.pos;
         self.out.restore(&snapshot.writer_snapshot);
     }
 
@@ -89,17 +88,10 @@ impl<'a> SourceFormatter<'a> {
         Ok(())
     }
 
-    /** Convenience for calling `token_at` followed by `space` */
-    pub fn token_at_space(&mut self, token: &'static str, pos: BytePos) -> FormatResult {
-        self.token_at(token, pos)?;
-        self.space()?;
-        Ok(())
-    }
-
     /** Write a token, asserting it is next in source and has the given position */
     pub fn token_at(&mut self, token: &str, pos: BytePos) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
-        assert_eq!(pos, self.pos);
+        self.source.expect_pos(pos);
         self.token_unchecked(token)?;
         Ok(())
     }
@@ -107,8 +99,15 @@ impl<'a> SourceFormatter<'a> {
     /** Write a token, asserting it is next in source and has the given ending position */
     pub fn token_end_at(&mut self, token: &str, end_pos: BytePos) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
-        assert_eq!(end_pos - BytePos::from_usize(token.len()), self.pos);
         self.token_unchecked(token)?;
+        self.source.expect_pos(end_pos);
+        Ok(())
+    }
+
+    /** Convenience for calling `token_at` followed by `space` */
+    pub fn token_at_space(&mut self, token: &'static str, pos: BytePos) -> FormatResult {
+        self.token_at(token, pos)?;
+        self.space()?;
         Ok(())
     }
 
@@ -120,76 +119,53 @@ impl<'a> SourceFormatter<'a> {
      */
     pub fn token_expect(&mut self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
-        if !self.remaining_source().starts_with(token) {
+        if !self.source.remaining().starts_with(token) {
             panic!(
                 "expected token \"{}\", found \"{}\"",
                 token,
-                &self.remaining_source()[..10.min(self.remaining_source().len())]
+                &self.source.remaining()[..10.min(self.source.remaining().len())]
             );
         }
         self.token_unchecked(token)?;
         Ok(())
     }
 
-    /** Write a token that may be next in source, or otherwise is missing */
+    /** Write a token that may be next in source, or otherwise is missing from source */
     pub fn token_maybe_missing(&mut self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
-        if self.remaining_source().starts_with(token) {
+        if self.source.remaining().starts_with(token) {
             self.token_unchecked(token)
         } else {
             self.token_missing(token)
         }
     }
 
-    /** Write a token assuming it is next in source */
-    fn token_unchecked(&mut self, token: &str) -> FormatResult {
-        self.out
-            .token(&token)
-            .map_err(|e| self.lift_constraint_err(e))?;
-        self.pos = self.pos + BytePos::from_usize(token.len());
-        self.next_is_whitespace_or_comments = true;
-        Ok(())
-    }
-
-    /** Write a token assuming it is missing from source */
-    fn token_missing(&mut self, token: &str) -> FormatResult {
-        self.out
-            .token(&token)
-            .map_err(|e| self.lift_constraint_err(e))?;
-        Ok(())
-    }
-
+    /** Copy a token from source */
     pub fn token_from_source(&mut self, span: Span) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
-        assert_eq!(span.lo(), self.pos);
-        let token = self.expect_span(span);
+        self.source.expect_pos(span.lo());
+        let token = self.source.get_span(span);
         self.token_unchecked(token)?;
         Ok(())
-    }
-
-    pub fn expect_span(&self, span: Span) -> &'a str {
-        self.source
-            .get(span.lo().to_usize()..span.hi().to_usize())
-            .expect("source string should include the span")
     }
 
     pub fn lift_constraint_err(&self, out_err: impl Into<ConstraintError>) -> FormatError {
         FormatError {
             kind: out_err.into(),
-            pos: self.pos,
+            pos: self.source.pos,
         }
     }
 
     fn handle_whitespace_and_comments(&mut self) -> bool {
         let mut len = 0;
         let mut len_without_trailing_whitespace = 0;
-        for token in rustc_lexer::tokenize(self.remaining_source()) {
+        for token in rustc_lexer::tokenize(self.source.remaining()) {
             match token.kind {
-                |TokenKind::LineComment { .. }| TokenKind::BlockComment { .. } => {
+                TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
                     len += token.len as usize;
                     len_without_trailing_whitespace = len;
                 }
-                | TokenKind::Whitespace => {
+                TokenKind::Whitespace => {
                     len += token.len as usize;
                 }
                 _ => break,
@@ -198,7 +174,7 @@ impl<'a> SourceFormatter<'a> {
         if len_without_trailing_whitespace > 0 {
             self.copy(len_without_trailing_whitespace);
         }
-        self.pos = self.pos + BytePos::from_usize(len - len_without_trailing_whitespace);
+        self.source.advance(len - len_without_trailing_whitespace);
         self.next_is_whitespace_or_comments = false;
         len_without_trailing_whitespace > 0
     }
@@ -210,19 +186,26 @@ impl<'a> SourceFormatter<'a> {
     }
 
     fn copy(&mut self, len: usize) {
-        let segment = &self.remaining_source()[..len];
+        let segment = &self.source.remaining()[..len];
         self.out.write_unchecked(segment);
-        self.pos = self.pos + BytePos::from_usize(len);
+        self.source.advance(len);
     }
 
-    pub fn debug_pos(&self) {
-        info!(
-            "{:?}",
-            self.remaining_source().chars().next().unwrap()
-        );
+    /** Write a token assuming it is next in source */
+    fn token_unchecked(&mut self, token: &str) -> FormatResult {
+        self.out
+            .token(&token)
+            .map_err(|e| self.lift_constraint_err(e))?;
+        self.source.advance(token.len());
+        self.next_is_whitespace_or_comments = true;
+        Ok(())
     }
 
-    fn remaining_source(&self) -> &'a str {
-        &self.source[self.pos.to_usize()..]
+    /** Write a token assuming it is missing from source */
+    fn token_missing(&mut self, token: &str) -> FormatResult {
+        self.out
+            .token(&token)
+            .map_err(|e| self.lift_constraint_err(e))?;
+        Ok(())
     }
 }

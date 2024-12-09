@@ -39,6 +39,13 @@ impl<'a> AstFormatter<'a> {
         self.out.constraints()
     }
 
+    fn with_indent(&mut self, f: impl FnOnce(&mut Self) -> FormatResult) -> FormatResult {
+        self.constraints().increment_indent();
+        let result = f(self);
+        self.constraints().decrement_indent();
+        result
+    }
+
     fn with_single_line(&mut self, f: impl FnOnce(&mut Self) -> FormatResult) -> FormatResult {
         let single_line_prev = std::mem::replace(&mut self.constraints().single_line, true);
         let result = f(self);

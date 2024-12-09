@@ -22,6 +22,7 @@ pub mod ast_formatter;
 pub mod constraint_writer;
 mod constraints;
 pub mod source_formatter;
+mod source_reader;
 
 use rustc_data_structures::sync::Lrc;
 use rustc_errors::emitter::{HumanEmitter, stderr_destination};

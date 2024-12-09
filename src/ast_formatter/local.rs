@@ -34,9 +34,10 @@ impl<'a> AstFormatter<'a> {
                 })
             })
             .next("wrap and indent then single line", |this| {
-                this.constraints().increment_indent();
-                this.out.newline_indent()?;
-                this.with_single_line(|this| this.expr(expr))
+                this.with_indent(|this| {
+                    this.out.newline_indent()?;
+                    this.with_single_line(|this| this.expr(expr))
+                })
             })
             .next("normal", |this| {
                 this.out.space()?;
@@ -44,10 +45,11 @@ impl<'a> AstFormatter<'a> {
                 Ok(())
             })
             .next("wrap and indent", |this| {
-                this.constraints().increment_indent();
-                this.out.newline_indent()?;
-                this.expr(expr)?;
-                Ok(())
+                this.with_indent(|this| {
+                    this.out.newline_indent()?;
+                    this.expr(expr)?;
+                    Ok(())
+                })
             })
             .result()?;
         Ok(())
