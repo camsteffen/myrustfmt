@@ -108,5 +108,4 @@ impl<'a> Formatter<'a> {
             .result()?;
         Ok(())
     }
-
 }

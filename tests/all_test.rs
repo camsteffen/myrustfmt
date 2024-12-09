@@ -1,6 +1,6 @@
 #![feature(rustc_private)]
 
-use myrustfmt::formatter::format_str;
+use myrustfmt::format_str;
 use tracing::{info, instrument};
 use tracing_test::traced_test;
 

@@ -1,5 +1,5 @@
-use tracing::info;
 use crate::formatter::{FormatResult, Formatter, FormatterSnapshot};
+use tracing::info;
 
 #[must_use]
 pub struct FallbackChain<'a, 'b> {

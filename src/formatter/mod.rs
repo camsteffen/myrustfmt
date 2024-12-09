@@ -1,6 +1,6 @@
 mod ast;
-mod list;
 mod fallback_chain;
+mod list;
 
 use crate::writer::{Constraint, ConstraintError, ConstraintWriter, WriterSnapshot};
 use rustc_data_structures::sync::Lrc;
@@ -29,14 +29,26 @@ pub struct FormatError {
     pos: BytePos,
 }
 
-struct Formatter<'a> {
+pub struct Formatter<'a> {
     out: ConstraintWriter,
     source: &'a str,
     pos: BytePos,
 }
 
 impl<'a> Formatter<'a> {
-    fn crate_(&mut self, crate_: &rustc_ast::ast::Crate) -> FormatResult {
+    pub fn new(source: &'a str, max_width: usize) -> Formatter<'a> {
+        Formatter {
+            out: ConstraintWriter::new(max_width),
+            source,
+            pos: BytePos(0),
+        }
+    }
+
+    pub fn finish(self) -> String {
+        self.out.finish()
+    }
+
+    pub fn crate_(&mut self, crate_: &rustc_ast::ast::Crate) -> FormatResult {
         for item in &crate_.items {
             self.skip_whitespace_and_comments();
             self.item(item)?;
@@ -149,7 +161,9 @@ impl<'a> Formatter<'a> {
     }
 
     fn space(&mut self) -> FormatResult {
-        self.out.token(" ").map_err(|e| self.lift_constraint_err(e))?;
+        self.out
+            .token(" ")
+            .map_err(|e| self.lift_constraint_err(e))?;
         self.skip_whitespace_and_comments();
         Ok(())
     }
@@ -171,50 +185,4 @@ impl<'a> Formatter<'a> {
     fn no_space(&mut self) {
         self.skip_whitespace_and_comments();
     }
-}
-
-pub fn format_str(source: &str, max_width: usize) -> String {
-    let crate_ = parse_ast(String::from(source));
-    let mut parse_tree = Formatter {
-        // nodes: Vec::new();
-        out: ConstraintWriter::new(max_width),
-        source,
-        pos: BytePos(0),
-    };
-    match parse_tree.crate_(&crate_) {
-        Ok(()) => {}
-        Err(e) => todo!("failed to format: {e:?}"),
-    }
-    parse_tree.out.finish()
-}
-
-fn parse_ast(string: String) -> rustc_ast::ast::Crate {
-    let source_map = Lrc::new(SourceMap::new(FilePathMapping::empty()));
-    let dcx = dcx(source_map.clone());
-    rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
-        let psess = ParseSess::with_dcx(dcx, source_map);
-        let mut parser = rustc_parse::new_parser_from_source_str(
-            &psess,
-            FileName::anon_source_code(&string),
-            string,
-        )
-        .unwrap();
-        parser.parse_crate_mod().unwrap_or_else(|err| {
-            err.emit();
-            panic!("ur done");
-        })
-    })
-}
-
-fn dcx(source_map: Lrc<SourceMap>) -> DiagCtxt {
-    let fallback_bundle = rustc_errors::fallback_fluent_bundle(
-        rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
-        false,
-    );
-    let emitter = Box::new(
-        HumanEmitter::new(stderr_destination(ColorConfig::Auto), fallback_bundle)
-            .sm(Some(source_map)),
-    );
-
-    DiagCtxt::new(emitter)
 }
