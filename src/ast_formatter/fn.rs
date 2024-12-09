@@ -28,7 +28,6 @@ impl<'a> AstFormatter<'a> {
         self.out.token_expect("fn")?;
         self.out.space()?;
         self.ident(item.ident)?;
-        self.out.no_space();
         self.fn_decl(decl)?;
         Ok(())
     }

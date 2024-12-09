@@ -5,12 +5,10 @@ use rustc_span::symbol::Ident;
 
 impl<'a> AstFormatter<'a> {
     pub fn ident(&mut self, ident: Ident) -> FormatResult {
-        let span = ident.span;
-        self.out.token_from_source(span)
+        self.out.token_from_source(ident.span)
     }
 
-    pub fn strlit(&mut self, strlit: &ast::StrLit) {
-        let span = strlit.span;
-        self.out.token_from_source(span);
+    pub fn strlit(&mut self, strlit: &ast::StrLit) -> FormatResult {
+        self.out.token_from_source(strlit.span)
     }
 }

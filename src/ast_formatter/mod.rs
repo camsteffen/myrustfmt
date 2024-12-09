@@ -30,7 +30,6 @@ impl<'a> AstFormatter<'a> {
 
     pub fn crate_(&mut self, crate_: &rustc_ast::ast::Crate) -> FormatResult {
         for item in &crate_.items {
-            self.out.no_space();
             self.item(item)?;
         }
         Ok(())

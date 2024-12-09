@@ -45,12 +45,13 @@ impl ConstraintWriter {
     }
 
     pub fn token(&mut self, token: &str) -> Result<(), TooWideError> {
-        if token.contains('\n') {
-            panic!()
-        }
         self.require_width(token.len())?;
         self.buffer.push_str(token);
         Ok(())
+    }
+    
+    pub fn write_unchecked(&mut self, source: &str) {
+        self.buffer.push_str(source);
     }
 
     pub fn newline(&mut self) -> Result<(), NewlineNotAllowedError> {

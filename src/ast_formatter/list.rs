@@ -41,11 +41,9 @@ impl<'a> AstFormatter<'a> {
         list: &[T],
         format_item: impl Fn(&mut Self, &T) -> FormatResult,
     ) -> FormatResult {
-        let token = kind.starting_brace();
-        self.out.token_expect(token)?;
+        self.out.token_expect(kind.starting_brace())?;
         if list.is_empty() {
-            let token = kind.ending_brace();
-            self.out.token_expect(token)?;
+            self.out.token_expect(kind.ending_brace())?;
             return Ok(());
         }
         self.fallback_chain("list")
@@ -53,16 +51,19 @@ impl<'a> AstFormatter<'a> {
                 let [head, tail @ ..] = list else {
                     unreachable!()
                 };
-                this.out.optional_space(kind.should_pad_contents())?;
+                if kind.should_pad_contents() {
+                    this.out.space()?;
+                }
                 format_item(this, head)?;
                 for item in tail {
                     this.out.token_maybe_missing(",")?;
                     this.out.space()?;
                     format_item(this, item)?;
                 }
-                this.out.optional_space(kind.should_pad_contents())?;
-                let token = kind.ending_brace();
-                this.out.token_expect(token)?;
+                if kind.should_pad_contents() {
+                    this.out.space()?;
+                }
+                this.out.token_expect(kind.ending_brace())?;
                 Ok(())
             })
             .next("wrapping to fit", |this| {
@@ -94,8 +95,7 @@ impl<'a> AstFormatter<'a> {
                 }
                 this.constraints().decrement_indent();
                 this.out.newline_indent()?;
-                let token = kind.ending_brace();
-                this.out.token_expect(token)?;
+                this.out.token_expect(kind.ending_brace())?;
                 Ok(())
             })
             .next("separate lines", |this| {
@@ -103,13 +103,11 @@ impl<'a> AstFormatter<'a> {
                 for item in list {
                     this.out.newline_indent()?;
                     format_item(this, item)?;
-                    this.out.no_space();
                     this.out.token_maybe_missing(",")?;
                 }
                 this.constraints().decrement_indent();
                 this.out.newline_indent()?;
-                let token = kind.ending_brace();
-                this.out.token_expect(token)?;
+                this.out.token_expect(kind.ending_brace())?;
                 Ok(())
             })
             .result()?;
