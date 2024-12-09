@@ -4,15 +4,15 @@ mod list;
 
 use crate::writer::{Constraint, ConstraintError, ConstraintWriter, WriterSnapshot};
 use rustc_data_structures::sync::Lrc;
-use rustc_errors::emitter::{stderr_destination, HumanEmitter};
+use rustc_errors::emitter::{HumanEmitter, stderr_destination};
 use rustc_errors::{ColorConfig, DiagCtxt};
 use rustc_lexer::TokenKind;
 use rustc_session::parse::ParseSess;
 use rustc_span::edition::Edition;
 use rustc_span::symbol::Ident;
 use rustc_span::{
-    source_map::{FilePathMapping, SourceMap},
     BytePos, FileName, Pos, Span,
+    source_map::{FilePathMapping, SourceMap},
 };
 use tracing::info;
 
@@ -116,13 +116,24 @@ impl<'a> Formatter<'a> {
 
     fn token(&mut self, token: &str, pos: BytePos) -> FormatResult {
         assert_eq!(pos, self.pos);
-        self.token_unchecked(token)?;
+        self.token_expect(token)?;
         Ok(())
     }
 
     fn token_with_end(&mut self, token: &str, end_pos: BytePos) -> FormatResult {
         assert_eq!(end_pos - BytePos::from_usize(token.len()), self.pos);
-        self.token_unchecked(token)?;
+        self.token_expect(token)?;
+        Ok(())
+    }
+
+    fn token_expect(&mut self, token: &str) -> FormatResult {
+        if !self.source[self.pos.to_usize()..].starts_with(token) {
+            panic!("expected token not found");
+        }
+        self.out
+            .token(&token)
+            .map_err(|e| self.lift_constraint_err(e))?;
+        self.pos = self.pos + BytePos::from_usize(token.len());
         Ok(())
     }
 
@@ -134,14 +145,40 @@ impl<'a> Formatter<'a> {
         Ok(())
     }
 
+    fn token_missing(&mut self, token: &str) -> FormatResult {
+        self.out
+            .token(&token)
+            .map_err(|e| self.lift_constraint_err(e))?;
+        Ok(())
+    }
+
+    fn token_maybe_missing(&mut self, token: &str) -> FormatResult {
+        if self.source[self.pos.to_usize()..].starts_with(token) {
+            self.token_unchecked(token)
+        } else {
+            self.token_missing(token)
+        }
+    }
+
     fn token_from_source(&mut self, span: Span) -> FormatResult {
         assert_eq!(span.lo(), self.pos);
-        let token = self
+        let token = self.expect_span(span);
+        self.token_expect(token)?;
+        Ok(())
+    }
+    
+    fn expect_span(&self, span: Span) -> &'a str {
+        self
             .source
             .get(span.lo().to_usize()..span.hi().to_usize())
-            .expect("source string should include the span");
-        self.token_unchecked(token)?;
-        Ok(())
+            .expect("source string should include the span")
+    }
+    
+    fn with_reserved_width(&mut self, len: usize, f: impl FnOnce(&mut Self) -> FormatResult) -> FormatResult {
+        self.out.sub_max_width(len).map_err(|e| self.lift_constraint_err(e))?;
+        let result = f(self);
+        self.out.add_max_width(len);
+        result
     }
 
     fn optional_space(&mut self, is_space: bool) -> FormatResult {
@@ -169,7 +206,7 @@ impl<'a> Formatter<'a> {
     }
 
     fn skip_whitespace_and_comments(&mut self) {
-        let len = rustc_lexer::tokenize(&self.source[self.pos.to_usize()..])
+        rustc_lexer::tokenize(&self.source[self.pos.to_usize()..])
             .take_while(|token| {
                 matches!(
                     token.kind,
@@ -177,12 +214,21 @@ impl<'a> Formatter<'a> {
                         | TokenKind::Whitespace
                 )
             })
-            .map(|token| token.len)
-            .sum();
-        self.pos = self.pos + BytePos::from_u32(len);
+            .for_each(|token| {
+                info!("skipping whitespace: {}", token.len);
+                self.pos = self.pos + BytePos::from_u32(token.len);
+            });
     }
 
     fn no_space(&mut self) {
         self.skip_whitespace_and_comments();
+    }
+
+    fn debug_pos(&self) {
+        info!("{:?}", self.source[self.pos.to_usize()..].chars().next().unwrap());
+    }
+    
+    fn debug_span(&self, span: Span) {
+        info!("{:?}", self.expect_span(span))
     }
 }

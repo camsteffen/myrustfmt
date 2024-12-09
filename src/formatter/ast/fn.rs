@@ -21,7 +21,7 @@ impl<'a> Formatter<'a> {
 
     fn fn_sig(&mut self, ast::FnSig { header, decl, span }: &ast::FnSig, item: &ast::Item) {
         self.fn_header(header);
-        self.token_unchecked("fn");
+        self.token_expect("fn");
         self.space();
         self.ident(item.ident);
         self.no_space();
@@ -62,7 +62,7 @@ impl<'a> Formatter<'a> {
         match output {
             ast::FnRetTy::Default(_) => {}
             ast::FnRetTy::Ty(ty) => {
-                self.token_unchecked("->")?;
+                self.token_expect("->")?;
                 self.space()?;
                 self.ty(ty);
                 self.space()?;
@@ -116,7 +116,7 @@ impl<'a> Formatter<'a> {
             }
             ast::CoroutineKind::AsyncGen { span, .. } => {
                 self.token_space("async", span.lo());
-                self.token_unchecked("gen");
+                self.token_expect("gen");
                 self.space();
             }
         }

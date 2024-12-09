@@ -16,13 +16,19 @@ impl<'a> Formatter<'a> {
             self.out.decrement_indent();
             self.newline_indent()?;
         }
-        self.token_unchecked("}")?;
+        self.debug_span(block.span);
+        self.debug_pos();
+        self.token_with_end("}", block.span.hi())?;
         Ok(())
     }
 
     fn stmt(&mut self, stmt: &ast::Stmt) -> FormatResult {
         match &stmt.kind {
-            ast::StmtKind::Let(local) => self.local(local),
+            ast::StmtKind::Let(local) => self.with_reserved_width(";".len(), |this| {
+                this.local(local)?;
+                this.token_expect(";")?;
+                Ok(())
+            }),
             ast::StmtKind::Item(_) => Ok(()),
             ast::StmtKind::Expr(_) => Ok(()),
             ast::StmtKind::Semi(_) => Ok(()),

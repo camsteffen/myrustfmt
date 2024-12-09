@@ -70,6 +70,19 @@ impl ConstraintWriter {
         self.constraints.pop();
     }
 
+    pub fn add_max_width(&mut self, len: usize) {
+        if let Some(max_width) = &mut self.max_width {
+            *max_width += len;
+        }
+    }
+
+    pub fn sub_max_width(&mut self, len: usize) -> Result<(), TooWideError> {
+        if let Some(max_width) = &mut self.max_width {
+            *max_width = max_width.checked_sub(len).ok_or(TooWideError)?;
+        }
+        Ok(())
+    }
+
     pub fn token(&mut self, token: &str) -> Result<(), TooWideError> {
         for constraint in &self.constraints {
             match constraint {

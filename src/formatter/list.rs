@@ -40,9 +40,9 @@ impl<'a> Formatter<'a> {
         list: &[T],
         format_item: impl Fn(&mut Formatter<'a>, &T) -> FormatResult,
     ) -> FormatResult {
-        self.token_unchecked(kind.starting_brace())?;
+        self.token_expect(kind.starting_brace())?;
         if list.is_empty() {
-            self.token_unchecked(kind.ending_brace())?;
+            self.token_expect(kind.ending_brace())?;
             return Ok(());
         }
         self.fallback_chain("list")
@@ -53,12 +53,12 @@ impl<'a> Formatter<'a> {
                 this.optional_space(kind.should_pad_contents())?;
                 format_item(this, head)?;
                 for item in tail {
-                    this.token_unchecked(",")?;
+                    this.token_maybe_missing(",")?;
                     this.space()?;
                     format_item(this, item)?;
                 }
                 this.optional_space(kind.should_pad_contents())?;
-                this.token_unchecked(kind.ending_brace())?;
+                this.token_expect(kind.ending_brace())?;
                 Ok(())
             })
             .next("wrapping to fit", |this| {
@@ -71,26 +71,26 @@ impl<'a> Formatter<'a> {
                     unreachable!()
                 };
                 format_item(this, head)?;
-                this.token_unchecked(",")?;
+                this.token_maybe_missing(",")?;
                 for item in tail {
                     this.fallback_chain("list item")
                         .next("same line", |this| {
                             this.space()?;
                             format_item(this, item)?;
-                            this.token_unchecked(",")?;
+                            this.token_maybe_missing(",")?;
                             Ok(())
                         })
                         .next("wrap", |this| {
                             this.newline_indent()?;
                             format_item(this, item)?;
-                            this.token_unchecked(",")?;
+                            this.token_maybe_missing(",")?;
                             Ok(())
                         })
                         .result()?;
                 }
                 this.out.decrement_indent();
                 this.newline_indent()?;
-                this.token_unchecked(kind.ending_brace())?;
+                this.token_expect(kind.ending_brace())?;
                 Ok(())
             })
             .next("separate lines", |this| {
@@ -98,11 +98,12 @@ impl<'a> Formatter<'a> {
                 for item in list {
                     this.newline_indent()?;
                     format_item(this, item)?;
-                    this.token_unchecked(",")?;
+                    this.no_space();
+                    this.token_maybe_missing(",")?;
                 }
                 this.out.decrement_indent();
                 this.newline_indent()?;
-                this.token_unchecked(kind.ending_brace())?;
+                this.token_expect(kind.ending_brace())?;
                 Ok(())
             })
             .result()?;

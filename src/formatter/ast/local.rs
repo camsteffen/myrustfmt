@@ -17,19 +17,17 @@ impl<'a> Formatter<'a> {
         match kind {
             ast::LocalKind::Decl => {
                 self.no_space();
-                self.token_unchecked(";")?;
+                self.token_expect(";")?;
                 Ok(())
             }
             ast::LocalKind::Init(expr) => {
                 self.space()?;
-                self.token_unchecked("=")?;
+                self.token_expect("=")?;
                 self.fallback_chain("local init")
                     .next("same line and no breaks", |this| {
                         this.with_no_breaks(|this| {
                             this.space()?;
                             this.expr(expr)?;
-                            this.no_space();
-                            this.token_unchecked(";")?;
                             Ok(())
                         })
                     })
@@ -39,7 +37,7 @@ impl<'a> Formatter<'a> {
                         this.with_no_breaks(|this| {
                             this.expr(expr)?;
                             this.no_space();
-                            this.token_unchecked(";")?;
+                            this.token_expect(";")?;
                             Ok(())
                         })
                     })
@@ -47,15 +45,13 @@ impl<'a> Formatter<'a> {
                         this.space()?;
                         this.expr(expr)?;
                         this.no_space();
-                        this.token_unchecked(";")?;
+                        this.token_expect(";")?;
                         Ok(())
                     })
                     .next("wrap and indent", |this| {
                         this.out.increment_indent();
                         this.newline_indent()?;
                         this.expr(expr)?;
-                        this.no_space();
-                        this.token_unchecked(";")?;
                         Ok(())
                     })
                     .result()?;
