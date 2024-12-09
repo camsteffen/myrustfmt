@@ -208,7 +208,7 @@ impl<'a> SourceFormatter<'a> {
             self.handle_whitespace_and_comments();
         }
     }
-    
+
     fn copy(&mut self, len: usize) {
         let segment = &self.remaining_source()[..len];
         self.out.write_unchecked(segment);
@@ -221,7 +221,7 @@ impl<'a> SourceFormatter<'a> {
             self.remaining_source().chars().next().unwrap()
         );
     }
-    
+
     fn remaining_source(&self) -> &'a str {
         &self.source[self.pos.to_usize()..]
     }
