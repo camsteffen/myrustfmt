@@ -1,8 +1,8 @@
+use crate::ast_formatter::AstFormatter;
+use crate::source_formatter::{FormatResult, SourceFormatter};
 use rustc_ast::ast;
 
-use crate::formatter::{FormatResult, Formatter};
-
-impl<'a> Formatter<'a> {
+impl<'a> AstFormatter<'a> {
     pub fn item(&mut self, item: &ast::Item) -> FormatResult {
         match &item.kind {
             ast::ItemKind::ExternCrate(_) => todo!(),

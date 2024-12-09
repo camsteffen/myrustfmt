@@ -18,31 +18,37 @@ extern crate thin_vec;
 #[allow(unused_extern_crates)]
 extern crate rustc_driver;
 
-pub mod formatter;
-pub mod writer;
+pub mod ast_formatter;
+pub mod constraint_writer;
+mod constraints;
+pub mod source_formatter;
 
 use rustc_data_structures::sync::Lrc;
-use rustc_errors::emitter::{stderr_destination, HumanEmitter};
+use rustc_errors::emitter::{HumanEmitter, stderr_destination};
 use rustc_errors::{ColorConfig, DiagCtxt};
 use rustc_lexer::TokenKind;
 use rustc_session::parse::ParseSess;
 use rustc_span::edition::Edition;
 use rustc_span::symbol::Ident;
 use rustc_span::{
-    source_map::{FilePathMapping, SourceMap},
     BytePos, FileName, Pos, Span,
+    source_map::{FilePathMapping, SourceMap},
 };
 
-use formatter::Formatter;
+use crate::ast_formatter::AstFormatter;
+use crate::constraints::Constraints;
+use source_formatter::SourceFormatter;
 
 pub fn format_str(source: &str, max_width: usize) -> String {
     let crate_ = parse_ast(String::from(source));
-    let mut parse_tree = Formatter::new(source, max_width);
-    match parse_tree.crate_(&crate_) {
+    let constraints = Constraints::new(max_width);
+    let source_formatter = SourceFormatter::new(source, constraints);
+    let mut ast_formatter = AstFormatter::new(source_formatter);
+    match ast_formatter.crate_(&crate_) {
         Ok(()) => {}
         Err(e) => todo!("failed to format: {e:?}"),
     }
-    parse_tree.finish()
+    ast_formatter.finish()
 }
 
 fn parse_ast(string: String) -> rustc_ast::ast::Crate {

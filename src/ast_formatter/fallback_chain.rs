@@ -1,11 +1,12 @@
-use crate::formatter::{FormatResult, Formatter, FormatterSnapshot};
+use crate::ast_formatter::AstFormatter;
+use crate::source_formatter::{FormatResult, SourceFormatter, SourceFormatterSnapshot};
 use tracing::info;
 
 #[must_use]
 pub struct FallbackChain<'a, 'b> {
     debug_name: &'static str,
-    out: &'b mut Formatter<'a>,
-    snapshot: FormatterSnapshot,
+    out: &'b mut AstFormatter<'a>,
+    snapshot: SourceFormatterSnapshot,
     result: Option<FormatResult>,
 }
 
@@ -13,7 +14,7 @@ impl<'a> FallbackChain<'a, '_> {
     pub fn next(
         mut self,
         debug_name: &'static str,
-        f: impl FnOnce(&mut Formatter<'a>) -> FormatResult,
+        f: impl FnOnce(&mut AstFormatter<'a>) -> FormatResult,
     ) -> Self {
         if matches!(self.result, None | Some(Err(_))) {
             let result = f(self.out);
@@ -22,7 +23,7 @@ impl<'a> FallbackChain<'a, '_> {
                 Err(e) => info!("{}: {} failed: {e:?}", self.debug_name, debug_name),
             }
             if let Err(_) = result {
-                self.out.restore(&self.snapshot);
+                self.out.out.restore(&self.snapshot);
             }
             self.result = Some(result);
         }
@@ -34,9 +35,9 @@ impl<'a> FallbackChain<'a, '_> {
     }
 }
 
-impl<'a> Formatter<'a> {
+impl<'a> AstFormatter<'a> {
     pub fn fallback_chain(&mut self, debug_name: &'static str) -> FallbackChain<'a, '_> {
-        let snapshot = self.snapshot();
+        let snapshot = self.out.snapshot();
         FallbackChain {
             debug_name,
             out: self,

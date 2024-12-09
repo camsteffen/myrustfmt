@@ -4,6 +4,7 @@ use myrustfmt::format_str;
 use tracing::{info, instrument};
 use tracing_test::traced_test;
 
+#[traced_test]
 #[test]
 fn long_list_of_short_items() {
     let source =

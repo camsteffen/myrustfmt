@@ -1,8 +1,8 @@
+use crate::ast_formatter::AstFormatter;
+use crate::source_formatter::{FormatResult, SourceFormatter};
 use rustc_ast::ast;
 
-use crate::formatter::{FormatResult, Formatter};
-
-impl<'a> Formatter<'a> {
+impl<'a> AstFormatter<'a> {
     pub fn pat(&mut self, pat: &ast::Pat) -> FormatResult {
         match pat.kind {
             ast::PatKind::Wild => todo!(),
