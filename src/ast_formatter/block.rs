@@ -6,12 +6,13 @@ impl<'a> AstFormatter<'a> {
     pub fn block(&mut self, block: &ast::Block) -> FormatResult {
         self.out.token_at("{", block.span.lo())?;
         if !block.stmts.is_empty() {
-            self.constraints().increment_indent();
-            for stmt in &block.stmts {
-                self.out.newline_indent()?;
-                self.stmt(stmt)?;
-            }
-            self.constraints().decrement_indent();
+            self.with_indent(|this| {
+                for stmt in &block.stmts {
+                    this.out.newline_indent()?;
+                    this.stmt(stmt)?;
+                }
+                Ok(())
+            })?;
             self.out.newline_indent()?;
         }
         self.out.token_end_at("}", block.span.hi())?;
