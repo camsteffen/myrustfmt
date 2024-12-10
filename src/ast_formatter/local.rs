@@ -1,14 +1,14 @@
 use crate::ast_formatter::AstFormatter;
-use crate::source_formatter::{FormatResult, SourceFormatter};
+use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter<'a> {
     pub fn local(&mut self, local: &ast::Local) -> FormatResult {
         let ast::Local {
             pat,
-            ty,
+            
             kind,
-            attrs,
+            
             span,
             ..
         } = local;

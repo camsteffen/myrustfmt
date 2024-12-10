@@ -1,20 +1,12 @@
 use crate::constraint_writer::{
-    ConstraintError, ConstraintWriter, NewlineNotAllowedError, TooWideError, WriterSnapshot,
+    ConstraintError, ConstraintWriter, WriterSnapshot,
 };
 use crate::constraints::Constraints;
 use crate::source_reader::SourceReader;
-use rustc_data_structures::sync::Lrc;
-use rustc_errors::emitter::{HumanEmitter, stderr_destination};
-use rustc_errors::{ColorConfig, DiagCtxt};
 use rustc_lexer::TokenKind;
-use rustc_session::parse::ParseSess;
-use rustc_span::edition::Edition;
-use rustc_span::symbol::Ident;
 use rustc_span::{
-    BytePos, FileName, Pos, Span,
-    source_map::{FilePathMapping, SourceMap},
+    BytePos, Span,
 };
-use tracing::info;
 
 pub struct SourceFormatterSnapshot {
     writer_snapshot: WriterSnapshot,

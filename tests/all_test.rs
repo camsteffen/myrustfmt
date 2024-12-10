@@ -1,7 +1,6 @@
 #![feature(rustc_private)]
 
 use myrustfmt::format_str;
-use tracing::{info, instrument};
 use tracing_test::traced_test;
 
 #[traced_test]
@@ -100,6 +99,37 @@ fn assign_wrap() {
 fn main() {
     let asdfasdf =
         [aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa];
+}"
+        .trim()
+    );
+}
+
+#[test]
+fn short_struct_pat_single_line() {
+    assert_eq!(
+        format_str("fn test() { let Struct { a, b, c: ccccccccc } = foo; }", 80),
+        "
+fn test() {
+    let Struct { a, b, c: ccccccccc } = foo;
+}"
+        .trim()
+    );
+}
+
+#[test]
+fn long_struct_pat_multiple_lines() {
+    assert_eq!(
+        format_str(
+            "fn test() { let Struct { a, b, c: cccccccccc } = foo; }",
+            80
+        ),
+        "
+fn test() {
+    let Struct {
+        a,
+        b,
+        c: cccccccccc,
+    } = foo;
 }"
         .trim()
     );

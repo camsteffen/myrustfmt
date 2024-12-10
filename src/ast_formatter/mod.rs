@@ -1,8 +1,5 @@
-use crate::constraint_writer::ConstraintError;
 use crate::constraints::Constraints;
-use crate::source_formatter::{FormatResult, SourceFormatter, SourceFormatterSnapshot};
-use rustc_span::{BytePos, Span};
-use tracing::info;
+use crate::source_formatter::{FormatResult, SourceFormatter};
 
 mod block;
 mod common;
@@ -14,6 +11,7 @@ pub mod list;
 mod local;
 mod pat;
 mod ty;
+mod qpath;
 
 pub struct AstFormatter<'a> {
     out: SourceFormatter<'a>,
@@ -71,7 +69,10 @@ impl<'a> AstFormatter<'a> {
         width_limit: usize,
         f: impl FnOnce(&mut Self) -> FormatResult,
     ) -> FormatResult {
-        let max_width = self.out.last_line_width() + width_limit;
+        let mut max_width = self.out.last_line_width() + width_limit;
+        if let Some(current_max_width) = self.constraints().max_width {
+            max_width = max_width.min(current_max_width);
+        }
         let max_width_prev = std::mem::replace(&mut self.constraints().max_width, Some(max_width));
         let result = self.with_single_line(f);
         self.constraints().max_width = max_width_prev;

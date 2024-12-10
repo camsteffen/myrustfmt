@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::source_formatter::{FormatResult, SourceFormatter};
+use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 use rustc_span::symbol::Ident;
 

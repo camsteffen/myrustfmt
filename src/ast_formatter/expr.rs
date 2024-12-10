@@ -1,13 +1,13 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::ListKind;
-use crate::source_formatter::{FormatResult, SourceFormatter};
+use crate::ast_formatter::list::ArrayListConfig;
+use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter<'a> {
     pub fn expr(&mut self, expr: &ast::Expr) -> FormatResult {
         match expr.kind {
             ast::ExprKind::Array(ref items) => {
-                self.list(ListKind::SquareBraces, items, |this, e| this.expr(e))
+                self.list(items, |this, e| this.expr(e), ArrayListConfig)
             }
             ast::ExprKind::ConstBlock(_) => todo!(),
             ast::ExprKind::Call(_, _) => todo!(),
@@ -35,7 +35,7 @@ impl<'a> AstFormatter<'a> {
             ast::ExprKind::Index(_, _, _) => todo!(),
             ast::ExprKind::Range(_, _, _) => todo!(),
             ast::ExprKind::Underscore => todo!(),
-            ast::ExprKind::Path(ref qself, ref path) => self.path(path),
+            ast::ExprKind::Path(ref qself, ref path) => self.qpath(qself, path),
             ast::ExprKind::AddrOf(_, _, _) => todo!(),
             ast::ExprKind::Break(_, _) => todo!(),
             ast::ExprKind::Continue(_) => todo!(),
@@ -55,20 +55,5 @@ impl<'a> AstFormatter<'a> {
             ast::ExprKind::Err(_) => todo!(),
             ast::ExprKind::Dummy => todo!(),
         }
-    }
-
-    fn path(&mut self, path: &ast::Path) -> FormatResult {
-        for segment in &path.segments {
-            self.path_segment(segment)?;
-        }
-        Ok(())
-    }
-
-    fn path_segment(&mut self, segment: &ast::PathSegment) -> FormatResult {
-        self.ident(segment.ident)?;
-        if let Some(args) = &segment.args {
-            todo!();
-        }
-        Ok(())
     }
 }

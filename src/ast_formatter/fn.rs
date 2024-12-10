@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::ListKind;
-use crate::source_formatter::{FormatResult, SourceFormatter};
+use crate::ast_formatter::list::ParamListConfig;
+use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter<'a> {
@@ -51,9 +51,7 @@ impl<'a> AstFormatter<'a> {
     }
 
     fn fn_decl(&mut self, ast::FnDecl { inputs, output }: &ast::FnDecl) -> FormatResult {
-        self.list(ListKind::Parethesis, inputs, |this, param| {
-            this.param(param)
-        })?;
+        self.list(inputs, |this, param| this.param(param), ParamListConfig)?;
         self.out.space()?;
         self.fn_ret_ty(output)?;
         Ok(())

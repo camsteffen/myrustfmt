@@ -27,12 +27,10 @@ mod source_reader;
 use rustc_data_structures::sync::Lrc;
 use rustc_errors::emitter::{HumanEmitter, stderr_destination};
 use rustc_errors::{ColorConfig, DiagCtxt};
-use rustc_lexer::TokenKind;
 use rustc_session::parse::ParseSess;
 use rustc_span::edition::Edition;
-use rustc_span::symbol::Ident;
 use rustc_span::{
-    BytePos, FileName, Pos, Span,
+    FileName,
     source_map::{FilePathMapping, SourceMap},
 };
 

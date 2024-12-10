@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::source_formatter::{FormatResult, SourceFormatter, SourceFormatterSnapshot};
+use crate::source_formatter::{FormatResult, SourceFormatterSnapshot};
 use tracing::info;
 
 #[must_use]

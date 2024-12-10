@@ -18,7 +18,9 @@ impl<'a> SourceReader<'a> {
     }
 
     pub fn expect_pos(&self, pos: BytePos) {
-        assert_eq!(pos, self.pos)
+        if pos != self.pos {
+            panic!("Expected position {} to be {}. Next char is {:?}.", self.pos.to_u32(), pos.to_u32(), self.remaining().chars().next().unwrap_or('\0'));
+        }
     }
 
     pub fn remaining(&self) -> &'a str {
