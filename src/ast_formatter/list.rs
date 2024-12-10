@@ -105,30 +105,31 @@ impl<'a> AstFormatter<'a> {
         let format_item = |this: &mut Self, item: &T| {
             this.with_width_limit_single_line(10, |this| format_item(this, item))
         };
-        self.constraints().increment_indent();
-        self.out.newline_indent()?;
-        let [head, tail @ ..] = list else {
-            unreachable!()
-        };
-        format_item(self, head)?;
-        self.out.token_maybe_missing(",")?;
-        for item in tail {
-            self.fallback_chain("list item")
-                .next("same line", |this| {
-                    this.out.space()?;
-                    format_item(this, item)?;
-                    this.out.token_maybe_missing(",")?;
-                    Ok(())
-                })
-                .next("wrap", |this| {
-                    this.out.newline_indent()?;
-                    format_item(this, item)?;
-                    this.out.token_maybe_missing(",")?;
-                    Ok(())
-                })
-                .result()?;
-        }
-        self.constraints().decrement_indent();
+        self.with_indent(|this| {
+            this.out.newline_indent()?;
+            let [head, tail @ ..] = list else {
+                unreachable!()
+            };
+            format_item(this, head)?;
+            this.out.token_maybe_missing(",")?;
+            for item in tail {
+                this.fallback_chain("list item")
+                    .next("same line", |this| {
+                        this.out.space()?;
+                        format_item(this, item)?;
+                        this.out.token_maybe_missing(",")?;
+                        Ok(())
+                    })
+                    .next("wrap", |this| {
+                        this.out.newline_indent()?;
+                        format_item(this, item)?;
+                        this.out.token_maybe_missing(",")?;
+                        Ok(())
+                    })
+                    .result()?;
+            }
+            Ok(())
+        })?;
         self.out.newline_indent()?;
         self.out.token_expect(C::END_BRACE)?;
         Ok(())
