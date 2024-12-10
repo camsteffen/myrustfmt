@@ -53,8 +53,8 @@ impl<'a> AstFormatter<'a> {
             .next("single line", |this| {
                 this.list_single_line(list, &format_item, &config)
             })
-            .next("wrapping to fit", |this| {
-                this.list_wrapping_to_fit(list, &format_item, &config)
+            .next("wrap to fit", |this| {
+                this.list_wrap_to_fit(list, &format_item, &config)
             })
             .next("separate lines", |this| {
                 this.list_separate_lines(list, &format_item, &config)
@@ -96,7 +96,7 @@ impl<'a> AstFormatter<'a> {
         Ok(())
     }
 
-    fn list_wrapping_to_fit<T, C: ListConfig>(
+    fn list_wrap_to_fit<T, C: ListConfig>(
         &mut self,
         list: &[T],
         format_item: impl Fn(&mut Self, &T) -> FormatResult,
