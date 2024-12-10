@@ -5,6 +5,7 @@ pub trait ListConfig {
     const START_BRACE: &'static str;
     const END_BRACE: &'static str;
     const PAD_CONTENTS: bool;
+    const ALLOW_WRAP_TO_FIT: bool;
 
     fn max_single_line_contents_width(&self) -> Option<usize> {
         None
@@ -19,18 +20,21 @@ impl ListConfig for ArrayListConfig {
     const START_BRACE: &'static str = "[";
     const END_BRACE: &'static str = "]";
     const PAD_CONTENTS: bool = false;
+    const ALLOW_WRAP_TO_FIT: bool = true;
 }
 
 impl ListConfig for ParamListConfig {
     const START_BRACE: &'static str = "(";
     const END_BRACE: &'static str = ")";
     const PAD_CONTENTS: bool = false;
+    const ALLOW_WRAP_TO_FIT: bool = false;
 }
 
 impl ListConfig for StructListConfig {
     const START_BRACE: &'static str = "{";
     const END_BRACE: &'static str = "}";
     const PAD_CONTENTS: bool = true;
+    const ALLOW_WRAP_TO_FIT: bool = false;
 
     fn max_single_line_contents_width(&self) -> Option<usize> {
         Some(18)
@@ -49,13 +53,15 @@ impl<'a> AstFormatter<'a> {
             self.out.token_expect(C::END_BRACE)?;
             return Ok(());
         }
-        self.fallback_chain("list")
-            .next("single line", |this| {
-                this.list_single_line(list, &format_item, &config)
-            })
-            .next("wrap to fit", |this| {
+        let mut fallback = self.fallback_chain("list").next("single line", |this| {
+            this.list_single_line(list, &format_item, &config)
+        });
+        if C::ALLOW_WRAP_TO_FIT {
+            fallback = fallback.next("wrap to fit", |this| {
                 this.list_wrap_to_fit(list, &format_item, &config)
-            })
+            });
+        }
+        fallback
             .next("separate lines", |this| {
                 this.list_separate_lines(list, &format_item, &config)
             })
