@@ -3,12 +3,10 @@ use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter<'a> {
-    pub fn local(&mut self, local: &ast::Local) -> FormatResult {
+    pub fn local(&mut self, local: &ast::Local, finally: impl Fn(&mut Self) -> FormatResult) -> FormatResult {
         let ast::Local {
             pat,
-            
             kind,
-            
             span,
             ..
         } = local;
@@ -16,13 +14,13 @@ impl<'a> AstFormatter<'a> {
         self.out.token_at_space("let", pos)?;
         self.pat(pat)?;
         match kind {
-            ast::LocalKind::Decl => Ok(()),
-            ast::LocalKind::Init(expr) => self.local_init(expr),
+            ast::LocalKind::Decl => finally(self),
+            ast::LocalKind::Init(expr) => self.local_init(expr, finally),
             ast::LocalKind::InitElse(_, _) => todo!(),
         }
     }
 
-    fn local_init(&mut self, expr: &ast::Expr) -> FormatResult {
+    fn local_init(&mut self, expr: &ast::Expr, finally: impl Fn(&mut Self) -> FormatResult) -> FormatResult {
         self.out.space()?;
         self.out.token_expect("=")?;
         self.fallback_chain("local init")
@@ -51,7 +49,8 @@ impl<'a> AstFormatter<'a> {
                     Ok(())
                 })
             })
-            .result()?;
+            .finally(finally)
+            .execute(self)?;
         Ok(())
     }
 }

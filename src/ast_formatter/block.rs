@@ -22,8 +22,7 @@ impl<'a> AstFormatter<'a> {
     fn stmt(&mut self, stmt: &ast::Stmt) -> FormatResult {
         match &stmt.kind {
             ast::StmtKind::Let(local) => {
-                self.with_reserved_width(";".len(), |this| this.local(local))?;
-                self.out.token_expect(";")?;
+                self.local(local, |this| this.out.token_expect(";"))?;
                 Ok(())
             }
             ast::StmtKind::Item(_) => todo!(),

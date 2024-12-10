@@ -5,11 +5,17 @@ pub trait ListConfig {
     const START_BRACE: &'static str;
     const END_BRACE: &'static str;
     const PAD_CONTENTS: bool;
-    const ALLOW_WRAP_TO_FIT: bool;
 
-    fn max_single_line_contents_width(&self) -> Option<usize> {
+    fn single_line_max_contents_width() -> Option<usize> {
         None
     }
+
+    fn wrap_to_fit() -> ListWrapToFitConfig;
+}
+
+enum ListWrapToFitConfig {
+    No,
+    Yes { max_element_width: usize },
 }
 
 pub struct ArrayListConfig;
@@ -20,24 +26,42 @@ impl ListConfig for ArrayListConfig {
     const START_BRACE: &'static str = "[";
     const END_BRACE: &'static str = "]";
     const PAD_CONTENTS: bool = false;
-    const ALLOW_WRAP_TO_FIT: bool = true;
+
+    fn single_line_max_contents_width() -> Option<usize> {
+        // array_width in rustfmt
+        Some(60)
+    }
+
+    fn wrap_to_fit() -> ListWrapToFitConfig {
+        // short_array_element_width_threshold in rustfmt
+        ListWrapToFitConfig::Yes {
+            max_element_width: 10,
+        }
+    }
 }
 
 impl ListConfig for ParamListConfig {
     const START_BRACE: &'static str = "(";
     const END_BRACE: &'static str = ")";
     const PAD_CONTENTS: bool = false;
-    const ALLOW_WRAP_TO_FIT: bool = false;
+
+    fn wrap_to_fit() -> ListWrapToFitConfig {
+        ListWrapToFitConfig::No
+    }
 }
 
 impl ListConfig for StructListConfig {
     const START_BRACE: &'static str = "{";
     const END_BRACE: &'static str = "}";
     const PAD_CONTENTS: bool = true;
-    const ALLOW_WRAP_TO_FIT: bool = false;
 
-    fn max_single_line_contents_width(&self) -> Option<usize> {
+    fn single_line_max_contents_width() -> Option<usize> {
+        // struct_lit_width in rustfmt
         Some(18)
+    }
+
+    fn wrap_to_fit() -> ListWrapToFitConfig {
+        ListWrapToFitConfig::No
     }
 }
 
@@ -45,7 +69,7 @@ impl<'a> AstFormatter<'a> {
     pub fn list<T, C: ListConfig>(
         &mut self,
         list: &[T],
-        format_item: impl Fn(&mut Self, &T) -> FormatResult,
+        format_item: impl Fn(&mut Self, &T) -> FormatResult + Copy,
         config: C,
     ) -> FormatResult {
         self.out.token_expect(C::START_BRACE)?;
@@ -56,16 +80,20 @@ impl<'a> AstFormatter<'a> {
         let mut fallback = self.fallback_chain("list").next("single line", |this| {
             this.list_single_line(list, &format_item, &config)
         });
-        if C::ALLOW_WRAP_TO_FIT {
-            fallback = fallback.next("wrap to fit", |this| {
-                this.list_wrap_to_fit(list, &format_item, &config)
-            });
+        match C::wrap_to_fit() {
+            ListWrapToFitConfig::Yes { max_element_width } => {
+                fallback = fallback.next("wrap to fit", move |this| {
+                    this.list_wrap_to_fit(list, &format_item, max_element_width)
+                });
+            }
+            ListWrapToFitConfig::No => {}
         }
         fallback
             .next("separate lines", |this| {
                 this.list_separate_lines(list, &format_item, &config)
             })
-            .result()?;
+            .finally(|this| this.out.token_expect(C::END_BRACE))
+            .execute(self)?;
         Ok(())
     }
 
@@ -73,7 +101,7 @@ impl<'a> AstFormatter<'a> {
         &mut self,
         list: &[T],
         format_item: &impl Fn(&mut Self, &T) -> FormatResult,
-        config: &C,
+        _config: &C,
     ) -> FormatResult {
         if C::PAD_CONTENTS {
             self.out.space()?;
@@ -90,7 +118,7 @@ impl<'a> AstFormatter<'a> {
             }
             Ok(())
         };
-        if let Some(max_width) = config.max_single_line_contents_width() {
+        if let Some(max_width) = C::single_line_max_contents_width() {
             self.with_width_limit_single_line(max_width, |this| contents(this))?;
         } else {
             contents(self)?;
@@ -98,18 +126,17 @@ impl<'a> AstFormatter<'a> {
         if C::PAD_CONTENTS {
             self.out.space()?;
         }
-        self.out.token_expect(C::END_BRACE)?;
         Ok(())
     }
 
-    fn list_wrap_to_fit<T, C: ListConfig>(
+    fn list_wrap_to_fit<T>(
         &mut self,
         list: &[T],
         format_item: impl Fn(&mut Self, &T) -> FormatResult,
-        config: &C,
+        max_element_width: usize,
     ) -> FormatResult {
         let format_item = |this: &mut Self, item: &T| {
-            this.with_width_limit_single_line(10, |this| format_item(this, item))
+            this.with_width_limit_single_line(max_element_width, |this| format_item(this, item))
         };
         self.with_indent(|this| {
             this.out.newline_indent()?;
@@ -120,24 +147,18 @@ impl<'a> AstFormatter<'a> {
             this.out.token_maybe_missing(",")?;
             for item in tail {
                 this.fallback_chain("list item")
-                    .next("same line", |this| {
-                        this.out.space()?;
+                    .next("same line", |this| this.out.space())
+                    .next("wrap", |this| this.out.newline_indent())
+                    .finally(|this| {
                         format_item(this, item)?;
                         this.out.token_maybe_missing(",")?;
                         Ok(())
                     })
-                    .next("wrap", |this| {
-                        this.out.newline_indent()?;
-                        format_item(this, item)?;
-                        this.out.token_maybe_missing(",")?;
-                        Ok(())
-                    })
-                    .result()?;
+                    .execute(this)?;
             }
             Ok(())
         })?;
         self.out.newline_indent()?;
-        self.out.token_expect(C::END_BRACE)?;
         Ok(())
     }
 
@@ -145,7 +166,7 @@ impl<'a> AstFormatter<'a> {
         &mut self,
         list: &[T],
         format_item: impl Fn(&mut Self, &T) -> FormatResult,
-        config: &C,
+        _config: &C,
     ) -> FormatResult {
         self.with_indent(|this| {
             for item in list {
@@ -156,7 +177,6 @@ impl<'a> AstFormatter<'a> {
             Ok(())
         })?;
         self.out.newline_indent()?;
-        self.out.token_expect(C::END_BRACE)?;
         Ok(())
     }
 }

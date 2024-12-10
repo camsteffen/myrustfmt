@@ -73,7 +73,7 @@ fn assign_wrap_long_list() {
     let source =
         "fn main() {let asdfasdfasdfasf=[aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa];}";
     assert_eq!(
-        format_str(source, 26),
+        format_str(source, 25),
         "
 fn main() {
     let asdfasdfasdfasf =
