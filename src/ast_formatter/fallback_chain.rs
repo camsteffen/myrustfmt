@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
+use crate::constraint_writer::ConstraintError;
 use crate::source_formatter::{FormatResult, SourceFormatterSnapshot};
 use tracing::info;
-
 /*
 #[must_use]
 pub struct FallbackChain<'a, 'b, T> {
@@ -86,7 +86,9 @@ impl<'a, F: Fn(&mut AstFormatter<'a>) -> FormatResult> FallbackChain<'a, '_, F> 
             return;
         }
         let result = f(self.ast_formatter).and_then(|()| (self.finally)(self.ast_formatter));
-        if result.is_err() {
+        if let Err(e) = result {
+            // if it's not a constraint error, prolly should abort
+            let _: ConstraintError = e.kind;
             self.ast_formatter.out.restore(&self.snapshot);
         }
         self.result = Some(result);

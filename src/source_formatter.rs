@@ -15,8 +15,8 @@ pub type FormatResult = Result<(), FormatError>;
 
 #[derive(Clone, Copy, Debug)]
 pub struct FormatError {
-    kind: ConstraintError,
-    pos: BytePos,
+    pub kind: ConstraintError,
+    pub pos: BytePos,
 }
 
 pub struct SourceFormatter<'a> {
