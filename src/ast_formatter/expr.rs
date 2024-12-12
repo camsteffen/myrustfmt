@@ -7,20 +7,20 @@ use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
 impl<'a> AstFormatter<'a> {
-    pub fn expr(&mut self, expr: &ast::Expr, end: Tail) -> FormatResult {
+    pub fn expr(&mut self, expr: &ast::Expr, tail: Tail) -> FormatResult {
         match expr.kind {
             ast::ExprKind::Array(ref items) => {
-                self.list(items, |this, e| this.expr(e, Tail::None), ArrayListConfig, end)
+                self.list(items, |this, e| this.expr(e, Tail::None), ArrayListConfig, tail)
             }
             ast::ExprKind::ConstBlock(_) => todo!(),
-            ast::ExprKind::Call(ref func, ref args) => self.call(func, args, end),
-            ast::ExprKind::MethodCall(ref method_call) => self.method_call(method_call, end),
+            ast::ExprKind::Call(ref func, ref args) => self.call(func, args, tail),
+            ast::ExprKind::MethodCall(ref method_call) => self.method_call(method_call, tail),
             ast::ExprKind::Tup(_) => todo!(),
             ast::ExprKind::Binary(_, _, _) => todo!(),
             ast::ExprKind::Unary(_, _) => todo!(),
             ast::ExprKind::Lit(_) => {
                 self.out.copy_span(expr.span);
-                self.tail(end)
+                self.tail(tail)
             },
             ast::ExprKind::Cast(_, _) => todo!(),
             ast::ExprKind::Type(_, _) => todo!(),
@@ -30,16 +30,16 @@ impl<'a> AstFormatter<'a> {
             ast::ExprKind::ForLoop { .. } => todo!(),
             ast::ExprKind::Loop(_, _, _) => todo!(),
             ast::ExprKind::Match(ref scrutinee, ref arms, ast::MatchKind::Prefix) => {
-                self.match_(scrutinee, arms, expr, end)
+                self.match_(scrutinee, arms, expr, tail)
             }
             ast::ExprKind::Match(_, _, ast::MatchKind::Postfix) => todo!(),
-            ast::ExprKind::Closure(ref closure) => self.closure(closure, end),
+            ast::ExprKind::Closure(ref closure) => self.closure(closure, tail),
             ast::ExprKind::Block(ref block, label) => {
                 if let Some(label) = label {
                     self.ident(label.ident)?;
                     self.out.space()?;
                 }
-                self.block(block, end)
+                self.block(block, tail)
             }
             ast::ExprKind::Gen(_, _, _, _) => todo!(),
             ast::ExprKind::Await(_, _) => todo!(),
@@ -50,21 +50,21 @@ impl<'a> AstFormatter<'a> {
                 self.expr(expr, Tail::None)?;
                 self.out.token_expect(".")?;
                 self.ident(ident)?;
-                self.tail(end)
+                self.tail(tail)
             }
             ast::ExprKind::Index(_, _, _) => todo!(),
             ast::ExprKind::Range(_, _, _) => todo!(),
             ast::ExprKind::Underscore => todo!(),
-            ast::ExprKind::Path(ref qself, ref path) => self.qpath_end(qself, path, end),
+            ast::ExprKind::Path(ref qself, ref path) => self.qpath_end(qself, path, tail),
             ast::ExprKind::AddrOf(borrow_kind, mutability, ref target) => {
-                self.addr_of(borrow_kind, mutability, target, expr, end)
+                self.addr_of(borrow_kind, mutability, target, expr, tail)
             }
             ast::ExprKind::Break(_, _) => todo!(),
             ast::ExprKind::Continue(_) => todo!(),
             ast::ExprKind::Ret(_) => todo!(),
             ast::ExprKind::InlineAsm(_) => todo!(),
             ast::ExprKind::OffsetOf(_, _) => todo!(),
-            ast::ExprKind::MacCall(ref mac_call) => self.mac_call(mac_call, end),
+            ast::ExprKind::MacCall(ref mac_call) => self.mac_call(mac_call, tail),
             ast::ExprKind::Struct(_) => todo!(),
             ast::ExprKind::Repeat(_, _) => todo!(),
             ast::ExprKind::Paren(_) => todo!(),
