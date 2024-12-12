@@ -46,9 +46,8 @@ impl ConstraintWriter {
 
     // #[instrument(skip(self))]
     pub fn token(&mut self, token: &str) -> Result<(), TooWideError> {
-        self.require_width(token.len())?;
         self.buffer.push_str(token);
-        Ok(())
+        self.check_width()
     }
     
     pub fn write_unchecked(&mut self, source: &str) {
@@ -65,20 +64,14 @@ impl ConstraintWriter {
     }
 
     pub fn indent(&mut self) -> Result<(), TooWideError> {
-        self.require_width(self.constraints.indent)?;
         self.buffer
             .extend(std::iter::repeat_n(' ', self.constraints.indent));
-        Ok(())
+        self.check_width()
     }
 
     #[instrument(skip(self), ret, fields(out = self.buffer))]
-    pub fn require_width(&mut self, len: usize) -> Result<(), TooWideError> {
-        if let Some(remaining_width) = self.remaining_width()? {
-            if len > remaining_width {
-                return Err(TooWideError);
-            }
-        }
-        Ok(())
+    pub fn check_width(&mut self) -> Result<(), TooWideError> {
+        self.remaining_width().map(drop)
     }
 
     pub fn remaining_width(&self) -> Result<Option<usize>, TooWideError> {

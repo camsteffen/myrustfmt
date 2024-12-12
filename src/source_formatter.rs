@@ -53,10 +53,6 @@ impl<'a> SourceFormatter<'a> {
         self.out.restore(&snapshot.writer_snapshot);
     }
 
-    pub fn require_width(&mut self, len: usize) -> FormatResult {
-        self.out.require_width(len).map_err(|e| self.lift_constraint_err(e))
-    }
-
     pub fn last_line_width(&self) -> usize {
         self.out.last_line_width()
     }
