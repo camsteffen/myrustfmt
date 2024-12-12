@@ -1,20 +1,34 @@
 use crate::ast_formatter::AstFormatter;
 use crate::source_formatter::FormatResult;
 
-use crate::ast_formatter::list::{AngleBracketedArgsConfig};
+use crate::ast_formatter::last_line::{EndReserved, EndWidth, drop_end_reserved};
+use crate::ast_formatter::list::AngleBracketedArgsConfig;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
 impl AstFormatter<'_> {
     pub fn qpath(&mut self, qself: &Option<P<ast::QSelf>>, path: &ast::Path) -> FormatResult {
+        self.qpath_end(qself, path, EndWidth::ZERO)
+            .map(drop_end_reserved)
+    }
+
+    pub fn qpath_end(
+        &mut self,
+        qself: &Option<P<ast::QSelf>>,
+        path: &ast::Path,
+        end: EndWidth,
+    ) -> FormatResult<EndReserved> {
         if let Some(qself) = qself.as_deref() {
             todo!();
         }
-        self.path(path)?;
-        Ok(())
+        self.path_end(path, end)
     }
 
     pub fn path(&mut self, path: &ast::Path) -> FormatResult {
+        self.path_end(path, EndWidth::ZERO).map(drop_end_reserved)
+    }
+
+    pub fn path_end(&mut self, path: &ast::Path, end: EndWidth) -> FormatResult<EndReserved> {
         if let [first_segment, rest @ ..] = &path.segments[..] {
             self.path_segment(first_segment)?;
             for segment in rest {
@@ -22,7 +36,7 @@ impl AstFormatter<'_> {
                 self.path_segment(segment)?;
             }
         }
-        Ok(())
+        self.reserve_end(end)
     }
 
     pub fn path_segment(&mut self, segment: &ast::PathSegment) -> FormatResult {

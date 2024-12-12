@@ -1,4 +1,5 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::last_line::{EndReserved, EndWidth, drop_end_reserved};
 use crate::source_formatter::FormatResult;
 
 pub trait ListConfig {
@@ -74,10 +75,21 @@ impl<'a> AstFormatter<'a> {
         format_item: impl Fn(&mut Self, &T) -> FormatResult + Copy,
         config: C,
     ) -> FormatResult {
+        self.list_end(list, format_item, config, EndWidth::ZERO)
+            .map(drop_end_reserved)
+    }
+
+    pub fn list_end<T, C: ListConfig>(
+        &mut self,
+        list: &[T],
+        format_item: impl Fn(&mut Self, &T) -> FormatResult + Copy,
+        config: C,
+        end: EndWidth,
+    ) -> FormatResult<EndReserved> {
         self.out.token_expect(C::START_BRACE)?;
         if list.is_empty() {
             self.out.token_expect(C::END_BRACE)?;
-            return Ok(());
+            return self.reserve_end(end);
         }
         let mut fallback = self.fallback_chain("list").next("single line", |this| {
             this.list_single_line(list, &format_item, &config)
@@ -94,9 +106,11 @@ impl<'a> AstFormatter<'a> {
             .next("separate lines", |this| {
                 this.list_separate_lines(list, &format_item, &config)
             })
-            .finally(|this| this.out.token_expect(C::END_BRACE))
-            .execute(self)?;
-        Ok(())
+            .finally(|this| {
+                this.out.token_expect(C::END_BRACE)?;
+                this.reserve_end(end)
+            })
+            .execute(self)
     }
 
     fn list_single_line<T, C: ListConfig>(

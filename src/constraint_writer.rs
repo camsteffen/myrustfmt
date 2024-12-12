@@ -72,7 +72,7 @@ impl ConstraintWriter {
     }
 
     #[instrument(skip(self), ret, fields(out = self.buffer))]
-    fn require_width(&mut self, len: usize) -> Result<(), TooWideError> {
+    pub fn require_width(&mut self, len: usize) -> Result<(), TooWideError> {
         if let Some(remaining_width) = self.remaining_width()? {
             if len > remaining_width {
                 return Err(TooWideError);

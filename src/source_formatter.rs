@@ -10,7 +10,7 @@ pub struct SourceFormatterSnapshot {
     pos: BytePos,
 }
 
-pub type FormatResult = Result<(), FormatError>;
+pub type FormatResult<T = ()> = Result<T, FormatError>;
 
 #[derive(Clone, Copy, Debug)]
 pub struct FormatError {
@@ -53,6 +53,10 @@ impl<'a> SourceFormatter<'a> {
         self.out.restore(&snapshot.writer_snapshot);
     }
 
+    pub fn require_width(&mut self, len: usize) -> FormatResult {
+        self.out.require_width(len).map_err(|e| self.lift_constraint_err(e))
+    }
+
     pub fn last_line_width(&self) -> usize {
         self.out.last_line_width()
     }
@@ -66,11 +70,11 @@ impl<'a> SourceFormatter<'a> {
         self.out.indent().map_err(|e| self.lift_constraint_err(e))?;
         Ok(())
     }
-    
+
     pub fn char_ending_at(&self, pos: BytePos) -> u8 {
         self.source.source.as_bytes()[pos.to_usize() - 1]
     }
-    
+
     pub fn skip_token_if_present(&mut self, token: &str) {
         self.handle_whitespace_and_comments_if_needed();
         if self.source.remaining().starts_with(token) {
@@ -191,7 +195,7 @@ impl<'a> SourceFormatter<'a> {
         self.out.write_unchecked(segment);
         self.source.advance(len);
     }
-    
+
     pub fn copy_span(&mut self, span: Span) {
         self.handle_whitespace_and_comments_if_needed();
         self.source.expect_pos(span.lo());

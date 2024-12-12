@@ -2,6 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{AngleBracketedArgsConfig, ListConfig, ParamListConfig};
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
+use crate::ast_formatter::last_line::{EndReserved, EndWidth};
 
 impl<'a> AstFormatter<'a> {
     pub fn fn_(&mut self, fn_: &ast::Fn, item: &ast::Item) -> FormatResult {
@@ -19,7 +20,7 @@ impl<'a> AstFormatter<'a> {
         Ok(())
     }
 
-    pub fn closure(&mut self, closure: &ast::Closure) -> FormatResult {
+    pub fn closure(&mut self, closure: &ast::Closure, end: EndWidth) -> FormatResult<EndReserved> {
         match closure.binder {
             ast::ClosureBinder::NotPresent => {}
             ast::ClosureBinder::For { span, ref generic_params } => todo!(),
@@ -35,8 +36,7 @@ impl<'a> AstFormatter<'a> {
             self.coroutine_kind(coroutine_kind)?;
         }
         self.fn_decl(&closure.fn_decl, ClosureParamListConfig)?;
-        self.expr(&closure.body)?;
-        Ok(())
+        self.expr_end(&closure.body, end)
     }
 
     pub fn parenthesized_args(&mut self, parenthesized_args: &ast::ParenthesizedArgs) -> FormatResult {
