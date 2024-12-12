@@ -1,4 +1,4 @@
-use tracing::instrument;
+use tracing::{info, instrument};
 use crate::constraints::Constraints;
 
 pub struct ConstraintWriter {
@@ -69,9 +69,14 @@ impl ConstraintWriter {
         self.check_width()
     }
 
-    #[instrument(skip(self), ret, fields(out = self.buffer))]
     pub fn check_width(&mut self) -> Result<(), TooWideError> {
-        self.remaining_width().map(drop)
+        match self.remaining_width() {
+            Ok(_width) => Ok(()),
+            Err(TooWideError) => {
+                info!("too wide: \"{}\"", self.last_line());
+                Err(TooWideError)
+            },
+        }
     }
 
     pub fn remaining_width(&self) -> Result<Option<usize>, TooWideError> {
@@ -83,6 +88,10 @@ impl ConstraintWriter {
                     .ok_or(TooWideError)
             })
             .transpose()
+    }
+    
+    fn last_line(&self) -> &str {
+        &self.buffer[self.last_line_start..]
     }
 
     // #[instrument(skip(self), ret)]
