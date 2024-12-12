@@ -36,6 +36,7 @@ impl<'a> AstFormatter<'a> {
             self.coroutine_kind(coroutine_kind)?;
         }
         self.fn_decl(&closure.fn_decl, ClosureParamListConfig)?;
+        self.out.space()?;
         self.expr(&closure.body, end)
     }
 
@@ -127,7 +128,6 @@ impl<'a> AstFormatter<'a> {
                 self.out.token_expect("->")?;
                 self.out.space()?;
                 self.ty(ty)?;
-                self.out.space()?;
             }
         }
         Ok(())

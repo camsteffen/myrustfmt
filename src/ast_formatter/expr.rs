@@ -9,19 +9,22 @@ use rustc_ast::ptr::P;
 impl<'a> AstFormatter<'a> {
     pub fn expr(&mut self, expr: &ast::Expr, tail: Tail) -> FormatResult {
         match expr.kind {
-            ast::ExprKind::Array(ref items) => {
-                self.list(items, |this, e| this.expr(e, Tail::None), ArrayListConfig, tail)
-            }
+            ast::ExprKind::Array(ref items) => self.list(
+                items,
+                |this, e| this.expr(e, Tail::None),
+                ArrayListConfig,
+                tail,
+            ),
             ast::ExprKind::ConstBlock(_) => todo!(),
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, tail),
-            ast::ExprKind::MethodCall(ref method_call) => self.method_call(method_call, tail),
+            ast::ExprKind::MethodCall(_) => self.dot_chain(expr, tail),
             ast::ExprKind::Tup(_) => todo!(),
             ast::ExprKind::Binary(_, _, _) => todo!(),
             ast::ExprKind::Unary(_, _) => todo!(),
             ast::ExprKind::Lit(_) => {
                 self.out.copy_span(expr.span);
                 self.tail(tail)
-            },
+            }
             ast::ExprKind::Cast(_, _) => todo!(),
             ast::ExprKind::Type(_, _) => todo!(),
             ast::ExprKind::Let(_, _, _, _) => todo!(),
@@ -46,12 +49,7 @@ impl<'a> AstFormatter<'a> {
             ast::ExprKind::TryBlock(_) => todo!(),
             ast::ExprKind::Assign(_, _, _) => todo!(),
             ast::ExprKind::AssignOp(_, _, _) => todo!(),
-            ast::ExprKind::Field(ref expr, ident) => {
-                self.expr(expr, Tail::None)?;
-                self.out.token_expect(".")?;
-                self.ident(ident)?;
-                self.tail(tail)
-            }
+            ast::ExprKind::Field(..) => self.dot_chain(expr, tail),
             ast::ExprKind::Index(_, _, _) => todo!(),
             ast::ExprKind::Range(_, _, _) => todo!(),
             ast::ExprKind::Underscore => todo!(),
@@ -95,14 +93,14 @@ impl<'a> AstFormatter<'a> {
         self.expr(target, end)
     }
 
-    fn call(
-        &mut self,
-        func: &ast::Expr,
-        args: &[P<ast::Expr>],
-        end: Tail,
-    ) -> FormatResult {
+    fn call(&mut self, func: &ast::Expr, args: &[P<ast::Expr>], end: Tail) -> FormatResult {
         self.expr(func, Tail::None)?;
-        self.list(args, |this, arg| this.expr(arg, Tail::None), ParamListConfig, end)
+        self.list(
+            args,
+            |this, arg| this.expr(arg, Tail::None),
+            ParamListConfig,
+            end,
+        )
     }
 
     fn delim_args(&mut self, delim_args: &ast::DelimArgs, end: Tail) -> FormatResult {
@@ -121,11 +119,11 @@ impl<'a> AstFormatter<'a> {
         scrutinee: &ast::Expr,
         arms: &[ast::Arm],
         expr: &ast::Expr,
-        end: Tail
+        end: Tail,
     ) -> FormatResult {
         self.out.token_at("match", expr.span.lo())?;
         self.out.space()?;
-        self.expr(scrutinee, Tail::SpaceSemicolon)?;
+        self.expr(scrutinee, Tail::SpaceOpenBrace)?;
         self.with_indent(|this| {
             for arm in arms {
                 this.out.newline_indent()?;
@@ -161,21 +159,5 @@ impl<'a> AstFormatter<'a> {
             todo!();
         }
         Ok(())
-    }
-
-    fn method_call(
-        &mut self,
-        method_call: &ast::MethodCall,
-        end: Tail,
-    ) -> FormatResult {
-        self.expr(&method_call.receiver, Tail::None)?;
-        self.out.token_expect(".")?;
-        self.path_segment(&method_call.seg)?;
-        self.list(
-            &method_call.args,
-            |this, arg| this.expr(arg, Tail::None),
-            ParamListConfig,
-            end,
-        )
     }
 }

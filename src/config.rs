@@ -3,5 +3,5 @@ pub struct Config {
 }
 
 pub const DEFAULT_CONFIG: Config = Config {
-    max_width: 80,
+    max_width: 100,
 };

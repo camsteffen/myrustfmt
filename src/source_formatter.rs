@@ -8,6 +8,7 @@ use rustc_span::{BytePos, Pos, Span};
 pub struct SourceFormatterSnapshot {
     writer_snapshot: WriterSnapshot,
     pos: BytePos,
+    next_is_whitespace_or_comments: bool,
 }
 
 pub type FormatResult = Result<(), FormatError>;
@@ -42,15 +43,27 @@ impl<'a> SourceFormatter<'a> {
     }
 
     pub fn snapshot(&self) -> SourceFormatterSnapshot {
+        let Self {
+            ref out,
+            ref source,
+            next_is_whitespace_or_comments,
+        } = *self;
         SourceFormatterSnapshot {
-            writer_snapshot: self.out.snapshot(),
-            pos: self.source.pos,
+            writer_snapshot: out.snapshot(),
+            pos: source.pos,
+            next_is_whitespace_or_comments,
         }
     }
 
     pub fn restore(&mut self, snapshot: &SourceFormatterSnapshot) {
-        self.source.pos = snapshot.pos;
-        self.out.restore(&snapshot.writer_snapshot);
+        let SourceFormatterSnapshot {
+            ref writer_snapshot,
+            pos,
+            next_is_whitespace_or_comments,
+        } = *snapshot;
+        self.source.pos = pos;
+        self.out.restore(writer_snapshot);
+        self.next_is_whitespace_or_comments = next_is_whitespace_or_comments;
     }
 
     pub fn last_line_width(&self) -> usize {
@@ -59,12 +72,7 @@ impl<'a> SourceFormatter<'a> {
 
     /** Writes a newline character and indent characters according to the current indent level */
     pub fn newline_indent(&mut self) -> FormatResult {
-        self.handle_whitespace_and_comments();
-        self.out
-            .newline()
-            .map_err(|e| self.lift_constraint_err(e))?;
-        self.out.indent().map_err(|e| self.lift_constraint_err(e))?;
-        Ok(())
+        self.handle_whitespace_and_comments_for_newline()
     }
 
     pub fn char_ending_at(&self, pos: BytePos) -> u8 {
@@ -72,10 +80,19 @@ impl<'a> SourceFormatter<'a> {
     }
 
     pub fn skip_token_if_present(&mut self, token: &str) {
+        let snapshot;
+        if self.next_is_whitespace_or_comments {
+            snapshot = Some(self.snapshot());
+            self.handle_whitespace_and_comments();
+        } else {
+            snapshot = None;
+        }
         self.handle_whitespace_and_comments_if_needed();
         if self.source.remaining().starts_with(token) {
             self.source.advance(token.len());
             self.next_is_whitespace_or_comments = true;
+        } else if let Some(snapshot) = snapshot {
+            self.restore(&snapshot);
         }
     }
 
@@ -121,10 +138,11 @@ impl<'a> SourceFormatter<'a> {
     pub fn token_expect(&mut self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
         if !self.source.remaining().starts_with(token) {
+            let (line, col) = self.source.line_col();
             panic!(
-                "expected token {:?}, found {:?}",
+                "expected token {:?}, found {:?} at {line}:{col}",
                 token,
-                &self.source.remaining()[..10.min(self.source.remaining().len())]
+                &self.source.remaining()[..10.min(self.source.remaining().len())],
             );
         }
         self.token_unchecked(token)?;
@@ -158,32 +176,71 @@ impl<'a> SourceFormatter<'a> {
     }
 
     fn handle_whitespace_and_comments(&mut self) -> bool {
-        let mut len = 0;
+        let mut len = 0usize;
         let mut len_without_trailing_whitespace = 0;
         for token in rustc_lexer::tokenize(self.source.remaining()) {
+            let token_start = len;
+            let token_end = token_start + token.len as usize;
+            let token_str = &self.source.remaining()[token_start..token_end];
             match token.kind {
                 TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
                     len += token.len as usize;
                     len_without_trailing_whitespace = len;
                 }
                 TokenKind::Whitespace => {
+                    // if let Some(newline_index) = token_str.find('\n') {
+                    //     len += newline_index;
+                    //     break;
+                    // }
                     len += token.len as usize;
                 }
                 _ => break,
             }
         }
         if len_without_trailing_whitespace > 0 {
+            // copy up to trailing whitespace
             self.copy(len_without_trailing_whitespace);
         }
+        // skip trailing whitespace
         self.source.advance(len - len_without_trailing_whitespace);
         self.next_is_whitespace_or_comments = false;
         len_without_trailing_whitespace > 0
+    }
+
+    fn handle_whitespace_and_comments_for_newline(&mut self) -> FormatResult {
+        for token in rustc_lexer::tokenize(self.source.remaining()) {
+            let token_str = &self.source.remaining()[..token.len as usize];
+            match token.kind {
+                TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
+                    self.copy(token.len as usize);
+                }
+                TokenKind::Whitespace => {
+                    let newline_count = token_str.bytes().filter(|&b| b == b'\n').count();
+                    self.newline()?;
+                    if newline_count >= 2 {
+                        self.newline()?;
+                    }
+                    self.indent()?;
+                    self.source.advance(token.len as usize);
+                }
+                _ => break,
+            }
+        }
+        Ok(())
     }
 
     fn handle_whitespace_and_comments_if_needed(&mut self) {
         if self.next_is_whitespace_or_comments {
             self.handle_whitespace_and_comments();
         }
+    }
+
+    fn newline(&mut self) -> FormatResult {
+        self.out.newline().map_err(|e| self.lift_constraint_err(e))
+    }
+
+    fn indent(&mut self) -> FormatResult {
+        self.out.indent().map_err(|e| self.lift_constraint_err(e))
     }
 
     fn copy(&mut self, len: usize) {

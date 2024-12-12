@@ -5,7 +5,7 @@ use crate::source_formatter::FormatResult;
 pub enum Tail {
     None,
     Semicolon,
-    SpaceSemicolon,
+    SpaceOpenBrace,
 }
 
 pub struct EndReserved {
@@ -17,9 +17,9 @@ impl<'a> AstFormatter<'a> {
         match tail {
             Tail::None => Ok(()),
             Tail::Semicolon => self.out.token_expect(";"),
-            Tail::SpaceSemicolon => {
+            Tail::SpaceOpenBrace => {
                 self.out.space()?;
-                self.out.token_expect(";")
+                self.out.token_expect("{")
             }
         }
     }

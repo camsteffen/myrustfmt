@@ -3,6 +3,7 @@
 use myrustfmt::format_str;
 use tracing_test::traced_test;
 
+// https://github.com/rust-lang/rustfmt/issues/4867
 #[test]
 fn slow_test() {
     let source =
