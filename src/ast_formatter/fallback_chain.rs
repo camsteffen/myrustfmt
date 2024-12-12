@@ -2,6 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::source_formatter::{FormatResult, SourceFormatterSnapshot};
 use tracing::info;
 
+/*
 #[must_use]
 pub struct FallbackChain<'a, 'b, T> {
     debug_name: &'static str,
@@ -50,14 +51,44 @@ impl<'a, 'b, T> FallbackChain<'a, 'b, T> {
         final_result.expect("fallback chain cannot be empty")
     }
 }
+*/
 
 impl<'a> AstFormatter<'a> {
-    pub fn fallback_chain<'b>(&mut self, debug_name: &'static str) -> FallbackChain<'a, 'b, ()> {
-        FallbackChain {
-            debug_name,
-            snapshot: self.out.snapshot(),
-            chain: Vec::new(),
-            finally: Box::new(|_| Ok(())),
+    pub fn fallback_chain<'b, T, F: Fn(&mut Self) -> FormatResult<T>>(
+        &mut self,
+        chain: impl FnOnce(&mut FallbackChain<'a, '_, T, F>),
+        finally: F,
+    ) -> FormatResult<T> {
+        let snapshot = self.out.snapshot();
+        let mut builder = FallbackChain {
+            ast_formatter: self,
+            result: None,
+            snapshot,
+            finally,
+        };
+        chain(&mut builder);
+        builder
+            .result
+            .expect("fallback chain must be used at least once")
+    }
+}
+
+pub struct FallbackChain<'a, 'b, T, F> {
+    ast_formatter: &'b mut AstFormatter<'a>,
+    result: Option<FormatResult<T>>,
+    snapshot: SourceFormatterSnapshot,
+    finally: F,
+}
+
+impl<'a, T, F: Fn(&mut AstFormatter<'a>) -> FormatResult<T>> FallbackChain<'a, '_, T, F> {
+    pub fn next(&mut self, f: impl FnOnce(&mut AstFormatter<'a>) -> FormatResult) {
+        if matches!(self.result, Some(Ok(_))) {
+            return;
         }
+        let result = f(self.ast_formatter).and_then(|()| (self.finally)(self.ast_formatter));
+        if result.is_err() {
+            self.ast_formatter.out.restore(&self.snapshot);
+        }
+        self.result = Some(result);
     }
 }

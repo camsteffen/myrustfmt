@@ -21,7 +21,7 @@ pub enum ListWrapToFitConfig {
     Yes { max_element_width: Option<usize> },
 }
 
-// todo so many configs?
+// todo so many configs? monomorphized?
 pub struct AngleBracketedArgsConfig;
 pub struct ArrayListConfig;
 pub struct ParamListConfig;
@@ -91,26 +91,24 @@ impl<'a> AstFormatter<'a> {
             self.out.token_expect(C::END_BRACE)?;
             return self.reserve_end(end);
         }
-        let mut fallback = self.fallback_chain("list").next("single line", |this| {
-            this.list_single_line(list, &format_item, &config)
-        });
-        match C::wrap_to_fit() {
-            ListWrapToFitConfig::Yes { max_element_width } => {
-                fallback = fallback.next("wrap to fit", move |this| {
-                    this.list_wrap_to_fit(list, &format_item, max_element_width)
-                });
-            }
-            ListWrapToFitConfig::No => {}
-        }
-        fallback
-            .next("separate lines", |this| {
-                this.list_separate_lines(list, &format_item, &config)
-            })
-            .finally(|this| {
+        self.fallback_chain(
+            |chain| {
+                chain.next(|this| this.list_single_line(list, &format_item, &config));
+                match C::wrap_to_fit() {
+                    ListWrapToFitConfig::Yes { max_element_width } => {
+                        chain.next(move |this| {
+                            this.list_wrap_to_fit(list, &format_item, max_element_width)
+                        });
+                    }
+                    ListWrapToFitConfig::No => {}
+                }
+                chain.next(|this| this.list_separate_lines(list, &format_item, &config));
+            },
+            |this| {
                 this.out.token_expect(C::END_BRACE)?;
                 this.reserve_end(end)
-            })
-            .execute(self)
+            },
+        )
     }
 
     fn list_single_line<T, C: ListConfig>(
@@ -166,15 +164,17 @@ impl<'a> AstFormatter<'a> {
             format_item(this, head)?;
             this.out.token_maybe_missing(",")?;
             for item in tail {
-                this.fallback_chain("list item")
-                    .next("same line", |this| this.out.space())
-                    .next("wrap", |this| this.out.newline_indent())
-                    .finally(|this| {
+                this.fallback_chain(
+                    |chain| {
+                        chain.next(|this| this.out.space());
+                        chain.next(|this| this.out.newline_indent());
+                    },
+                    |this| {
                         format_item(this, item)?;
                         this.out.token_maybe_missing(",")?;
                         Ok(())
-                    })
-                    .execute(this)?;
+                    },
+                )?;
             }
             Ok(())
         })?;
