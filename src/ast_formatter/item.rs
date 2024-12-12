@@ -2,6 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{ListConfig, ListWrapToFitConfig};
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
+use crate::ast_formatter::last_line::Tail;
 
 impl<'a> AstFormatter<'a> {
     pub fn item(&mut self, item: &ast::Item) -> FormatResult {
@@ -102,6 +103,7 @@ impl<'a> AstFormatter<'a> {
                     items,
                     |this, (use_tree, _)| this.use_tree(use_tree),
                     UseTreeListConfig,
+                    Tail::None
                 )?
             },
             ast::UseTreeKind::Glob => todo!(),

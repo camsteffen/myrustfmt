@@ -2,7 +2,7 @@ use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::{drop_end_reserved, EndReserved, EndWidth};
+use crate::ast_formatter::last_line::{drop_end_reserved, EndReserved, Tail};
 use crate::ast_formatter::list::{ParamListConfig, StructListConfig};
 use crate::source_formatter::FormatResult;
 
@@ -11,14 +11,14 @@ impl<'a> AstFormatter<'a> {
         &mut self,
         pat: &ast::Pat,
     ) -> FormatResult {
-        self.pat_end(pat, EndWidth::ZERO).map(drop_end_reserved)
+        self.pat_end(pat, Tail::None)
     }
-    
+
     pub fn pat_end(
         &mut self,
         pat: &ast::Pat,
-        end: EndWidth,
-    ) -> FormatResult<EndReserved> {
+        end: Tail,
+    ) -> FormatResult {
         match pat.kind {
             ast::PatKind::Wild => todo!(),
             ast::PatKind::Ident(ast::BindingMode(by_ref, mutbl), ident, ref pat) => {
@@ -32,19 +32,19 @@ impl<'a> AstFormatter<'a> {
                     }
                 }
                 self.ident(ident)?;
-                self.reserve_end(end)
+                self.tail(end)
             }
             ast::PatKind::Struct(ref qself, ref path, ref fields, rest) => {
                 self.struct_(qself, path, fields, rest, end)
             }
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 self.qpath(qself, path)?;
-                self.list_end(fields, |this, field| this.pat(field), ParamListConfig, end)
+                self.list(fields, |this, field| this.pat(field), ParamListConfig, end)
             }
             ast::PatKind::Or(_) => todo!(),
             ast::PatKind::Path(_, _) => todo!(),
             ast::PatKind::Tuple(ref fields) => {
-                self.list_end(fields, |this, field| this.pat(field), ParamListConfig, end)
+                self.list(fields, |this, field| this.pat(field), ParamListConfig, end)
             }
             ast::PatKind::Box(_) => todo!(),
             ast::PatKind::Deref(_) => todo!(),
@@ -66,11 +66,11 @@ impl<'a> AstFormatter<'a> {
         path: &ast::Path,
         fields: &[ast::PatField],
         rest: ast::PatFieldsRest,
-        end: EndWidth
-    ) -> FormatResult<EndReserved> {
+        end: Tail
+    ) -> FormatResult {
         self.qpath(qself, path)?;
         self.out.space()?;
-        self.list_end(fields, Self::pat_field, StructListConfig, end)
+        self.list(fields, Self::pat_field, StructListConfig, end)
     }
 
     fn pat_field(&mut self, pat_field: &ast::PatField) -> FormatResult {

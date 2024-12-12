@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::{EndReserved, EndWidth, drop_end_reserved};
+use crate::ast_formatter::last_line::{EndReserved, Tail, drop_end_reserved};
 use crate::source_formatter::FormatResult;
 
 pub trait ListConfig {
@@ -74,22 +74,12 @@ impl<'a> AstFormatter<'a> {
         list: &[T],
         format_item: impl Fn(&mut Self, &T) -> FormatResult + Copy,
         config: C,
+        end: Tail,
     ) -> FormatResult {
-        self.list_end(list, format_item, config, EndWidth::ZERO)
-            .map(drop_end_reserved)
-    }
-
-    pub fn list_end<T, C: ListConfig>(
-        &mut self,
-        list: &[T],
-        format_item: impl Fn(&mut Self, &T) -> FormatResult + Copy,
-        config: C,
-        end: EndWidth,
-    ) -> FormatResult<EndReserved> {
         self.out.token_expect(C::START_BRACE)?;
         if list.is_empty() {
             self.out.token_expect(C::END_BRACE)?;
-            return self.reserve_end(end);
+            return self.tail(end);
         }
         self.fallback_chain(
             |chain| {
@@ -106,7 +96,7 @@ impl<'a> AstFormatter<'a> {
             },
             |this| {
                 this.out.token_expect(C::END_BRACE)?;
-                this.reserve_end(end)
+                this.tail(end)
             },
         )
     }

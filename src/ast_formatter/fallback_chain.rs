@@ -54,11 +54,11 @@ impl<'a, 'b, T> FallbackChain<'a, 'b, T> {
 */
 
 impl<'a> AstFormatter<'a> {
-    pub fn fallback_chain<'b, T, F: Fn(&mut Self) -> FormatResult<T>>(
+    pub fn fallback_chain<'b, F: Fn(&mut Self) -> FormatResult>(
         &mut self,
-        chain: impl FnOnce(&mut FallbackChain<'a, '_, T, F>),
+        chain: impl FnOnce(&mut FallbackChain<'a, '_, F>),
         finally: F,
-    ) -> FormatResult<T> {
+    ) -> FormatResult {
         let snapshot = self.out.snapshot();
         let mut builder = FallbackChain {
             ast_formatter: self,
@@ -73,14 +73,14 @@ impl<'a> AstFormatter<'a> {
     }
 }
 
-pub struct FallbackChain<'a, 'b, T, F> {
+pub struct FallbackChain<'a, 'b, F> {
     ast_formatter: &'b mut AstFormatter<'a>,
-    result: Option<FormatResult<T>>,
+    result: Option<FormatResult>,
     snapshot: SourceFormatterSnapshot,
     finally: F,
 }
 
-impl<'a, T, F: Fn(&mut AstFormatter<'a>) -> FormatResult<T>> FallbackChain<'a, '_, T, F> {
+impl<'a, F: Fn(&mut AstFormatter<'a>) -> FormatResult> FallbackChain<'a, '_, F> {
     pub fn next(&mut self, f: impl FnOnce(&mut AstFormatter<'a>) -> FormatResult) {
         if matches!(self.result, Some(Ok(_))) {
             return;

@@ -2,20 +2,15 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{ArrayListConfig, ParamListConfig};
 use crate::source_formatter::FormatResult;
 
-use crate::ast_formatter::last_line::{EndReserved, EndWidth, drop_end_reserved};
+use crate::ast_formatter::last_line::{EndReserved, Tail, drop_end_reserved};
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
 impl<'a> AstFormatter<'a> {
-    pub fn expr(&mut self, expr: &ast::Expr) -> FormatResult {
-        self.expr_end(expr, EndWidth::ZERO)
-            .map(drop_end_reserved)
-    }
-
-    pub fn expr_end(&mut self, expr: &ast::Expr, end: EndWidth) -> FormatResult<EndReserved> {
+    pub fn expr(&mut self, expr: &ast::Expr, end: Tail) -> FormatResult {
         match expr.kind {
             ast::ExprKind::Array(ref items) => {
-                self.list_end(items, |this, e| this.expr(e), ArrayListConfig, end)
+                self.list(items, |this, e| this.expr(e, Tail::None), ArrayListConfig, end)
             }
             ast::ExprKind::ConstBlock(_) => todo!(),
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, end),
@@ -25,7 +20,7 @@ impl<'a> AstFormatter<'a> {
             ast::ExprKind::Unary(_, _) => todo!(),
             ast::ExprKind::Lit(_) => {
                 self.out.copy_span(expr.span);
-                self.reserve_end(end)
+                self.tail(end)
             },
             ast::ExprKind::Cast(_, _) => todo!(),
             ast::ExprKind::Type(_, _) => todo!(),
@@ -44,7 +39,7 @@ impl<'a> AstFormatter<'a> {
                     self.ident(label.ident)?;
                     self.out.space()?;
                 }
-                self.block_end(block, end)
+                self.block(block, end)
             }
             ast::ExprKind::Gen(_, _, _, _) => todo!(),
             ast::ExprKind::Await(_, _) => todo!(),
@@ -52,10 +47,10 @@ impl<'a> AstFormatter<'a> {
             ast::ExprKind::Assign(_, _, _) => todo!(),
             ast::ExprKind::AssignOp(_, _, _) => todo!(),
             ast::ExprKind::Field(ref expr, ident) => {
-                self.expr(expr)?;
+                self.expr(expr, Tail::None)?;
                 self.out.token_expect(".")?;
                 self.ident(ident)?;
-                self.reserve_end(end)
+                self.tail(end)
             }
             ast::ExprKind::Index(_, _, _) => todo!(),
             ast::ExprKind::Range(_, _, _) => todo!(),
@@ -69,7 +64,7 @@ impl<'a> AstFormatter<'a> {
             ast::ExprKind::Ret(_) => todo!(),
             ast::ExprKind::InlineAsm(_) => todo!(),
             ast::ExprKind::OffsetOf(_, _) => todo!(),
-            ast::ExprKind::MacCall(ref mac_call) => self.mac_call_end(mac_call, end),
+            ast::ExprKind::MacCall(ref mac_call) => self.mac_call(mac_call, end),
             ast::ExprKind::Struct(_) => todo!(),
             ast::ExprKind::Repeat(_, _) => todo!(),
             ast::ExprKind::Paren(_) => todo!(),
@@ -90,36 +85,32 @@ impl<'a> AstFormatter<'a> {
         mutability: ast::Mutability,
         target: &ast::Expr,
         expr: &ast::Expr,
-        end: EndWidth,
-    ) -> FormatResult<EndReserved> {
+        end: Tail,
+    ) -> FormatResult {
         match borrow_kind {
             ast::BorrowKind::Raw => todo!(),
             ast::BorrowKind::Ref => self.out.token_at("&", expr.span.lo())?,
         }
         self.mutability(mutability)?;
-        self.expr_end(target, end)
+        self.expr(target, end)
     }
 
     fn call(
         &mut self,
         func: &ast::Expr,
         args: &[P<ast::Expr>],
-        end: EndWidth,
-    ) -> FormatResult<EndReserved> {
-        self.expr(func)?;
-        self.list_end(args, |this, arg| this.expr(arg), ParamListConfig, end)
+        end: Tail,
+    ) -> FormatResult {
+        self.expr(func, Tail::None)?;
+        self.list(args, |this, arg| this.expr(arg, Tail::None), ParamListConfig, end)
     }
 
-    fn delim_args(&mut self, delim_args: &ast::DelimArgs, end: EndWidth) -> FormatResult<EndReserved> {
+    fn delim_args(&mut self, delim_args: &ast::DelimArgs, end: Tail) -> FormatResult {
         self.out.copy_span(delim_args.dspan.entire());
-        self.reserve_end(end)
+        self.tail(end)
     }
 
-    pub fn mac_call(&mut self, mac_call: &ast::MacCall) -> FormatResult {
-        self.mac_call_end(mac_call, EndWidth::ZERO).map(drop_end_reserved)
-    }
-    
-    pub fn mac_call_end(&mut self, mac_call: &ast::MacCall, end: EndWidth) -> FormatResult<EndReserved> {
+    pub fn mac_call(&mut self, mac_call: &ast::MacCall, end: Tail) -> FormatResult {
         self.path(&mac_call.path)?;
         self.out.token_expect("!")?;
         self.delim_args(&mac_call.args, end)
@@ -130,13 +121,11 @@ impl<'a> AstFormatter<'a> {
         scrutinee: &ast::Expr,
         arms: &[ast::Arm],
         expr: &ast::Expr,
-        end: EndWidth
-    ) -> FormatResult<EndReserved> {
+        end: Tail
+    ) -> FormatResult {
         self.out.token_at("match", expr.span.lo())?;
         self.out.space()?;
-        self.expr(scrutinee)?;
-        self.out.space()?;
-        self.out.token_expect("{")?;
+        self.expr(scrutinee, Tail::SpaceSemicolon)?;
         self.with_indent(|this| {
             for arm in arms {
                 this.out.newline_indent()?;
@@ -146,7 +135,7 @@ impl<'a> AstFormatter<'a> {
         })?;
         self.out.newline_indent()?;
         self.out.token_expect("}")?;
-        self.reserve_end(end)
+        self.tail(end)
     }
 
     fn arm(&mut self, arm: &ast::Arm) -> FormatResult {
@@ -156,13 +145,13 @@ impl<'a> AstFormatter<'a> {
             self.out.space()?;
             self.out.token_expect("if")?;
             self.out.space()?;
-            self.expr(guard)?;
+            self.expr(guard, Tail::None)?;
         }
         if let Some(body) = arm.body.as_deref() {
             self.out.space()?;
             self.out.token_expect("=>")?;
             self.out.space()?;
-            self.expr(body)?;
+            self.expr(body, Tail::None)?;
             if self.out.char_ending_at(body.span.hi()) == b'}' {
                 self.out.skip_token_if_present(",");
             } else {
@@ -177,14 +166,14 @@ impl<'a> AstFormatter<'a> {
     fn method_call(
         &mut self,
         method_call: &ast::MethodCall,
-        end: EndWidth,
-    ) -> FormatResult<EndReserved> {
-        self.expr(&method_call.receiver)?;
+        end: Tail,
+    ) -> FormatResult {
+        self.expr(&method_call.receiver, Tail::None)?;
         self.out.token_expect(".")?;
         self.path_segment(&method_call.seg)?;
-        self.list_end(
+        self.list(
             &method_call.args,
-            |this, arg| this.expr(arg),
+            |this, arg| this.expr(arg, Tail::None),
             ParamListConfig,
             end,
         )

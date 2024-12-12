@@ -1,10 +1,10 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::{EndReserved, EndWidth};
+use crate::ast_formatter::last_line::{EndReserved, Tail};
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter<'a> {
-    pub fn local(&mut self, local: &ast::Local, end: EndWidth) -> FormatResult<EndReserved> {
+    pub fn local(&mut self, local: &ast::Local, end: Tail) -> FormatResult {
         let ast::Local {
             pat, kind, span, ..
         } = local;
@@ -20,7 +20,7 @@ impl<'a> AstFormatter<'a> {
         }
     }
 
-    fn local_init(&mut self, expr: &ast::Expr, end: EndWidth) -> FormatResult<EndReserved> {
+    fn local_init(&mut self, expr: &ast::Expr, end: Tail) -> FormatResult {
         self.out.space()?;
         self.out.token_expect("=")?;
         self.fallback_chain(
@@ -29,7 +29,7 @@ impl<'a> AstFormatter<'a> {
                 chain.next(|this| {
                     this.with_single_line(|this| {
                         this.out.space()?;
-                        this.expr(expr)?;
+                        this.expr(expr, Tail::None)?;
                         Ok(())
                     })
                 });
@@ -37,25 +37,25 @@ impl<'a> AstFormatter<'a> {
                 chain.next(|this| {
                     this.with_indent(|this| {
                         this.out.newline_indent()?;
-                        this.with_single_line(|this| this.expr(expr))
+                        this.with_single_line(|this| this.expr(expr, Tail::None))
                     })
                 });
                 // normal
                 chain.next(|this| {
                     this.out.space()?;
-                    this.expr(expr)?;
+                    this.expr(expr, Tail::None)?;
                     Ok(())
                 });
                 // wrap and indent
                 chain.next(|this| {
                     this.with_indent(|this| {
                         this.out.newline_indent()?;
-                        this.expr(expr)?;
+                        this.expr(expr, Tail::None)?;
                         Ok(())
                     })
                 });
             },
-            |this| this.reserve_end(end),
+            |this| this.tail(end),
         )
     }
 }

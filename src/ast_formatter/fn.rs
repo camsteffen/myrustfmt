@@ -2,7 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{AngleBracketedArgsConfig, ListConfig, ParamListConfig};
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
-use crate::ast_formatter::last_line::{EndReserved, EndWidth};
+use crate::ast_formatter::last_line::{EndReserved, Tail};
 
 impl<'a> AstFormatter<'a> {
     pub fn fn_(&mut self, fn_: &ast::Fn, item: &ast::Item) -> FormatResult {
@@ -15,12 +15,12 @@ impl<'a> AstFormatter<'a> {
         self.fn_sig(sig, generics, item)?;
         if let Some(body) = body {
             self.out.space()?;
-            self.block(body)?;
+            self.block(body, Tail::None)?;
         }
         Ok(())
     }
 
-    pub fn closure(&mut self, closure: &ast::Closure, end: EndWidth) -> FormatResult<EndReserved> {
+    pub fn closure(&mut self, closure: &ast::Closure, end: Tail) -> FormatResult {
         match closure.binder {
             ast::ClosureBinder::NotPresent => {}
             ast::ClosureBinder::For { span, ref generic_params } => todo!(),
@@ -36,11 +36,11 @@ impl<'a> AstFormatter<'a> {
             self.coroutine_kind(coroutine_kind)?;
         }
         self.fn_decl(&closure.fn_decl, ClosureParamListConfig)?;
-        self.expr_end(&closure.body, end)
+        self.expr(&closure.body, end)
     }
 
     pub fn parenthesized_args(&mut self, parenthesized_args: &ast::ParenthesizedArgs) -> FormatResult {
-        self.list(&parenthesized_args.inputs, |this, ty| this.ty(ty), ParamListConfig)?;
+        self.list(&parenthesized_args.inputs, |this, ty| this.ty(ty), ParamListConfig, Tail::None)?;
         self.fn_ret_ty(&parenthesized_args.output)?;
         Ok(())
     }
@@ -56,7 +56,7 @@ impl<'a> AstFormatter<'a> {
         self.out.space()?;
         self.ident(item.ident)?;
         if !generics.params.is_empty() {
-            self.list(&generics.params, Self::generic_param, AngleBracketedArgsConfig)?;
+            self.list(&generics.params, Self::generic_param, AngleBracketedArgsConfig, Tail::None)?;
         }
         self.fn_decl(decl, ParamListConfig)?;
         Ok(())
@@ -82,7 +82,7 @@ impl<'a> AstFormatter<'a> {
         }
         Ok(())
     }
-    
+
     fn fn_header(
         &mut self,
         &ast::FnHeader {
@@ -102,7 +102,7 @@ impl<'a> AstFormatter<'a> {
     }
 
     fn fn_decl(&mut self, ast::FnDecl { inputs, output }: &ast::FnDecl, input_list_config: impl ListConfig) -> FormatResult {
-        self.list(inputs, |this, param| this.param(param), input_list_config)?;
+        self.list(inputs, |this, param| this.param(param), input_list_config,Tail::None)?;
         self.fn_ret_ty(output)?;
         Ok(())
     }

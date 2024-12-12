@@ -2,10 +2,10 @@ use crate::ast_formatter::AstFormatter;
 use crate::source_formatter::FormatResult;
 
 #[derive(Clone, Copy)]
-pub struct EndWidth(usize);
-
-impl EndWidth {
-    pub const ZERO: EndWidth = EndWidth(0);
+pub enum Tail {
+    None,
+    Semicolon,
+    SpaceSemicolon,
 }
 
 pub struct EndReserved {
@@ -13,19 +13,15 @@ pub struct EndReserved {
 }
 
 impl<'a> AstFormatter<'a> {
-    pub fn with_end_width(
-        &mut self,
-        len: usize,
-        f: impl FnOnce(&mut Self, EndWidth) -> FormatResult<EndReserved>,
-    ) -> FormatResult {
-        let EndReserved { .. } = f(self, EndWidth(len))?;
-        Ok(())
-    }
-
-    pub fn reserve_end(&mut self, end_width: EndWidth) -> FormatResult<EndReserved> {
-        let EndWidth(len) = end_width;
-        self.out.require_width(len)?;
-        Ok(EndReserved { _private: () })
+    pub fn tail(&mut self, tail: Tail) -> FormatResult {
+        match tail {
+            Tail::None => Ok(()),
+            Tail::Semicolon => self.out.token_expect(";"),
+            Tail::SpaceSemicolon => {
+                self.out.space()?;
+                self.out.token_expect(";")
+            }
+        }
     }
 }
 

@@ -10,7 +10,7 @@ pub struct SourceFormatterSnapshot {
     pos: BytePos,
 }
 
-pub type FormatResult<T = ()> = Result<T, FormatError>;
+pub type FormatResult = Result<(), FormatError>;
 
 #[derive(Clone, Copy, Debug)]
 pub struct FormatError {
