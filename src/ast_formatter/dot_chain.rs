@@ -52,7 +52,7 @@ impl AstFormatter<'_> {
                 });
                 // hanging indent and wrap each item
                 chain.next(|this| {
-                    this.with_indent(|this| {
+                    this.indented(|this| {
                         for item in rest {
                             this.out.newline_indent()?;
                             this.dot_chain_item(item)?;

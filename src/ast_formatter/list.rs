@@ -126,7 +126,7 @@ impl<'a> AstFormatter<'a> {
         if let Some(max_width) = C::single_line_max_contents_width() {
             self.with_width_limit_single_line(max_width, |this| contents(this))?;
         } else {
-            contents(self)?;
+            self.with_single_line(|this| contents(this))?;
         }
         if C::PAD_CONTENTS {
             self.out.space()?;
@@ -146,7 +146,7 @@ impl<'a> AstFormatter<'a> {
             }
             None => format_item(this, item),
         };
-        self.with_indent(|this| {
+        self.indented(|this| {
             this.out.newline_indent()?;
             let [head, tail @ ..] = list else {
                 unreachable!()
@@ -178,7 +178,7 @@ impl<'a> AstFormatter<'a> {
         format_item: impl Fn(&mut Self, &T) -> FormatResult,
         _config: &C,
     ) -> FormatResult {
-        self.with_indent(|this| {
+        self.indented(|this| {
             for item in list {
                 this.out.newline_indent()?;
                 format_item(this, item)?;

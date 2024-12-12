@@ -35,7 +35,7 @@ impl<'a> AstFormatter<'a> {
                 });
                 // wrap and indent then single line
                 chain.next(|this| {
-                    this.with_indent(|this| {
+                    this.indented(|this| {
                         this.out.newline_indent()?;
                         this.with_single_line(|this| this.expr(expr, Tail::None))
                     })
@@ -48,7 +48,7 @@ impl<'a> AstFormatter<'a> {
                 });
                 // wrap and indent
                 chain.next(|this| {
-                    this.with_indent(|this| {
+                    this.indented(|this| {
                         this.out.newline_indent()?;
                         this.expr(expr, Tail::None)?;
                         Ok(())

@@ -34,7 +34,7 @@ impl<'a> AstFormatter<'a> {
                     ast::ModKind::Loaded(items, ast::Inline::Yes, _mod_spans) => {
                         self.out.space()?;
                         self.out.token_expect("{")?;
-                        self.with_indent(|this| {
+                        self.indented(|this| {
                             for item in items {
                                 this.out.newline_indent()?;
                                 this.item(item)?;

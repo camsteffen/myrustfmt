@@ -7,7 +7,7 @@ impl<'a> AstFormatter<'a> {
     pub fn block(&mut self, block: &ast::Block, end: Tail) -> FormatResult {
         self.out.token_at("{", block.span.lo())?;
         if !block.stmts.is_empty() {
-            self.with_indent(|this| {
+            self.indented(|this| {
                 for stmt in &block.stmts {
                     this.out.newline_indent()?;
                     this.stmt(stmt)?;

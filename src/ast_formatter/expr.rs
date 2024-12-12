@@ -124,7 +124,7 @@ impl<'a> AstFormatter<'a> {
         self.out.token_at("match", expr.span.lo())?;
         self.out.space()?;
         self.expr(scrutinee, Tail::SpaceOpenBrace)?;
-        self.with_indent(|this| {
+        self.indented(|this| {
             for arm in arms {
                 this.out.newline_indent()?;
                 this.arm(arm)?;

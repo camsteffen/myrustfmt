@@ -208,6 +208,7 @@ impl<'a> SourceFormatter<'a> {
     }
 
     fn handle_whitespace_and_comments_for_newline(&mut self) -> FormatResult {
+        let mut newlines_happened = false;
         for token in rustc_lexer::tokenize(self.source.remaining()) {
             let token_str = &self.source.remaining()[..token.len as usize];
             match token.kind {
@@ -222,9 +223,14 @@ impl<'a> SourceFormatter<'a> {
                     }
                     self.indent()?;
                     self.source.advance(token.len as usize);
+                    newlines_happened = true;
                 }
                 _ => break,
             }
+        }
+        if !newlines_happened {
+            self.newline()?;
+            self.indent()?;
         }
         Ok(())
     }
