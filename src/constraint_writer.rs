@@ -1,5 +1,5 @@
-use crate::constraints::Constraints;
 use tracing::instrument;
+use crate::constraints::Constraints;
 
 pub struct ConstraintWriter {
     constraints: Constraints,
@@ -44,6 +44,7 @@ impl ConstraintWriter {
         self.buffer.truncate(snapshot.len);
     }
 
+    // #[instrument(skip(self))]
     pub fn token(&mut self, token: &str) -> Result<(), TooWideError> {
         self.require_width(token.len())?;
         self.buffer.push_str(token);
@@ -91,7 +92,7 @@ impl ConstraintWriter {
             .transpose()
     }
 
-    #[instrument(skip(self), ret)]
+    // #[instrument(skip(self), ret)]
     pub fn last_line_width(&self) -> usize {
         self.buffer.len() - self.last_line_start
     }

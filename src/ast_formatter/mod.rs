@@ -1,6 +1,7 @@
 use crate::constraints::Constraints;
 use crate::source_formatter::{FormatResult, SourceFormatter};
 
+mod attr;
 mod block;
 mod common;
 mod expr;
@@ -10,16 +11,17 @@ mod item;
 pub mod list;
 mod local;
 mod pat;
+mod path;
 mod ty;
-mod qpath;
 
 pub struct AstFormatter<'a> {
     out: SourceFormatter<'a>,
+    reserved_width: usize,
 }
 
 impl<'a> AstFormatter<'a> {
     pub fn new(out: SourceFormatter<'a>) -> Self {
-        AstFormatter { out }
+        AstFormatter { out, reserved_width: 0 }
     }
 
     pub fn finish(self) -> String {
@@ -27,6 +29,7 @@ impl<'a> AstFormatter<'a> {
     }
 
     pub fn crate_(&mut self, crate_: &rustc_ast::ast::Crate) -> FormatResult {
+        self.attrs(&crate_.attrs)?;
         for item in &crate_.items {
             self.item(item)?;
         }
@@ -56,11 +59,24 @@ impl<'a> AstFormatter<'a> {
         len: usize,
         f: impl FnOnce(&mut Self) -> FormatResult,
     ) -> FormatResult {
+        self.reserved_width += len;
         self.constraints()
             .sub_max_width(len)
             .map_err(|e| self.out.lift_constraint_err(e))?;
         let result = f(self);
         self.constraints().add_max_width(len);
+        self.reserved_width -= len;
+        result
+    }
+
+    fn with_leading_lines(&mut self, f: impl FnOnce(&mut Self) -> FormatResult) -> FormatResult {
+        let reserved_width = std::mem::replace(&mut self.reserved_width, 0);
+        self.constraints().add_max_width(reserved_width);
+        let result = f(self);
+        self.constraints()
+            .sub_max_width(reserved_width)
+            .map_err(|e| self.out.lift_constraint_err(e))?;
+        self.reserved_width = reserved_width;
         result
     }
 

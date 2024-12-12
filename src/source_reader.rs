@@ -18,9 +18,26 @@ impl<'a> SourceReader<'a> {
     }
 
     pub fn expect_pos(&self, pos: BytePos) {
-        if pos != self.pos {
-            panic!("Expected position {} to be {}. Next char is {:?}.", self.pos.to_u32(), pos.to_u32(), self.remaining().chars().next().unwrap_or('\0'));
+        if pos == self.pos {
+            return;
         }
+        let token = self.next_token();
+        if pos > self.pos {
+            if token.len < 20 {
+                panic!("Skipped token: {:?}", &self.remaining()[..token.len as usize])
+            }
+            panic!("Skipped token: {:?}", token.kind)
+        }
+        panic!(
+            "Expected position to be {}, but was actually {}. Next token is {:?}.",
+            pos.to_u32(),
+            self.pos.to_u32(),
+            token.kind
+        );
+    }
+    
+    fn next_token(&self) -> rustc_lexer::Token {
+        rustc_lexer::tokenize(self.remaining()).next().unwrap()
     }
 
     pub fn remaining(&self) -> &'a str {

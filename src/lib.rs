@@ -19,6 +19,7 @@ extern crate thin_vec;
 extern crate rustc_driver;
 
 pub mod ast_formatter;
+mod config;
 pub mod constraint_writer;
 mod constraints;
 pub mod source_formatter;
@@ -33,24 +34,33 @@ use rustc_span::{
     FileName,
     source_map::{FilePathMapping, SourceMap},
 };
+use std::fs;
+use std::path::Path;
 
 use crate::ast_formatter::AstFormatter;
+use crate::config::DEFAULT_CONFIG;
 use crate::constraints::Constraints;
 use source_formatter::SourceFormatter;
 
-pub fn format_str(source: &str, max_width: usize) -> String {
-    let crate_ = parse_ast(String::from(source));
-    let constraints = Constraints::new(max_width);
-    let source_formatter = SourceFormatter::new(source, constraints);
-    let mut ast_formatter = AstFormatter::new(source_formatter);
-    match ast_formatter.crate_(&crate_) {
-        Ok(()) => {}
-        Err(e) => todo!("failed to format: {e:?}"),
-    }
-    ast_formatter.finish()
+pub fn format_file(path: impl AsRef<Path>) -> String {
+    let string = fs::read_to_string(path).unwrap();
+    format_str(&string, DEFAULT_CONFIG.max_width)
 }
 
-fn parse_ast(string: String) -> rustc_ast::ast::Crate {
+pub fn format_str(source: &str, max_width: usize) -> String {
+    parse_ast_then(String::from(source), |crate_| {
+        let constraints = Constraints::new(max_width);
+        let source_formatter = SourceFormatter::new(source, constraints);
+        let mut ast_formatter = AstFormatter::new(source_formatter);
+        match ast_formatter.crate_(&crate_) {
+            Ok(()) => {}
+            Err(e) => todo!("failed to format: {e:?}"),
+        }
+        ast_formatter.finish()
+    })
+}
+
+fn parse_ast_then<T>(string: String, f: impl FnOnce(rustc_ast::ast::Crate) -> T) -> T {
     let source_map = Lrc::new(SourceMap::new(FilePathMapping::empty()));
     let dcx = dcx(source_map.clone());
     rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
@@ -61,10 +71,11 @@ fn parse_ast(string: String) -> rustc_ast::ast::Crate {
             string,
         )
         .unwrap();
-        parser.parse_crate_mod().unwrap_or_else(|err| {
+        let crate_ = parser.parse_crate_mod().unwrap_or_else(|err| {
             err.emit();
             panic!("ur done");
-        })
+        });
+        f(crate_)
     })
 }
 

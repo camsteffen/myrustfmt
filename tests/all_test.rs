@@ -16,8 +16,9 @@ fn main() {
         aaaaa, aaaaa, aaaaa, aaaaa, aaaaa,
         aaaaa, aaaaa, aaaaa,
     ];
-}"
-        .trim()
+}
+"
+        .trim_start()
     );
 }
 
@@ -26,7 +27,7 @@ fn main() {
 fn long_list_of_slightly_long_items() {
     let source = "fn main() { let asdfasdf = [aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa]; }";
     assert_eq!(
-        format_str(source, 44),
+        format_str(source, 20),
         "
 fn main() {
     let asdfasdf = [
@@ -37,8 +38,9 @@ fn main() {
         aaaaaaaaaaa,
         aaaaaaaaaaa,
     ];
-}"
-        .trim()
+}
+"
+        .trim_start()
     );
 }
 
@@ -53,7 +55,7 @@ fn test_list_formats() {
     //         "
     // fn main() {
     //     let asdfasdf = [aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa];
-    // }".trim()
+    // }".trim_start()
     //     );
     assert_eq!(
         format_str(source, 68),
@@ -62,8 +64,9 @@ fn main() {
     let asdfasdf = [
         aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa,
     ];
-}"
-        .trim()
+}
+"
+        .trim_start()
     );
 }
 
@@ -83,8 +86,9 @@ fn main() {
             aaaaaaaaaaa,
             aaaaaaaaaaa,
         ];
-}"
-        .trim()
+}
+"
+        .trim_start()
     );
 }
 
@@ -99,8 +103,9 @@ fn assign_wrap() {
 fn main() {
     let asdfasdf =
         [aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa];
-}"
-        .trim()
+}
+"
+        .trim_start()
     );
 }
 
@@ -111,8 +116,9 @@ fn short_struct_pat_single_line() {
         "
 fn test() {
     let Struct { a, b, c: ccccccccc } = foo;
-}"
-        .trim()
+}
+"
+        .trim_start()
     );
 }
 
@@ -130,7 +136,8 @@ fn test() {
         b,
         c: cccccccccc,
     } = foo;
-}"
-        .trim()
+}
+"
+        .trim_start()
     );
 }

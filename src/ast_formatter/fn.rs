@@ -1,44 +1,95 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::ParamListConfig;
+use crate::ast_formatter::list::{AngleBracketedArgsConfig, ListConfig, ParamListConfig};
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter<'a> {
     pub fn fn_(&mut self, fn_: &ast::Fn, item: &ast::Item) -> FormatResult {
         let ast::Fn {
-            defaultness,
             generics,
             sig,
             body,
             ..
         } = fn_;
-        self.fn_sig(sig, item);
+        self.fn_sig(sig, generics, item)?;
         if let Some(body) = body {
+            self.out.space()?;
             self.block(body)?;
         }
+        Ok(())
+    }
+
+    pub fn closure(&mut self, closure: &ast::Closure) -> FormatResult {
+        match closure.binder {
+            ast::ClosureBinder::NotPresent => {}
+            ast::ClosureBinder::For { span, ref generic_params } => todo!(),
+        }
+        match closure.capture_clause {
+            ast::CaptureBy::Ref => {}
+            ast::CaptureBy::Value { move_kw } => {
+                self.out.token_at_space("move", move_kw.lo())?
+            },
+        }
+        self.constness(closure.constness)?;
+        if let Some(coroutine_kind) = &closure.coroutine_kind {
+            self.coroutine_kind(coroutine_kind)?;
+        }
+        self.fn_decl(&closure.fn_decl, ClosureParamListConfig)?;
+        self.expr(&closure.body)?;
+        Ok(())
+    }
+
+    pub fn parenthesized_args(&mut self, parenthesized_args: &ast::ParenthesizedArgs) -> FormatResult {
+        self.list(&parenthesized_args.inputs, |this, ty| this.ty(ty), ParamListConfig)?;
+        self.fn_ret_ty(&parenthesized_args.output)?;
         Ok(())
     }
 
     fn fn_sig(
         &mut self,
         ast::FnSig { header, decl, span }: &ast::FnSig,
+        generics: &ast::Generics,
         item: &ast::Item,
     ) -> FormatResult {
         self.fn_header(header)?;
         self.out.token_expect("fn")?;
         self.out.space()?;
         self.ident(item.ident)?;
-        self.fn_decl(decl)?;
+        if !generics.params.is_empty() {
+            self.list(&generics.params, Self::generic_param, AngleBracketedArgsConfig)?;
+        }
+        self.fn_decl(decl, ParamListConfig)?;
         Ok(())
     }
 
+    fn generic_param(&mut self, param: &ast::GenericParam) -> FormatResult {
+        self.ident(param.ident)?;
+        self.generic_bounds(&param.bounds)?;
+        match param.kind {
+            ast::GenericParamKind::Const {ref ty,kw_span, ref default} => {
+                self.out.token_at_space("const", kw_span.lo())?;
+                if let Some(default) = default {
+                    todo!()
+                }
+                self.ty(ty)?;
+            }
+            ast::GenericParamKind::Lifetime => {}
+            ast::GenericParamKind::Type {ref default} => {
+                if let Some(default) = default {
+                    todo!()
+                }
+            }
+        }
+        Ok(())
+    }
+    
     fn fn_header(
         &mut self,
-        ast::FnHeader {
-            safety,
-            coroutine_kind,
+        &ast::FnHeader {
+            ref safety,
+            ref coroutine_kind,
             constness,
-            ext,
+            ref ext,
         }: &ast::FnHeader,
     ) -> FormatResult {
         self.safety(safety)?;
@@ -50,32 +101,40 @@ impl<'a> AstFormatter<'a> {
         Ok(())
     }
 
-    fn fn_decl(&mut self, ast::FnDecl { inputs, output }: &ast::FnDecl) -> FormatResult {
-        self.list(inputs, |this, param| this.param(param), ParamListConfig)?;
-        self.out.space()?;
+    fn fn_decl(&mut self, ast::FnDecl { inputs, output }: &ast::FnDecl, input_list_config: impl ListConfig) -> FormatResult {
+        self.list(inputs, |this, param| this.param(param), input_list_config)?;
         self.fn_ret_ty(output)?;
         Ok(())
     }
 
     fn param(&mut self, param: &ast::Param) -> FormatResult {
-        todo!()
+        tracing::info!("{:?}", param);
+        self.attrs(&param.attrs)?;
+        self.pat(&param.pat)?;
+        if !matches!(param.ty.kind, ast::TyKind::Infer) {
+            self.out.token_expect(":")?;
+            self.out.space()?;
+            self.ty(&param.ty)?;
+        }
+        Ok(())
     }
 
     fn fn_ret_ty(&mut self, output: &ast::FnRetTy) -> FormatResult {
         match output {
             ast::FnRetTy::Default(_) => {}
             ast::FnRetTy::Ty(ty) => {
+                self.out.space()?;
                 self.out.token_expect("->")?;
                 self.out.space()?;
-                self.ty(ty);
+                self.ty(ty)?;
                 self.out.space()?;
             }
         }
         Ok(())
     }
 
-    fn constness(&mut self, constness: &ast::Const) -> FormatResult {
-        match *constness {
+    fn constness(&mut self, constness: ast::Const) -> FormatResult {
+        match constness {
             ast::Const::Yes(span) => {
                 let pos = span.lo();
                 self.out.token_at_space("const", pos)
@@ -101,20 +160,6 @@ impl<'a> AstFormatter<'a> {
         Ok(())
     }
 
-    fn safety(&mut self, safety: &ast::Safety) -> FormatResult {
-        match *safety {
-            ast::Safety::Unsafe(span) => {
-                let pos = span.lo();
-                self.out.token_at_space("unsafe", pos)
-            }
-            ast::Safety::Safe(span) => {
-                let pos = span.lo();
-                self.out.token_at_space("safe", pos)
-            }
-            ast::Safety::Default => Ok(()),
-        }
-    }
-
     fn coroutine_kind(&mut self, coroutine_kind: &ast::CoroutineKind) -> FormatResult {
         match *coroutine_kind {
             ast::CoroutineKind::Async { span, .. } => {
@@ -136,4 +181,12 @@ impl<'a> AstFormatter<'a> {
             }
         }
     }
+}
+
+struct ClosureParamListConfig;
+
+impl ListConfig for ClosureParamListConfig {
+    const START_BRACE: &'static str = "|";
+    const END_BRACE: &'static str = "|";
+    const PAD_CONTENTS: bool = false;
 }

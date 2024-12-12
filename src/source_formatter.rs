@@ -1,12 +1,9 @@
-use crate::constraint_writer::{
-    ConstraintError, ConstraintWriter, WriterSnapshot,
-};
+use crate::constraint_writer::{ConstraintError, ConstraintWriter, WriterSnapshot};
 use crate::constraints::Constraints;
 use crate::source_reader::SourceReader;
+
 use rustc_lexer::TokenKind;
-use rustc_span::{
-    BytePos, Span,
-};
+use rustc_span::{BytePos, Pos, Span};
 
 pub struct SourceFormatterSnapshot {
     writer_snapshot: WriterSnapshot,
@@ -69,6 +66,18 @@ impl<'a> SourceFormatter<'a> {
         self.out.indent().map_err(|e| self.lift_constraint_err(e))?;
         Ok(())
     }
+    
+    pub fn char_ending_at(&self, pos: BytePos) -> u8 {
+        self.source.source.as_bytes()[pos.to_usize() - 1]
+    }
+    
+    pub fn skip_token_if_present(&mut self, token: &str) {
+        self.handle_whitespace_and_comments_if_needed();
+        if self.source.remaining().starts_with(token) {
+            self.source.advance(token.len());
+            self.next_is_whitespace_or_comments = true;
+        }
+    }
 
     /** Writes a space and accounts for spaces and comments in source */
     pub fn space(&mut self) -> FormatResult {
@@ -113,7 +122,7 @@ impl<'a> SourceFormatter<'a> {
         self.handle_whitespace_and_comments_if_needed();
         if !self.source.remaining().starts_with(token) {
             panic!(
-                "expected token \"{}\", found \"{}\"",
+                "expected token {:?}, found {:?}",
                 token,
                 &self.source.remaining()[..10.min(self.source.remaining().len())]
             );
@@ -181,6 +190,16 @@ impl<'a> SourceFormatter<'a> {
         let segment = &self.source.remaining()[..len];
         self.out.write_unchecked(segment);
         self.source.advance(len);
+    }
+    
+    pub fn copy_span(&mut self, span: Span) {
+        self.handle_whitespace_and_comments_if_needed();
+        self.source.expect_pos(span.lo());
+        self.copy(span.hi().to_usize() - span.lo().to_usize())
+    }
+
+    pub fn copy_to(&mut self, pos: BytePos) {
+        self.copy(pos.to_usize() - self.source.pos.to_usize());
     }
 
     /** Write a token assuming it is next in source */

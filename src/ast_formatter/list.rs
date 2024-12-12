@@ -10,17 +10,27 @@ pub trait ListConfig {
         None
     }
 
-    fn wrap_to_fit() -> ListWrapToFitConfig;
+    fn wrap_to_fit() -> ListWrapToFitConfig {
+        ListWrapToFitConfig::No
+    }
 }
 
-enum ListWrapToFitConfig {
+pub enum ListWrapToFitConfig {
     No,
-    Yes { max_element_width: usize },
+    Yes { max_element_width: Option<usize> },
 }
 
+// todo so many configs?
+pub struct AngleBracketedArgsConfig;
 pub struct ArrayListConfig;
 pub struct ParamListConfig;
 pub struct StructListConfig;
+
+impl ListConfig for AngleBracketedArgsConfig {
+    const START_BRACE: &'static str = "<";
+    const END_BRACE: &'static str = ">";
+    const PAD_CONTENTS: bool = false;
+}
 
 impl ListConfig for ArrayListConfig {
     const START_BRACE: &'static str = "[";
@@ -35,7 +45,7 @@ impl ListConfig for ArrayListConfig {
     fn wrap_to_fit() -> ListWrapToFitConfig {
         // short_array_element_width_threshold in rustfmt
         ListWrapToFitConfig::Yes {
-            max_element_width: 10,
+            max_element_width: Some(10),
         }
     }
 }
@@ -44,10 +54,6 @@ impl ListConfig for ParamListConfig {
     const START_BRACE: &'static str = "(";
     const END_BRACE: &'static str = ")";
     const PAD_CONTENTS: bool = false;
-
-    fn wrap_to_fit() -> ListWrapToFitConfig {
-        ListWrapToFitConfig::No
-    }
 }
 
 impl ListConfig for StructListConfig {
@@ -58,10 +64,6 @@ impl ListConfig for StructListConfig {
     fn single_line_max_contents_width() -> Option<usize> {
         // struct_lit_width in rustfmt
         Some(18)
-    }
-
-    fn wrap_to_fit() -> ListWrapToFitConfig {
-        ListWrapToFitConfig::No
     }
 }
 
@@ -116,6 +118,7 @@ impl<'a> AstFormatter<'a> {
                 this.out.space()?;
                 format_item(this, item)?;
             }
+            this.out.skip_token_if_present(",");
             Ok(())
         };
         if let Some(max_width) = C::single_line_max_contents_width() {
@@ -133,10 +136,13 @@ impl<'a> AstFormatter<'a> {
         &mut self,
         list: &[T],
         format_item: impl Fn(&mut Self, &T) -> FormatResult,
-        max_element_width: usize,
+        max_element_width: Option<usize>,
     ) -> FormatResult {
-        let format_item = |this: &mut Self, item: &T| {
-            this.with_width_limit_single_line(max_element_width, |this| format_item(this, item))
+        let format_item = |this: &mut Self, item: &T| match max_element_width {
+            Some(max_width) => {
+                this.with_width_limit_single_line(max_width, |this| format_item(this, item))
+            }
+            None => format_item(this, item),
         };
         self.with_indent(|this| {
             this.out.newline_indent()?;
