@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{ArrayListConfig, ParamListConfig};
+use crate::ast_formatter::list::{array_list_config, param_list_config };
 use crate::source_formatter::FormatResult;
 
 use crate::ast_formatter::last_line::{EndReserved, Tail, drop_end_reserved};
@@ -12,7 +12,7 @@ impl<'a> AstFormatter<'a> {
             ast::ExprKind::Array(ref items) => self.list(
                 items,
                 |this, e| this.expr(e, Tail::None),
-                ArrayListConfig,
+                array_list_config(),
                 tail,
             ),
             ast::ExprKind::ConstBlock(_) => todo!(),
@@ -98,7 +98,7 @@ impl<'a> AstFormatter<'a> {
         self.list(
             args,
             |this, arg| this.expr(arg, Tail::None),
-            ParamListConfig,
+            param_list_config(),
             end,
         )
     }

@@ -11,7 +11,7 @@ pub struct SourceFormatterSnapshot {
     next_is_whitespace_or_comments: bool,
 }
 
-pub type FormatResult = Result<(), FormatError>;
+pub type FormatResult<T = ()> = Result<T, FormatError>;
 
 #[derive(Clone, Copy, Debug)]
 pub struct FormatError {
@@ -67,7 +67,11 @@ impl<'a> SourceFormatter<'a> {
     }
 
     pub fn last_line_width(&self) -> usize {
-        self.out.last_line_width()
+        self.out.last_line_len()
+    }
+
+    pub fn line(&self) -> usize {
+        self.out.line()
     }
 
     /** Writes a newline character and indent characters according to the current indent level */

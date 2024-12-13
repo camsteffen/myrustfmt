@@ -115,6 +115,8 @@ impl<'a> AstFormatter<'a> {
 struct UseTreeListConfig;
 
 impl ListConfig for UseTreeListConfig {
+    type Item = (ast::UseTree, ast::NodeId);
+    
     const START_BRACE: &'static str = "{";
     const END_BRACE: &'static str = "}";
     const PAD_CONTENTS: bool = false;

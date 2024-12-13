@@ -2,7 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::source_formatter::FormatResult;
 
 use crate::ast_formatter::last_line::{EndReserved, Tail, drop_end_reserved};
-use crate::ast_formatter::list::AngleBracketedArgsConfig;
+use crate::ast_formatter::list::{angle_bracketed_list_config };
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
@@ -49,10 +49,11 @@ impl AstFormatter<'_> {
                             ast::AngleBracketedArg::Arg(arg) => this.generic_arg(arg),
                             ast::AngleBracketedArg::Constraint(AssocItemConstraint) => todo!(),
                         },
-                        AngleBracketedArgsConfig,
+                        angle_bracketed_list_config(),
                         Tail::None
                     )?;
                 }
+                // (A, B) -> C
                 ast::Parenthesized(parenthesized_args) => {
                     self.parenthesized_args(parenthesized_args)?;
                 }

@@ -1,46 +1,72 @@
 use crate::ast_formatter::AstFormatter;
 use crate::constraint_writer::ConstraintError;
-use crate::source_formatter::{FormatResult, SourceFormatterSnapshot};
+use crate::source_formatter::{FormatResult, SourceFormatter, SourceFormatterSnapshot};
 use tracing::info;
+
+pub trait HasSourceFormatter<'a> {
+    fn source_formatter(&mut self) -> &mut SourceFormatter<'a>;
+}
+
+impl<'a> HasSourceFormatter<'a> for AstFormatter<'a> {
+    fn source_formatter(&mut self) -> &mut SourceFormatter<'a> {
+        &mut self.out
+    }
+}
+
+pub fn fallback_chain<'source, CTX, Finally>(
+    ctx: &mut CTX,
+    chain: impl FnOnce(&mut FallbackChain<CTX, Finally>),
+    finally: Finally,
+) -> FormatResult
+where
+    CTX: HasSourceFormatter<'source>,
+    Finally: Fn(&mut CTX) -> FormatResult,
+{
+    let snapshot = ctx.source_formatter().snapshot();
+    let mut builder = FallbackChain {
+        ctx,
+        result: None,
+        snapshot,
+        finally,
+    };
+    chain(&mut builder);
+    builder
+        .result
+        .expect("fallback chain must be used at least once")
+}
 
 impl<'a> AstFormatter<'a> {
     pub fn fallback_chain<'b, F: Fn(&mut Self) -> FormatResult>(
         &mut self,
-        chain: impl FnOnce(&mut FallbackChain<'a, '_, F>),
+        chain: impl FnOnce(&mut FallbackChain<Self, F>),
         finally: F,
     ) -> FormatResult {
-        let snapshot = self.out.snapshot();
-        let mut builder = FallbackChain {
-            ast_formatter: self,
-            result: None,
-            snapshot,
-            finally,
-        };
-        chain(&mut builder);
-        builder
-            .result
-            .expect("fallback chain must be used at least once")
+        fallback_chain(self, chain, finally)
     }
 }
 
-pub struct FallbackChain<'a, 'b, F> {
-    ast_formatter: &'b mut AstFormatter<'a>,
+pub struct FallbackChain<'ctx, CTX, Finally> {
+    ctx: &'ctx mut CTX,
     result: Option<FormatResult>,
     snapshot: SourceFormatterSnapshot,
-    finally: F,
+    finally: Finally,
 }
 
-impl<'a, F: Fn(&mut AstFormatter<'a>) -> FormatResult> FallbackChain<'a, '_, F> {
-    pub fn next(&mut self, f: impl FnOnce(&mut AstFormatter<'a>) -> FormatResult) {
+impl<'ctx, 'source, CTX, Finally> FallbackChain<'ctx, CTX, Finally>
+where
+    CTX: HasSourceFormatter<'source>,
+    Finally: Fn(&mut CTX) -> FormatResult,
+{
+    pub fn next(&mut self, f: impl FnOnce(&mut CTX) -> FormatResult) {
         if matches!(self.result, Some(Ok(_))) {
             return;
         }
-        let result = f(self.ast_formatter).and_then(|()| (self.finally)(self.ast_formatter));
+        let result = f(self.ctx).and_then(|()| (self.finally)(self.ctx));
         if let Err(e) = result {
             // future-proof: only recover from constraint errors
             let _: ConstraintError = e.kind;
 
-            self.ast_formatter.out.restore(&self.snapshot);
+            self.ctx.source_formatter().restore(&self.snapshot);
         }
         self.result = Some(result);
     }

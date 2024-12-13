@@ -1,9 +1,9 @@
 use crate::ast_formatter::AstFormatter;
 use crate::source_formatter::FormatResult;
 
-use crate::ast_formatter::list::ParamListConfig;
-use rustc_ast::ast;
 use crate::ast_formatter::last_line::Tail;
+use crate::ast_formatter::list::param_list_config;
+use rustc_ast::ast;
 
 impl AstFormatter<'_> {
     pub fn attrs(&mut self, attrs: &[ast::Attribute]) -> FormatResult {
@@ -47,8 +47,8 @@ impl AstFormatter<'_> {
                     ast::MetaItemInner::MetaItem(item) => this.meta_item(item),
                     ast::MetaItemInner::Lit(lit) => this.meta_item_lit(lit),
                 },
-                ParamListConfig,
-                Tail::None
+                param_list_config(),
+                Tail::None,
             ),
             ast::MetaItemKind::NameValue(lit) => self.meta_item_lit(lit),
         }

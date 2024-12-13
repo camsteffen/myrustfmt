@@ -5,6 +5,7 @@ pub struct ConstraintWriter {
     constraints: Constraints,
     buffer: String,
     last_line_start: usize,
+    line: usize,
 }
 
 pub struct WriterSnapshot {
@@ -19,6 +20,7 @@ impl ConstraintWriter {
             constraints,
             buffer: String::new(),
             last_line_start: 0,
+            line: 0,
         }
     }
 
@@ -28,6 +30,10 @@ impl ConstraintWriter {
 
     pub fn constraints(&mut self) -> &mut Constraints {
         &mut self.constraints
+    }
+    
+    pub fn line(&self) -> usize {
+        self.line
     }
 
     pub fn snapshot(&self) -> WriterSnapshot {
@@ -47,7 +53,7 @@ impl ConstraintWriter {
     // #[instrument(skip(self))]
     pub fn token(&mut self, token: &str) -> Result<(), TooWideError> {
         self.buffer.push_str(token);
-        self.check_width()
+        self.check_width_constraints()
     }
     
     pub fn write_unchecked(&mut self, source: &str) {
@@ -60,16 +66,18 @@ impl ConstraintWriter {
         }
         self.buffer.push('\n');
         self.last_line_start = self.buffer.len();
+        self.line += 1;
+        self.constraints.max_width_first_line = None;
         Ok(())
     }
 
     pub fn indent(&mut self) -> Result<(), TooWideError> {
         self.buffer
             .extend(std::iter::repeat_n(' ', self.constraints.indent));
-        self.check_width()
+        self.check_width_constraints()
     }
 
-    pub fn check_width(&mut self) -> Result<(), TooWideError> {
+    pub fn check_width_constraints(&mut self) -> Result<(), TooWideError> {
         match self.remaining_width() {
             Ok(_width) => Ok(()),
             Err(TooWideError) => {
@@ -80,11 +88,29 @@ impl ConstraintWriter {
     }
 
     pub fn remaining_width(&self) -> Result<Option<usize>, TooWideError> {
+        let a = self.remaining_max_width()?;
+        let b = self.remaining_max_width_first_line()?;
+        Ok(a.min(b))
+    }
+    
+    pub fn remaining_max_width(&self) -> Result<Option<usize>, TooWideError> {
         self.constraints
             .max_width
             .map(|max_width| {
                 max_width
-                    .checked_sub(self.last_line_width())
+                    .checked_sub(self.last_line_len())
+                    .ok_or(TooWideError)
+            })
+            .transpose()
+    }
+
+
+    pub fn remaining_max_width_first_line(&self) -> Result<Option<usize>, TooWideError> {
+        self.constraints
+            .max_width_first_line
+            .map(|max_width| {
+                max_width
+                    .checked_sub(self.last_line_len())
                     .ok_or(TooWideError)
             })
             .transpose()
@@ -95,7 +121,7 @@ impl ConstraintWriter {
     }
 
     // #[instrument(skip(self), ret)]
-    pub fn last_line_width(&self) -> usize {
+    pub fn last_line_len(&self) -> usize {
         self.buffer.len() - self.last_line_start
     }
 }

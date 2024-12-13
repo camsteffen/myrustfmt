@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::ParamListConfig;
+use crate::ast_formatter::list::param_list_config;
 use crate::source_formatter::FormatResult;
 
 use rustc_ast::ast;
@@ -9,51 +9,43 @@ impl AstFormatter<'_> {
     pub fn dot_chain(&mut self, expr: &ast::Expr, tail: Tail) -> FormatResult {
         let mut dot_chain = Vec::new();
         build_dot_chain(&mut dot_chain, expr);
-        self.do_dot_chain(&dot_chain, tail)
-    }
-
-    fn do_dot_chain(&mut self, dot_chain: &[&ast::Expr], tail: Tail) -> FormatResult {
-        let [root, rest @ ..] = &dot_chain else {
-            unreachable!("empty dot chain")
+        let [root, dot_chain @ ..] = &dot_chain[..] else {
+            unreachable!();
         };
-        self.fallback_chain(
-            |chain| {
-                chain.next(|this| this.dot_chain_with_single_line_root(root, rest));
-                // root expression spans multiple lines, each item on a separate line, no indent
-                chain.next(|this| {
-                    this.expr(root, Tail::None)?;
-                    for item in rest {
-                        this.out.newline_indent()?;
-                        this.dot_chain_item(item)?;
-                    }
-                    Ok(())
-                });
-            },
-            |this| this.tail(tail),
-        )
+        let is_root_single_line = self.with_is_single_line(|this| this.expr(root, Tail::None))?;
+        if dot_chain.is_empty() {
+            self.tail(tail)
+        } else if is_root_single_line {
+            self.dot_chain_single_line_root(dot_chain, tail)
+        } else {
+            // each item on a separate line, no indent
+            for item in dot_chain {
+                self.out.newline_indent()?;
+                self.dot_chain_item(item)?;
+            }
+            self.tail(tail)?;
+            Ok(())
+        }
     }
 
-    fn dot_chain_with_single_line_root(
-        &mut self,
-        root: &ast::Expr,
-        rest: &[&ast::Expr],
-    ) -> FormatResult {
-        self.with_single_line(|this| this.expr(root, Tail::None))?;
+    fn dot_chain_single_line_root(&mut self, dot_chain: &[&ast::Expr], tail: Tail) -> FormatResult {
         self.fallback_chain(
             |chain| {
-                // whole chain on one line
+                // single line until the last item
                 chain.next(|this| {
                     this.with_single_line(|this| {
-                        for item in rest {
+                        for item in &dot_chain[..dot_chain.len() - 1] {
                             this.dot_chain_item(item)?;
                         }
                         Ok(())
-                    })
+                    })?;
+                    this.dot_chain_item(dot_chain.last().unwrap())?;
+                    Ok(())
                 });
-                // hanging indent and wrap each item
+                // wrap and indent each item
                 chain.next(|this| {
                     this.indented(|this| {
-                        for item in rest {
+                        for item in dot_chain {
                             this.out.newline_indent()?;
                             this.dot_chain_item(item)?;
                         }
@@ -61,7 +53,7 @@ impl AstFormatter<'_> {
                     })
                 })
             },
-            |_| Ok(()),
+            |this| this.tail(tail),
         )?;
         Ok(())
     }
@@ -75,7 +67,7 @@ impl AstFormatter<'_> {
                 self.list(
                     &method_call.args,
                     |this, arg| this.expr(arg, Tail::None),
-                    ParamListConfig,
+                    param_list_config(),
                     Tail::None,
                 )?;
                 Ok(())

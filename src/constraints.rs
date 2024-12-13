@@ -6,6 +6,7 @@ const INDENT_WIDTH: usize = 4;
 pub struct Constraints {
     pub single_line: bool,
     pub max_width: Option<usize>,
+    pub max_width_first_line: Option<usize>,
     pub indent: usize,
 }
 
@@ -14,6 +15,7 @@ impl Constraints {
         Constraints {
             single_line: false,
             max_width: Some(max_width),
+            max_width_first_line: None,
             indent: 0,
         }
     }
