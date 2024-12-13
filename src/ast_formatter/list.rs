@@ -6,6 +6,7 @@ use std::marker::PhantomData;
 
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
+use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 pub trait ListConfig {
     type Item;
@@ -14,16 +15,16 @@ pub trait ListConfig {
     const END_BRACE: &'static str;
     const PAD_CONTENTS: bool;
 
-    fn single_line_max_contents_width() -> Option<usize> {
+    fn allow_item_overflow(_item: &Self::Item, _is_only_item: bool) -> bool {
+        false
+    }
+
+    fn single_line_max_contents_width(&self) -> Option<usize> {
         None
     }
 
     fn wrap_to_fit() -> ListWrapToFitConfig {
         ListWrapToFitConfig::No
-    }
-
-    fn allow_item_overflow(_item: &Self::Item, _is_only_list_item: bool) -> bool {
-        false
     }
 }
 
@@ -53,9 +54,12 @@ pub fn array_list_config<T: Overflow>() -> impl ListConfig<Item = T> {
         const END_BRACE: &'static str = "]";
         const PAD_CONTENTS: bool = false;
 
-        fn single_line_max_contents_width() -> Option<usize> {
-            // array_width in rustfmt
-            Some(60)
+        fn allow_item_overflow(item: &Self::Item, is_only_item: bool) -> bool {
+            <T as Overflow>::allow_overflow(item, is_only_item)
+        }
+
+        fn single_line_max_contents_width(&self) -> Option<usize> {
+            Some(RUSTFMT_CONFIG_DEFAULTS.array_width)
         }
 
         fn wrap_to_fit() -> ListWrapToFitConfig {
@@ -64,16 +68,15 @@ pub fn array_list_config<T: Overflow>() -> impl ListConfig<Item = T> {
                 max_element_width: Some(10),
             }
         }
-
-        fn allow_item_overflow(item: &Self::Item, is_only_list_item: bool) -> bool {
-            <T as Overflow>::allow_overflow(item, is_only_list_item)
-        }
     }
     Config(PhantomData::<T>)
 }
 
-pub fn param_list_config<T: Overflow>() -> impl ListConfig<Item = T> {
-    struct Config<T>(PhantomData<T>);
+pub fn param_list_config<T: Overflow>(single_line_max_contents_width: usize) -> impl ListConfig<Item = T> {
+    struct Config<T> {
+        t: PhantomData<T>,
+        single_line_max_contents_width: usize,
+    }
     impl<T: Overflow> ListConfig for Config<T> {
         type Item = T;
 
@@ -81,11 +84,15 @@ pub fn param_list_config<T: Overflow>() -> impl ListConfig<Item = T> {
         const END_BRACE: &'static str = ")";
         const PAD_CONTENTS: bool = false;
 
-        fn allow_item_overflow(item: &Self::Item, is_only_list_item: bool) -> bool {
-            <T as Overflow>::allow_overflow(item, is_only_list_item)
+        fn allow_item_overflow(item: &Self::Item, is_only_item: bool) -> bool {
+            <T as Overflow>::allow_overflow(item, is_only_item)
+        }
+
+        fn single_line_max_contents_width(&self) -> Option<usize> {
+            Some(self.single_line_max_contents_width)
         }
     }
-    Config(PhantomData::<T>)
+    Config { t: PhantomData::<T>, single_line_max_contents_width }
 }
 
 pub fn param_list_no_overflow_config<T>() -> impl ListConfig<Item = T> {
@@ -109,9 +116,8 @@ impl ListConfig for PatFieldListConfig {
     const END_BRACE: &'static str = "}";
     const PAD_CONTENTS: bool = true;
 
-    fn single_line_max_contents_width() -> Option<usize> {
-        // struct_lit_width in rustfmt
-        Some(18)
+    fn single_line_max_contents_width(&self) -> Option<usize> {
+        Some(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
     }
 }
 
@@ -208,14 +214,17 @@ where
             })?;
             let last = list.last().expect("list shouldn't be empty");
             if Config::allow_item_overflow(last, list.len() == 1) {
-                format_item(this, last)?;
+                let is_in_overflow_prev = std::mem::replace(&mut this.is_in_overflow, true);
+                let result = format_item(this, last);
+                this.is_in_overflow = is_in_overflow_prev;
+                result?;
             } else {
                 this.with_single_line(|this| format_item(this, last))?;
             }
             this.out.skip_token_if_present(",");
             Ok(())
         };
-        if let Some(max_width) = Config::single_line_max_contents_width() {
+        if let Some(max_width) = config.single_line_max_contents_width() {
             this.with_width_limit_first_line(max_width, |this| contents(this))?;
         } else {
             contents(this)?;

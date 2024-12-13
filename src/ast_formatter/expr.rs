@@ -5,6 +5,7 @@ use crate::source_formatter::FormatResult;
 use crate::ast_formatter::last_line::{EndReserved, Tail, drop_end_reserved};
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
+use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 impl<'a> AstFormatter<'a> {
     pub fn expr(&mut self, expr: &ast::Expr, tail: Tail) -> FormatResult {
@@ -98,7 +99,7 @@ impl<'a> AstFormatter<'a> {
         self.list(
             args,
             |this, arg| this.expr(arg, Tail::None),
-            param_list_config(),
+            param_list_config(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
             end,
         )
     }

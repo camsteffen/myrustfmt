@@ -24,6 +24,7 @@ pub mod constraint_writer;
 mod constraints;
 pub mod source_formatter;
 mod source_reader;
+mod rustfmt_config_defaults;
 
 use rustc_data_structures::sync::Lrc;
 use rustc_errors::emitter::{HumanEmitter, stderr_destination};

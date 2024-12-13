@@ -1,5 +1,5 @@
-use tracing::{info, instrument};
 use crate::constraints::Constraints;
+use tracing::{info, instrument};
 
 pub struct ConstraintWriter {
     constraints: Constraints,
@@ -8,8 +8,9 @@ pub struct ConstraintWriter {
     line: usize,
 }
 
-pub struct WriterSnapshot {
+pub struct ConstraintWriterSnapshot {
     constraints: Constraints,
+    line: usize,
     len: usize,
     last_line_start: usize,
 }
@@ -31,23 +32,37 @@ impl ConstraintWriter {
     pub fn constraints(&mut self) -> &mut Constraints {
         &mut self.constraints
     }
-    
+
     pub fn line(&self) -> usize {
         self.line
     }
 
-    pub fn snapshot(&self) -> WriterSnapshot {
-        WriterSnapshot {
-            constraints: self.constraints.clone(),
-            len: self.buffer.len(),
-            last_line_start: self.last_line_start,
+    pub fn snapshot(&self) -> ConstraintWriterSnapshot {
+        let Self {
+            ref constraints,
+            ref buffer,
+            last_line_start,
+            line,
+        } = *self;
+        ConstraintWriterSnapshot {
+            constraints: constraints.clone(),
+            line,
+            len: buffer.len(),
+            last_line_start,
         }
     }
 
-    pub fn restore(&mut self, snapshot: &WriterSnapshot) {
-        self.constraints = snapshot.constraints.clone();
-        self.last_line_start = snapshot.last_line_start;
-        self.buffer.truncate(snapshot.len);
+    pub fn restore(&mut self, snapshot: &ConstraintWriterSnapshot) {
+        let ConstraintWriterSnapshot {
+            ref constraints,
+            last_line_start,
+            len,
+            line,
+        } = *snapshot;
+        self.constraints = constraints.clone();
+        self.last_line_start = last_line_start;
+        self.line = line;
+        self.buffer.truncate(len);
     }
 
     // #[instrument(skip(self))]
@@ -55,7 +70,7 @@ impl ConstraintWriter {
         self.buffer.push_str(token);
         self.check_width_constraints()
     }
-    
+
     pub fn write_unchecked(&mut self, source: &str) {
         self.buffer.push_str(source);
     }
@@ -83,7 +98,7 @@ impl ConstraintWriter {
             Err(TooWideError) => {
                 info!("too wide: \"{}\"", self.last_line());
                 Err(TooWideError)
-            },
+            }
         }
     }
 
@@ -92,7 +107,7 @@ impl ConstraintWriter {
         let b = self.remaining_max_width_first_line()?;
         Ok(a.min(b))
     }
-    
+
     pub fn remaining_max_width(&self) -> Result<Option<usize>, TooWideError> {
         self.constraints
             .max_width
@@ -104,7 +119,6 @@ impl ConstraintWriter {
             .transpose()
     }
 
-
     pub fn remaining_max_width_first_line(&self) -> Result<Option<usize>, TooWideError> {
         self.constraints
             .max_width_first_line
@@ -115,7 +129,7 @@ impl ConstraintWriter {
             })
             .transpose()
     }
-    
+
     fn last_line(&self) -> &str {
         &self.buffer[self.last_line_start..]
     }

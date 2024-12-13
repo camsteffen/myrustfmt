@@ -1,4 +1,4 @@
-use crate::constraint_writer::{ConstraintError, ConstraintWriter, WriterSnapshot};
+use crate::constraint_writer::{ConstraintError, ConstraintWriter, ConstraintWriterSnapshot};
 use crate::constraints::Constraints;
 use crate::source_reader::SourceReader;
 
@@ -6,7 +6,7 @@ use rustc_lexer::TokenKind;
 use rustc_span::{BytePos, Pos, Span};
 
 pub struct SourceFormatterSnapshot {
-    writer_snapshot: WriterSnapshot,
+    writer_snapshot: ConstraintWriterSnapshot,
     pos: BytePos,
     next_is_whitespace_or_comments: bool,
 }

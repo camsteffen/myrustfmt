@@ -1,9 +1,10 @@
+use rustc_ast::ast;
+
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::param_list_config;
+use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::source_formatter::FormatResult;
-
-use rustc_ast::ast;
 
 impl AstFormatter<'_> {
     pub fn dot_chain(&mut self, expr: &ast::Expr, tail: Tail) -> FormatResult {
@@ -12,10 +13,22 @@ impl AstFormatter<'_> {
         let [root, dot_chain @ ..] = &dot_chain[..] else {
             unreachable!();
         };
-        let is_root_single_line = self.with_is_single_line(|this| this.expr(root, Tail::None))?;
-        if dot_chain.is_empty() {
-            self.tail(tail)
-        } else if is_root_single_line {
+        if self.is_in_overflow {
+            // single-line the whole thing
+            self.with_single_line(|this| {
+                this.expr(root, Tail::None)?;
+                dot_chain
+                    .iter()
+                    .try_for_each(|item| this.dot_chain_item(item))?;
+                Ok(())
+            })?;
+            self.tail(tail)?;
+            return Ok(());
+        }
+        let root_is_single_line = self.with_is_single_line(|this| this.expr(root, Tail::None))?;
+        // if dot_chain.is_empty() {
+        //     self.tail(tail)
+        if root_is_single_line {
             self.dot_chain_single_line_root(dot_chain, tail)
         } else {
             // each item on a separate line, no indent
@@ -37,9 +50,10 @@ impl AstFormatter<'_> {
                         for item in &dot_chain[..dot_chain.len() - 1] {
                             this.dot_chain_item(item)?;
                         }
+                        this.dot_chain_item(dot_chain.last().unwrap())?;
                         Ok(())
                     })?;
-                    this.dot_chain_item(dot_chain.last().unwrap())?;
+                    // this.dot_chain_item(dot_chain.last().unwrap())?;
                     Ok(())
                 });
                 // wrap and indent each item
@@ -67,7 +81,7 @@ impl AstFormatter<'_> {
                 self.list(
                     &method_call.args,
                     |this, arg| this.expr(arg, Tail::None),
-                    param_list_config(),
+                    param_list_config(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
                     Tail::None,
                 )?;
                 Ok(())

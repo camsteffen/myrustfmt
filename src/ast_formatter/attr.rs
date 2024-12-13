@@ -4,6 +4,7 @@ use crate::source_formatter::FormatResult;
 use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::param_list_config;
 use rustc_ast::ast;
+use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 impl AstFormatter<'_> {
     pub fn attrs(&mut self, attrs: &[ast::Attribute]) -> FormatResult {
@@ -47,7 +48,7 @@ impl AstFormatter<'_> {
                     ast::MetaItemInner::MetaItem(item) => this.meta_item(item),
                     ast::MetaItemInner::Lit(lit) => this.meta_item_lit(lit),
                 },
-                param_list_config(),
+                param_list_config(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
                 Tail::None,
             ),
             ast::MetaItemKind::NameValue(lit) => self.meta_item_lit(lit),
