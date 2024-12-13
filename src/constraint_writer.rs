@@ -102,26 +102,14 @@ impl ConstraintWriter {
         }
     }
 
+    pub fn max_width(&self) -> Option<usize> {
+        let a = self.constraints.max_width?;
+        let b = self.constraints.max_width_first_line?;
+        Some(a.min(b))
+    }
+
     pub fn remaining_width(&self) -> Result<Option<usize>, TooWideError> {
-        let a = self.remaining_max_width()?;
-        let b = self.remaining_max_width_first_line()?;
-        Ok(a.min(b))
-    }
-
-    pub fn remaining_max_width(&self) -> Result<Option<usize>, TooWideError> {
-        self.constraints
-            .max_width
-            .map(|max_width| {
-                max_width
-                    .checked_sub(self.last_line_len())
-                    .ok_or(TooWideError)
-            })
-            .transpose()
-    }
-
-    pub fn remaining_max_width_first_line(&self) -> Result<Option<usize>, TooWideError> {
-        self.constraints
-            .max_width_first_line
+        self.max_width()
             .map(|max_width| {
                 max_width
                     .checked_sub(self.last_line_len())

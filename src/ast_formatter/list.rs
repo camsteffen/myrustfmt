@@ -198,21 +198,23 @@ where
             list,
             format_item,
             config,
-            end,
+            ..
         } = self;
         if Config::PAD_CONTENTS {
             this.out.space()?;
         }
         let contents = |this: &mut AstFormatter<'source>| {
+            let [items_except_last @ .., last] = list else {
+                unreachable!()
+            };
             this.with_single_line(|this| {
-                for item in &list[..list.len() - 1] {
+                for item in items_except_last {
                     format_item(this, item)?;
                     this.out.token_maybe_missing(",")?;
                     this.out.space()?;
                 }
                 Ok(())
             })?;
-            let last = list.last().expect("list shouldn't be empty");
             if Config::allow_item_overflow(last, list.len() == 1) {
                 let is_in_overflow_prev = std::mem::replace(&mut this.is_in_overflow, true);
                 let result = format_item(this, last);

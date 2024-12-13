@@ -48,6 +48,10 @@ pub fn format_file(path: impl AsRef<Path>) -> String {
     format_str(&string, DEFAULT_CONFIG.max_width)
 }
 
+pub fn format_str_defaults(source: &str) -> String {
+    format_str(source, DEFAULT_CONFIG.max_width)
+}
+
 pub fn format_str(source: &str, max_width: usize) -> String {
     parse_ast_then(String::from(source), |crate_| {
         let constraints = Constraints::new(max_width);
