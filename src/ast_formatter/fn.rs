@@ -1,8 +1,6 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::{EndReserved, Tail};
-use crate::ast_formatter::list::{
-    ListConfig, angle_bracketed_list_config, param_list_no_overflow_config,
-};
+use crate::ast_formatter::last_line::Tail;
+use crate::ast_formatter::list::{ListConfig, list_overflow_no, param_list_config};
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
@@ -17,7 +15,7 @@ impl<'a> AstFormatter<'a> {
         self.fn_sig(sig, generics, item)?;
         if let Some(body) = body {
             self.out.space()?;
-            self.block(body, Tail::None)?;
+            self.block(body, Tail::NONE)?;
         }
         Ok(())
     }
@@ -50,8 +48,9 @@ impl<'a> AstFormatter<'a> {
         self.list(
             &parenthesized_args.inputs,
             |this, ty| this.ty(ty),
-            param_list_no_overflow_config(),
-            Tail::None,
+            param_list_config(None),
+            list_overflow_no(),
+            Tail::NONE,
         )?;
         self.fn_ret_ty(&parenthesized_args.output)?;
         Ok(())
@@ -67,40 +66,8 @@ impl<'a> AstFormatter<'a> {
         self.out.token_expect("fn")?;
         self.out.space()?;
         self.ident(item.ident)?;
-        if !generics.params.is_empty() {
-            self.list(
-                &generics.params,
-                Self::generic_param,
-                angle_bracketed_list_config(),
-                Tail::None,
-            )?;
-        }
-        self.fn_decl(decl, param_list_no_overflow_config())?;
-        Ok(())
-    }
-
-    fn generic_param(&mut self, param: &ast::GenericParam) -> FormatResult {
-        self.ident(param.ident)?;
-        self.generic_bounds(&param.bounds)?;
-        match param.kind {
-            ast::GenericParamKind::Const {
-                ref ty,
-                kw_span,
-                ref default,
-            } => {
-                self.out.token_at_space("const", kw_span.lo())?;
-                if let Some(default) = default {
-                    todo!()
-                }
-                self.ty(ty)?;
-            }
-            ast::GenericParamKind::Lifetime => {}
-            ast::GenericParamKind::Type { ref default } => {
-                if let Some(default) = default {
-                    todo!()
-                }
-            }
-        }
+        self.generics(generics)?;
+        self.fn_decl(decl, param_list_config(None))?;
         Ok(())
     }
 
@@ -125,13 +92,14 @@ impl<'a> AstFormatter<'a> {
     fn fn_decl(
         &mut self,
         ast::FnDecl { inputs, output }: &ast::FnDecl,
-        input_list_config: impl ListConfig<Item=ast::Param>,
+        input_list_config: impl ListConfig,
     ) -> FormatResult {
         self.list(
             inputs,
             |this, param| this.param(param),
             input_list_config,
-            Tail::None,
+            list_overflow_no(),
+            Tail::NONE,
         )?;
         self.fn_ret_ty(output)?;
         Ok(())
@@ -215,8 +183,6 @@ impl<'a> AstFormatter<'a> {
 struct ClosureParamListConfig;
 
 impl ListConfig for ClosureParamListConfig {
-    type Item=ast::Param;
-    
     const START_BRACE: &'static str = "|";
     const END_BRACE: &'static str = "|";
     const PAD_CONTENTS: bool = false;

@@ -76,6 +76,12 @@ impl ConstraintWriter {
     }
 
     pub fn newline(&mut self) -> Result<(), NewlineNotAllowedError> {
+        if let Some(newline_budget) = &mut self.constraints.newline_budget {
+            let Some(n) = newline_budget.checked_sub(1) else {
+                return Err(NewlineNotAllowedError);
+            };
+            *newline_budget = n;
+        }
         if self.constraints.single_line {
             return Err(NewlineNotAllowedError);
         }
@@ -103,9 +109,10 @@ impl ConstraintWriter {
     }
 
     pub fn max_width(&self) -> Option<usize> {
-        let a = self.constraints.max_width?;
-        let b = self.constraints.max_width_first_line?;
-        Some(a.min(b))
+        match (self.constraints.max_width, self.constraints.max_width_first_line) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        }
     }
 
     pub fn remaining_width(&self) -> Result<Option<usize>, TooWideError> {

@@ -38,7 +38,7 @@ impl<'a> SourceFormatter<'a> {
         self.out.finish()
     }
 
-    pub fn constraints(&mut self) -> &mut Constraints {
+    pub fn constraints_mut(&mut self) -> &mut Constraints {
         self.out.constraints()
     }
 

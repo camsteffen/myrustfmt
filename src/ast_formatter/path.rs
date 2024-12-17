@@ -1,14 +1,14 @@
 use crate::ast_formatter::AstFormatter;
 use crate::source_formatter::FormatResult;
 
-use crate::ast_formatter::last_line::{EndReserved, Tail, drop_end_reserved};
-use crate::ast_formatter::list::{angle_bracketed_list_config };
+use crate::ast_formatter::last_line::{Tail};
+use crate::ast_formatter::list::{list_overflow_no, AngleBracketedListConfig};
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
 impl AstFormatter<'_> {
     pub fn qpath(&mut self, qself: &Option<P<ast::QSelf>>, path: &ast::Path) -> FormatResult {
-        self.qpath_end(qself, path, Tail::None)
+        self.qpath_end(qself, path, Tail::NONE)
     }
 
     pub fn qpath_end(
@@ -24,7 +24,7 @@ impl AstFormatter<'_> {
     }
 
     pub fn path(&mut self, path: &ast::Path) -> FormatResult {
-        self.path_end(path, Tail::None)
+        self.path_end(path, Tail::NONE)
     }
 
     pub fn path_end(&mut self, path: &ast::Path, end: Tail) -> FormatResult {
@@ -35,7 +35,7 @@ impl AstFormatter<'_> {
                 self.path_segment(segment)?;
             }
         }
-        self.tail(end)
+        self.tail(&end)
     }
 
     pub fn path_segment(&mut self, segment: &ast::PathSegment) -> FormatResult {
@@ -49,8 +49,9 @@ impl AstFormatter<'_> {
                             ast::AngleBracketedArg::Arg(arg) => this.generic_arg(arg),
                             ast::AngleBracketedArg::Constraint(AssocItemConstraint) => todo!(),
                         },
-                        angle_bracketed_list_config(),
-                        Tail::None
+                        AngleBracketedListConfig,
+                        list_overflow_no(),
+                        Tail::NONE
                     )?;
                 }
                 // (A, B) -> C

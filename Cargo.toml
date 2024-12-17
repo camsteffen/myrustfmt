@@ -19,6 +19,7 @@ tracing = "0.1.35"
 #rustc_span = { path = "../../.rustup/toolchains/nightly-2024-09-10-aarch64-apple-darwin/lib/rustlib/rustc-src/rust/compiler/rustc_span" }
 
 [dev-dependencies]
+regex = "1.11.1"
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 
 #[package.metadata.rust-analyzer]

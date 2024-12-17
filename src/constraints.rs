@@ -8,11 +8,13 @@ pub struct Constraints {
     pub max_width: Option<usize>,
     pub max_width_first_line: Option<usize>,
     pub indent: usize,
+    pub newline_budget: Option<usize>,
 }
 
 impl Constraints {
     pub fn new(max_width: usize) -> Constraints {
         Constraints {
+            newline_budget: None,
             single_line: false,
             max_width: Some(max_width),
             max_width_first_line: None,

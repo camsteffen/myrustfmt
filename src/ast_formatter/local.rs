@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::{EndReserved, Tail};
+use crate::ast_formatter::last_line::{Tail};
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
@@ -29,7 +29,7 @@ impl<'a> AstFormatter<'a> {
                 chain.next(|this| {
                     this.with_single_line(|this| {
                         this.out.space()?;
-                        this.expr(expr, Tail::None)?;
+                        this.expr(expr, Tail::NONE)?;
                         Ok(())
                     })
                 });
@@ -37,25 +37,25 @@ impl<'a> AstFormatter<'a> {
                 chain.next(|this| {
                     this.indented(|this| {
                         this.out.newline_indent()?;
-                        this.with_single_line(|this| this.expr(expr, Tail::None))
+                        this.with_single_line(|this| this.expr(expr, Tail::NONE))
                     })
                 });
                 // normal
                 chain.next(|this| {
                     this.out.space()?;
-                    this.expr(expr, Tail::None)?;
+                    this.expr(expr, Tail::NONE)?;
                     Ok(())
                 });
                 // wrap and indent
                 chain.next(|this| {
                     this.indented(|this| {
                         this.out.newline_indent()?;
-                        this.expr(expr, Tail::None)?;
+                        this.expr(expr, Tail::NONE)?;
                         Ok(())
                     })
                 });
             },
-            |this| this.tail(end),
+            |this| this.tail(&end),
         )
     }
 }

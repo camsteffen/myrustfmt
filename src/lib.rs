@@ -22,9 +22,9 @@ pub mod ast_formatter;
 mod config;
 pub mod constraint_writer;
 mod constraints;
+mod rustfmt_config_defaults;
 pub mod source_formatter;
 mod source_reader;
-mod rustfmt_config_defaults;
 
 use rustc_data_structures::sync::Lrc;
 use rustc_errors::emitter::{HumanEmitter, stderr_destination};

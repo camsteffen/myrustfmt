@@ -1,28 +1,21 @@
 use crate::ast_formatter::AstFormatter;
 use crate::source_formatter::FormatResult;
 
-#[derive(Clone, Copy)]
-pub enum Tail {
-    None,
-    Semicolon,
-    SpaceOpenBrace,
-}
+pub struct Tail(Option<Box<dyn Fn(&mut AstFormatter<'_>) -> FormatResult>>);
 
-pub struct EndReserved {
-    _private: (),
-}
+impl Tail {
+    pub const NONE: Tail = Tail(None);
 
-impl<'a> AstFormatter<'a> {
-    pub fn tail(&mut self, tail: Tail) -> FormatResult {
-        match tail {
-            Tail::None => Ok(()),
-            Tail::Semicolon => self.out.token_expect(";"),
-            Tail::SpaceOpenBrace => {
-                self.out.space()?;
-                self.out.token_expect("{")
-            }
-        }
+    pub fn new(f: impl Fn(&mut AstFormatter<'_>) -> FormatResult + 'static) -> Self {
+        Tail(Some(Box::new(f)))
     }
 }
 
-pub fn drop_end_reserved(_last_line: EndReserved) {}
+impl AstFormatter<'_> {
+    pub fn tail(&mut self, tail: &Tail) -> FormatResult {
+        if let Some(f) = &tail.0 {
+            f(self)?;
+        }
+        Ok(())
+    }
+}

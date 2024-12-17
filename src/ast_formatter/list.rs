@@ -1,23 +1,17 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::fallback_chain::{HasSourceFormatter, fallback_chain};
-use crate::ast_formatter::last_line::{EndReserved, Tail, drop_end_reserved};
+use crate::ast_formatter::last_line::Tail;
 use crate::source_formatter::{FormatResult, SourceFormatter};
 use std::marker::PhantomData;
 
+use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
-use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 pub trait ListConfig {
-    type Item;
-
     const START_BRACE: &'static str;
     const END_BRACE: &'static str;
     const PAD_CONTENTS: bool;
-
-    fn allow_item_overflow(_item: &Self::Item, _is_only_item: bool) -> bool {
-        false
-    }
 
     fn single_line_max_contents_width(&self) -> Option<usize> {
         None
@@ -33,85 +27,54 @@ pub enum ListWrapToFitConfig {
     Yes { max_element_width: Option<usize> },
 }
 
-pub fn angle_bracketed_list_config<T>() -> impl ListConfig<Item = T> {
-    struct Config<T>(PhantomData<T>);
-    impl<T> ListConfig for Config<T> {
-        type Item = T;
-
-        const START_BRACE: &'static str = "<";
-        const END_BRACE: &'static str = ">";
-        const PAD_CONTENTS: bool = false;
-    }
-    Config(PhantomData::<T>)
+pub struct AngleBracketedListConfig;
+impl ListConfig for AngleBracketedListConfig {
+    const START_BRACE: &'static str = "<";
+    const END_BRACE: &'static str = ">";
+    const PAD_CONTENTS: bool = false;
 }
 
-pub fn array_list_config<T: Overflow>() -> impl ListConfig<Item = T> {
-    struct Config<T>(PhantomData<T>);
-    impl<T: Overflow> ListConfig for Config<T> {
-        type Item = T;
+pub struct ArrayListConfig;
+impl ListConfig for ArrayListConfig {
+    const START_BRACE: &'static str = "[";
+    const END_BRACE: &'static str = "]";
+    const PAD_CONTENTS: bool = false;
 
-        const START_BRACE: &'static str = "[";
-        const END_BRACE: &'static str = "]";
-        const PAD_CONTENTS: bool = false;
+    fn single_line_max_contents_width(&self) -> Option<usize> {
+        Some(RUSTFMT_CONFIG_DEFAULTS.array_width)
+    }
 
-        fn allow_item_overflow(item: &Self::Item, is_only_item: bool) -> bool {
-            <T as Overflow>::allow_overflow(item, is_only_item)
-        }
-
-        fn single_line_max_contents_width(&self) -> Option<usize> {
-            Some(RUSTFMT_CONFIG_DEFAULTS.array_width)
-        }
-
-        fn wrap_to_fit() -> ListWrapToFitConfig {
-            // short_array_element_width_threshold in rustfmt
-            ListWrapToFitConfig::Yes {
-                max_element_width: Some(10),
-            }
+    fn wrap_to_fit() -> ListWrapToFitConfig {
+        // short_array_element_width_threshold in rustfmt
+        ListWrapToFitConfig::Yes {
+            max_element_width: Some(10),
         }
     }
-    Config(PhantomData::<T>)
 }
 
-pub fn param_list_config<T: Overflow>(single_line_max_contents_width: usize) -> impl ListConfig<Item = T> {
-    struct Config<T> {
-        t: PhantomData<T>,
-        single_line_max_contents_width: usize,
+pub fn param_list_config(
+    single_line_max_contents_width: Option<usize>,
+) -> impl ListConfig {
+    struct ParamListConfig {
+        single_line_max_contents_width: Option<usize>,
     }
-    impl<T: Overflow> ListConfig for Config<T> {
-        type Item = T;
-
+    impl ListConfig for ParamListConfig {
         const START_BRACE: &'static str = "(";
         const END_BRACE: &'static str = ")";
         const PAD_CONTENTS: bool = false;
 
-        fn allow_item_overflow(item: &Self::Item, is_only_item: bool) -> bool {
-            <T as Overflow>::allow_overflow(item, is_only_item)
-        }
-
         fn single_line_max_contents_width(&self) -> Option<usize> {
-            Some(self.single_line_max_contents_width)
+            self.single_line_max_contents_width
         }
     }
-    Config { t: PhantomData::<T>, single_line_max_contents_width }
-}
-
-pub fn param_list_no_overflow_config<T>() -> impl ListConfig<Item = T> {
-    struct Config<T>(PhantomData<T>);
-    impl<T> ListConfig for Config<T> {
-        type Item = T;
-
-        const START_BRACE: &'static str = "(";
-        const END_BRACE: &'static str = ")";
-        const PAD_CONTENTS: bool = false;
+    ParamListConfig {
+        single_line_max_contents_width,
     }
-    Config(PhantomData::<T>)
 }
 
-pub struct PatFieldListConfig;
+pub struct StructFieldListConfig;
 
-impl ListConfig for PatFieldListConfig {
-    type Item = ast::PatField;
-
+impl ListConfig for StructFieldListConfig {
     const START_BRACE: &'static str = "{";
     const END_BRACE: &'static str = "}";
     const PAD_CONTENTS: bool = true;
@@ -121,89 +84,158 @@ impl ListConfig for PatFieldListConfig {
     }
 }
 
+pub trait ListOverflow {
+    type Item;
+    
+    fn format_if_overflow(
+        _ast_formatter: &mut AstFormatter<'_>,
+        _item: &Self::Item,
+        _is_only_item: bool,
+    ) -> Option<FormatResult> {
+        None
+    } 
+}
+
+pub fn list_overflow_no<T>() -> impl ListOverflow<Item = T> {
+    ListOverflowNo(PhantomData)
+}
+
+pub fn list_overflow_yes<T: Overflow>() -> impl ListOverflow<Item = T> {
+    ListOverflowYes(PhantomData)
+}
+
+struct ListOverflowNo<T>(PhantomData<T>);
+struct ListOverflowYes<T>(PhantomData<T>);
+
+impl<T> ListOverflow for ListOverflowNo<T> {
+    type Item = T;
+    
+    fn format_if_overflow(
+        _ast_formatter: &mut AstFormatter<'_>,
+        _item: &Self::Item,
+        _is_only_item: bool,
+    ) -> Option<FormatResult> {
+        None
+    }
+}
+
+
+impl<T: Overflow> ListOverflow for ListOverflowYes<T> {
+    type Item = T;
+
+    fn format_if_overflow(
+        ast_formatter: &mut AstFormatter<'_>,
+        item: &Self::Item,
+        is_only_item: bool,
+    ) -> Option<FormatResult> {
+        Overflow::format_if_overflow(ast_formatter, item, is_only_item)
+    } 
+}
+
 impl<'a> AstFormatter<'a> {
-    pub fn list<T, C: ListConfig<Item = T>>(
+    pub fn list<T, C: ListConfig>(
         &mut self,
         list: &[T],
         format_item: impl (Fn(&mut Self, &T) -> FormatResult) + Copy,
         config: C,
-        end: Tail,
+        overflow: impl ListOverflow<Item=T>,
+        tail: Tail,
     ) -> FormatResult {
-        ListContext {
-            ast_formatter: self,
-            list,
-            format_item,
-            end,
-            config,
-        }
-        .format()
-    }
-}
-
-struct ListContext<'source, 'list, 'a, Item, FormatItem, Config> {
-    ast_formatter: &'a mut AstFormatter<'source>,
-    list: &'list [Item],
-    format_item: FormatItem,
-    end: Tail,
-    config: Config,
-}
-
-impl<'source, 'list, 'a, Item, FormatItem, Config> HasSourceFormatter<'source>
-    for ListContext<'source, '_, '_, Item, FormatItem, Config>
-{
-    fn source_formatter(&mut self) -> &mut SourceFormatter<'source> {
-        &mut self.ast_formatter.out
-    }
-}
-
-impl<'source: 'list, 'list, 'a, Item, FormatItem, Config>
-    ListContext<'source, 'list, '_, Item, FormatItem, Config>
-where
-    FormatItem: (Fn(&mut AstFormatter<'source>, &Item) -> FormatResult) + Copy,
-    Config: ListConfig<Item = Item>,
-{
-    fn format(&mut self) -> FormatResult {
-        let ListContext {
-            ast_formatter: ref mut this,
-            end,
-            ..
-        } = *self;
-        this.out.token_expect(Config::START_BRACE)?;
-        if self.list.is_empty() {
-            this.out.token_expect(Config::END_BRACE)?;
-            return this.tail(end);
-        }
-        fallback_chain(
-            self,
-            |chain| {
-                chain.next(|this| this.list_single_line());
-                match Config::wrap_to_fit() {
-                    ListWrapToFitConfig::Yes { max_element_width } => {
-                        chain.next(move |this| this.list_wrap_to_fit(max_element_width));
-                    }
-                    ListWrapToFitConfig::No => {}
-                }
-                chain.next(|this| this.list_separate_lines());
-            },
-            |this| {
-                this.ast_formatter.out.token_expect(Config::END_BRACE)?;
-                this.ast_formatter.tail(end)
-            },
+        self.format_list(
+            C::START_BRACE,
+            C::END_BRACE,
+            list.is_empty(),
+            |this, tail| this.list_non_empty_contents_default(list, format_item, overflow, config, tail),
+            tail,
         )
     }
 
-    fn list_single_line(&mut self) -> FormatResult {
-        let ListContext {
-            ast_formatter: this,
-            list,
-            format_item,
-            config,
-            ..
-        } = self;
-        if Config::PAD_CONTENTS {
-            this.out.space()?;
+    pub fn list_separate_lines<T>(
+        &mut self,
+        list: &[T],
+        start_brace: &'static str,
+        end_brace: &'static str,
+        format_item: impl (Fn(&mut Self, &T) -> FormatResult) + Copy,
+        end: Tail,
+    ) -> FormatResult {
+        self.format_list(
+            start_brace,
+            end_brace,
+            list.is_empty(),
+            |this, tail| this.list_contents_separate_lines(list, format_item, tail),
+            end,
+        )
+    }
+
+    fn format_list<'b, 'c>(
+        &mut self,
+        start_brace: &'static str,
+        end_brace: &'static str,
+        is_empty: bool,
+        non_empty: impl FnOnce(&mut AstFormatter<'a>, Tail) -> FormatResult + 'b,
+        end: Tail,
+    ) -> FormatResult {
+        self.out.token_expect(start_brace)?;
+        if is_empty {
+            self.out.token_expect(end_brace)?;
+            return self.tail(&end);
         }
-        let contents = |this: &mut AstFormatter<'source>| {
+        non_empty(
+            self,
+            Tail::new(move |this| {
+                this.out.token_expect(end_brace)?;
+                this.tail(&end)?;
+                Ok(())
+            }),
+        )
+    }
+
+    fn list_non_empty_contents_default<T, Config>(
+        &mut self,
+        list: &[T],
+        format_item: impl (Fn(&mut Self, &T) -> FormatResult) + Copy,
+        overflow: impl ListOverflow<Item=T>,
+        config: Config,
+        end: Tail,
+    ) -> FormatResult
+    where
+        Config: ListConfig,
+    {
+        fallback_chain(
+            self,
+            |chain| {
+                chain.next(|this| {
+                    this.list_contents_single_line(list, format_item, overflow, Config::PAD_CONTENTS,
+                                                   config.single_line_max_contents_width(),
+                    )
+                });
+                match Config::wrap_to_fit() {
+                    ListWrapToFitConfig::Yes { max_element_width } => {
+                        chain.next(move |this| {
+                            this.list_contents_wrap_to_fit(list, format_item, max_element_width)
+                        });
+                    }
+                    ListWrapToFitConfig::No => {}
+                }
+                chain.next(|this| this.list_contents_separate_lines(list, format_item, Tail::NONE));
+            },
+            |this| this.tail(&end),
+        )
+    }
+
+    fn list_contents_single_line<Item, Overflow: ListOverflow<Item=Item>>(
+        &mut self,
+        list: &[Item],
+        format_item: impl (Fn(&mut Self, &Item) -> FormatResult) + Copy,
+        _overflow: Overflow,
+        pad_contents: bool,
+        max_width: Option<usize>,
+    ) -> FormatResult
+    {
+        if pad_contents {
+            self.out.space()?;
+        }
+        let contents = |this: &mut Self| {
             let [items_except_last @ .., last] = list else {
                 unreachable!()
             };
@@ -215,10 +247,7 @@ where
                 }
                 Ok(())
             })?;
-            if Config::allow_item_overflow(last, list.len() == 1) {
-                let is_in_overflow_prev = std::mem::replace(&mut this.is_in_overflow, true);
-                let result = format_item(this, last);
-                this.is_in_overflow = is_in_overflow_prev;
+            if let Some(result) = Overflow::format_if_overflow(this, last, list.len() == 1) {
                 result?;
             } else {
                 this.with_single_line(|this| format_item(this, last))?;
@@ -226,32 +255,31 @@ where
             this.out.skip_token_if_present(",");
             Ok(())
         };
-        if let Some(max_width) = config.single_line_max_contents_width() {
-            this.with_width_limit_first_line(max_width, |this| contents(this))?;
+        if let Some(max_width) = max_width {
+            self.with_width_limit_first_line(max_width, |this| contents(this))?;
         } else {
-            contents(this)?;
+            contents(self)?;
         }
-        if Config::PAD_CONTENTS {
-            this.out.space()?;
+        if pad_contents {
+            self.out.space()?;
         }
         Ok(())
     }
 
-    fn list_wrap_to_fit(&mut self, max_element_width: Option<usize>) -> FormatResult {
-        let ListContext {
-            ast_formatter: this,
-            list,
-            format_item,
-            config,
-            end,
-        } = self;
-        let format_item = |this: &mut AstFormatter<'source>, item| match max_element_width {
+    fn list_contents_wrap_to_fit<T>(
+        &mut self,
+
+        list: &[T],
+        format_item: impl (Fn(&mut Self, &T) -> FormatResult) + Copy,
+        max_element_width: Option<usize>,
+    ) -> FormatResult {
+        let format_item = |this: &mut Self, item| match max_element_width {
             Some(max_width) => {
                 this.with_width_limit_single_line(max_width, |this| format_item(this, item))
             }
             None => format_item(this, item),
         };
-        this.indented(|this| {
+        self.indented(|this| {
             this.out.newline_indent()?;
             let [head, tail @ ..] = list else {
                 unreachable!()
@@ -273,18 +301,18 @@ where
             }
             Ok(())
         })?;
-        this.out.newline_indent()?;
+        self.out.newline_indent()?;
         Ok(())
     }
 
-    fn list_separate_lines(&mut self) -> FormatResult {
-        let ListContext {
-            ast_formatter: ref mut this,
-            list,
-            format_item,
-            ..
-        } = *self;
-        this.indented(|this| {
+    fn list_contents_separate_lines<T>(
+        &mut self,
+        list: &[T],
+
+        format_item: impl (Fn(&mut Self, &T) -> FormatResult) + Copy,
+        tail: Tail,
+    ) -> FormatResult {
+        self.indented(|this| {
             for item in list {
                 this.out.newline_indent()?;
                 format_item(this, item)?;
@@ -292,61 +320,174 @@ where
             }
             Ok(())
         })?;
-        this.out.newline_indent()?;
+        self.out.newline_indent()?;
+        self.tail(&tail)?;
         Ok(())
     }
 }
 
+trait OverflowHandler {
+    type Result;
+
+    const FORMATTING: bool;
+
+    fn no_overflow() -> Self::Result;
+    fn overflows(
+        this: &mut AstFormatter<'_>,
+        format: impl FnOnce(&mut AstFormatter<'_>) -> FormatResult,
+    ) -> Self::Result;
+}
+
+struct CheckIfOverflow;
+struct OverflowDoFormat;
+
+impl OverflowHandler for CheckIfOverflow {
+    type Result = bool;
+
+    const FORMATTING: bool = false;
+
+    fn no_overflow() -> bool {
+        false
+    }
+
+    fn overflows(
+        _this: &mut AstFormatter<'_>,
+        _format: impl FnOnce(&mut AstFormatter<'_>) -> FormatResult,
+    ) -> bool {
+        true
+    }
+}
+
+impl OverflowHandler for OverflowDoFormat {
+    type Result = FormatResult;
+
+    const FORMATTING: bool = true;
+
+    fn no_overflow() -> FormatResult {
+        unreachable!()
+    }
+
+    fn overflows(
+        this: &mut AstFormatter<'_>,
+        format: impl FnOnce(&mut AstFormatter<'_>) -> FormatResult,
+    ) -> FormatResult {
+        this.with_not_single_line(format)
+    }
+}
+
 trait Overflow {
-    fn allow_overflow(&self, is_only_list_item: bool) -> bool;
+    fn format_or_check_if_overflow<H: OverflowHandler>(
+        this: &mut AstFormatter<'_>,
+        t: &Self,
+        is_only_list_item: bool,
+    ) -> H::Result;
+
+    fn check_if_overflows(this: &mut AstFormatter<'_>, t: &Self, is_only_list_item: bool) -> bool {
+        Self::format_or_check_if_overflow::<CheckIfOverflow>(this, t, is_only_list_item)
+    }
+
+    fn format(this: &mut AstFormatter<'_>, t: &Self, is_only_list_item: bool) -> FormatResult {
+        Self::format_or_check_if_overflow::<OverflowDoFormat>(this, t, is_only_list_item)
+    }
+
+    fn format_if_overflow(
+        this: &mut AstFormatter<'_>,
+        t: &Self,
+        is_only_list_item: bool,
+    ) -> Option<FormatResult> {
+        if Self::check_if_overflows(this, t, is_only_list_item) {
+            Some(Self::format(this, t, is_only_list_item))
+        } else {
+            None
+        }
+    }
 }
 
 impl Overflow for ast::Expr {
-    fn allow_overflow(&self, is_only_list_item: bool) -> bool {
-        if !self.attrs.is_empty() {
-            return false;
+    fn format_or_check_if_overflow<H: OverflowHandler>(
+        this: &mut AstFormatter<'_>,
+        expr: &Self,
+        is_only_list_item: bool,
+    ) -> H::Result {
+        if !expr.attrs.is_empty() {
+            return H::no_overflow();
         }
-        match &self.kind {
+        match expr.kind {
             // block-like
-            | ast::ExprKind::Block(..)
-            | ast::ExprKind::Closure(..)
-            | ast::ExprKind::Gen(..) => true,
+            ast::ExprKind::Block(..) | ast::ExprKind::Closure(..) | ast::ExprKind::Gen(..) => {
+                H::overflows(this, |this| this.expr(expr, Tail::NONE))
+            }
             // control flow
-            | ast::ExprKind::ForLoop { .. }
-            | ast::ExprKind::If(..)
-            | ast::ExprKind::Loop(..)
-            | ast::ExprKind::Match(..)
-            | ast::ExprKind::While(..)
+            // | ast::ExprKind::ForLoop { .. }
+            // | ast::ExprKind::If(..)
+            // | ast::ExprKind::Loop(..)
+            // | ast::ExprKind::Match(..)
+            // | ast::ExprKind::While(..)
             // list
-            | ast::ExprKind::Array(..)
-            | ast::ExprKind::Call(..)
-            | ast::ExprKind::MacCall(..)
-            | ast::ExprKind::MethodCall(..)
-            | ast::ExprKind::Struct(..)
-            | ast::ExprKind::Tup(..) => is_only_list_item,
+            // | ast::ExprKind::Array(..)
+            // | ast::ExprKind::Call(..)
+            // | ast::ExprKind::MacCall(..)
+            // | ast::ExprKind::Struct(..)
+            // | ast::ExprKind::Tup(..) if is_only_list_item => H::overflows(|| this.expr(expr, Tail::None)),
+            // | ast::ExprKind::MethodCall(..) if is_only_list_item => H::overflows(|| this.dot_chain(expr, Tail::NONE, true)),
             // prefix
-            | ast::ExprKind::AddrOf(_, _, expr)
-            | ast::ExprKind::Cast(expr, _)
-            | ast::ExprKind::Try(expr)
-            | ast::ExprKind::Unary(_, expr) => expr.allow_overflow(is_only_list_item),
-            _ => false,
+            ast::ExprKind::AddrOf(borrow_kind, mutability, ref inner)
+                if H::FORMATTING
+                    || Overflow::check_if_overflows(this, inner, is_only_list_item) =>
+            {
+                H::overflows(this, |this| {
+                    this.addr_of(borrow_kind, mutability, expr)?;
+                    Overflow::format(this, inner, is_only_list_item)
+                })
+            }
+            ast::ExprKind::Cast(ref target, _)
+                if H::FORMATTING
+                    || Overflow::check_if_overflows(this, target, is_only_list_item) =>
+            {
+                todo!()
+            }
+            ast::ExprKind::Try(ref target)
+                if H::FORMATTING
+                    || Overflow::check_if_overflows(this, target, is_only_list_item) =>
+            {
+                todo!()
+            }
+            ast::ExprKind::Unary(_, ref target)
+                if H::FORMATTING
+                    || Overflow::check_if_overflows(this, target, is_only_list_item) =>
+            {
+                todo!()
+            }
+            _ => H::no_overflow(),
         }
     }
 }
 
 impl Overflow for ast::MetaItemInner {
-    fn allow_overflow(&self, _is_only_list_item: bool) -> bool {
-        match self {
-            ast::MetaItemInner::Lit(..) => true,
+    fn format_or_check_if_overflow<H: OverflowHandler>(
+        this: &mut AstFormatter<'_>,
+        item: &Self,
+        is_only_list_item: bool,
+    ) -> H::Result {
+        match item {
+            ast::MetaItemInner::Lit(..) => H::overflows(this, |this| todo!()),
             ast::MetaItemInner::MetaItem(meta_item) => {
-                matches!(meta_item.kind, ast::MetaItemKind::Word)
+                if matches!(meta_item.kind, ast::MetaItemKind::Word) {
+                    H::overflows(this, |this| this.meta_item(meta_item))
+                } else {
+                    H::no_overflow()
+                }
             }
         }
     }
 }
 
 impl<T: Overflow> Overflow for P<T> {
-    fn allow_overflow(&self, is_only_list_item: bool) -> bool {
-        <T as Overflow>::allow_overflow(self, is_only_list_item)
+    fn format_or_check_if_overflow<H: OverflowHandler>(
+        this: &mut AstFormatter<'_>,
+        t: &Self,
+        is_only_list_item: bool,
+    ) -> H::Result {
+        <T as Overflow>::format_or_check_if_overflow::<H>(this, t, is_only_list_item)
     }
 }

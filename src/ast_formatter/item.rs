@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{ListConfig, ListWrapToFitConfig};
+use crate::ast_formatter::list::{list_overflow_no, param_list_config, ListConfig, ListWrapToFitConfig, StructFieldListConfig};
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 use crate::ast_formatter::last_line::Tail;
@@ -21,7 +21,7 @@ impl<'a> AstFormatter<'a> {
                 self.out.token_at_space("use", item.span.lo())?;
                 self.use_tree(use_tree)?;
                 self.out.token_end_at(";", item.span.hi())?;
-            },
+            }
             ast::ItemKind::Static(_) => todo!(),
             ast::ItemKind::Const(_) => todo!(),
             ast::ItemKind::Fn(fn_) => self.fn_(fn_, item)?,
@@ -52,7 +52,7 @@ impl<'a> AstFormatter<'a> {
             ast::ItemKind::GlobalAsm(_) => todo!(),
             ast::ItemKind::TyAlias(_) => todo!(),
             ast::ItemKind::Enum(_, _) => todo!(),
-            ast::ItemKind::Struct(_, _) => todo!(),
+            ast::ItemKind::Struct(variants, generics) => self.struct_item(variants, generics, item)?,
             ast::ItemKind::Union(_, _) => todo!(),
             ast::ItemKind::Trait(_) => todo!(),
             ast::ItemKind::TraitAlias(_, _) => todo!(),
@@ -71,7 +71,7 @@ impl<'a> AstFormatter<'a> {
             ast::VisibilityKind::Public => {
                 self.out.token_at("pub", vis.span.lo())?;
                 self.out.space()?;
-            },
+            }
             ast::VisibilityKind::Restricted {
                 ref path,
                 shorthand,
@@ -87,6 +87,26 @@ impl<'a> AstFormatter<'a> {
         Ok(())
     }
 
+    fn struct_item(&mut self, variants: &ast::VariantData, generics: &ast::Generics, item: &ast::Item) -> FormatResult {
+        self.out.token_expect("struct")?;
+        self.out.space()?;
+        self.variant_data(variants)?;
+        self.generics(generics)?;
+        Ok(())
+    }
+
+    fn variant_data(&mut self, variants: &ast::VariantData) -> FormatResult {
+        match variants {
+            ast::VariantData::Struct { fields, .. } => self.list(fields, Self::field_def, StructFieldListConfig, list_overflow_no(), Tail::NONE),
+            ast::VariantData::Tuple(fields, _) => self.list(fields, Self::field_def, param_list_config(None), list_overflow_no(), Tail::NONE),
+            ast::VariantData::Unit(_) => Ok(())
+        }
+    }
+
+    fn field_def(&mut self, field: &ast::FieldDef) -> FormatResult {
+        todo!()
+    }
+
     fn use_tree(&mut self, use_tree: &ast::UseTree) -> FormatResult {
         self.path(&use_tree.prefix)?;
         match use_tree.kind {
@@ -99,13 +119,25 @@ impl<'a> AstFormatter<'a> {
             }
             ast::UseTreeKind::Nested { ref items, span } => {
                 self.out.token_expect("::")?;
-                self.list(
-                    items,
-                    |this, (use_tree, _)| this.use_tree(use_tree),
-                    UseTreeListConfig,
-                    Tail::None
-                )?
-            },
+                let has_nested = items.iter().any(|(item, _)| matches!(item.kind, ast::UseTreeKind::Nested { .. }));
+                if has_nested {
+                    self.list_separate_lines(
+                        items,
+                        "{",
+                        "}",
+                        |this, (use_tree, _)| this.use_tree(use_tree),
+                        Tail::NONE,
+                    )?
+                } else {
+                    self.list(
+                        items,
+                        |this, (use_tree, _)| this.use_tree(use_tree),
+                        UseTreeListConfig,
+                        list_overflow_no(),
+                        Tail::NONE,
+                    )?
+                }
+            }
             ast::UseTreeKind::Glob => todo!(),
         }
         Ok(())
@@ -115,8 +147,6 @@ impl<'a> AstFormatter<'a> {
 struct UseTreeListConfig;
 
 impl ListConfig for UseTreeListConfig {
-    type Item = (ast::UseTree, ast::NodeId);
-    
     const START_BRACE: &'static str = "{";
     const END_BRACE: &'static str = "}";
     const PAD_CONTENTS: bool = false;
