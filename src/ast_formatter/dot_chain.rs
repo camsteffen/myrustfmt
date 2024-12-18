@@ -3,7 +3,7 @@ use rustc_ast::ast;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::param_list_config;
+use crate::ast_formatter::list::{list, param_list_config};
 use crate::constraint_writer::TooWideError;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::source_formatter::{FormatError, FormatResult};
@@ -128,7 +128,7 @@ impl AstFormatter<'_> {
             ast::ExprKind::Field(_, ident) => self.ident(ident),
             ast::ExprKind::MethodCall(ref method_call) => {
                 self.path_segment(&method_call.seg)?;
-                self.list(
+                list(
                     &method_call.args,
                     |this, arg| this.expr(arg, Tail::NONE),
                     param_list_config(Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)),

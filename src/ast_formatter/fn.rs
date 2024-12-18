@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{ListConfig, param_list_config};
+use crate::ast_formatter::list::{ListConfig, list, param_list_config};
 use crate::source_formatter::FormatResult;
 
 use rustc_ast::ast;
@@ -116,7 +116,7 @@ impl<'a> AstFormatter<'a> {
         &mut self,
         parenthesized_args: &ast::ParenthesizedArgs,
     ) -> FormatResult {
-        self.list(
+        list(
             &parenthesized_args.inputs,
             |this, ty| this.ty(ty),
             param_list_config(None),
@@ -164,7 +164,7 @@ impl<'a> AstFormatter<'a> {
         ast::FnDecl { inputs, output }: &ast::FnDecl,
         input_list_config: impl ListConfig,
     ) -> FormatResult {
-        self.list(inputs, |this, param| this.param(param), input_list_config)
+        list(inputs, |this, param| this.param(param), input_list_config)
             .tail(Tail::new(&|this| this.fn_ret_ty(output)))
             .format(self)?;
         Ok(())

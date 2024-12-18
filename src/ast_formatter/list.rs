@@ -180,26 +180,27 @@ where
     }
 }
 
-impl<'a> AstFormatter<'a> {
-    pub fn list<'list, Item, FormatItem, Config>(
-        &mut self,
-        list: &'list [Item],
-        format_item: FormatItem,
-        config: Config,
-    ) -> ListBuilder<'list, 'static, Item, FormatItem, Config, ListOverflowNo<Item>>
-    where
-        Config: ListConfig,
-        FormatItem: Fn(&mut Self, &Item) -> FormatResult,
-    {
-        ListBuilder {
-            list,
-            format_item,
-            config,
-            tail: Tail::NONE,
-            overflow: ListOverflowNo(PhantomData),
-        }
+pub fn list<'a, 'list, Item, FormatItem, Config>(
+    list: &'list [Item],
+    format_item: FormatItem,
+    config: Config,
+) -> ListBuilder<'list, 'static, Item, FormatItem, Config, ListOverflowNo<Item>>
+where
+    Config: ListConfig,
+    FormatItem: Fn(&mut AstFormatter<'a>, &Item) -> FormatResult,
+{
+    ListBuilder {
+        list,
+        format_item,
+        config,
+        tail: Tail::NONE,
+        overflow: ListOverflowNo(PhantomData),
     }
+}
 
+impl<'a> AstFormatter<'a> {
+    pub fn list(&self) {}
+    
     pub fn list_separate_lines<T>(
         &mut self,
         list: &[T],

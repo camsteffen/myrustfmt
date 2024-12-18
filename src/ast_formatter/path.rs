@@ -2,7 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::source_formatter::FormatResult;
 
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::AngleBracketedListConfig;
+use crate::ast_formatter::list::{AngleBracketedListConfig, list};
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
@@ -43,7 +43,7 @@ impl AstFormatter<'_> {
         if let Some(args) = &segment.args.as_deref() {
             match args {
                 ast::AngleBracketed(args) => {
-                    self.list(
+                    list(
                         &args.args,
                         |this, arg| match arg {
                             ast::AngleBracketedArg::Arg(arg) => this.generic_arg(arg),

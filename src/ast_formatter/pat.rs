@@ -3,7 +3,7 @@ use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{StructFieldListConfig, param_list_config};
+use crate::ast_formatter::list::{StructFieldListConfig, list, param_list_config};
 use crate::source_formatter::FormatResult;
 
 impl<'a> AstFormatter<'a> {
@@ -32,16 +32,17 @@ impl<'a> AstFormatter<'a> {
             }
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 self.qpath(qself, path)?;
-                self.list(fields, |this, pat| this.pat(pat), param_list_config(None))
+                list(fields, |this, pat| this.pat(pat), param_list_config(None))
                     .tail(end)
                     .format(self)
             }
             ast::PatKind::Or(_) => todo!(),
             ast::PatKind::Path(_, _) => todo!(),
-            ast::PatKind::Tuple(ref fields) => self
-                .list(fields, |this, pat| this.pat(pat), param_list_config(None))
-                .tail(end)
-                .format(self),
+            ast::PatKind::Tuple(ref fields) => {
+                list(fields, |this, pat| this.pat(pat), param_list_config(None))
+                    .tail(end)
+                    .format(self)
+            }
             ast::PatKind::Box(_) => todo!(),
             ast::PatKind::Deref(_) => todo!(),
             ast::PatKind::Ref(_, _) => todo!(),
@@ -66,7 +67,7 @@ impl<'a> AstFormatter<'a> {
     ) -> FormatResult {
         self.qpath(qself, path)?;
         self.out.space()?;
-        self.list(fields, Self::pat_field, StructFieldListConfig)
+        list(fields, Self::pat_field, StructFieldListConfig)
             .tail(end)
             .format(self)
     }

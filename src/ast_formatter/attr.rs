@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
 use crate::source_formatter::FormatResult;
 
-use crate::ast_formatter::list::param_list_config;
+use crate::ast_formatter::list::{list, param_list_config};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 
@@ -46,7 +46,7 @@ impl AstFormatter<'_> {
             ast::MetaItemKind::Word => Ok(()),
             ast::MetaItemKind::List(items) => {
                 let single_line_max_contents_width = RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width;
-                self.list(
+                list(
                     items,
                     |this, item| match item {
                         ast::MetaItemInner::MetaItem(item) => this.meta_item(item),

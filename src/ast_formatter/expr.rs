@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{ArrayListConfig, StructFieldListConfig, param_list_config};
+use crate::ast_formatter::list::{ArrayListConfig, StructFieldListConfig, list, param_list_config};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::source_formatter::{FormatError, FormatResult};
 
@@ -11,23 +11,23 @@ use rustc_span::source_map::Spanned;
 impl<'a> AstFormatter<'a> {
     pub fn expr(&mut self, expr: &ast::Expr, tail: Tail<'_>) -> FormatResult {
         match expr.kind {
-            ast::ExprKind::Array(ref items) => self
-                .list(items, |this, e| this.expr(e, Tail::NONE), ArrayListConfig)
-                .overflow()
-                .tail(tail)
-                .format(self),
+            ast::ExprKind::Array(ref items) => {
+                list(items, |this, e| this.expr(e, Tail::NONE), ArrayListConfig)
+                    .overflow()
+                    .tail(tail)
+                    .format(self)
+            }
             ast::ExprKind::ConstBlock(_) => todo!(),
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, tail),
             ast::ExprKind::Field(..) | ast::ExprKind::MethodCall(_) => {
                 self.dot_chain(expr, tail, false)
             }
-            ast::ExprKind::Tup(ref items) => self
-                .list(
-                    items,
-                    |this, item| this.expr(item, Tail::NONE),
-                    param_list_config(Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)),
-                )
-                .format(self),
+            ast::ExprKind::Tup(ref items) => list(
+                items,
+                |this, item| this.expr(item, Tail::NONE),
+                param_list_config(Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)),
+            )
+            .format(self),
             ast::ExprKind::Binary(op, ref left, ref right) => self.binop(left, op, right, tail),
             ast::ExprKind::Unary(_, _) => todo!(),
             ast::ExprKind::Lit(_) => {
@@ -166,7 +166,7 @@ impl<'a> AstFormatter<'a> {
     fn call(&mut self, func: &ast::Expr, args: &[P<ast::Expr>], end: Tail<'_>) -> FormatResult {
         self.expr(func, Tail::NONE)?;
         let single_line_max_contents_width = RUSTFMT_CONFIG_DEFAULTS.fn_call_width;
-        self.list(
+        list(
             args,
             |this, arg| this.expr(arg, Tail::NONE),
             param_list_config(Some(single_line_max_contents_width)),
@@ -273,8 +273,7 @@ impl<'a> AstFormatter<'a> {
     fn struct_expr(&mut self, struct_: &ast::StructExpr) -> FormatResult {
         self.qpath(&struct_.qself, &struct_.path)?;
         self.out.space()?;
-        self.list(&struct_.fields, Self::expr_field, StructFieldListConfig)
-            .format(self)?;
+        list(&struct_.fields, Self::expr_field, StructFieldListConfig).format(self)?;
         Ok(())
     }
 

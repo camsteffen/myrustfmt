@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::param_list_config;
+use crate::ast_formatter::list::{list, param_list_config};
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
@@ -20,9 +20,9 @@ impl<'a> AstFormatter<'a> {
             ast::TyKind::PinnedRef(lifetime, mut_ty) => todo!(),
             ast::TyKind::BareFn(ty) => todo!(),
             ast::TyKind::Never => todo!(),
-            ast::TyKind::Tup(elements) => self
-                .list(elements, |this, ty| this.ty(ty), param_list_config(None))
-                .format(self),
+            ast::TyKind::Tup(elements) => {
+                list(elements, |this, ty| this.ty(ty), param_list_config(None)).format(self)
+            }
             ast::TyKind::Path(qself, path) => self.qpath(qself, path),
             ast::TyKind::TraitObject(bounds, syntax) => todo!(),
             ast::TyKind::ImplTrait(_, bounds) => {

@@ -1,21 +1,27 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{param_list_config, ListConfig, ListWrapToFitConfig, StructFieldListConfig};
+use crate::ast_formatter::last_line::Tail;
+use crate::ast_formatter::list::{
+    ListConfig, ListWrapToFitConfig, StructFieldListConfig, list, param_list_config,
+};
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
-use crate::ast_formatter::last_line::Tail;
 
 impl<'a> AstFormatter<'a> {
     pub fn item(&mut self, item: &ast::Item) -> FormatResult {
         self.item_generic(item, |this, kind| this.item_kind(kind, item))
     }
-    
-    fn item_generic<K>(&mut self, item: &ast::Item<K>, kind: impl FnOnce(&mut Self, &K) -> FormatResult) -> FormatResult {
+
+    fn item_generic<K>(
+        &mut self,
+        item: &ast::Item<K>,
+        kind: impl FnOnce(&mut Self, &K) -> FormatResult,
+    ) -> FormatResult {
         self.attrs(&item.attrs)?;
         self.vis(&item.vis)?;
         kind(self, &item.kind)?;
         Ok(())
     }
-    
+
     pub fn item_kind(&mut self, kind: &ast::ItemKind, item: &ast::Item) -> FormatResult {
         match kind {
             ast::ItemKind::ExternCrate(name) => {
@@ -61,7 +67,9 @@ impl<'a> AstFormatter<'a> {
             ast::ItemKind::GlobalAsm(_) => todo!(),
             ast::ItemKind::TyAlias(_) => todo!(),
             ast::ItemKind::Enum(_, _) => todo!(),
-            ast::ItemKind::Struct(variants, generics) => self.struct_item(variants, generics, item)?,
+            ast::ItemKind::Struct(variants, generics) => {
+                self.struct_item(variants, generics, item)?
+            }
             ast::ItemKind::Union(_, _) => todo!(),
             ast::ItemKind::Trait(_) => todo!(),
             ast::ItemKind::TraitAlias(_, _) => todo!(),
@@ -95,7 +103,7 @@ impl<'a> AstFormatter<'a> {
         }
         Ok(())
     }
-    
+
     fn impl_(&mut self, impl_: &ast::Impl, item: &ast::Item) -> FormatResult {
         self.out.token_at("impl", item.span.lo())?;
         self.generics(&impl_.generics)?;
@@ -122,8 +130,12 @@ impl<'a> AstFormatter<'a> {
         self.out.token_end_at("}", item.span.hi())?;
         Ok(())
     }
-    
-    fn assoc_item_kind(&mut self, kind: &ast::AssocItemKind, item: &ast::AssocItem) -> FormatResult {
+
+    fn assoc_item_kind(
+        &mut self,
+        kind: &ast::AssocItemKind,
+        item: &ast::AssocItem,
+    ) -> FormatResult {
         match kind {
             ast::AssocItemKind::Const(const_item) => todo!(),
             ast::AssocItemKind::Fn(fn_) => self.fn_(fn_, item),
@@ -134,7 +146,12 @@ impl<'a> AstFormatter<'a> {
         }
     }
 
-    fn struct_item(&mut self, variants: &ast::VariantData, generics: &ast::Generics, item: &ast::Item) -> FormatResult {
+    fn struct_item(
+        &mut self,
+        variants: &ast::VariantData,
+        generics: &ast::Generics,
+        item: &ast::Item,
+    ) -> FormatResult {
         self.out.token_expect("struct")?;
         self.out.space()?;
         self.ident(item.ident)?;
@@ -146,9 +163,13 @@ impl<'a> AstFormatter<'a> {
 
     fn variant_data(&mut self, variants: &ast::VariantData) -> FormatResult {
         match variants {
-            ast::VariantData::Struct { fields, .. } => self.list(fields, Self::field_def, StructFieldListConfig).format(self),
-            ast::VariantData::Tuple(fields, _) => self.list(fields, Self::field_def, param_list_config(None)).format(self),
-            ast::VariantData::Unit(_) => Ok(())
+            ast::VariantData::Struct { fields, .. } => {
+                list(fields, Self::field_def, StructFieldListConfig).format(self)
+            }
+            ast::VariantData::Tuple(fields, _) => {
+                list(fields, Self::field_def, param_list_config(None)).format(self)
+            }
+            ast::VariantData::Unit(_) => Ok(()),
         }
     }
 
@@ -176,7 +197,9 @@ impl<'a> AstFormatter<'a> {
             }
             ast::UseTreeKind::Nested { ref items, span } => {
                 self.out.token_expect("::")?;
-                let has_nested = items.iter().any(|(item, _)| matches!(item.kind, ast::UseTreeKind::Nested { .. }));
+                let has_nested = items
+                    .iter()
+                    .any(|(item, _)| matches!(item.kind, ast::UseTreeKind::Nested { .. }));
                 if has_nested {
                     self.list_separate_lines(
                         items,
@@ -186,11 +209,12 @@ impl<'a> AstFormatter<'a> {
                         Tail::NONE,
                     )?
                 } else {
-                    self.list(
+                    list(
                         items,
                         |this, (use_tree, _)| this.use_tree(use_tree),
                         UseTreeListConfig,
-                    ).format(self)?
+                    )
+                    .format(self)?
                 }
             }
             ast::UseTreeKind::Glob => todo!(),
@@ -207,6 +231,8 @@ impl ListConfig for UseTreeListConfig {
     const PAD_CONTENTS: bool = false;
 
     fn wrap_to_fit() -> ListWrapToFitConfig {
-        ListWrapToFitConfig::Yes { max_element_width: None }
+        ListWrapToFitConfig::Yes {
+            max_element_width: None,
+        }
     }
 }
