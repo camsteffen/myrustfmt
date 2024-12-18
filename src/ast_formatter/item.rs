@@ -1,14 +1,23 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{list_overflow_no, param_list_config, ListConfig, ListWrapToFitConfig, StructFieldListConfig};
+use crate::ast_formatter::list::{param_list_config, ListConfig, ListWrapToFitConfig, StructFieldListConfig};
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 use crate::ast_formatter::last_line::Tail;
 
 impl<'a> AstFormatter<'a> {
     pub fn item(&mut self, item: &ast::Item) -> FormatResult {
+        self.item_generic(item, |this, kind| this.item_kind(kind, item))
+    }
+    
+    fn item_generic<K>(&mut self, item: &ast::Item<K>, kind: impl FnOnce(&mut Self, &K) -> FormatResult) -> FormatResult {
         self.attrs(&item.attrs)?;
         self.vis(&item.vis)?;
-        match &item.kind {
+        kind(self, &item.kind)?;
+        Ok(())
+    }
+    
+    pub fn item_kind(&mut self, kind: &ast::ItemKind, item: &ast::Item) -> FormatResult {
+        match kind {
             ast::ItemKind::ExternCrate(name) => {
                 self.out.token_at("extern", item.span.lo())?;
                 self.out.space()?;
@@ -56,7 +65,7 @@ impl<'a> AstFormatter<'a> {
             ast::ItemKind::Union(_, _) => todo!(),
             ast::ItemKind::Trait(_) => todo!(),
             ast::ItemKind::TraitAlias(_, _) => todo!(),
-            ast::ItemKind::Impl(_) => todo!(),
+            ast::ItemKind::Impl(impl_) => self.impl_(impl_, item)?,
             ast::ItemKind::MacCall(_) => todo!(),
             ast::ItemKind::MacroDef(_) => todo!(),
             ast::ItemKind::Delegation(_) => todo!(),
@@ -86,25 +95,73 @@ impl<'a> AstFormatter<'a> {
         }
         Ok(())
     }
+    
+    fn impl_(&mut self, impl_: &ast::Impl, item: &ast::Item) -> FormatResult {
+        self.out.token_at("impl", item.span.lo())?;
+        self.generics(&impl_.generics)?;
+        self.out.space()?;
+        if let Some(of_trait) = &impl_.of_trait {
+            self.trait_ref(of_trait)?;
+            self.out.space()?;
+            self.out.token_expect("for")?;
+            self.out.space()?;
+        }
+        self.ty(&impl_.self_ty)?;
+        self.out.space()?;
+        self.out.token_expect("{")?;
+        if !impl_.items.is_empty() {
+            self.indented(|this| {
+                for item in &impl_.items {
+                    this.out.newline_indent()?;
+                    this.item_generic(item, |this, kind| this.assoc_item_kind(kind, item))?;
+                }
+                Ok(())
+            })?;
+            self.out.newline_indent()?;
+        }
+        self.out.token_end_at("}", item.span.hi())?;
+        Ok(())
+    }
+    
+    fn assoc_item_kind(&mut self, kind: &ast::AssocItemKind, item: &ast::AssocItem) -> FormatResult {
+        match kind {
+            ast::AssocItemKind::Const(const_item) => todo!(),
+            ast::AssocItemKind::Fn(fn_) => self.fn_(fn_, item),
+            ast::AssocItemKind::Type(ty_alias) => todo!(),
+            ast::AssocItemKind::MacCall(mac_call) => todo!(),
+            ast::AssocItemKind::Delegation(delegation) => todo!(),
+            ast::AssocItemKind::DelegationMac(delegation_mac) => todo!(),
+        }
+    }
 
     fn struct_item(&mut self, variants: &ast::VariantData, generics: &ast::Generics, item: &ast::Item) -> FormatResult {
         self.out.token_expect("struct")?;
         self.out.space()?;
-        self.variant_data(variants)?;
+        self.ident(item.ident)?;
         self.generics(generics)?;
+        self.out.space()?;
+        self.variant_data(variants)?;
         Ok(())
     }
 
     fn variant_data(&mut self, variants: &ast::VariantData) -> FormatResult {
         match variants {
-            ast::VariantData::Struct { fields, .. } => self.list(fields, Self::field_def, StructFieldListConfig, list_overflow_no(), Tail::NONE),
-            ast::VariantData::Tuple(fields, _) => self.list(fields, Self::field_def, param_list_config(None), list_overflow_no(), Tail::NONE),
+            ast::VariantData::Struct { fields, .. } => self.list(fields, Self::field_def, StructFieldListConfig).format(self),
+            ast::VariantData::Tuple(fields, _) => self.list(fields, Self::field_def, param_list_config(None)).format(self),
             ast::VariantData::Unit(_) => Ok(())
         }
     }
 
     fn field_def(&mut self, field: &ast::FieldDef) -> FormatResult {
-        todo!()
+        self.attrs(&field.attrs)?;
+        self.vis(&field.vis)?;
+        if let Some(ident) = field.ident {
+            self.ident(ident)?;
+            self.out.token_expect(":")?;
+            self.out.space()?;
+        }
+        self.ty(&field.ty)?;
+        Ok(())
     }
 
     fn use_tree(&mut self, use_tree: &ast::UseTree) -> FormatResult {
@@ -133,9 +190,7 @@ impl<'a> AstFormatter<'a> {
                         items,
                         |this, (use_tree, _)| this.use_tree(use_tree),
                         UseTreeListConfig,
-                        list_overflow_no(),
-                        Tail::NONE,
-                    )?
+                    ).format(self)?
                 }
             }
             ast::UseTreeKind::Glob => todo!(),

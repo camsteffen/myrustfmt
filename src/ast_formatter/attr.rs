@@ -1,10 +1,9 @@
 use crate::ast_formatter::AstFormatter;
 use crate::source_formatter::FormatResult;
 
-use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{list_overflow_yes, param_list_config};
-use rustc_ast::ast;
+use crate::ast_formatter::list::param_list_config;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
+use rustc_ast::ast;
 
 impl AstFormatter<'_> {
     pub fn attrs(&mut self, attrs: &[ast::Attribute]) -> FormatResult {
@@ -16,24 +15,27 @@ impl AstFormatter<'_> {
     }
 
     fn attr(&mut self, attr: &ast::Attribute) -> FormatResult {
-        self.out.token_at("#", attr.span.lo())?;
-        match attr.style {
-            ast::AttrStyle::Inner => {
-                self.out.token_expect("!")?;
-            }
-            ast::AttrStyle::Outer => {}
-        }
         match attr.kind {
-            ast::AttrKind::Normal(ref normal_attr) => match attr.meta() {
+            ast::AttrKind::Normal(_) => match attr.meta() {
                 None => todo!(),
                 Some(meta) => {
+                    self.out.token_at("#", attr.span.lo())?;
+                    match attr.style {
+                        ast::AttrStyle::Inner => {
+                            self.out.token_expect("!")?;
+                        }
+                        ast::AttrStyle::Outer => {}
+                    }
                     self.out.token_expect("[")?;
                     self.meta_item(&meta)?;
                     self.out.token_expect("]")?;
                     Ok(())
                 }
             },
-            ast::AttrKind::DocComment(comment_kind, _symbol) => todo!(),
+            ast::AttrKind::DocComment(_comment_kind, _symbol) => {
+                // self.out.copy_span(attr.span);
+                Ok(())
+            },
         }
     }
 
@@ -51,15 +53,15 @@ impl AstFormatter<'_> {
                         ast::MetaItemInner::Lit(lit) => this.meta_item_lit(lit),
                     },
                     param_list_config(Some(single_line_max_contents_width)),
-                    list_overflow_yes(),
-                    Tail::NONE,
                 )
+                .overflow()
+                .format(self)
             }
             ast::MetaItemKind::NameValue(lit) => self.meta_item_lit(lit),
         }
     }
 
-    fn meta_item_lit(&mut self, lit: &ast::MetaItemLit) -> FormatResult {
+    fn meta_item_lit(&mut self, _lit: &ast::MetaItemLit) -> FormatResult {
         todo!()
     }
 }

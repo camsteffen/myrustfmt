@@ -1,5 +1,5 @@
 use crate::constraints::Constraints;
-use tracing::{info, instrument};
+use tracing::info;
 
 pub struct ConstraintWriter {
     constraints: Constraints,
@@ -31,6 +31,10 @@ impl ConstraintWriter {
 
     pub fn constraints(&mut self) -> &mut Constraints {
         &mut self.constraints
+    }
+
+    pub fn len(&self) -> usize {
+        self.buffer.len()
     }
 
     pub fn line(&self) -> usize {
@@ -109,7 +113,10 @@ impl ConstraintWriter {
     }
 
     pub fn max_width(&self) -> Option<usize> {
-        match (self.constraints.max_width, self.constraints.max_width_first_line) {
+        match (
+            self.constraints.max_width,
+            self.constraints.max_width_first_line,
+        ) {
             (Some(a), Some(b)) => Some(a.min(b)),
             (a, b) => a.or(b),
         }

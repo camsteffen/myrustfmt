@@ -18,26 +18,30 @@ impl<'a> SourceReader<'a> {
     }
 
     pub fn expect_pos(&self, pos: BytePos) {
-        if pos == self.pos {
-            return;
+        if pos != self.pos {
+            let token = self.next_token();
+            let upcoming_len = (token.len as usize).min(20).min(self.remaining().len());
+            let upcoming = &self.remaining()[..upcoming_len];
+            panic!(
+                "Expected position is {} bytes {}. Currently at {}. Next: \"{}\"",
+                pos.to_u32().abs_diff(self.pos.to_u32()),
+                if pos.to_u32() > self.pos.to_u32() { "ahead" } else { "behind" },
+                self.line_col_string(),
+                upcoming,
+            );
         }
-        let token = self.next_token();
-        if pos > self.pos {
-            if token.len < 20 {
-                panic!(
-                    "Skipped token: {:?} at {}",
-                    &self.remaining()[..token.len as usize],
-                    self.line_col_string()
-                )
-            }
-            panic!("Skipped token: {:?}", token.kind)
+    }
+    
+    pub fn eat(&mut self, token: &str) {
+        if !self.remaining().starts_with(token) {
+            let (line, col) = self.line_col();
+            panic!(
+                "expected token {:?}, found {:?} at {line}:{col}",
+                token,
+                &self.remaining()[..10.min(self.remaining().len())],
+            );
         }
-        panic!(
-            "Expected position to be {}, but was actually {}. Next token is {:?}.",
-            pos.to_u32(),
-            self.pos.to_u32(),
-            token.kind
-        );
+        self.advance(token.len());
     }
 
     fn next_token(&self) -> rustc_lexer::Token {

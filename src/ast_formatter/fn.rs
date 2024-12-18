@@ -1,11 +1,12 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{ListConfig, list_overflow_no, param_list_config};
+use crate::ast_formatter::list::{ListConfig, param_list_config};
 use crate::source_formatter::FormatResult;
+
 use rustc_ast::ast;
 
 impl<'a> AstFormatter<'a> {
-    pub fn fn_(&mut self, fn_: &ast::Fn, item: &ast::Item) -> FormatResult {
+    pub fn fn_<K>(&mut self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
         let ast::Fn {
             generics,
             sig,
@@ -20,11 +21,16 @@ impl<'a> AstFormatter<'a> {
         Ok(())
     }
 
-    pub fn closure(&mut self, closure: &ast::Closure, end: Tail) -> FormatResult {
+    pub fn closure(
+        &mut self,
+        closure: &ast::Closure,
+        is_overflow: bool,
+        end: Tail<'_>,
+    ) -> FormatResult {
         match closure.binder {
             ast::ClosureBinder::NotPresent => {}
             ast::ClosureBinder::For {
-                span,
+                span: _,
                 ref generic_params,
             } => todo!(),
         }
@@ -38,7 +44,72 @@ impl<'a> AstFormatter<'a> {
         }
         self.fn_decl(&closure.fn_decl, ClosureParamListConfig)?;
         self.out.space()?;
-        self.expr(&closure.body, end)
+
+        if is_overflow {
+            self.with_not_single_line(|this| this.closure_body(&closure.body, end))?;
+        } else {
+            self.closure_body(&closure.body, end)?;
+        }
+        Ok(())
+    }
+
+    fn closure_body(&mut self, body: &ast::Expr, tail: Tail<'_>) -> FormatResult {
+        let mut inner_expr = None;
+        if let ast::ExprKind::Block(block, None) = &body.kind {
+            if matches!(block.rules, ast::BlockCheckMode::Default) {
+                if let [stmt] = &block.stmts[..] {
+                    if let ast::StmtKind::Expr(expr) = &stmt.kind {
+                        if expr.attrs.is_empty() {
+                            inner_expr = Some(expr);
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(expr) = inner_expr {
+            self.out.skip_token("{");
+            self.closure_body(expr, tail)?;
+            self.out.skip_token("}");
+            return Ok(());
+        }
+        fn allow_multi_line(expr: &ast::Expr) -> bool {
+            match expr.kind {
+                ast::ExprKind::Match(..)
+                | ast::ExprKind::Gen(..)
+                | ast::ExprKind::Block(..)
+                | ast::ExprKind::TryBlock(..)
+                | ast::ExprKind::Loop(..)
+                | ast::ExprKind::Struct(..) => true,
+
+                ast::ExprKind::AddrOf(_, _, ref expr)
+                | ast::ExprKind::Try(ref expr)
+                | ast::ExprKind::Unary(_, ref expr)
+                | ast::ExprKind::Cast(ref expr, _) => allow_multi_line(expr),
+
+                _ => false,
+            }
+        }
+        if allow_multi_line(body) {
+            self.expr(body, tail)
+        } else {
+            self.fallback_chain(
+                |chain| {
+                    chain.next(|this| this.with_single_line(|this| this.expr(body, tail)));
+                    chain.next(|this| {
+                        this.out.token_missing("{")?;
+                        this.indented(|this| {
+                            this.out.newline_indent()?;
+                            this.expr(body, tail)?;
+                            Ok(())
+                        })?;
+                        this.out.newline_indent()?;
+                        this.out.token_missing("}")?;
+                        Ok(())
+                    });
+                },
+                |_this| Ok(()),
+            )
+        }
     }
 
     pub fn parenthesized_args(
@@ -49,18 +120,17 @@ impl<'a> AstFormatter<'a> {
             &parenthesized_args.inputs,
             |this, ty| this.ty(ty),
             param_list_config(None),
-            list_overflow_no(),
-            Tail::NONE,
-        )?;
+        )
+        .format(self)?;
         self.fn_ret_ty(&parenthesized_args.output)?;
         Ok(())
     }
 
-    fn fn_sig(
+    fn fn_sig<K>(
         &mut self,
         ast::FnSig { header, decl, span }: &ast::FnSig,
         generics: &ast::Generics,
-        item: &ast::Item,
+        item: &ast::Item<K>,
     ) -> FormatResult {
         self.fn_header(header)?;
         self.out.token_expect("fn")?;
@@ -94,20 +164,19 @@ impl<'a> AstFormatter<'a> {
         ast::FnDecl { inputs, output }: &ast::FnDecl,
         input_list_config: impl ListConfig,
     ) -> FormatResult {
-        self.list(
-            inputs,
-            |this, param| this.param(param),
-            input_list_config,
-            list_overflow_no(),
-            Tail::NONE,
-        )?;
-        self.fn_ret_ty(output)?;
+        self.list(inputs, |this, param| this.param(param), input_list_config)
+            .tail(Tail::new(&|this| this.fn_ret_ty(output)))
+            .format(self)?;
         Ok(())
     }
 
     fn param(&mut self, param: &ast::Param) -> FormatResult {
         tracing::info!("{:?}", param);
         self.attrs(&param.attrs)?;
+        if param.is_self() {
+            self.ty(&param.ty)?;
+            return Ok(());
+        }
         self.pat(&param.pat)?;
         if !matches!(param.ty.kind, ast::TyKind::Infer) {
             self.out.token_expect(":")?;

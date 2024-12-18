@@ -70,6 +70,10 @@ impl<'a> SourceFormatter<'a> {
         self.out.last_line_len()
     }
 
+    pub fn len(&self) -> usize {
+        self.out.len()
+    }
+
     pub fn line(&self) -> usize {
         self.out.line()
     }
@@ -83,6 +87,13 @@ impl<'a> SourceFormatter<'a> {
         self.source.source.as_bytes()[pos.to_usize() - 1]
     }
 
+
+    pub fn skip_token(&mut self, token: &str) {
+        self.handle_whitespace_and_comments_if_needed();
+        self.source.eat(token);
+        self.next_is_whitespace_or_comments = false;
+    }
+
     pub fn skip_token_if_present(&mut self, token: &str) {
         let snapshot;
         if self.next_is_whitespace_or_comments {
@@ -91,7 +102,7 @@ impl<'a> SourceFormatter<'a> {
         } else {
             snapshot = None;
         }
-        self.handle_whitespace_and_comments_if_needed();
+        // self.handle_whitespace_and_comments_if_needed();
         if self.source.remaining().starts_with(token) {
             self.source.advance(token.len());
             self.next_is_whitespace_or_comments = true;
@@ -141,15 +152,9 @@ impl<'a> SourceFormatter<'a> {
      */
     pub fn token_expect(&mut self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
-        if !self.source.remaining().starts_with(token) {
-            let (line, col) = self.source.line_col();
-            panic!(
-                "expected token {:?}, found {:?} at {line}:{col}",
-                token,
-                &self.source.remaining()[..10.min(self.source.remaining().len())],
-            );
-        }
-        self.token_unchecked(token)?;
+        self.source.eat(token);
+        self.next_is_whitespace_or_comments = true;
+        self.token_out(token)?;
         Ok(())
     }
 
@@ -269,21 +274,23 @@ impl<'a> SourceFormatter<'a> {
         self.copy(pos.to_usize() - self.source.pos.to_usize());
     }
 
-    /** Write a token assuming it is next in source */
-    fn token_unchecked(&mut self, token: &str) -> FormatResult {
+    /** Write a token */
+    fn token_out(&mut self, token: &str) -> FormatResult {
         self.out
             .token(&token)
-            .map_err(|e| self.lift_constraint_err(e))?;
+            .map_err(|e| self.lift_constraint_err(e))
+    }
+
+    /** Write a token assuming it is next in source */
+    fn token_unchecked(&mut self, token: &str) -> FormatResult {
+        self.token_out(token)?;
         self.source.advance(token.len());
         self.next_is_whitespace_or_comments = true;
         Ok(())
     }
 
     /** Write a token assuming it is missing from source */
-    fn token_missing(&mut self, token: &str) -> FormatResult {
-        self.out
-            .token(&token)
-            .map_err(|e| self.lift_constraint_err(e))?;
-        Ok(())
+    pub fn token_missing(&mut self, token: &str) -> FormatResult {
+        self.token_out(token)
     }
 }

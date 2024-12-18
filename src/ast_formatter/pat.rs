@@ -2,23 +2,16 @@ use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::{ Tail};
-use crate::ast_formatter::list::{list_overflow_no, param_list_config, StructFieldListConfig};
+use crate::ast_formatter::last_line::Tail;
+use crate::ast_formatter::list::{StructFieldListConfig, param_list_config};
 use crate::source_formatter::FormatResult;
 
 impl<'a> AstFormatter<'a> {
-    pub fn pat(
-        &mut self,
-        pat: &ast::Pat,
-    ) -> FormatResult {
+    pub fn pat(&mut self, pat: &ast::Pat) -> FormatResult {
         self.pat_end(pat, Tail::NONE)
     }
 
-    pub fn pat_end(
-        &mut self,
-        pat: &ast::Pat,
-        end: Tail,
-    ) -> FormatResult {
+    pub fn pat_end(&mut self, pat: &ast::Pat, end: Tail<'_>) -> FormatResult {
         match pat.kind {
             ast::PatKind::Wild => todo!(),
             ast::PatKind::Ident(ast::BindingMode(by_ref, mutbl), ident, ref pat) => {
@@ -32,20 +25,23 @@ impl<'a> AstFormatter<'a> {
                     }
                 }
                 self.ident(ident)?;
-                self.tail(&end)
+                self.tail(end)
             }
             ast::PatKind::Struct(ref qself, ref path, ref fields, rest) => {
                 self.struct_pat(qself, path, fields, rest, end)
             }
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 self.qpath(qself, path)?;
-                self.list(fields, |this, field| this.pat(field), param_list_config(None), list_overflow_no(), end)
+                self.list(fields, |this, pat| this.pat(pat), param_list_config(None))
+                    .tail(end)
+                    .format(self)
             }
             ast::PatKind::Or(_) => todo!(),
             ast::PatKind::Path(_, _) => todo!(),
-            ast::PatKind::Tuple(ref fields) => {
-                self.list(fields, |this, field| this.pat(field), param_list_config(None), list_overflow_no(), end)
-            }
+            ast::PatKind::Tuple(ref fields) => self
+                .list(fields, |this, pat| this.pat(pat), param_list_config(None))
+                .tail(end)
+                .format(self),
             ast::PatKind::Box(_) => todo!(),
             ast::PatKind::Deref(_) => todo!(),
             ast::PatKind::Ref(_, _) => todo!(),
@@ -66,11 +62,13 @@ impl<'a> AstFormatter<'a> {
         path: &ast::Path,
         fields: &[ast::PatField],
         rest: ast::PatFieldsRest,
-        end: Tail
+        end: Tail<'_>,
     ) -> FormatResult {
         self.qpath(qself, path)?;
         self.out.space()?;
-        self.list(fields, Self::pat_field, StructFieldListConfig, list_overflow_no(), end)
+        self.list(fields, Self::pat_field, StructFieldListConfig)
+            .tail(end)
+            .format(self)
     }
 
     fn pat_field(&mut self, pat_field: &ast::PatField) -> FormatResult {

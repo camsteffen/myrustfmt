@@ -1,6 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{list_overflow_no, AngleBracketedListConfig};
+use crate::ast_formatter::list::{AngleBracketedListConfig, };
 use crate::source_formatter::FormatResult;
 
 use rustc_ast::ast;
@@ -14,9 +13,8 @@ impl AstFormatter<'_> {
             &generics.params,
             Self::generic_param,
             AngleBracketedListConfig,
-            list_overflow_no(),
-            Tail::NONE,
         )
+        .format(self)
     }
 
     fn generic_param(&mut self, param: &ast::GenericParam) -> FormatResult {

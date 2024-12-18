@@ -4,8 +4,13 @@ use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter<'a> {
-    pub fn block(&mut self, block: &ast::Block, end: Tail) -> FormatResult {
+    pub fn block(&mut self, block: &ast::Block, end: Tail<'_>) -> FormatResult {
         self.out.token_at("{", block.span.lo())?;
+        self.block_after_open_brace(block, end)?;
+        Ok(())
+    }
+
+    pub fn block_after_open_brace(&mut self, block: &ast::Block, end: Tail<'_>) -> FormatResult {
         if !block.stmts.is_empty() {
             self.indented(|this| {
                 for stmt in &block.stmts {
@@ -17,12 +22,14 @@ impl<'a> AstFormatter<'a> {
             self.out.newline_indent()?;
         }
         self.out.token_end_at("}", block.span.hi())?;
-        self.tail(&end)
+        self.tail(end)?;
+        Ok(())
     }
 
     fn stmt(&mut self, stmt: &ast::Stmt) -> FormatResult {
         let hi = stmt.span.hi();
-        let semicolon = Tail::new(move |this| this.out.token_end_at(";", hi));
+        let semicolon = move |this: &mut AstFormatter<'_>| this.out.token_end_at(";", hi);
+        let semicolon = Tail::new(&semicolon);
         match &stmt.kind {
             ast::StmtKind::Let(local) => self.local(local, semicolon),
             ast::StmtKind::Item(_) => todo!(),

@@ -1,8 +1,8 @@
 use crate::ast_formatter::AstFormatter;
 use crate::source_formatter::FormatResult;
 
-use crate::ast_formatter::last_line::{Tail};
-use crate::ast_formatter::list::{list_overflow_no, AngleBracketedListConfig};
+use crate::ast_formatter::last_line::Tail;
+use crate::ast_formatter::list::AngleBracketedListConfig;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
@@ -15,7 +15,7 @@ impl AstFormatter<'_> {
         &mut self,
         qself: &Option<P<ast::QSelf>>,
         path: &ast::Path,
-        end: Tail,
+        end: Tail<'_>,
     ) -> FormatResult {
         if let Some(qself) = qself.as_deref() {
             todo!();
@@ -27,7 +27,7 @@ impl AstFormatter<'_> {
         self.path_end(path, Tail::NONE)
     }
 
-    pub fn path_end(&mut self, path: &ast::Path, end: Tail) -> FormatResult {
+    pub fn path_end(&mut self, path: &ast::Path, end: Tail<'_>) -> FormatResult {
         if let [first_segment, rest @ ..] = &path.segments[..] {
             self.path_segment(first_segment)?;
             for segment in rest {
@@ -35,7 +35,7 @@ impl AstFormatter<'_> {
                 self.path_segment(segment)?;
             }
         }
-        self.tail(&end)
+        self.tail(end)
     }
 
     pub fn path_segment(&mut self, segment: &ast::PathSegment) -> FormatResult {
@@ -50,9 +50,8 @@ impl AstFormatter<'_> {
                             ast::AngleBracketedArg::Constraint(AssocItemConstraint) => todo!(),
                         },
                         AngleBracketedListConfig,
-                        list_overflow_no(),
-                        Tail::NONE
-                    )?;
+                    )
+                    .format(self)?;
                 }
                 // (A, B) -> C
                 ast::Parenthesized(parenthesized_args) => {

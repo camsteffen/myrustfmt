@@ -4,7 +4,7 @@ use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter<'a> {
-    pub fn local(&mut self, local: &ast::Local, end: Tail) -> FormatResult {
+    pub fn local(&mut self, local: &ast::Local, end: Tail<'_>) -> FormatResult {
         let ast::Local {
             pat, kind, span, ..
         } = local;
@@ -20,7 +20,7 @@ impl<'a> AstFormatter<'a> {
         }
     }
 
-    fn local_init(&mut self, expr: &ast::Expr, end: Tail) -> FormatResult {
+    fn local_init(&mut self, expr: &ast::Expr, end: Tail<'_>) -> FormatResult {
         self.out.space()?;
         self.out.token_expect("=")?;
         self.fallback_chain(
@@ -55,7 +55,7 @@ impl<'a> AstFormatter<'a> {
                     })
                 });
             },
-            |this| this.tail(&end),
+            |this| this.tail(end),
         )
     }
 }

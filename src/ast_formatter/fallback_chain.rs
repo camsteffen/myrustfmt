@@ -1,7 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::constraint_writer::ConstraintError;
 use crate::source_formatter::{FormatResult, SourceFormatter, SourceFormatterSnapshot};
-use tracing::info;
 
 pub trait HasSourceFormatter<'a> {
     fn source_formatter(&mut self) -> &mut SourceFormatter<'a>;
