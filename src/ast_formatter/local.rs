@@ -3,7 +3,7 @@ use crate::ast_formatter::last_line::{Tail};
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
-impl<'a> AstFormatter<'a> {
+impl<'a> AstFormatter {
     pub fn local(&mut self, local: &ast::Local, end: Tail<'_>) -> FormatResult {
         let ast::Local {
             pat, kind, span, ..

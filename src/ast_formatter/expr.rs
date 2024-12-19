@@ -8,7 +8,7 @@ use rustc_ast::ast;
 use rustc_ast::ptr::P;
 use rustc_span::source_map::Spanned;
 
-impl<'a> AstFormatter<'a> {
+impl<'a> AstFormatter {
     pub fn expr(&mut self, expr: &ast::Expr, tail: Tail<'_>) -> FormatResult {
         match expr.kind {
             ast::ExprKind::Array(ref items) => {

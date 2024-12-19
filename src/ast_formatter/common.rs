@@ -3,7 +3,7 @@ use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 use rustc_span::symbol::Ident;
 
-impl<'a> AstFormatter<'a> {
+impl<'a> AstFormatter {
     pub fn ident(&mut self, ident: Ident) -> FormatResult {
         self.out.token_from_source(ident.span)
     }

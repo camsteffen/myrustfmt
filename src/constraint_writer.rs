@@ -1,11 +1,12 @@
 use crate::constraints::Constraints;
+use std::cell::Cell;
 use tracing::info;
 
 pub struct ConstraintWriter {
     constraints: Constraints,
-    buffer: String,
-    last_line_start: usize,
-    line: usize,
+    buffer: Cell<String>,
+    last_line_start: Cell<usize>,
+    line: Cell<usize>,
 }
 
 pub struct ConstraintWriterSnapshot {
@@ -19,94 +20,100 @@ impl ConstraintWriter {
     pub fn new(constraints: Constraints) -> ConstraintWriter {
         ConstraintWriter {
             constraints,
-            buffer: String::new(),
-            last_line_start: 0,
-            line: 0,
+            buffer: Cell::new(String::new()),
+            last_line_start: Cell::new(0),
+            line: Cell::new(0),
         }
     }
 
     pub fn finish(self) -> String {
-        self.buffer
+        self.buffer.into_inner()
     }
 
-    pub fn constraints(&mut self) -> &mut Constraints {
-        &mut self.constraints
+    pub fn constraints(&self) -> &Constraints {
+        &self.constraints
     }
 
     pub fn len(&self) -> usize {
-        self.buffer.len()
+        self.with_buffer(|b| b.len())
     }
 
     pub fn line(&self) -> usize {
-        self.line
+        self.line.get()
+    }
+
+    fn with_buffer<T>(&self, f: impl FnOnce(&mut String) -> T) -> T {
+        let mut buffer = self.buffer.take();
+        let out = f(&mut buffer);
+        self.buffer.set(buffer);
+        out
     }
 
     pub fn snapshot(&self) -> ConstraintWriterSnapshot {
         let Self {
             ref constraints,
-            ref buffer,
-            last_line_start,
-            line,
+            buffer: _,
+            ref last_line_start,
+            ref line,
         } = *self;
         ConstraintWriterSnapshot {
             constraints: constraints.clone(),
-            line,
-            len: buffer.len(),
-            last_line_start,
+            line: line.get(),
+            len: self.len(),
+            last_line_start: last_line_start.get(),
         }
     }
 
-    pub fn restore(&mut self, snapshot: &ConstraintWriterSnapshot) {
+    pub fn restore(&self, snapshot: &ConstraintWriterSnapshot) {
         let ConstraintWriterSnapshot {
             ref constraints,
             last_line_start,
             len,
             line,
         } = *snapshot;
-        self.constraints = constraints.clone();
-        self.last_line_start = last_line_start;
-        self.line = line;
-        self.buffer.truncate(len);
+        self.constraints.set(constraints);
+        self.last_line_start.set(last_line_start);
+        self.line.set(line);
+        self.with_buffer(|b| b.truncate(len));
     }
 
     // #[instrument(skip(self))]
-    pub fn token(&mut self, token: &str) -> Result<(), TooWideError> {
-        self.buffer.push_str(token);
+    pub fn token(&self, token: &str) -> Result<(), TooWideError> {
+        self.write_unchecked(token);
         self.check_width_constraints()
     }
 
-    pub fn write_unchecked(&mut self, source: &str) {
-        self.buffer.push_str(source);
+    pub fn write_unchecked(&self, source: &str) {
+        self.with_buffer(|b| b.push_str(source));
     }
 
-    pub fn newline(&mut self) -> Result<(), NewlineNotAllowedError> {
-        if let Some(newline_budget) = &mut self.constraints.newline_budget {
+    pub fn newline(&self) -> Result<(), NewlineNotAllowedError> {
+        if let Some(newline_budget) = self.constraints.newline_budget.get() {
             let Some(n) = newline_budget.checked_sub(1) else {
                 return Err(NewlineNotAllowedError);
             };
-            *newline_budget = n;
+            self.constraints.newline_budget.set(Some(n));
         }
-        if self.constraints.single_line {
+        if self.constraints.single_line.get() {
             return Err(NewlineNotAllowedError);
         }
-        self.buffer.push('\n');
-        self.last_line_start = self.buffer.len();
-        self.line += 1;
-        self.constraints.max_width_first_line = None;
+        self.with_buffer(|b| b.push('\n'));
+        self.last_line_start.set(self.len());
+        self.line.set(self.line.get() + 1);
+        self.constraints.max_width_first_line.set(None);
         Ok(())
     }
 
-    pub fn indent(&mut self) -> Result<(), TooWideError> {
-        self.buffer
-            .extend(std::iter::repeat_n(' ', self.constraints.indent));
+    pub fn indent(&self) -> Result<(), TooWideError> {
+        self.with_buffer(|b| b.extend(std::iter::repeat_n(' ', self.constraints.indent.get())));
         self.check_width_constraints()
     }
 
-    pub fn check_width_constraints(&mut self) -> Result<(), TooWideError> {
+    pub fn check_width_constraints(&self) -> Result<(), TooWideError> {
         match self.remaining_width() {
             Ok(_width) => Ok(()),
             Err(TooWideError) => {
-                info!("too wide: \"{}\"", self.last_line());
+                info!("too wide: \"{}\"", self.last_line_to_string());
                 Err(TooWideError)
             }
         }
@@ -114,8 +121,8 @@ impl ConstraintWriter {
 
     pub fn max_width(&self) -> Option<usize> {
         match (
-            self.constraints.max_width,
-            self.constraints.max_width_first_line,
+            self.constraints.max_width.get(),
+            self.constraints.max_width_first_line.get(),
         ) {
             (Some(a), Some(b)) => Some(a.min(b)),
             (a, b) => a.or(b),
@@ -132,13 +139,13 @@ impl ConstraintWriter {
             .transpose()
     }
 
-    fn last_line(&self) -> &str {
-        &self.buffer[self.last_line_start..]
+    fn last_line_to_string(&self) -> String {
+        self.with_buffer(|b| String::from(&b[self.last_line_start.get()..]))
     }
 
     // #[instrument(skip(self), ret)]
     pub fn last_line_len(&self) -> usize {
-        self.buffer.len() - self.last_line_start
+        self.len() - self.last_line_start.get()
     }
 }
 

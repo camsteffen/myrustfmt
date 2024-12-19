@@ -55,7 +55,7 @@ pub fn format_str_defaults(source: &str) -> String {
 pub fn format_str(source: &str, max_width: usize) -> String {
     parse_ast_then(String::from(source), |crate_| {
         let constraints = Constraints::new(max_width);
-        let source_formatter = SourceFormatter::new(source, constraints);
+        let source_formatter = SourceFormatter::new(String::from(source), constraints);
         let mut ast_formatter = AstFormatter::new(source_formatter);
         match ast_formatter.crate_(&crate_) {
             Ok(()) => {}

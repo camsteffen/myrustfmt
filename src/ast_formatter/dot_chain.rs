@@ -8,7 +8,7 @@ use crate::constraint_writer::TooWideError;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::source_formatter::{FormatError, FormatResult};
 
-impl AstFormatter<'_> {
+impl AstFormatter {
     pub fn dot_chain(
         &mut self,
         expr: &ast::Expr,
@@ -56,7 +56,7 @@ impl AstFormatter<'_> {
             |chain| {
                 // single line
                 chain.next(|this| {
-                    let format = |this: &mut AstFormatter<'_>| {
+                    let format = |this: &mut AstFormatter| {
                         let [until_last @ .., last] = dot_chain else {
                             unreachable!()
                         };

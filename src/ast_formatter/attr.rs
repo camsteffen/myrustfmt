@@ -5,7 +5,7 @@ use crate::ast_formatter::list::{list, param_list_config};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 
-impl AstFormatter<'_> {
+impl AstFormatter {
     pub fn attrs(&mut self, attrs: &[ast::Attribute]) -> FormatResult {
         for attr in attrs {
             self.attr(attr)?;

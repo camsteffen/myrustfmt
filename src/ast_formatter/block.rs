@@ -3,7 +3,7 @@ use crate::ast_formatter::last_line::Tail;
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
-impl<'a> AstFormatter<'a> {
+impl<'a> AstFormatter {
     pub fn block(&mut self, block: &ast::Block, end: Tail<'_>) -> FormatResult {
         self.out.token_at("{", block.span.lo())?;
         self.block_after_open_brace(block, end)?;
@@ -28,7 +28,7 @@ impl<'a> AstFormatter<'a> {
 
     fn stmt(&mut self, stmt: &ast::Stmt) -> FormatResult {
         let hi = stmt.span.hi();
-        let semicolon = move |this: &mut AstFormatter<'_>| this.out.token_end_at(";", hi);
+        let semicolon = move |this: &mut AstFormatter| this.out.token_end_at(";", hi);
         let semicolon = Tail::new(&semicolon);
         match &stmt.kind {
             ast::StmtKind::Let(local) => self.local(local, semicolon),

@@ -3,7 +3,7 @@ use crate::ast_formatter::list::{list, param_list_config};
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
-impl<'a> AstFormatter<'a> {
+impl<'a> AstFormatter {
     pub fn ty(&mut self, ty: &ast::Ty) -> FormatResult {
         match &ty.kind {
             ast::TyKind::Slice(ty) => todo!(),

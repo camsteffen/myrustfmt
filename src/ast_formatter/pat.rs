@@ -6,7 +6,7 @@ use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::{StructFieldListConfig, list, param_list_config};
 use crate::source_formatter::FormatResult;
 
-impl<'a> AstFormatter<'a> {
+impl<'a> AstFormatter {
     pub fn pat(&mut self, pat: &ast::Pat) -> FormatResult {
         self.pat_end(pat, Tail::NONE)
     }

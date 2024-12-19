@@ -86,7 +86,7 @@ pub trait ListOverflow {
     type Item;
 
     fn format_if_overflow(
-        _ast_formatter: &mut AstFormatter<'_>,
+        _ast_formatter: &mut AstFormatter,
         _item: &Self::Item,
         _is_only_item: bool,
     ) -> Option<FormatResult> {
@@ -101,7 +101,7 @@ impl<T> ListOverflow for ListOverflowNo<T> {
     type Item = T;
 
     fn format_if_overflow(
-        _ast_formatter: &mut AstFormatter<'_>,
+        _ast_formatter: &mut AstFormatter,
         _item: &Self::Item,
         _is_only_item: bool,
     ) -> Option<FormatResult> {
@@ -113,7 +113,7 @@ impl<T: Overflow> ListOverflow for ListOverflowYes<T> {
     type Item = T;
 
     fn format_if_overflow(
-        ast_formatter: &mut AstFormatter<'_>,
+        ast_formatter: &mut AstFormatter,
         item: &Self::Item,
         is_only_item: bool,
     ) -> Option<FormatResult> {
@@ -133,7 +133,7 @@ impl<'a, 'list, 'tail, Item, FormatItem, Config, Overflow>
     ListBuilder<'list, 'tail, Item, FormatItem, Config, Overflow>
 where
     Config: ListConfig,
-    FormatItem: Fn(&mut AstFormatter<'a>, &Item) -> FormatResult,
+    FormatItem: Fn(&mut AstFormatter, &Item) -> FormatResult,
     Overflow: ListOverflow<Item = Item>,
 {
     pub fn overflow(
@@ -161,7 +161,7 @@ where
         }
     }
 
-    pub fn format(self, this: &mut AstFormatter<'a>) -> FormatResult {
+    pub fn format(self, this: &mut AstFormatter) -> FormatResult {
         this.format_list(
             Config::START_BRACE,
             Config::END_BRACE,
@@ -187,7 +187,7 @@ pub fn list<'a, 'list, Item, FormatItem, Config>(
 ) -> ListBuilder<'list, 'static, Item, FormatItem, Config, ListOverflowNo<Item>>
 where
     Config: ListConfig,
-    FormatItem: Fn(&mut AstFormatter<'a>, &Item) -> FormatResult,
+    FormatItem: Fn(&mut AstFormatter, &Item) -> FormatResult,
 {
     ListBuilder {
         list,
@@ -198,9 +198,9 @@ where
     }
 }
 
-impl<'a> AstFormatter<'a> {
+impl<'a> AstFormatter {
     pub fn list(&self) {}
-    
+
     pub fn list_separate_lines<T>(
         &mut self,
         list: &[T],
@@ -223,7 +223,7 @@ impl<'a> AstFormatter<'a> {
         start_brace: &'static str,
         end_brace: &'static str,
         is_empty: bool,
-        non_empty: impl FnOnce(&mut AstFormatter<'a>, Tail) -> FormatResult + 'b,
+        non_empty: impl FnOnce(&mut AstFormatter, Tail) -> FormatResult + 'b,
         end: Tail<'_>,
     ) -> FormatResult {
         self.out.token_expect(start_brace)?;
@@ -398,8 +398,8 @@ trait OverflowHandler {
 
     fn no_overflow() -> Self::Result;
     fn overflows(
-        this: &mut AstFormatter<'_>,
-        format: impl FnOnce(&mut AstFormatter<'_>) -> FormatResult,
+        this: &mut AstFormatter,
+        format: impl FnOnce(&mut AstFormatter) -> FormatResult,
     ) -> Self::Result;
 }
 
@@ -416,8 +416,8 @@ impl OverflowHandler for CheckIfOverflow {
     }
 
     fn overflows(
-        _this: &mut AstFormatter<'_>,
-        _format: impl FnOnce(&mut AstFormatter<'_>) -> FormatResult,
+        _this: &mut AstFormatter,
+        _format: impl FnOnce(&mut AstFormatter) -> FormatResult,
     ) -> bool {
         true
     }
@@ -433,8 +433,8 @@ impl OverflowHandler for OverflowDoFormat {
     }
 
     fn overflows(
-        this: &mut AstFormatter<'_>,
-        format: impl FnOnce(&mut AstFormatter<'_>) -> FormatResult,
+        this: &mut AstFormatter,
+        format: impl FnOnce(&mut AstFormatter) -> FormatResult,
     ) -> FormatResult {
         // this.with_not_single_line(format)
         format(this)
@@ -443,21 +443,21 @@ impl OverflowHandler for OverflowDoFormat {
 
 trait Overflow {
     fn format_or_check_if_overflow<H: OverflowHandler>(
-        this: &mut AstFormatter<'_>,
+        this: &mut AstFormatter,
         t: &Self,
         is_only_list_item: bool,
     ) -> H::Result;
 
-    fn check_if_overflows(this: &mut AstFormatter<'_>, t: &Self, is_only_list_item: bool) -> bool {
+    fn check_if_overflows(this: &mut AstFormatter, t: &Self, is_only_list_item: bool) -> bool {
         Self::format_or_check_if_overflow::<CheckIfOverflow>(this, t, is_only_list_item)
     }
 
-    fn format(this: &mut AstFormatter<'_>, t: &Self, is_only_list_item: bool) -> FormatResult {
+    fn format(this: &mut AstFormatter, t: &Self, is_only_list_item: bool) -> FormatResult {
         Self::format_or_check_if_overflow::<OverflowDoFormat>(this, t, is_only_list_item)
     }
 
     fn format_if_overflow(
-        this: &mut AstFormatter<'_>,
+        this: &mut AstFormatter,
         t: &Self,
         is_only_list_item: bool,
     ) -> Option<FormatResult> {
@@ -471,7 +471,7 @@ trait Overflow {
 
 impl Overflow for ast::Expr {
     fn format_or_check_if_overflow<H: OverflowHandler>(
-        this: &mut AstFormatter<'_>,
+        this: &mut AstFormatter,
         expr: &Self,
         is_only_list_item: bool,
     ) -> H::Result {
@@ -532,7 +532,7 @@ impl Overflow for ast::Expr {
 
 impl Overflow for ast::MetaItemInner {
     fn format_or_check_if_overflow<H: OverflowHandler>(
-        this: &mut AstFormatter<'_>,
+        this: &mut AstFormatter,
         item: &Self,
         is_only_list_item: bool,
     ) -> H::Result {
@@ -551,7 +551,7 @@ impl Overflow for ast::MetaItemInner {
 
 impl<T: Overflow> Overflow for P<T> {
     fn format_or_check_if_overflow<H: OverflowHandler>(
-        this: &mut AstFormatter<'_>,
+        this: &mut AstFormatter,
         t: &Self,
         is_only_list_item: bool,
     ) -> H::Result {

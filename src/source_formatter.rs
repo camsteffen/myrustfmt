@@ -1,6 +1,7 @@
 use crate::constraint_writer::{ConstraintError, ConstraintWriter, ConstraintWriterSnapshot};
 use crate::constraints::Constraints;
 use crate::source_reader::SourceReader;
+use std::cell::Cell;
 
 use rustc_lexer::TokenKind;
 use rustc_span::{BytePos, Pos, Span};
@@ -19,18 +20,18 @@ pub struct FormatError {
     pub pos: BytePos,
 }
 
-pub struct SourceFormatter<'a> {
-    source: SourceReader<'a>,
+pub struct SourceFormatter {
+    source: SourceReader,
     out: ConstraintWriter,
-    next_is_whitespace_or_comments: bool,
+    next_is_whitespace_or_comments: Cell<bool>,
 }
 
-impl<'a> SourceFormatter<'a> {
-    pub fn new(source: &'a str, constraints: Constraints) -> SourceFormatter<'a> {
+impl SourceFormatter {
+    pub fn new(source: String, constraints: Constraints) -> SourceFormatter {
         SourceFormatter {
             source: SourceReader::new(source),
             out: ConstraintWriter::new(constraints),
-            next_is_whitespace_or_comments: true,
+            next_is_whitespace_or_comments: Cell::new(true),
         }
     }
 
@@ -38,20 +39,20 @@ impl<'a> SourceFormatter<'a> {
         self.out.finish()
     }
 
-    pub fn constraints_mut(&mut self) -> &mut Constraints {
+    pub fn constraints(&self) -> &Constraints {
         self.out.constraints()
     }
 
     pub fn snapshot(&self) -> SourceFormatterSnapshot {
         let Self {
-            ref out,
-            ref source,
+            out,
+            source,
             next_is_whitespace_or_comments,
-        } = *self;
+        } = self;
         SourceFormatterSnapshot {
             writer_snapshot: out.snapshot(),
-            pos: source.pos,
-            next_is_whitespace_or_comments,
+            pos: source.pos.get(),
+            next_is_whitespace_or_comments: next_is_whitespace_or_comments.get(),
         }
     }
 
@@ -61,9 +62,10 @@ impl<'a> SourceFormatter<'a> {
             pos,
             next_is_whitespace_or_comments,
         } = *snapshot;
-        self.source.pos = pos;
+        self.source.pos.set(pos);
         self.out.restore(writer_snapshot);
-        self.next_is_whitespace_or_comments = next_is_whitespace_or_comments;
+        self.next_is_whitespace_or_comments
+            .set(next_is_whitespace_or_comments);
     }
 
     pub fn last_line_width(&self) -> usize {
@@ -79,7 +81,7 @@ impl<'a> SourceFormatter<'a> {
     }
 
     /** Writes a newline character and indent characters according to the current indent level */
-    pub fn newline_indent(&mut self) -> FormatResult {
+    pub fn newline_indent(&self) -> FormatResult {
         self.handle_whitespace_and_comments_for_newline()
     }
 
@@ -87,16 +89,15 @@ impl<'a> SourceFormatter<'a> {
         self.source.source.as_bytes()[pos.to_usize() - 1]
     }
 
-
-    pub fn skip_token(&mut self, token: &str) {
+    pub fn skip_token(&self, token: &str) {
         self.handle_whitespace_and_comments_if_needed();
         self.source.eat(token);
-        self.next_is_whitespace_or_comments = false;
+        self.next_is_whitespace_or_comments.set(false);
     }
 
     pub fn skip_token_if_present(&mut self, token: &str) {
         let snapshot;
-        if self.next_is_whitespace_or_comments {
+        if self.next_is_whitespace_or_comments.get() {
             snapshot = Some(self.snapshot());
             self.handle_whitespace_and_comments();
         } else {
@@ -105,7 +106,7 @@ impl<'a> SourceFormatter<'a> {
         // self.handle_whitespace_and_comments_if_needed();
         if self.source.remaining().starts_with(token) {
             self.source.advance(token.len());
-            self.next_is_whitespace_or_comments = true;
+            self.next_is_whitespace_or_comments.set(true);
         } else if let Some(snapshot) = snapshot {
             self.restore(&snapshot);
         }
@@ -153,13 +154,13 @@ impl<'a> SourceFormatter<'a> {
     pub fn token_expect(&mut self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
         self.source.eat(token);
-        self.next_is_whitespace_or_comments = true;
+        self.next_is_whitespace_or_comments.set(true);
         self.token_out(token)?;
         Ok(())
     }
 
     /** Write a token that may be next in source, or otherwise is missing from source */
-    pub fn token_maybe_missing(&mut self, token: &str) -> FormatResult {
+    pub fn token_maybe_missing(&self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
         if self.source.remaining().starts_with(token) {
             self.token_unchecked(token)
@@ -169,7 +170,7 @@ impl<'a> SourceFormatter<'a> {
     }
 
     /** Copy a token from source */
-    pub fn token_from_source(&mut self, span: Span) -> FormatResult {
+    pub fn token_from_source(&self, span: Span) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
         self.source.expect_pos(span.lo());
         let token = self.source.get_span(span);
@@ -180,11 +181,11 @@ impl<'a> SourceFormatter<'a> {
     pub fn lift_constraint_err(&self, out_err: impl Into<ConstraintError>) -> FormatError {
         FormatError {
             kind: out_err.into(),
-            pos: self.source.pos,
+            pos: self.source.pos.get(),
         }
     }
 
-    fn handle_whitespace_and_comments(&mut self) -> bool {
+    fn handle_whitespace_and_comments(&self) -> bool {
         let mut len = 0usize;
         let mut len_without_trailing_whitespace = 0;
         for token in rustc_lexer::tokenize(self.source.remaining()) {
@@ -212,11 +213,11 @@ impl<'a> SourceFormatter<'a> {
         }
         // skip trailing whitespace
         self.source.advance(len - len_without_trailing_whitespace);
-        self.next_is_whitespace_or_comments = false;
+        self.next_is_whitespace_or_comments.set(false);
         len_without_trailing_whitespace > 0
     }
 
-    fn handle_whitespace_and_comments_for_newline(&mut self) -> FormatResult {
+    fn handle_whitespace_and_comments_for_newline(&self) -> FormatResult {
         let mut newlines_happened = false;
         for token in rustc_lexer::tokenize(self.source.remaining()) {
             let token_str = &self.source.remaining()[..token.len as usize];
@@ -244,53 +245,53 @@ impl<'a> SourceFormatter<'a> {
         Ok(())
     }
 
-    fn handle_whitespace_and_comments_if_needed(&mut self) {
-        if self.next_is_whitespace_or_comments {
+    fn handle_whitespace_and_comments_if_needed(&self) {
+        if self.next_is_whitespace_or_comments.get() {
             self.handle_whitespace_and_comments();
         }
     }
 
-    fn newline(&mut self) -> FormatResult {
+    fn newline(&self) -> FormatResult {
         self.out.newline().map_err(|e| self.lift_constraint_err(e))
     }
 
-    fn indent(&mut self) -> FormatResult {
+    fn indent(&self) -> FormatResult {
         self.out.indent().map_err(|e| self.lift_constraint_err(e))
     }
 
-    fn copy(&mut self, len: usize) {
+    fn copy(&self, len: usize) {
         let segment = &self.source.remaining()[..len];
         self.out.write_unchecked(segment);
         self.source.advance(len);
     }
 
-    pub fn copy_span(&mut self, span: Span) {
+    pub fn copy_span(&self, span: Span) {
         self.handle_whitespace_and_comments_if_needed();
         self.source.expect_pos(span.lo());
         self.copy(span.hi().to_usize() - span.lo().to_usize())
     }
 
-    pub fn copy_to(&mut self, pos: BytePos) {
-        self.copy(pos.to_usize() - self.source.pos.to_usize());
+    pub fn copy_to(&self, pos: BytePos) {
+        self.copy(pos.to_usize() - self.source.pos.get().to_usize());
     }
 
     /** Write a token */
-    fn token_out(&mut self, token: &str) -> FormatResult {
+    fn token_out(&self, token: &str) -> FormatResult {
         self.out
             .token(&token)
             .map_err(|e| self.lift_constraint_err(e))
     }
 
     /** Write a token assuming it is next in source */
-    fn token_unchecked(&mut self, token: &str) -> FormatResult {
+    fn token_unchecked(&self, token: &str) -> FormatResult {
         self.token_out(token)?;
         self.source.advance(token.len());
-        self.next_is_whitespace_or_comments = true;
+        self.next_is_whitespace_or_comments.set(true);
         Ok(())
     }
 
     /** Write a token assuming it is missing from source */
-    pub fn token_missing(&mut self, token: &str) -> FormatResult {
+    pub fn token_missing(&self, token: &str) -> FormatResult {
         self.token_out(token)
     }
 }

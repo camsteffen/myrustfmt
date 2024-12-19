@@ -6,7 +6,7 @@ use crate::ast_formatter::list::{
 use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
-impl<'a> AstFormatter<'a> {
+impl<'a> AstFormatter {
     pub fn item(&mut self, item: &ast::Item) -> FormatResult {
         self.item_generic(item, |this, kind| this.item_kind(kind, item))
     }

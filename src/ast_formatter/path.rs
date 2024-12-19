@@ -6,7 +6,7 @@ use crate::ast_formatter::list::{AngleBracketedListConfig, list};
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
-impl AstFormatter<'_> {
+impl AstFormatter {
     pub fn qpath(&mut self, qself: &Option<P<ast::QSelf>>, path: &ast::Path) -> FormatResult {
         self.qpath_end(qself, path, Tail::NONE)
     }

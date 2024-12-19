@@ -5,7 +5,7 @@ use crate::source_formatter::FormatResult;
 
 use rustc_ast::ast;
 
-impl<'a> AstFormatter<'a> {
+impl<'a> AstFormatter {
     pub fn fn_<K>(&mut self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
         let ast::Fn {
             generics,

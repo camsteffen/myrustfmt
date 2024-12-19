@@ -2,23 +2,23 @@ use crate::ast_formatter::AstFormatter;
 use crate::constraint_writer::ConstraintError;
 use crate::source_formatter::{FormatResult, SourceFormatter, SourceFormatterSnapshot};
 
-pub trait HasSourceFormatter<'a> {
-    fn source_formatter(&mut self) -> &mut SourceFormatter<'a>;
+pub trait HasSourceFormatter {
+    fn source_formatter(&mut self) -> &mut SourceFormatter;
 }
 
-impl<'a> HasSourceFormatter<'a> for AstFormatter<'a> {
-    fn source_formatter(&mut self) -> &mut SourceFormatter<'a> {
+impl HasSourceFormatter for AstFormatter {
+    fn source_formatter(&mut self) -> &mut SourceFormatter {
         &mut self.out
     }
 }
 
-pub fn fallback_chain<'source, CTX, Finally>(
+pub fn fallback_chain<CTX, Finally>(
     ctx: &mut CTX,
     chain: impl FnOnce(&mut FallbackChain<CTX, Finally>),
     finally: Finally,
 ) -> FormatResult
 where
-    CTX: HasSourceFormatter<'source>,
+    CTX: HasSourceFormatter,
     Finally: Fn(&mut CTX) -> FormatResult,
 {
     let snapshot = ctx.source_formatter().snapshot();
@@ -34,7 +34,7 @@ where
         .expect("fallback chain must be used at least once")
 }
 
-impl<'a> AstFormatter<'a> {
+impl<'a> AstFormatter {
     pub fn fallback_chain<'b, F: Fn(&mut Self) -> FormatResult>(
         &mut self,
         chain: impl FnOnce(&mut FallbackChain<Self, F>),
@@ -51,9 +51,9 @@ pub struct FallbackChain<'ctx, CTX, Finally> {
     finally: Finally,
 }
 
-impl<'ctx, 'source, CTX, Finally> FallbackChain<'ctx, CTX, Finally>
+impl<'ctx, CTX, Finally> FallbackChain<'ctx, CTX, Finally>
 where
-    CTX: HasSourceFormatter<'source>,
+    CTX: HasSourceFormatter,
     Finally: Fn(&mut CTX) -> FormatResult,
 {
     pub fn next(&mut self, f: impl FnOnce(&mut CTX) -> FormatResult) {
