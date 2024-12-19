@@ -56,7 +56,7 @@ impl SourceFormatter {
         }
     }
 
-    pub fn restore(&mut self, snapshot: &SourceFormatterSnapshot) {
+    pub fn restore(&self, snapshot: &SourceFormatterSnapshot) {
         let SourceFormatterSnapshot {
             ref writer_snapshot,
             pos,
@@ -95,7 +95,7 @@ impl SourceFormatter {
         self.next_is_whitespace_or_comments.set(false);
     }
 
-    pub fn skip_token_if_present(&mut self, token: &str) {
+    pub fn skip_token_if_present(&self, token: &str) {
         let snapshot;
         if self.next_is_whitespace_or_comments.get() {
             snapshot = Some(self.snapshot());
@@ -113,7 +113,7 @@ impl SourceFormatter {
     }
 
     /** Writes a space and accounts for spaces and comments in source */
-    pub fn space(&mut self) -> FormatResult {
+    pub fn space(&self) -> FormatResult {
         if !self.handle_whitespace_and_comments() {
             self.out
                 .token(" ")
@@ -123,7 +123,7 @@ impl SourceFormatter {
     }
 
     /** Write a token, asserting it is next in source and has the given position */
-    pub fn token_at(&mut self, token: &str, pos: BytePos) -> FormatResult {
+    pub fn token_at(&self, token: &str, pos: BytePos) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
         self.source.expect_pos(pos);
         self.token_unchecked(token)?;
@@ -131,7 +131,7 @@ impl SourceFormatter {
     }
 
     /** Write a token, asserting it is next in source and has the given ending position */
-    pub fn token_end_at(&mut self, token: &str, end_pos: BytePos) -> FormatResult {
+    pub fn token_end_at(&self, token: &str, end_pos: BytePos) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
         self.token_unchecked(token)?;
         self.source.expect_pos(end_pos);
@@ -139,7 +139,7 @@ impl SourceFormatter {
     }
 
     /** Convenience for calling `token_at` followed by `space` */
-    pub fn token_at_space(&mut self, token: &'static str, pos: BytePos) -> FormatResult {
+    pub fn token_at_space(&self, token: &'static str, pos: BytePos) -> FormatResult {
         self.token_at(token, pos)?;
         self.space()?;
         Ok(())
@@ -151,7 +151,7 @@ impl SourceFormatter {
      * Note: This compares the token string to source and is thus somewhat less
      * performant than token_at. But this is useful when you don't have a Span.
      */
-    pub fn token_expect(&mut self, token: &str) -> FormatResult {
+    pub fn token_expect(&self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
         self.source.eat(token);
         self.next_is_whitespace_or_comments.set(true);

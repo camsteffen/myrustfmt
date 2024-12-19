@@ -7,14 +7,14 @@ use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter {
-    pub fn item(&mut self, item: &ast::Item) -> FormatResult {
+    pub fn item(&self, item: &ast::Item) -> FormatResult {
         self.item_generic(item, |this, kind| this.item_kind(kind, item))
     }
 
     fn item_generic<K>(
-        &mut self,
+        &self,
         item: &ast::Item<K>,
-        kind: impl FnOnce(&mut Self, &K) -> FormatResult,
+        kind: impl FnOnce(&Self, &K) -> FormatResult,
     ) -> FormatResult {
         self.attrs(&item.attrs)?;
         self.vis(&item.vis)?;
@@ -22,7 +22,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    pub fn item_kind(&mut self, kind: &ast::ItemKind, item: &ast::Item) -> FormatResult {
+    pub fn item_kind(&self, kind: &ast::ItemKind, item: &ast::Item) -> FormatResult {
         match kind {
             ast::ItemKind::ExternCrate(name) => {
                 self.out.token_at("extern", item.span.lo())?;
@@ -83,7 +83,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn vis(&mut self, vis: &ast::Visibility) -> FormatResult {
+    fn vis(&self, vis: &ast::Visibility) -> FormatResult {
         match vis.kind {
             ast::VisibilityKind::Public => {
                 self.out.token_at("pub", vis.span.lo())?;
@@ -104,7 +104,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn impl_(&mut self, impl_: &ast::Impl, item: &ast::Item) -> FormatResult {
+    fn impl_(&self, impl_: &ast::Impl, item: &ast::Item) -> FormatResult {
         self.out.token_at("impl", item.span.lo())?;
         self.generics(&impl_.generics)?;
         self.out.space()?;
@@ -132,7 +132,7 @@ impl<'a> AstFormatter {
     }
 
     fn assoc_item_kind(
-        &mut self,
+        &self,
         kind: &ast::AssocItemKind,
         item: &ast::AssocItem,
     ) -> FormatResult {
@@ -147,7 +147,7 @@ impl<'a> AstFormatter {
     }
 
     fn struct_item(
-        &mut self,
+        &self,
         variants: &ast::VariantData,
         generics: &ast::Generics,
         item: &ast::Item,
@@ -161,7 +161,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn variant_data(&mut self, variants: &ast::VariantData) -> FormatResult {
+    fn variant_data(&self, variants: &ast::VariantData) -> FormatResult {
         match variants {
             ast::VariantData::Struct { fields, .. } => {
                 list(fields, Self::field_def, StructFieldListConfig).format(self)
@@ -173,7 +173,7 @@ impl<'a> AstFormatter {
         }
     }
 
-    fn field_def(&mut self, field: &ast::FieldDef) -> FormatResult {
+    fn field_def(&self, field: &ast::FieldDef) -> FormatResult {
         self.attrs(&field.attrs)?;
         self.vis(&field.vis)?;
         if let Some(ident) = field.ident {
@@ -185,7 +185,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn use_tree(&mut self, use_tree: &ast::UseTree) -> FormatResult {
+    fn use_tree(&self, use_tree: &ast::UseTree) -> FormatResult {
         self.path(&use_tree.prefix)?;
         match use_tree.kind {
             ast::UseTreeKind::Simple(None) => {}

@@ -7,12 +7,12 @@ use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
 impl AstFormatter {
-    pub fn qpath(&mut self, qself: &Option<P<ast::QSelf>>, path: &ast::Path) -> FormatResult {
+    pub fn qpath(&self, qself: &Option<P<ast::QSelf>>, path: &ast::Path) -> FormatResult {
         self.qpath_end(qself, path, Tail::NONE)
     }
 
     pub fn qpath_end(
-        &mut self,
+        &self,
         qself: &Option<P<ast::QSelf>>,
         path: &ast::Path,
         end: Tail<'_>,
@@ -23,11 +23,11 @@ impl AstFormatter {
         self.path_end(path, end)
     }
 
-    pub fn path(&mut self, path: &ast::Path) -> FormatResult {
+    pub fn path(&self, path: &ast::Path) -> FormatResult {
         self.path_end(path, Tail::NONE)
     }
 
-    pub fn path_end(&mut self, path: &ast::Path, end: Tail<'_>) -> FormatResult {
+    pub fn path_end(&self, path: &ast::Path, end: Tail<'_>) -> FormatResult {
         if let [first_segment, rest @ ..] = &path.segments[..] {
             self.path_segment(first_segment)?;
             for segment in rest {
@@ -38,7 +38,7 @@ impl AstFormatter {
         self.tail(end)
     }
 
-    pub fn path_segment(&mut self, segment: &ast::PathSegment) -> FormatResult {
+    pub fn path_segment(&self, segment: &ast::PathSegment) -> FormatResult {
         self.ident(segment.ident)?;
         if let Some(args) = &segment.args.as_deref() {
             match args {
@@ -63,7 +63,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn generic_arg(&mut self, arg: &ast::GenericArg) -> FormatResult {
+    fn generic_arg(&self, arg: &ast::GenericArg) -> FormatResult {
         match &arg {
             ast::GenericArg::Lifetime(lifetime) => self.lifetime(lifetime),
             ast::GenericArg::Type(ty) => self.ty(ty),

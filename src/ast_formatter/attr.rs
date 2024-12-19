@@ -6,7 +6,7 @@ use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 
 impl AstFormatter {
-    pub fn attrs(&mut self, attrs: &[ast::Attribute]) -> FormatResult {
+    pub fn attrs(&self, attrs: &[ast::Attribute]) -> FormatResult {
         for attr in attrs {
             self.attr(attr)?;
             self.out.newline_indent()?;
@@ -14,7 +14,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn attr(&mut self, attr: &ast::Attribute) -> FormatResult {
+    fn attr(&self, attr: &ast::Attribute) -> FormatResult {
         match attr.kind {
             ast::AttrKind::Normal(_) => match attr.meta() {
                 None => todo!(),
@@ -39,7 +39,7 @@ impl AstFormatter {
         }
     }
 
-    pub fn meta_item(&mut self, meta: &ast::MetaItem) -> FormatResult {
+    pub fn meta_item(&self, meta: &ast::MetaItem) -> FormatResult {
         self.safety(&meta.unsafety)?;
         self.path(&meta.path)?;
         match &meta.kind {
@@ -61,7 +61,7 @@ impl AstFormatter {
         }
     }
 
-    fn meta_item_lit(&mut self, _lit: &ast::MetaItemLit) -> FormatResult {
+    fn meta_item_lit(&self, _lit: &ast::MetaItemLit) -> FormatResult {
         todo!()
     }
 }

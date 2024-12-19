@@ -6,7 +6,7 @@ use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter {
-    pub fn fn_<K>(&mut self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
+    pub fn fn_<K>(&self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
         let ast::Fn {
             generics,
             sig,
@@ -22,7 +22,7 @@ impl<'a> AstFormatter {
     }
 
     pub fn closure(
-        &mut self,
+        &self,
         closure: &ast::Closure,
         is_overflow: bool,
         end: Tail<'_>,
@@ -53,7 +53,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn closure_body(&mut self, body: &ast::Expr, tail: Tail<'_>) -> FormatResult {
+    fn closure_body(&self, body: &ast::Expr, tail: Tail<'_>) -> FormatResult {
         let mut inner_expr = None;
         if let ast::ExprKind::Block(block, None) = &body.kind {
             if matches!(block.rules, ast::BlockCheckMode::Default) {
@@ -113,7 +113,7 @@ impl<'a> AstFormatter {
     }
 
     pub fn parenthesized_args(
-        &mut self,
+        &self,
         parenthesized_args: &ast::ParenthesizedArgs,
     ) -> FormatResult {
         list(
@@ -127,7 +127,7 @@ impl<'a> AstFormatter {
     }
 
     fn fn_sig<K>(
-        &mut self,
+        &self,
         ast::FnSig { header, decl, span }: &ast::FnSig,
         generics: &ast::Generics,
         item: &ast::Item<K>,
@@ -142,7 +142,7 @@ impl<'a> AstFormatter {
     }
 
     fn fn_header(
-        &mut self,
+        &self,
         &ast::FnHeader {
             ref safety,
             ref coroutine_kind,
@@ -160,7 +160,7 @@ impl<'a> AstFormatter {
     }
 
     fn fn_decl(
-        &mut self,
+        &self,
         ast::FnDecl { inputs, output }: &ast::FnDecl,
         input_list_config: impl ListConfig,
     ) -> FormatResult {
@@ -170,7 +170,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn param(&mut self, param: &ast::Param) -> FormatResult {
+    fn param(&self, param: &ast::Param) -> FormatResult {
         tracing::info!("{:?}", param);
         self.attrs(&param.attrs)?;
         if param.is_self() {
@@ -186,7 +186,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn fn_ret_ty(&mut self, output: &ast::FnRetTy) -> FormatResult {
+    fn fn_ret_ty(&self, output: &ast::FnRetTy) -> FormatResult {
         match output {
             ast::FnRetTy::Default(_) => {}
             ast::FnRetTy::Ty(ty) => {
@@ -199,7 +199,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn constness(&mut self, constness: ast::Const) -> FormatResult {
+    fn constness(&self, constness: ast::Const) -> FormatResult {
         match constness {
             ast::Const::Yes(span) => {
                 let pos = span.lo();
@@ -209,7 +209,7 @@ impl<'a> AstFormatter {
         }
     }
 
-    fn extern_(&mut self, ext: &ast::Extern) -> FormatResult {
+    fn extern_(&self, ext: &ast::Extern) -> FormatResult {
         match *ext {
             ast::Extern::None => {}
             ast::Extern::Implicit(span) => {
@@ -226,7 +226,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn coroutine_kind(&mut self, coroutine_kind: &ast::CoroutineKind) -> FormatResult {
+    fn coroutine_kind(&self, coroutine_kind: &ast::CoroutineKind) -> FormatResult {
         match *coroutine_kind {
             ast::CoroutineKind::Async { span, .. } => {
                 let pos = span.lo();

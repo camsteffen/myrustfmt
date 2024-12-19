@@ -4,7 +4,7 @@ use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter {
-    pub fn ty(&mut self, ty: &ast::Ty) -> FormatResult {
+    pub fn ty(&self, ty: &ast::Ty) -> FormatResult {
         match &ty.kind {
             ast::TyKind::Slice(ty) => todo!(),
             ast::TyKind::Array(ty, length) => todo!(),
@@ -43,17 +43,17 @@ impl<'a> AstFormatter {
         }
     }
 
-    pub fn lifetime(&mut self, lifetime: &ast::Lifetime) -> FormatResult {
+    pub fn lifetime(&self, lifetime: &ast::Lifetime) -> FormatResult {
         self.ident(lifetime.ident)
     }
 
-    fn mut_ty(&mut self, mut_ty: &ast::MutTy) -> FormatResult {
+    fn mut_ty(&self, mut_ty: &ast::MutTy) -> FormatResult {
         self.mutability(mut_ty.mutbl)?;
         self.ty(&mut_ty.ty)?;
         Ok(())
     }
 
-    pub fn generic_bounds(&mut self, bounds: &[ast::GenericBound]) -> FormatResult {
+    pub fn generic_bounds(&self, bounds: &[ast::GenericBound]) -> FormatResult {
         for bound in bounds {
             match bound {
                 ast::GenericBound::Trait(poly_trait_ref) => self.poly_trait_ref(poly_trait_ref)?,
@@ -64,11 +64,11 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    pub fn trait_ref(&mut self, trait_ref: &ast::TraitRef) -> FormatResult {
+    pub fn trait_ref(&self, trait_ref: &ast::TraitRef) -> FormatResult {
         self.path(&trait_ref.path)
     }
 
-    fn poly_trait_ref(&mut self, poly_trait_ref: &ast::PolyTraitRef) -> FormatResult {
+    fn poly_trait_ref(&self, poly_trait_ref: &ast::PolyTraitRef) -> FormatResult {
         for param in &poly_trait_ref.bound_generic_params {
             todo!();
         }

@@ -7,11 +7,11 @@ use crate::ast_formatter::list::{StructFieldListConfig, list, param_list_config}
 use crate::source_formatter::FormatResult;
 
 impl<'a> AstFormatter {
-    pub fn pat(&mut self, pat: &ast::Pat) -> FormatResult {
+    pub fn pat(&self, pat: &ast::Pat) -> FormatResult {
         self.pat_end(pat, Tail::NONE)
     }
 
-    pub fn pat_end(&mut self, pat: &ast::Pat, end: Tail<'_>) -> FormatResult {
+    pub fn pat_end(&self, pat: &ast::Pat, end: Tail<'_>) -> FormatResult {
         match pat.kind {
             ast::PatKind::Wild => todo!(),
             ast::PatKind::Ident(ast::BindingMode(by_ref, mutbl), ident, ref pat) => {
@@ -58,7 +58,7 @@ impl<'a> AstFormatter {
     }
 
     fn struct_pat(
-        &mut self,
+        &self,
         qself: &Option<P<ast::QSelf>>,
         path: &ast::Path,
         fields: &[ast::PatField],
@@ -72,7 +72,7 @@ impl<'a> AstFormatter {
             .format(self)
     }
 
-    fn pat_field(&mut self, pat_field: &ast::PatField) -> FormatResult {
+    fn pat_field(&self, pat_field: &ast::PatField) -> FormatResult {
         // pat_field.attrs;
         self.ident(pat_field.ident)?;
         if !pat_field.is_shorthand {

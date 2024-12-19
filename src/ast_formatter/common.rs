@@ -4,11 +4,11 @@ use rustc_ast::ast;
 use rustc_span::symbol::Ident;
 
 impl<'a> AstFormatter {
-    pub fn ident(&mut self, ident: Ident) -> FormatResult {
+    pub fn ident(&self, ident: Ident) -> FormatResult {
         self.out.token_from_source(ident.span)
     }
     
-    pub fn mutability(&mut self, mutability: ast::Mutability) -> FormatResult {
+    pub fn mutability(&self, mutability: ast::Mutability) -> FormatResult {
         match mutability {
             ast::Mutability::Mut => {
                 self.out.token_expect("mut")?;
@@ -19,11 +19,11 @@ impl<'a> AstFormatter {
         }
     }
 
-    pub fn strlit(&mut self, strlit: &ast::StrLit) -> FormatResult {
+    pub fn strlit(&self, strlit: &ast::StrLit) -> FormatResult {
         self.out.token_from_source(strlit.span)
     }
 
-    pub fn safety(&mut self, safety: &ast::Safety) -> FormatResult {
+    pub fn safety(&self, safety: &ast::Safety) -> FormatResult {
         match *safety {
             ast::Safety::Unsafe(span) => {
                 let pos = span.lo();

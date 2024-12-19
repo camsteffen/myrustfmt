@@ -5,7 +5,7 @@ use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
 
 impl AstFormatter {
-    pub fn generics(&mut self, generics: &ast::Generics) -> FormatResult {
+    pub fn generics(&self, generics: &ast::Generics) -> FormatResult {
         if generics.params.is_empty() {
             return Ok(());
         }
@@ -17,7 +17,7 @@ impl AstFormatter {
         .format(self)
     }
 
-    fn generic_param(&mut self, param: &ast::GenericParam) -> FormatResult {
+    fn generic_param(&self, param: &ast::GenericParam) -> FormatResult {
         self.ident(param.ident)?;
         self.generic_bounds(&param.bounds)?;
         match param.kind {

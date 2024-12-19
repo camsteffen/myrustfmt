@@ -10,7 +10,7 @@ use crate::source_formatter::{FormatError, FormatResult};
 
 impl AstFormatter {
     pub fn dot_chain(
-        &mut self,
+        &self,
         expr: &ast::Expr,
         tail: Tail<'_>,
         is_overflow: bool,
@@ -47,7 +47,7 @@ impl AstFormatter {
     }
 
     fn dot_chain_single_line_root(
-        &mut self,
+        &self,
         dot_chain: &[&ast::Expr],
         root_len: usize,
         tail: Tail<'_>,
@@ -56,7 +56,7 @@ impl AstFormatter {
             |chain| {
                 // single line
                 chain.next(|this| {
-                    let format = |this: &mut AstFormatter| {
+                    let format = |this: &AstFormatter| {
                         let [until_last @ .., last] = dot_chain else {
                             unreachable!()
                         };
@@ -122,7 +122,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn dot_chain_item(&mut self, expr: &ast::Expr) -> FormatResult {
+    fn dot_chain_item(&self, expr: &ast::Expr) -> FormatResult {
         self.out.token_expect(".")?;
         match expr.kind {
             ast::ExprKind::Field(_, ident) => self.ident(ident),

@@ -9,7 +9,7 @@ use rustc_ast::ptr::P;
 use rustc_span::source_map::Spanned;
 
 impl<'a> AstFormatter {
-    pub fn expr(&mut self, expr: &ast::Expr, tail: Tail<'_>) -> FormatResult {
+    pub fn expr(&self, expr: &ast::Expr, tail: Tail<'_>) -> FormatResult {
         match expr.kind {
             ast::ExprKind::Array(ref items) => {
                 list(items, |this, e| this.expr(e, Tail::NONE), ArrayListConfig)
@@ -127,7 +127,7 @@ impl<'a> AstFormatter {
     }
 
     fn binop(
-        &mut self,
+        &self,
         left: &ast::Expr,
         op: Spanned<ast::BinOpKind>,
         right: &ast::Expr,
@@ -141,7 +141,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn label(&mut self, label: Option<ast::Label>) -> FormatResult {
+    fn label(&self, label: Option<ast::Label>) -> FormatResult {
         if let Some(label) = label {
             self.ident(label.ident)?;
             self.out.space()?;
@@ -150,7 +150,7 @@ impl<'a> AstFormatter {
     }
 
     pub fn addr_of(
-        &mut self,
+        &self,
         borrow_kind: ast::BorrowKind,
         mutability: ast::Mutability,
         expr: &ast::Expr,
@@ -163,7 +163,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn call(&mut self, func: &ast::Expr, args: &[P<ast::Expr>], end: Tail<'_>) -> FormatResult {
+    fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], end: Tail<'_>) -> FormatResult {
         self.expr(func, Tail::NONE)?;
         let single_line_max_contents_width = RUSTFMT_CONFIG_DEFAULTS.fn_call_width;
         list(
@@ -176,13 +176,13 @@ impl<'a> AstFormatter {
         .format(self)
     }
 
-    fn delim_args(&mut self, delim_args: &ast::DelimArgs, end: Tail<'_>) -> FormatResult {
+    fn delim_args(&self, delim_args: &ast::DelimArgs, end: Tail<'_>) -> FormatResult {
         self.out.copy_span(delim_args.dspan.entire());
         self.tail(end)
     }
 
     fn if_(
-        &mut self,
+        &self,
         scrutinee: &ast::Expr,
         block: &ast::Block,
         else_: Option<&ast::Expr>,
@@ -217,14 +217,14 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    pub fn mac_call(&mut self, mac_call: &ast::MacCall, end: Tail<'_>) -> FormatResult {
+    pub fn mac_call(&self, mac_call: &ast::MacCall, end: Tail<'_>) -> FormatResult {
         self.path(&mac_call.path)?;
         self.out.token_expect("!")?;
         self.delim_args(&mac_call.args, end)
     }
 
     fn match_(
-        &mut self,
+        &self,
         scrutinee: &ast::Expr,
         arms: &[ast::Arm],
         expr: &ast::Expr,
@@ -245,7 +245,7 @@ impl<'a> AstFormatter {
         self.tail(end)
     }
 
-    fn arm(&mut self, arm: &ast::Arm) -> FormatResult {
+    fn arm(&self, arm: &ast::Arm) -> FormatResult {
         self.attrs(&arm.attrs)?;
         self.pat(&arm.pat)?;
         if let Some(guard) = arm.guard.as_deref() {
@@ -270,14 +270,14 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn struct_expr(&mut self, struct_: &ast::StructExpr) -> FormatResult {
+    fn struct_expr(&self, struct_: &ast::StructExpr) -> FormatResult {
         self.qpath(&struct_.qself, &struct_.path)?;
         self.out.space()?;
         list(&struct_.fields, Self::expr_field, StructFieldListConfig).format(self)?;
         Ok(())
     }
 
-    fn expr_field(&mut self, field: &ast::ExprField) -> FormatResult {
+    fn expr_field(&self, field: &ast::ExprField) -> FormatResult {
         self.attrs(&field.attrs)?;
         self.ident(field.ident)?;
         if !field.is_shorthand {
