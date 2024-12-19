@@ -133,7 +133,7 @@ impl<'a, 'list, 'tail, Item, FormatItem, Config, Overflow>
     ListBuilder<'list, 'tail, Item, FormatItem, Config, Overflow>
 where
     Config: ListConfig,
-    FormatItem: Fn(&AstFormatter, &Item) -> FormatResult,
+    FormatItem: Fn(&Item) -> FormatResult,
     Overflow: ListOverflow<Item = Item>,
 {
     pub fn overflow(
@@ -166,7 +166,7 @@ where
             Config::START_BRACE,
             Config::END_BRACE,
             self.list.is_empty(),
-            |this, tail| {
+            |tail| {
                 this.list_non_empty_contents_default(
                     self.list,
                     self.format_item,
@@ -187,7 +187,7 @@ pub fn list<'a, 'list, Item, FormatItem, Config>(
 ) -> ListBuilder<'list, 'static, Item, FormatItem, Config, ListOverflowNo<Item>>
 where
     Config: ListConfig,
-    FormatItem: Fn(&AstFormatter, &Item) -> FormatResult,
+    FormatItem: Fn(&Item) -> FormatResult,
 {
     ListBuilder {
         list,
@@ -206,14 +206,14 @@ impl<'a> AstFormatter {
         list: &[T],
         start_brace: &'static str,
         end_brace: &'static str,
-        format_item: impl Fn(&Self, &T) -> FormatResult,
+        format_item: impl Fn(&T) -> FormatResult,
         end: Tail<'_>,
     ) -> FormatResult {
         self.format_list(
             start_brace,
             end_brace,
             list.is_empty(),
-            |this, tail| this.list_contents_separate_lines(list, format_item, tail),
+            |tail| self.list_contents_separate_lines(list, format_item, tail),
             end,
         )
     }
@@ -223,7 +223,7 @@ impl<'a> AstFormatter {
         start_brace: &'static str,
         end_brace: &'static str,
         is_empty: bool,
-        non_empty: impl FnOnce(&AstFormatter, Tail) -> FormatResult + 'b,
+        non_empty: impl FnOnce(Tail) -> FormatResult + 'b,
         end: Tail<'_>,
     ) -> FormatResult {
         self.out.token_expect(start_brace)?;
@@ -233,10 +233,9 @@ impl<'a> AstFormatter {
             return Ok(());
         }
         non_empty(
-            self,
-            Tail::new(&move |this| {
-                this.out.token_expect(end_brace)?;
-                this.tail(end)?;
+            Tail::new(&move || {
+                self.out.token_expect(end_brace)?;
+                self.tail(end)?;
                 Ok(())
             }),
         )
@@ -245,7 +244,7 @@ impl<'a> AstFormatter {
     fn list_non_empty_contents_default<T, Config>(
         &self,
         list: &[T],
-        format_item: impl Fn(&Self, &T) -> FormatResult,
+        format_item: impl Fn(&T) -> FormatResult,
         overflow: impl ListOverflow<Item = T>,
         config: Config,
         tail: Tail<'_>,
@@ -254,10 +253,10 @@ impl<'a> AstFormatter {
         Config: ListConfig,
     {
         fallback_chain(
-            self,
+            &self.out,
             |chain| {
-                chain.next(|this| {
-                    this.list_contents_single_line(
+                chain.next(|| {
+                    self.list_contents_single_line(
                         list,
                         tail,
                         &format_item,
@@ -268,8 +267,8 @@ impl<'a> AstFormatter {
                 });
                 match Config::wrap_to_fit() {
                     ListWrapToFitConfig::Yes { max_element_width } => {
-                        chain.next(|this| {
-                            this.list_contents_wrap_to_fit(
+                        chain.next(|| {
+                            self.list_contents_wrap_to_fit(
                                 list,
                                 tail,
                                 &format_item,
@@ -279,9 +278,9 @@ impl<'a> AstFormatter {
                     }
                     ListWrapToFitConfig::No => {}
                 }
-                chain.next(|this| this.list_contents_separate_lines(list, format_item, tail));
+                chain.next(|| self.list_contents_separate_lines(list, format_item, tail));
             },
-            |this| Ok(()),
+            || Ok(()),
         )
     }
 
@@ -289,7 +288,7 @@ impl<'a> AstFormatter {
         &self,
         list: &[Item],
         tail: Tail,
-        format_item: impl Fn(&Self, &Item) -> FormatResult,
+        format_item: impl Fn(&Item) -> FormatResult,
         _overflow: Overflow,
         pad_contents: bool,
         max_width: Option<usize>,
@@ -300,33 +299,33 @@ impl<'a> AstFormatter {
         let [items_except_last @ .., last] = list else {
             unreachable!()
         };
-        let format = |this: &Self| {
+        let format = || {
             for item in items_except_last {
-                format_item(this, item)?;
-                this.out.token_maybe_missing(",")?;
-                this.out.space()?;
+                format_item(item)?;
+                self.out.token_maybe_missing(",")?;
+                self.out.space()?;
             }
-            if this.allow_overflow.get() {
-                if let Some(result) = Overflow::format_if_overflow(this, last, list.len() == 1) {
+            if self.allow_overflow.get() {
+                if let Some(result) = Overflow::format_if_overflow(self, last, list.len() == 1) {
                     result?;
                 } else {
-                    format_item(this, last)?;
+                    format_item(last)?;
                 }
             } else {
-                format_item(this, last)?;
+                format_item(last)?;
             }
-            this.out.skip_token_if_present(",");
+            self.out.skip_token_if_present(",");
             if pad_contents {
-                this.out.space()?;
+                self.out.space()?;
             }
-            this.tail(tail)?;
+            self.tail(tail)?;
             Ok(())
         };
-        let format = |this: &Self| this.with_single_line(format);
+        let format = || self.with_single_line(format);
         if let Some(max_width) = max_width {
             self.with_width_limit_first_line(max_width, format)?;
         } else {
-            format(self)?;
+            format()?;
         }
         Ok(())
     }
@@ -335,31 +334,31 @@ impl<'a> AstFormatter {
         &self,
         list: &[T],
         tail: Tail,
-        format_item: impl Fn(&Self, &T) -> FormatResult,
+        format_item: impl Fn(&T) -> FormatResult,
         max_element_width: Option<usize>,
     ) -> FormatResult {
-        let format_item = |this: &Self, item| match max_element_width {
+        let format_item = |item| match max_element_width {
             Some(max_width) => {
-                this.with_width_limit_single_line(max_width, |this| format_item(this, item))
+                self.with_width_limit_single_line(max_width, || format_item(item))
             }
-            None => format_item(this, item),
+            None => format_item(item),
         };
-        self.indented(|this| {
-            this.out.newline_indent()?;
+        self.indented(|| {
+            self.out.newline_indent()?;
             let [head, tail @ ..] = list else {
                 unreachable!()
             };
-            format_item(this, head)?;
-            this.out.token_maybe_missing(",")?;
+            format_item(head)?;
+            self.out.token_maybe_missing(",")?;
             for item in tail {
-                this.fallback_chain(
+                self.fallback_chain(
                     |chain| {
-                        chain.next(|this| this.out.space());
-                        chain.next(|this| this.out.newline_indent());
+                        chain.next(|| self.out.space());
+                        chain.next(|| self.out.newline_indent());
                     },
-                    |this| {
-                        format_item(this, item)?;
-                        this.out.token_maybe_missing(",")?;
+                    || {
+                        format_item(item)?;
+                        self.out.token_maybe_missing(",")?;
                         Ok(())
                     },
                 )?;
@@ -374,14 +373,14 @@ impl<'a> AstFormatter {
     fn list_contents_separate_lines<T>(
         &self,
         list: &[T],
-        format_item: impl Fn(&Self, &T) -> FormatResult,
+        format_item: impl Fn(&T) -> FormatResult,
         tail: Tail<'_>,
     ) -> FormatResult {
-        self.indented(|this| {
+        self.indented(|| {
             for item in list {
-                this.out.newline_indent()?;
-                format_item(this, item)?;
-                this.out.token_maybe_missing(",")?;
+                self.out.newline_indent()?;
+                format_item(item)?;
+                self.out.token_maybe_missing(",")?;
             }
             Ok(())
         })?;
@@ -398,8 +397,7 @@ trait OverflowHandler {
 
     fn no_overflow() -> Self::Result;
     fn overflows(
-        this: &AstFormatter,
-        format: impl FnOnce(&AstFormatter) -> FormatResult,
+        format: impl FnOnce() -> FormatResult,
     ) -> Self::Result;
 }
 
@@ -416,8 +414,7 @@ impl OverflowHandler for CheckIfOverflow {
     }
 
     fn overflows(
-        _this: &AstFormatter,
-        _format: impl FnOnce(&AstFormatter) -> FormatResult,
+        _format: impl FnOnce() -> FormatResult,
     ) -> bool {
         true
     }
@@ -433,11 +430,9 @@ impl OverflowHandler for OverflowDoFormat {
     }
 
     fn overflows(
-        this: &AstFormatter,
-        format: impl FnOnce(&AstFormatter) -> FormatResult,
+        format: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
-        // this.with_not_single_line(format)
-        format(this)
+        format()
     }
 }
 
@@ -481,9 +476,9 @@ impl Overflow for ast::Expr {
         match expr.kind {
             // block-like
             ast::ExprKind::Block(..) | ast::ExprKind::Gen(..) => {
-                H::overflows(this, |this| this.expr(expr, Tail::NONE))
+                H::overflows(|| this.expr(expr, Tail::NONE))
             }
-            ast::ExprKind::Closure(ref closure) => H::overflows(this, |this| this.closure(closure, true, Tail::NONE)),
+            ast::ExprKind::Closure(ref closure) => H::overflows(|| this.closure(closure, true, Tail::NONE)),
             // control flow
             // | ast::ExprKind::ForLoop { .. }
             // | ast::ExprKind::If(..)
@@ -502,7 +497,7 @@ impl Overflow for ast::Expr {
                 if H::FORMATTING
                     || Overflow::check_if_overflows(this, inner, is_only_list_item) =>
             {
-                H::overflows(this, |this| {
+                H::overflows(|| {
                     this.addr_of(borrow_kind, mutability, expr)?;
                     Overflow::format(this, inner, is_only_list_item)
                 })
@@ -537,10 +532,10 @@ impl Overflow for ast::MetaItemInner {
         is_only_list_item: bool,
     ) -> H::Result {
         match item {
-            ast::MetaItemInner::Lit(..) => H::overflows(this, |this| todo!()),
+            ast::MetaItemInner::Lit(..) => H::overflows(|| todo!()),
             ast::MetaItemInner::MetaItem(meta_item) => {
                 if matches!(meta_item.kind, ast::MetaItemKind::Word) {
-                    H::overflows(this, |this| this.meta_item(meta_item))
+                    H::overflows(|| this.meta_item(meta_item))
                 } else {
                     H::no_overflow()
                 }

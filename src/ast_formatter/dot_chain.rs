@@ -22,17 +22,17 @@ impl AstFormatter {
         };
         if is_overflow {
             // single-line the whole thing
-            self.with_single_line(|this| {
-                this.expr(root, Tail::NONE)?;
+            self.with_single_line(|| {
+                self.expr(root, Tail::NONE)?;
                 dot_chain
                     .iter()
-                    .try_for_each(|item| this.dot_chain_item(item))?;
+                    .try_for_each(|item| self.dot_chain_item(item))?;
                 Ok(())
             })?;
             self.tail(tail)?;
             return Ok(());
         }
-        let (len, height) = self.with_dimensions(|this| this.expr(root, Tail::NONE))?;
+        let (len, height) = self.with_dimensions(|| self.expr(root, Tail::NONE))?;
         if height == 0 {
             self.dot_chain_single_line_root(dot_chain, len, tail)
         } else {
@@ -55,69 +55,69 @@ impl AstFormatter {
         self.fallback_chain(
             |chain| {
                 // single line
-                chain.next(|this| {
-                    let format = |this: &AstFormatter| {
+                chain.next(|| {
+                    let format = || {
                         let [until_last @ .., last] = dot_chain else {
                             unreachable!()
                         };
-                        this.with_single_line(|this| {
-                            this.with_no_overflow(|this| {
+                        self.with_single_line(|| {
+                            self.with_no_overflow(|| {
                                 for item in until_last {
-                                    this.dot_chain_item(item)?;
+                                    self.dot_chain_item(item)?;
                                 }
                                 Ok(())
                             })?;
-                            let before_last = this.out.snapshot();
-                            let no_overflow_result = this.with_no_overflow(|this| {
-                                this.dot_chain_item(last)
+                            let before_last = self.out.snapshot();
+                            let no_overflow_result = self.with_no_overflow(|| {
+                                self.dot_chain_item(last)
                             });
                             if matches!(no_overflow_result, Ok(())) {
                                 info!("no overflow ok");
                                 return Ok(())
                             }
-                            this.out.restore(&before_last);
-                            let wrap_result = this.indented(|this| {
-                                this.with_not_single_line(|this| {
-                                    this.out.newline_indent()
+                            self.out.restore(&before_last);
+                            let wrap_result = self.indented(|| {
+                                self.with_not_single_line(|| {
+                                    self.out.newline_indent()
                                 })?;
-                                this.with_no_overflow(|this| {
-                                    this.dot_chain_item(last)
+                                self.with_no_overflow(|| {
+                                    self.dot_chain_item(last)
                                 })?;
                                 Ok(())
                             });
                             if wrap_result.is_ok() {
                                 // if wrapping makes the last item fit on one line,
                                 // abort the single-line approach
-                                return Err(this.out.lift_constraint_err(TooWideError));
+                                return Err(self.out.lift_constraint_err(TooWideError));
                             }
-                            this.out.restore(&before_last);
+                            self.out.restore(&before_last);
                             // try with overflow
-                            this.dot_chain_item(last)?;
+                            self.dot_chain_item(last)?;
                             Ok(())
                         })
                     };
                     if dot_chain.len() > 1 {
                         let Some(width) = RUSTFMT_CONFIG_DEFAULTS.chain_width.checked_sub(root_len)
                         else {
-                            return Err(this.out.lift_constraint_err(TooWideError));
+                            return Err(self.out.lift_constraint_err(TooWideError));
                         };
-                        this.with_width_limit_first_line(width, format)
+                        self.with_width_limit_first_line(width, format)
                     } else {
-                        format(this)
+                        format()
                     }
                 });
                 // wrap and indent each item
-                chain.next(|this| {
-                    this.indented(|this| {
+                chain.next(|| {
+                    self.indented(|| {
                         for item in dot_chain {
-                            this.out.newline_indent()?;
-                            this.dot_chain_item(item)?;
+                            self.out.newline_indent()?;
+                            self.dot_chain_item(item)?;
                         }
                         Ok(())
                     })
                 })
             },
-            move |this| this.tail(tail),
+            move || self.tail(tail),
         )?;
         Ok(())
     }
@@ -130,7 +130,7 @@ impl AstFormatter {
                 self.path_segment(&method_call.seg)?;
                 list(
                     &method_call.args,
-                    |this, arg| this.expr(arg, Tail::NONE),
+                    |arg| self.expr(arg, Tail::NONE),
                     param_list_config(Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)),
                 )
                 .overflow()

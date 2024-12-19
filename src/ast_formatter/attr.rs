@@ -48,9 +48,9 @@ impl AstFormatter {
                 let single_line_max_contents_width = RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width;
                 list(
                     items,
-                    |this, item| match item {
-                        ast::MetaItemInner::MetaItem(item) => this.meta_item(item),
-                        ast::MetaItemInner::Lit(lit) => this.meta_item_lit(lit),
+                    |item| match item {
+                        ast::MetaItemInner::MetaItem(item) => self.meta_item(item),
+                        ast::MetaItemInner::Lit(lit) => self.meta_item_lit(lit),
                     },
                     param_list_config(Some(single_line_max_contents_width)),
                 )

@@ -32,14 +32,14 @@ impl<'a> AstFormatter {
             }
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 self.qpath(qself, path)?;
-                list(fields, |this, pat| this.pat(pat), param_list_config(None))
+                list(fields, |pat| self.pat(pat), param_list_config(None))
                     .tail(end)
                     .format(self)
             }
             ast::PatKind::Or(_) => todo!(),
             ast::PatKind::Path(_, _) => todo!(),
             ast::PatKind::Tuple(ref fields) => {
-                list(fields, |this, pat| this.pat(pat), param_list_config(None))
+                list(fields, |pat| self.pat(pat), param_list_config(None))
                     .tail(end)
                     .format(self)
             }
@@ -67,7 +67,7 @@ impl<'a> AstFormatter {
     ) -> FormatResult {
         self.qpath(qself, path)?;
         self.out.space()?;
-        list(fields, Self::pat_field, StructFieldListConfig)
+        list(fields, |f| self.pat_field(f), StructFieldListConfig)
             .tail(end)
             .format(self)
     }

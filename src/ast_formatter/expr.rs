@@ -12,7 +12,7 @@ impl<'a> AstFormatter {
     pub fn expr(&self, expr: &ast::Expr, tail: Tail<'_>) -> FormatResult {
         match expr.kind {
             ast::ExprKind::Array(ref items) => {
-                list(items, |this, e| this.expr(e, Tail::NONE), ArrayListConfig)
+                list(items, |e| self.expr(e, Tail::NONE), ArrayListConfig)
                     .overflow()
                     .tail(tail)
                     .format(self)
@@ -24,7 +24,7 @@ impl<'a> AstFormatter {
             }
             ast::ExprKind::Tup(ref items) => list(
                 items,
-                |this, item| this.expr(item, Tail::NONE),
+                |item| self.expr(item, Tail::NONE),
                 param_list_config(Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)),
             )
             .format(self),
@@ -168,7 +168,7 @@ impl<'a> AstFormatter {
         let single_line_max_contents_width = RUSTFMT_CONFIG_DEFAULTS.fn_call_width;
         list(
             args,
-            |this, arg| this.expr(arg, Tail::NONE),
+            |arg| self.expr(arg, Tail::NONE),
             param_list_config(Some(single_line_max_contents_width)),
         )
         .overflow()
@@ -192,17 +192,17 @@ impl<'a> AstFormatter {
         self.out.space()?;
         self.fallback_chain(
             |chain| {
-                chain.next(|this| {
-                    this.with_single_line(|this| this.expr(scrutinee, Tail::OPEN_BLOCK))
+                chain.next(|| {
+                    self.with_single_line(|| self.expr(scrutinee, Tail::OPEN_BLOCK))
                 });
-                chain.next(|this| {
-                    this.expr(scrutinee, Tail::NONE)?;
-                    this.out.newline_indent()?;
-                    this.out.token_expect("{")?;
+                chain.next(|| {
+                    self.expr(scrutinee, Tail::NONE)?;
+                    self.out.newline_indent()?;
+                    self.out.token_expect("{")?;
                     Ok(())
                 });
             },
-            |_| Ok(()),
+            || Ok(()),
         )?;
         match else_ {
             None => self.block_after_open_brace(block, tail)?,
@@ -233,10 +233,10 @@ impl<'a> AstFormatter {
         self.out.token_at("match", expr.span.lo())?;
         self.out.space()?;
         self.expr(scrutinee, Tail::OPEN_BLOCK)?;
-        self.indented(|this| {
+        self.indented(|| {
             for arm in arms {
-                this.out.newline_indent()?;
-                this.arm(arm)?;
+                self.out.newline_indent()?;
+                self.arm(arm)?;
             }
             Ok(())
         })?;
@@ -273,7 +273,7 @@ impl<'a> AstFormatter {
     fn struct_expr(&self, struct_: &ast::StructExpr) -> FormatResult {
         self.qpath(&struct_.qself, &struct_.path)?;
         self.out.space()?;
-        list(&struct_.fields, Self::expr_field, StructFieldListConfig).format(self)?;
+        list(&struct_.fields, |f| self.expr_field(f), StructFieldListConfig).format(self)?;
         Ok(())
     }
 

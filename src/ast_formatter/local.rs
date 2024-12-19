@@ -26,36 +26,36 @@ impl<'a> AstFormatter {
         self.fallback_chain(
             |chain| {
                 // single line
-                chain.next(|this| {
-                    this.with_single_line(|this| {
-                        this.out.space()?;
-                        this.expr(expr, Tail::NONE)?;
+                chain.next(|| {
+                    self.with_single_line(|| {
+                        self.out.space()?;
+                        self.expr(expr, Tail::NONE)?;
                         Ok(())
                     })
                 });
                 // wrap and indent then single line
-                chain.next(|this| {
-                    this.indented(|this| {
-                        this.out.newline_indent()?;
-                        this.with_single_line(|this| this.expr(expr, Tail::NONE))
+                chain.next(|| {
+                    self.indented(|| {
+                        self.out.newline_indent()?;
+                        self.with_single_line(|| self.expr(expr, Tail::NONE))
                     })
                 });
                 // normal
-                chain.next(|this| {
-                    this.out.space()?;
-                    this.expr(expr, Tail::NONE)?;
+                chain.next(|| {
+                    self.out.space()?;
+                    self.expr(expr, Tail::NONE)?;
                     Ok(())
                 });
                 // wrap and indent
-                chain.next(|this| {
-                    this.indented(|this| {
-                        this.out.newline_indent()?;
-                        this.expr(expr, Tail::NONE)?;
+                chain.next(|| {
+                    self.indented(|| {
+                        self.out.newline_indent()?;
+                        self.expr(expr, Tail::NONE)?;
                         Ok(())
                     })
                 });
             },
-            |this| this.tail(end),
+            || self.tail(end),
         )
     }
 }

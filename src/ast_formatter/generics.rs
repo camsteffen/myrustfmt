@@ -11,7 +11,7 @@ impl AstFormatter {
         }
         list(
             &generics.params,
-            Self::generic_param,
+            |p| self.generic_param(p),
             AngleBracketedListConfig,
         )
         .format(self)

@@ -45,8 +45,8 @@ impl AstFormatter {
                 ast::AngleBracketed(args) => {
                     list(
                         &args.args,
-                        |this, arg| match arg {
-                            ast::AngleBracketedArg::Arg(arg) => this.generic_arg(arg),
+                        |arg| match arg {
+                            ast::AngleBracketedArg::Arg(arg) => self.generic_arg(arg),
                             ast::AngleBracketedArg::Constraint(AssocItemConstraint) => todo!(),
                         },
                         AngleBracketedListConfig,

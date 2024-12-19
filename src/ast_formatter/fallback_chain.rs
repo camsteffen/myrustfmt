@@ -2,30 +2,18 @@ use crate::ast_formatter::AstFormatter;
 use crate::constraint_writer::ConstraintError;
 use crate::source_formatter::{FormatResult, SourceFormatter, SourceFormatterSnapshot};
 
-pub trait HasSourceFormatter {
-    fn source_formatter(&self) -> &SourceFormatter;
-}
-
-impl HasSourceFormatter for AstFormatter {
-    fn source_formatter(&self) -> &SourceFormatter {
-        &self.out
-    }
-}
-
-pub fn fallback_chain<CTX, Finally>(
-    ctx: &CTX,
-    chain: impl FnOnce(&mut FallbackChain<CTX, Finally>),
+pub fn fallback_chain<Finally>(
+    out: &SourceFormatter,
+    chain: impl FnOnce(&mut FallbackChain<'_, Finally>),
     finally: Finally,
 ) -> FormatResult
 where
-    CTX: HasSourceFormatter,
-    Finally: Fn(&CTX) -> FormatResult,
+    Finally: Fn() -> FormatResult,
 {
-    let snapshot = ctx.source_formatter().snapshot();
     let mut builder = FallbackChain {
-        ctx,
+        out,
         result: None,
-        snapshot,
+        snapshot: out.snapshot(),
         finally,
     };
     chain(&mut builder);
@@ -35,37 +23,36 @@ where
 }
 
 impl<'a> AstFormatter {
-    pub fn fallback_chain<'b, F: Fn(&Self) -> FormatResult>(
+    pub fn fallback_chain<'b, F: Fn() -> FormatResult>(
         &self,
-        chain: impl FnOnce(&mut FallbackChain<Self, F>),
+        chain: impl FnOnce(&mut FallbackChain<F>),
         finally: F,
     ) -> FormatResult {
-        fallback_chain(self, chain, finally)
+        fallback_chain(&self.out, chain, finally)
     }
 }
 
-pub struct FallbackChain<'ctx, CTX, Finally> {
-    ctx: &'ctx CTX,
+pub struct FallbackChain<'a, Finally> {
+    out: &'a SourceFormatter,
     result: Option<FormatResult>,
     snapshot: SourceFormatterSnapshot,
     finally: Finally,
 }
 
-impl<'ctx, CTX, Finally> FallbackChain<'ctx, CTX, Finally>
+impl<'a, Finally> FallbackChain<'a, Finally>
 where
-    CTX: HasSourceFormatter,
-    Finally: Fn(&CTX) -> FormatResult,
+    Finally: Fn() -> FormatResult,
 {
-    pub fn next(&mut self, f: impl FnOnce(&CTX) -> FormatResult) {
+    pub fn next(&mut self, f: impl FnOnce() -> FormatResult) {
         if matches!(self.result, Some(Ok(_))) {
             return;
         }
-        let result = f(self.ctx).and_then(|()| (self.finally)(self.ctx));
+        let result = f().and_then(|()| (self.finally)());
         if let Err(e) = result {
             // future-proof: only recover from constraint errors
             let _: ConstraintError = e.kind;
 
-            self.ctx.source_formatter().restore(&self.snapshot);
+            self.out.restore(&self.snapshot);
         }
         self.result = Some(result);
     }

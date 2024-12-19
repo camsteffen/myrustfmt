@@ -8,17 +8,17 @@ use rustc_ast::ast;
 
 impl<'a> AstFormatter {
     pub fn item(&self, item: &ast::Item) -> FormatResult {
-        self.item_generic(item, |this, kind| this.item_kind(kind, item))
+        self.item_generic(item, |kind| self.item_kind(kind, item))
     }
 
     fn item_generic<K>(
         &self,
         item: &ast::Item<K>,
-        kind: impl FnOnce(&Self, &K) -> FormatResult,
+        kind: impl FnOnce(&K) -> FormatResult,
     ) -> FormatResult {
         self.attrs(&item.attrs)?;
         self.vis(&item.vis)?;
-        kind(self, &item.kind)?;
+        kind(&item.kind)?;
         Ok(())
     }
 
@@ -49,10 +49,10 @@ impl<'a> AstFormatter {
                     ast::ModKind::Loaded(items, ast::Inline::Yes, _mod_spans) => {
                         self.out.space()?;
                         self.out.token_expect("{")?;
-                        self.indented(|this| {
+                        self.indented(|| {
                             for item in items {
-                                this.out.newline_indent()?;
-                                this.item(item)?;
+                                self.out.newline_indent()?;
+                                self.item(item)?;
                             }
                             Ok(())
                         })?;
@@ -118,10 +118,10 @@ impl<'a> AstFormatter {
         self.out.space()?;
         self.out.token_expect("{")?;
         if !impl_.items.is_empty() {
-            self.indented(|this| {
+            self.indented(|| {
                 for item in &impl_.items {
-                    this.out.newline_indent()?;
-                    this.item_generic(item, |this, kind| this.assoc_item_kind(kind, item))?;
+                    self.out.newline_indent()?;
+                    self.item_generic(item, |kind| self.assoc_item_kind(kind, item))?;
                 }
                 Ok(())
             })?;
@@ -164,10 +164,10 @@ impl<'a> AstFormatter {
     fn variant_data(&self, variants: &ast::VariantData) -> FormatResult {
         match variants {
             ast::VariantData::Struct { fields, .. } => {
-                list(fields, Self::field_def, StructFieldListConfig).format(self)
+                list(fields, |f| self.field_def(f), StructFieldListConfig).format(self)
             }
             ast::VariantData::Tuple(fields, _) => {
-                list(fields, Self::field_def, param_list_config(None)).format(self)
+                list(fields, |f| self.field_def(f), param_list_config(None)).format(self)
             }
             ast::VariantData::Unit(_) => Ok(()),
         }
@@ -205,13 +205,13 @@ impl<'a> AstFormatter {
                         items,
                         "{",
                         "}",
-                        |this, (use_tree, _)| this.use_tree(use_tree),
+                        |(use_tree, _)| self.use_tree(use_tree),
                         Tail::NONE,
                     )?
                 } else {
                     list(
                         items,
-                        |this, (use_tree, _)| this.use_tree(use_tree),
+                        |(use_tree, _)| self.use_tree(use_tree),
                         UseTreeListConfig,
                     )
                     .format(self)?

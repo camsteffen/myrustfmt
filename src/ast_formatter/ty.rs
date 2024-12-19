@@ -21,7 +21,7 @@ impl<'a> AstFormatter {
             ast::TyKind::BareFn(ty) => todo!(),
             ast::TyKind::Never => todo!(),
             ast::TyKind::Tup(elements) => {
-                list(elements, |this, ty| this.ty(ty), param_list_config(None)).format(self)
+                list(elements, |ty| self.ty(ty), param_list_config(None)).format(self)
             }
             ast::TyKind::Path(qself, path) => self.qpath(qself, path),
             ast::TyKind::TraitObject(bounds, syntax) => todo!(),

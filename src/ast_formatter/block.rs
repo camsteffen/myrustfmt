@@ -12,10 +12,10 @@ impl<'a> AstFormatter {
 
     pub fn block_after_open_brace(&self, block: &ast::Block, end: Tail<'_>) -> FormatResult {
         if !block.stmts.is_empty() {
-            self.indented(|this| {
+            self.indented(|| {
                 for stmt in &block.stmts {
-                    this.out.newline_indent()?;
-                    this.stmt(stmt)?;
+                    self.out.newline_indent()?;
+                    self.stmt(stmt)?;
                 }
                 Ok(())
             })?;
@@ -28,7 +28,7 @@ impl<'a> AstFormatter {
 
     fn stmt(&self, stmt: &ast::Stmt) -> FormatResult {
         let hi = stmt.span.hi();
-        let semicolon = move |this: &AstFormatter| this.out.token_end_at(";", hi);
+        let semicolon = move || self.out.token_end_at(";", hi);
         let semicolon = Tail::new(&semicolon);
         match &stmt.kind {
             ast::StmtKind::Let(local) => self.local(local, semicolon),

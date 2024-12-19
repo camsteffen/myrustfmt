@@ -7,7 +7,7 @@ pub struct Tail<'a>(TailImpl<'a>);
 #[derive(Clone, Copy)]
 enum TailImpl<'a> {
     None,
-    Dyn(&'a dyn Fn(&AstFormatter) -> FormatResult),
+    Dyn(&'a dyn Fn() -> FormatResult),
     Static(fn(&AstFormatter) -> FormatResult),
 }
 
@@ -19,7 +19,7 @@ impl<'a> Tail<'a> {
         Ok(())
     }));
 
-    pub fn new(f: &'a (dyn Fn(&AstFormatter) -> FormatResult + 'a)) -> Self {
+    pub fn new(f: &'a (dyn Fn() -> FormatResult + 'a)) -> Self {
         Tail(TailImpl::Dyn(f))
     }
 }
@@ -28,7 +28,7 @@ impl AstFormatter {
     pub fn tail(&self, tail: Tail) -> FormatResult {
         match tail.0 {
             TailImpl::None => Ok(()),
-            TailImpl::Dyn(f) => f(self),
+            TailImpl::Dyn(f) => f(),
             TailImpl::Static(f) => f(self),
         }
     }

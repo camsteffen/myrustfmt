@@ -46,7 +46,7 @@ impl<'a> AstFormatter {
         self.out.space()?;
 
         if is_overflow {
-            self.with_not_single_line(|this| this.closure_body(&closure.body, end))?;
+            self.with_not_single_line(|| self.closure_body(&closure.body, end))?;
         } else {
             self.closure_body(&closure.body, end)?;
         }
@@ -94,20 +94,20 @@ impl<'a> AstFormatter {
         } else {
             self.fallback_chain(
                 |chain| {
-                    chain.next(|this| this.with_single_line(|this| this.expr(body, tail)));
-                    chain.next(|this| {
-                        this.out.token_missing("{")?;
-                        this.indented(|this| {
-                            this.out.newline_indent()?;
-                            this.expr(body, tail)?;
+                    chain.next(|| self.with_single_line(|| self.expr(body, tail)));
+                    chain.next(|| {
+                        self.out.token_missing("{")?;
+                        self.indented(|| {
+                            self.out.newline_indent()?;
+                            self.expr(body, tail)?;
                             Ok(())
                         })?;
-                        this.out.newline_indent()?;
-                        this.out.token_missing("}")?;
+                        self.out.newline_indent()?;
+                        self.out.token_missing("}")?;
                         Ok(())
                     });
                 },
-                |_this| Ok(()),
+                || Ok(()),
             )
         }
     }
@@ -118,7 +118,7 @@ impl<'a> AstFormatter {
     ) -> FormatResult {
         list(
             &parenthesized_args.inputs,
-            |this, ty| this.ty(ty),
+            |ty| self.ty(ty),
             param_list_config(None),
         )
         .format(self)?;
@@ -164,8 +164,8 @@ impl<'a> AstFormatter {
         ast::FnDecl { inputs, output }: &ast::FnDecl,
         input_list_config: impl ListConfig,
     ) -> FormatResult {
-        list(inputs, |this, param| this.param(param), input_list_config)
-            .tail(Tail::new(&|this| this.fn_ret_ty(output)))
+        list(inputs, |param| self.param(param), input_list_config)
+            .tail(Tail::new(&|| self.fn_ret_ty(output)))
             .format(self)?;
         Ok(())
     }
