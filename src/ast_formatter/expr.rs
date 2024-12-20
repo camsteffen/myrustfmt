@@ -31,8 +31,8 @@ impl<'a> AstFormatter {
                 |item| self.expr(item),
                 param_list_config(Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)),
             )
-                .tail(tail)
-                .format(self),
+            .tail(tail)
+            .format(self),
             ast::ExprKind::Binary(op, ref left, ref right) => self.binop(left, op, right, tail),
             ast::ExprKind::Unary(op, ref target) => {
                 self.out.token_expect(op.as_str())?;
@@ -225,9 +225,9 @@ impl<'a> AstFormatter {
             |arg| self.expr(arg),
             param_list_config(Some(single_line_max_contents_width)),
         )
-            .overflow()
-            .tail(end)
-            .format(self)
+        .overflow()
+        .tail(end)
+        .format(self)
     }
 
     fn delim_args(&self, delim_args: &ast::DelimArgs, end: Tail<'_>) -> FormatResult {
@@ -302,10 +302,29 @@ impl<'a> AstFormatter {
         self.attrs(&arm.attrs)?;
         self.pat(&arm.pat)?;
         if let Some(guard) = arm.guard.as_deref() {
-            self.out.space()?;
-            self.out.token_expect("if")?;
-            self.out.space()?;
-            self.expr(guard)?;
+            let guard = || {
+                self.out.token_expect("if")?;
+                self.out.space()?;
+                self.expr(guard)?;
+                Ok(())
+            };
+            self.fallback_chain(
+                |chain| {
+                    chain.next(|| {
+                        self.out.space()?;
+                        guard()?;
+                        Ok(())
+                    });
+                    chain.next(|| {
+                        self.indented(|| {
+                            self.out.newline_indent()?;
+                            guard()?;
+                            Ok(())
+                        })
+                    });
+                },
+                || Ok(()),
+            )?;
         }
         if let Some(body) = arm.body.as_deref() {
             self.out.space()?;
@@ -331,9 +350,9 @@ impl<'a> AstFormatter {
             |f| self.expr_field(f),
             struct_field_list_config(false),
         )
-            .rest(ListRest::from(&struct_.rest))
-            .tail(tail)
-            .format(self)?;
+        .rest(ListRest::from(&struct_.rest))
+        .tail(tail)
+        .format(self)?;
         Ok(())
     }
 
