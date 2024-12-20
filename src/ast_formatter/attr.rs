@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::source_formatter::FormatResult;
+use crate::error::FormatResult;
 
 use crate::ast_formatter::list::{list, param_list_config};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -33,9 +33,8 @@ impl AstFormatter {
                 }
             },
             ast::AttrKind::DocComment(_comment_kind, _symbol) => {
-                // self.out.copy_span(attr.span);
-                Ok(())
-            },
+                self.out.copy_span(attr.span)
+            }
         }
     }
 

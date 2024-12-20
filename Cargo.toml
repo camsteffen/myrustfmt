@@ -6,6 +6,7 @@ edition = "2024"
 
 [dependencies]
 tracing = "0.1.35"
+thiserror = "2.0.8"
 #tracing-subscriber = "0.3.19"
 # https://youtrack.jetbrains.com/issue/RUST-946/Cant-find-libsyntax-from-rust-sources-in-external-librairies
 # rustc --print sysroot

@@ -18,10 +18,13 @@ extern crate thin_vec;
 #[allow(unused_extern_crates)]
 extern crate rustc_driver;
 
+const RUSTFMT_QUIRKS: bool = true;
+
 pub mod ast_formatter;
 mod config;
 pub mod constraint_writer;
 mod constraints;
+mod error;
 mod rustfmt_config_defaults;
 pub mod source_formatter;
 mod source_reader;
@@ -54,12 +57,13 @@ pub fn format_str_defaults(source: &str) -> String {
 
 pub fn format_str(source: &str, max_width: usize) -> String {
     parse_ast_then(String::from(source), |crate_| {
+        let config = DEFAULT_CONFIG;
         let constraints = Constraints::new(max_width);
         let source_formatter = SourceFormatter::new(String::from(source), constraints);
-        let mut ast_formatter = AstFormatter::new(source_formatter);
+        let ast_formatter = AstFormatter::new(config, source_formatter);
         match ast_formatter.crate_(&crate_) {
             Ok(()) => {}
-            Err(e) => todo!("failed to format: {e:?}"),
+            Err(e) => panic!("{}", e.display(source)),
         }
         ast_formatter.finish()
     })

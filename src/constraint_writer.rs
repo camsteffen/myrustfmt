@@ -1,6 +1,7 @@
 use crate::constraints::Constraints;
 use std::cell::Cell;
 use tracing::info;
+use crate::error::{NewlineNotAllowedError, WidthLimitExceededError};
 
 pub struct ConstraintWriter {
     constraints: Constraints,
@@ -78,7 +79,7 @@ impl ConstraintWriter {
     }
 
     // #[instrument(skip(self))]
-    pub fn token(&self, token: &str) -> Result<(), TooWideError> {
+    pub fn token(&self, token: &str) -> Result<(), WidthLimitExceededError> {
         self.write_unchecked(token);
         self.check_width_constraints()
     }
@@ -104,17 +105,17 @@ impl ConstraintWriter {
         Ok(())
     }
 
-    pub fn indent(&self) -> Result<(), TooWideError> {
+    pub fn indent(&self) -> Result<(), WidthLimitExceededError> {
         self.with_buffer(|b| b.extend(std::iter::repeat_n(' ', self.constraints.indent.get())));
         self.check_width_constraints()
     }
 
-    pub fn check_width_constraints(&self) -> Result<(), TooWideError> {
+    pub fn check_width_constraints(&self) -> Result<(), WidthLimitExceededError> {
         match self.remaining_width() {
             Ok(_width) => Ok(()),
-            Err(TooWideError) => {
+            Err(WidthLimitExceededError) => {
                 info!("too wide: \"{}\"", self.last_line_to_string());
-                Err(TooWideError)
+                Err(WidthLimitExceededError)
             }
         }
     }
@@ -129,46 +130,21 @@ impl ConstraintWriter {
         }
     }
 
-    pub fn remaining_width(&self) -> Result<Option<usize>, TooWideError> {
+    pub fn remaining_width(&self) -> Result<Option<usize>, WidthLimitExceededError> {
         self.max_width()
             .map(|max_width| {
                 max_width
                     .checked_sub(self.last_line_len())
-                    .ok_or(TooWideError)
+                    .ok_or(WidthLimitExceededError)
             })
             .transpose()
     }
 
     fn last_line_to_string(&self) -> String {
-        self.with_buffer(|b| String::from(&b[self.last_line_start.get()..]))
+        self.with_buffer(|b| String::from(b[self.last_line_start.get()..].trim_start()))
     }
 
-    // #[instrument(skip(self), ret)]
     pub fn last_line_len(&self) -> usize {
         self.len() - self.last_line_start.get()
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum ConstraintError {
-    NewlineNotAllowed,
-    TooWide,
-}
-
-#[derive(Debug)]
-pub struct NewlineNotAllowedError;
-
-#[derive(Debug)]
-pub struct TooWideError;
-
-impl From<NewlineNotAllowedError> for ConstraintError {
-    fn from(_: NewlineNotAllowedError) -> Self {
-        ConstraintError::NewlineNotAllowed
-    }
-}
-
-impl From<TooWideError> for ConstraintError {
-    fn from(_: TooWideError) -> Self {
-        ConstraintError::TooWide
     }
 }

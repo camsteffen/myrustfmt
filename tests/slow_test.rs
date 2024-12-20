@@ -6,8 +6,7 @@ use tracing_test::traced_test;
 // https://github.com/rust-lang/rustfmt/issues/4867
 #[test]
 fn slow_test() {
-    let source =
-        r#"
+    let source = r#"
 mod modA {
     mod modB {
         mod modC {

@@ -3,8 +3,8 @@ use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{StructFieldListConfig, list, param_list_config};
-use crate::source_formatter::FormatResult;
+use crate::ast_formatter::list::{list, param_list_config, struct_field_list_config};
+use crate::error::FormatResult;
 
 impl<'a> AstFormatter {
     pub fn pat(&self, pat: &ast::Pat) -> FormatResult {
@@ -13,7 +13,7 @@ impl<'a> AstFormatter {
 
     pub fn pat_end(&self, pat: &ast::Pat, end: Tail<'_>) -> FormatResult {
         match pat.kind {
-            ast::PatKind::Wild => todo!(),
+            ast::PatKind::Wild => self.out.token_expect("_"),
             ast::PatKind::Ident(ast::BindingMode(by_ref, mutbl), ident, ref pat) => {
                 self.mutability(mutbl)?;
                 match by_ref {
@@ -25,6 +25,12 @@ impl<'a> AstFormatter {
                     }
                 }
                 self.ident(ident)?;
+                if let Some(pat) = pat {
+                    self.out.space()?;
+                    self.out.token_expect("@")?;
+                    self.out.space()?;
+                    self.pat(pat)?;
+                }
                 self.tail(end)
             }
             ast::PatKind::Struct(ref qself, ref path, ref fields, rest) => {
@@ -37,7 +43,7 @@ impl<'a> AstFormatter {
                     .format(self)
             }
             ast::PatKind::Or(_) => todo!(),
-            ast::PatKind::Path(_, _) => todo!(),
+            ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path),
             ast::PatKind::Tuple(ref fields) => {
                 list(fields, |pat| self.pat(pat), param_list_config(None))
                     .tail(end)
@@ -67,15 +73,24 @@ impl<'a> AstFormatter {
     ) -> FormatResult {
         self.qpath(qself, path)?;
         self.out.space()?;
-        list(fields, |f| self.pat_field(f), StructFieldListConfig)
-            .tail(end)
-            .format(self)
+        let has_rest = matches!(rest, ast::PatFieldsRest::Rest);
+        let single_line_block = self.config().rustfmt_quirks && has_rest;
+        list(
+            fields,
+            |f| self.pat_field(f),
+            struct_field_list_config(single_line_block),
+        )
+        .rest(has_rest)
+        .tail(end)
+        .format(self)
     }
 
     fn pat_field(&self, pat_field: &ast::PatField) -> FormatResult {
-        // pat_field.attrs;
-        self.ident(pat_field.ident)?;
-        if !pat_field.is_shorthand {
+        self.attrs(&pat_field.attrs)?;
+        if pat_field.is_shorthand {
+            self.pat(&pat_field.pat)?;
+        } else {
+            self.ident(pat_field.ident)?;
             self.out.token_expect(":")?;
             self.out.space()?;
             self.pat(&pat_field.pat)?;

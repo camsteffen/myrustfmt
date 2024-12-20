@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::{ListConfig, list, param_list_config};
-use crate::source_formatter::FormatResult;
+use crate::error::FormatResult;
 
 use rustc_ast::ast;
 
@@ -13,10 +13,24 @@ impl<'a> AstFormatter {
             body,
             ..
         } = fn_;
-        self.fn_sig(sig, generics, item)?;
+        self.fn_header(&sig.header)?;
+        self.out.token_expect("fn")?;
+        self.out.space()?;
+        self.ident(item.ident)?;
+        self.generic_params(&generics.params)?;
+        let (decl_tail, opened_block) = if generics.where_clause.is_empty() && body.is_some() {
+            (Tail::OPEN_BLOCK, true)
+        } else {
+            (Tail::NONE, false)
+        };
+        self.fn_decl(&sig.decl, param_list_config(None), decl_tail)?;
+        self.where_clause(&generics.where_clause)?;
         if let Some(body) = body {
-            self.out.space()?;
-            self.block(body, Tail::NONE)?;
+            if opened_block {
+                self.block_after_open_brace(body, Tail::NONE)?;
+            } else {
+                self.block(body, Tail::NONE)?;
+            }
         }
         Ok(())
     }
@@ -27,28 +41,37 @@ impl<'a> AstFormatter {
         is_overflow: bool,
         end: Tail<'_>,
     ) -> FormatResult {
-        match closure.binder {
+        let ast::Closure {
+            ref binder,
+            capture_clause,
+            constness,
+            ref coroutine_kind,
+            ref fn_decl,
+            ref body,
+            ..
+        } = *closure;
+        match *binder {
             ast::ClosureBinder::NotPresent => {}
             ast::ClosureBinder::For {
                 span: _,
-                ref generic_params,
+                generic_params: _,
             } => todo!(),
         }
-        match closure.capture_clause {
+        match capture_clause {
             ast::CaptureBy::Ref => {}
             ast::CaptureBy::Value { move_kw } => self.out.token_at_space("move", move_kw.lo())?,
         }
-        self.constness(closure.constness)?;
-        if let Some(coroutine_kind) = &closure.coroutine_kind {
+        self.constness(constness)?;
+        if let Some(coroutine_kind) = coroutine_kind {
             self.coroutine_kind(coroutine_kind)?;
         }
-        self.fn_decl(&closure.fn_decl, ClosureParamListConfig)?;
+        self.fn_decl(fn_decl, ClosureParamListConfig, Tail::NONE)?;
         self.out.space()?;
 
         if is_overflow {
-            self.with_not_single_line(|| self.closure_body(&closure.body, end))?;
+            self.with_not_single_line(|| self.closure_body(body, end))?;
         } else {
-            self.closure_body(&closure.body, end)?;
+            self.closure_body(body, end)?;
         }
         Ok(())
     }
@@ -67,12 +90,12 @@ impl<'a> AstFormatter {
             }
         }
         if let Some(expr) = inner_expr {
-            self.out.skip_token("{");
+            self.out.skip_token("{")?;
             self.closure_body(expr, tail)?;
-            self.out.skip_token("}");
+            self.out.skip_token("}")?;
             return Ok(());
         }
-        fn allow_multi_line(expr: &ast::Expr) -> bool {
+        fn is_block_like(expr: &ast::Expr) -> bool {
             match expr.kind {
                 ast::ExprKind::Match(..)
                 | ast::ExprKind::Gen(..)
@@ -84,38 +107,41 @@ impl<'a> AstFormatter {
                 ast::ExprKind::AddrOf(_, _, ref expr)
                 | ast::ExprKind::Try(ref expr)
                 | ast::ExprKind::Unary(_, ref expr)
-                | ast::ExprKind::Cast(ref expr, _) => allow_multi_line(expr),
+                | ast::ExprKind::Cast(ref expr, _) => is_block_like(expr),
 
                 _ => false,
             }
         }
-        if allow_multi_line(body) {
-            self.expr(body, tail)
+        let with_block = || {
+            self.out.token_missing("{")?;
+            self.indented(|| {
+                self.out.newline_indent()?;
+                self.expr(body)?;
+                Ok(())
+            })?;
+            self.out.newline_indent()?;
+            self.out.token_missing("}")?;
+            self.tail(tail)?;
+            Ok(())
+        };
+        if is_block_like(body) {
+            self.expr_tail(body, tail)
         } else {
             self.fallback_chain(
                 |chain| {
-                    chain.next(|| self.with_single_line(|| self.expr(body, tail)));
                     chain.next(|| {
-                        self.out.token_missing("{")?;
-                        self.indented(|| {
-                            self.out.newline_indent()?;
-                            self.expr(body, tail)?;
-                            Ok(())
-                        })?;
-                        self.out.newline_indent()?;
-                        self.out.token_missing("}")?;
-                        Ok(())
+                        self.with_no_overflow(|| {
+                            self.with_single_line(|| self.expr_tail(body, tail))
+                        })
                     });
+                    chain.next(with_block);
                 },
                 || Ok(()),
             )
         }
     }
 
-    pub fn parenthesized_args(
-        &self,
-        parenthesized_args: &ast::ParenthesizedArgs,
-    ) -> FormatResult {
+    pub fn parenthesized_args(&self, parenthesized_args: &ast::ParenthesizedArgs) -> FormatResult {
         list(
             &parenthesized_args.inputs,
             |ty| self.ty(ty),
@@ -123,21 +149,6 @@ impl<'a> AstFormatter {
         )
         .format(self)?;
         self.fn_ret_ty(&parenthesized_args.output)?;
-        Ok(())
-    }
-
-    fn fn_sig<K>(
-        &self,
-        ast::FnSig { header, decl, span }: &ast::FnSig,
-        generics: &ast::Generics,
-        item: &ast::Item<K>,
-    ) -> FormatResult {
-        self.fn_header(header)?;
-        self.out.token_expect("fn")?;
-        self.out.space()?;
-        self.ident(item.ident)?;
-        self.generics(generics)?;
-        self.fn_decl(decl, param_list_config(None))?;
         Ok(())
     }
 
@@ -163,15 +174,19 @@ impl<'a> AstFormatter {
         &self,
         ast::FnDecl { inputs, output }: &ast::FnDecl,
         input_list_config: impl ListConfig,
+        tail: Tail<'_>,
     ) -> FormatResult {
         list(inputs, |param| self.param(param), input_list_config)
-            .tail(Tail::new(&|| self.fn_ret_ty(output)))
+            .tail(Tail::new(&|| {
+                self.fn_ret_ty(output)?;
+                self.tail(tail)?;
+                Ok(())
+            }))
             .format(self)?;
         Ok(())
     }
 
     fn param(&self, param: &ast::Param) -> FormatResult {
-        tracing::info!("{:?}", param);
         self.attrs(&param.attrs)?;
         if param.is_self() {
             self.ty(&param.ty)?;
@@ -219,7 +234,7 @@ impl<'a> AstFormatter {
             ast::Extern::Explicit(ref abi, span) => {
                 let pos = span.lo();
                 self.out.token_at_space("extern", pos)?;
-                self.strlit(abi);
+                self.strlit(abi)?;
                 self.out.space()?;
             }
         }

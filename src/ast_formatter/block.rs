@@ -1,12 +1,12 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::source_formatter::FormatResult;
+use crate::error::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter {
-    pub fn block(&self, block: &ast::Block, end: Tail<'_>) -> FormatResult {
+    pub fn block(&self, block: &ast::Block, tail: Tail<'_>) -> FormatResult {
         self.out.token_at("{", block.span.lo())?;
-        self.block_after_open_brace(block, end)?;
+        self.block_after_open_brace(block, tail)?;
         Ok(())
     }
 
@@ -32,9 +32,9 @@ impl<'a> AstFormatter {
         let semicolon = Tail::new(&semicolon);
         match &stmt.kind {
             ast::StmtKind::Let(local) => self.local(local, semicolon),
-            ast::StmtKind::Item(_) => todo!(),
-            ast::StmtKind::Expr(expr) => self.expr(expr, Tail::NONE),
-            ast::StmtKind::Semi(expr) => self.expr(expr, semicolon),
+            ast::StmtKind::Item(item) => self.item(item),
+            ast::StmtKind::Expr(expr) => self.expr(expr),
+            ast::StmtKind::Semi(expr) => self.expr_tail(expr, semicolon),
             ast::StmtKind::Empty => self.out.token_expect(";"),
             ast::StmtKind::MacCall(mac_call_stmt) => {
                 self.attrs(&mac_call_stmt.attrs)?;

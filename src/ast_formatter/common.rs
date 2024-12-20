@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::source_formatter::FormatResult;
+use crate::error::FormatResult;
 use rustc_ast::ast;
 use rustc_span::symbol::Ident;
 
@@ -7,15 +7,15 @@ impl<'a> AstFormatter {
     pub fn ident(&self, ident: Ident) -> FormatResult {
         self.out.token_from_source(ident.span)
     }
-    
+
     pub fn mutability(&self, mutability: ast::Mutability) -> FormatResult {
         match mutability {
             ast::Mutability::Mut => {
                 self.out.token_expect("mut")?;
                 self.out.space()?;
                 Ok(())
-            },
-            ast::Mutability::Not => Ok(())
+            }
+            ast::Mutability::Not => Ok(()),
         }
     }
 

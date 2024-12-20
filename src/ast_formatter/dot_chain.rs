@@ -1,29 +1,21 @@
-use tracing::info;
 use rustc_ast::ast;
-
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::{list, param_list_config};
-use crate::constraint_writer::TooWideError;
+use crate::error::{WidthLimitExceededError};
+use crate::constraints::INDENT_WIDTH;
+use crate::error::FormatResult;
+use crate::RUSTFMT_QUIRKS;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
-use crate::source_formatter::{FormatError, FormatResult};
-
 impl AstFormatter {
-    pub fn dot_chain(
-        &self,
-        expr: &ast::Expr,
-        tail: Tail<'_>,
-        is_overflow: bool,
-    ) -> FormatResult {
+    pub fn dot_chain(&self, expr: &ast::Expr, tail: Tail<'_>, is_overflow: bool) -> FormatResult {
         let mut dot_chain = Vec::new();
         build_dot_chain(&mut dot_chain, expr);
-        let [root, dot_chain @ ..] = &dot_chain[..] else {
-            unreachable!();
-        };
+        let (root, dot_chain) = dot_chain.split_first().unwrap();
         if is_overflow {
             // single-line the whole thing
             self.with_single_line(|| {
-                self.expr(root, Tail::NONE)?;
+                self.expr(root)?;
                 dot_chain
                     .iter()
                     .try_for_each(|item| self.dot_chain_item(item))?;
@@ -32,7 +24,7 @@ impl AstFormatter {
             self.tail(tail)?;
             return Ok(());
         }
-        let (len, height) = self.with_dimensions(|| self.expr(root, Tail::NONE))?;
+        let (len, height) = self.with_dimensions(|| self.expr(root))?;
         if height == 0 {
             self.dot_chain_single_line_root(dot_chain, len, tail)
         } else {
@@ -57,9 +49,7 @@ impl AstFormatter {
                 // single line
                 chain.next(|| {
                     let format = || {
-                        let [until_last @ .., last] = dot_chain else {
-                            unreachable!()
-                        };
+                        let (last, until_last) = dot_chain.split_last().unwrap();
                         self.with_single_line(|| {
                             self.with_no_overflow(|| {
                                 for item in until_last {
@@ -68,27 +58,21 @@ impl AstFormatter {
                                 Ok(())
                             })?;
                             let before_last = self.out.snapshot();
-                            let no_overflow_result = self.with_no_overflow(|| {
-                                self.dot_chain_item(last)
-                            });
+                            let no_overflow_result =
+                                self.with_no_overflow(|| self.dot_chain_item(last));
                             if matches!(no_overflow_result, Ok(())) {
-                                info!("no overflow ok");
-                                return Ok(())
+                                return Ok(());
                             }
                             self.out.restore(&before_last);
                             let wrap_result = self.indented(|| {
-                                self.with_not_single_line(|| {
-                                    self.out.newline_indent()
-                                })?;
-                                self.with_no_overflow(|| {
-                                    self.dot_chain_item(last)
-                                })?;
+                                self.with_not_single_line(|| self.out.newline_indent())?;
+                                self.with_no_overflow(|| self.dot_chain_item(last))?;
                                 Ok(())
                             });
                             if wrap_result.is_ok() {
                                 // if wrapping makes the last item fit on one line,
                                 // abort the single-line approach
-                                return Err(self.out.lift_constraint_err(TooWideError));
+                                return Err(self.out.format_error(WidthLimitExceededError));
                             }
                             self.out.restore(&before_last);
                             // try with overflow
@@ -96,28 +80,36 @@ impl AstFormatter {
                             Ok(())
                         })
                     };
-                    if dot_chain.len() > 1 {
+                    if RUSTFMT_QUIRKS && dot_chain.len() == 1 {
+                        format()
+                    } else {
                         let Some(width) = RUSTFMT_CONFIG_DEFAULTS.chain_width.checked_sub(root_len)
                         else {
-                            return Err(self.out.lift_constraint_err(TooWideError));
+                            return Err(self.out.format_error(WidthLimitExceededError));
                         };
                         self.with_width_limit_first_line(width, format)
-                    } else {
-                        format()
                     }
                 });
                 // wrap and indent each item
                 chain.next(|| {
+                    let rest = if root_len > INDENT_WIDTH {
+                        dot_chain
+                    } else {
+                        let (first, rest) = dot_chain.split_first().unwrap();
+                        self.dot_chain_item(first)?;
+                        rest
+                    };
                     self.indented(|| {
-                        for item in dot_chain {
+                        for item in rest {
                             self.out.newline_indent()?;
                             self.dot_chain_item(item)?;
                         }
                         Ok(())
-                    })
+                    })?;
+                    Ok(())
                 })
             },
-            move || self.tail(tail),
+            || self.tail(tail),
         )?;
         Ok(())
     }
@@ -130,8 +122,9 @@ impl AstFormatter {
                 self.path_segment(&method_call.seg)?;
                 list(
                     &method_call.args,
-                    |arg| self.expr(arg, Tail::NONE),
-                    param_list_config(Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)),
+                    |arg| self.expr(arg),
+                    // param_list_config(Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)),
+                    param_list_config(None),
                 )
                 .overflow()
                 .format(self)?;

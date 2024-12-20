@@ -1,10 +1,13 @@
-use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{
-    ListConfig, ListWrapToFitConfig, StructFieldListConfig, list, param_list_config,
-};
-use crate::source_formatter::FormatResult;
 use rustc_ast::ast;
+use rustc_ast::ptr::P;
+use rustc_span::Span;
+use rustc_span::symbol::Ident;
+
+use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::list::{
+    ListConfig, ListWrapToFitConfig, list, param_list_config, struct_field_list_config,
+};
+use crate::error::FormatResult;
 
 impl<'a> AstFormatter {
     pub fn item(&self, item: &ast::Item) -> FormatResult {
@@ -29,6 +32,12 @@ impl<'a> AstFormatter {
                 self.out.space()?;
                 self.out.token_expect("crate")?;
                 self.out.space()?;
+                if name.is_some() {
+                    self.out.eat_token()?;
+                    self.out.space()?;
+                    self.out.token_expect("as")?;
+                    self.out.space()?;
+                }
                 self.ident(item.ident)?;
                 self.out.token_end_at(";", item.span.hi())?;
             }
@@ -38,7 +47,7 @@ impl<'a> AstFormatter {
                 self.out.token_end_at(";", item.span.hi())?;
             }
             ast::ItemKind::Static(_) => todo!(),
-            ast::ItemKind::Const(_) => todo!(),
+            ast::ItemKind::Const(const_item) => self.const_item(const_item, item.ident)?,
             ast::ItemKind::Fn(fn_) => self.fn_(fn_, item)?,
             ast::ItemKind::Mod(safety, mod_kind) => {
                 self.safety(safety)?;
@@ -48,15 +57,7 @@ impl<'a> AstFormatter {
                 match mod_kind {
                     ast::ModKind::Loaded(items, ast::Inline::Yes, _mod_spans) => {
                         self.out.space()?;
-                        self.out.token_expect("{")?;
-                        self.indented(|| {
-                            for item in items {
-                                self.out.newline_indent()?;
-                                self.item(item)?;
-                            }
-                            Ok(())
-                        })?;
-                        self.out.token_expect("}")?;
+                        self.list_separate_lines(items, "{", "}", |item| self.item(item))?;
                     }
                     ast::ModKind::Loaded(_, ast::Inline::No, _) | ast::ModKind::Unloaded => {
                         self.out.token_end_at(";", item.span.hi())?;
@@ -66,12 +67,12 @@ impl<'a> AstFormatter {
             ast::ItemKind::ForeignMod(_) => todo!(),
             ast::ItemKind::GlobalAsm(_) => todo!(),
             ast::ItemKind::TyAlias(_) => todo!(),
-            ast::ItemKind::Enum(_, _) => todo!(),
+            ast::ItemKind::Enum(def, generics) => self.enum_(&def.variants, generics, item)?,
             ast::ItemKind::Struct(variants, generics) => {
                 self.struct_item(variants, generics, item)?
             }
             ast::ItemKind::Union(_, _) => todo!(),
-            ast::ItemKind::Trait(_) => todo!(),
+            ast::ItemKind::Trait(trait_) => self.trait_(trait_, item)?,
             ast::ItemKind::TraitAlias(_, _) => todo!(),
             ast::ItemKind::Impl(impl_) => self.impl_(impl_, item)?,
             ast::ItemKind::MacCall(_) => todo!(),
@@ -91,7 +92,7 @@ impl<'a> AstFormatter {
             }
             ast::VisibilityKind::Restricted {
                 ref path,
-                shorthand,
+                shorthand: _,
                 ..
             } => {
                 self.out.token_at("pub", vis.span.lo())?;
@@ -104,9 +105,52 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
+    fn const_item(&self, const_item: &ast::ConstItem, ident: Ident) -> FormatResult {
+        self.out.token_expect("const")?;
+        self.out.space()?;
+        self.ident(ident)?;
+        self.out.token_expect(":")?;
+        self.out.space()?;
+        self.ty(&const_item.ty)?;
+        if let Some(expr) = &const_item.expr {
+            self.out.space()?;
+            self.out.token_expect("=")?;
+            self.out.space()?;
+            self.expr(expr)?;
+        }
+        self.out.token_expect(";")?;
+        Ok(())
+    }
+
+    fn enum_(
+        &self,
+        variants: &[ast::Variant],
+        generics: &ast::Generics,
+        item: &ast::Item,
+    ) -> FormatResult {
+        self.out.token_expect("enum")?;
+        self.out.space()?;
+        self.ident(item.ident)?;
+        self.generic_params(&generics.params)?;
+        self.out.space()?;
+        self.list_separate_lines(variants, "{", "}", |v| self.variant(v))?;
+        Ok(())
+    }
+
+    fn variant(&self, variant: &ast::Variant) -> FormatResult {
+        self.attrs(&variant.attrs)?;
+        self.vis(&variant.vis)?;
+        self.ident(variant.ident)?;
+        self.variant_data(&variant.data)?;
+        if let Some(_discriminant) = &variant.disr_expr {
+            todo!()
+        }
+        Ok(())
+    }
+
     fn impl_(&self, impl_: &ast::Impl, item: &ast::Item) -> FormatResult {
         self.out.token_at("impl", item.span.lo())?;
-        self.generics(&impl_.generics)?;
+        self.generic_params(&impl_.generics.params)?;
         self.out.space()?;
         if let Some(of_trait) = &impl_.of_trait {
             self.trait_ref(of_trait)?;
@@ -115,35 +159,57 @@ impl<'a> AstFormatter {
             self.out.space()?;
         }
         self.ty(&impl_.self_ty)?;
-        self.out.space()?;
+        self.where_clause(&impl_.generics.where_clause)?;
+        if impl_.generics.where_clause.is_empty() {
+            self.out.space()?;
+        }
+        self.assoc_items(&impl_.items, item.span)?;
+        Ok(())
+    }
+
+    fn assoc_items(&self, items: &[P<ast::AssocItem>], item_span: Span) -> FormatResult {
         self.out.token_expect("{")?;
-        if !impl_.items.is_empty() {
+        if !items.is_empty() {
             self.indented(|| {
-                for item in &impl_.items {
+                for item in items {
                     self.out.newline_indent()?;
-                    self.item_generic(item, |kind| self.assoc_item_kind(kind, item))?;
+                    self.assoc_item(item)?;
                 }
                 Ok(())
             })?;
             self.out.newline_indent()?;
         }
-        self.out.token_end_at("}", item.span.hi())?;
+        self.out.token_end_at("}", item_span.hi())?;
         Ok(())
     }
 
-    fn assoc_item_kind(
-        &self,
-        kind: &ast::AssocItemKind,
-        item: &ast::AssocItem,
-    ) -> FormatResult {
+    fn assoc_item(&self, item: &ast::AssocItem) -> FormatResult {
+        self.item_generic(item, |kind| self.assoc_item_kind(kind, item))
+    }
+
+    fn assoc_item_kind(&self, kind: &ast::AssocItemKind, item: &ast::AssocItem) -> FormatResult {
         match kind {
-            ast::AssocItemKind::Const(const_item) => todo!(),
+            ast::AssocItemKind::Const(const_item) => self.const_item(const_item, item.ident),
             ast::AssocItemKind::Fn(fn_) => self.fn_(fn_, item),
-            ast::AssocItemKind::Type(ty_alias) => todo!(),
-            ast::AssocItemKind::MacCall(mac_call) => todo!(),
-            ast::AssocItemKind::Delegation(delegation) => todo!(),
-            ast::AssocItemKind::DelegationMac(delegation_mac) => todo!(),
+            ast::AssocItemKind::Type(ty_alias) => self.ty_alias(ty_alias, item.ident),
+            ast::AssocItemKind::MacCall(_mac_call) => todo!(),
+            ast::AssocItemKind::Delegation(_delegation) => todo!(),
+            ast::AssocItemKind::DelegationMac(_delegation_mac) => todo!(),
         }
+    }
+
+    fn ty_alias(&self, ty_alias: &ast::TyAlias, ident: Ident) -> FormatResult {
+        self.out.token_expect("type")?;
+        self.out.space()?;
+        self.ident(ident)?;
+        if let Some(ty) = &ty_alias.ty {
+            self.out.space()?;
+            self.out.token_expect("=")?;
+            self.out.space()?;
+            self.ty(ty)?;
+        }
+        self.out.token_expect(";")?;
+        Ok(())
     }
 
     fn struct_item(
@@ -155,17 +221,35 @@ impl<'a> AstFormatter {
         self.out.token_expect("struct")?;
         self.out.space()?;
         self.ident(item.ident)?;
-        self.generics(generics)?;
+        self.generic_params(&generics.params)?;
+        if !matches!(variants, ast::VariantData::Unit(_)) {
+            self.out.space()?;
+            self.variant_data(variants)?;
+        }
+        if matches!(variants, ast::VariantData::Unit(_) | ast::VariantData::Tuple(..)) {
+            self.out.token_expect(";")?;
+        }
+        Ok(())
+    }
+
+    fn trait_(&self, trait_: &ast::Trait, item: &ast::Item) -> FormatResult {
+        self.out.token_expect("trait")?;
         self.out.space()?;
-        self.variant_data(variants)?;
+        self.ident(item.ident)?;
+        // self.generic_params(&trait_.generics.params)?;
+        // self.generic_bounds(&trait_.bounds)?;
+        self.assoc_items(&trait_.items, item.span)?;
         Ok(())
     }
 
     fn variant_data(&self, variants: &ast::VariantData) -> FormatResult {
         match variants {
-            ast::VariantData::Struct { fields, .. } => {
-                list(fields, |f| self.field_def(f), StructFieldListConfig).format(self)
-            }
+            ast::VariantData::Struct { fields, .. } => list(
+                fields,
+                |f| self.field_def(f),
+                struct_field_list_config(false),
+            )
+            .format(self),
             ast::VariantData::Tuple(fields, _) => {
                 list(fields, |f| self.field_def(f), param_list_config(None)).format(self)
             }
@@ -195,19 +279,15 @@ impl<'a> AstFormatter {
                 self.out.space()?;
                 self.ident(rename)?;
             }
-            ast::UseTreeKind::Nested { ref items, span } => {
+            ast::UseTreeKind::Nested { ref items, span: _ } => {
                 self.out.token_expect("::")?;
                 let has_nested = items
                     .iter()
                     .any(|(item, _)| matches!(item.kind, ast::UseTreeKind::Nested { .. }));
                 if has_nested {
-                    self.list_separate_lines(
-                        items,
-                        "{",
-                        "}",
-                        |(use_tree, _)| self.use_tree(use_tree),
-                        Tail::NONE,
-                    )?
+                    self.list_separate_lines(items, "{", "}", |(use_tree, _)| {
+                        self.use_tree(use_tree)
+                    })?
                 } else {
                     list(
                         items,

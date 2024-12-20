@@ -1,7 +1,7 @@
-use crate::constraint_writer::TooWideError;
+use crate::error::WidthLimitExceededError;
 use std::cell::Cell;
 
-const INDENT_WIDTH: usize = 4;
+pub const INDENT_WIDTH: usize = 4;
 
 #[derive(Clone)]
 pub struct Constraints {
@@ -52,10 +52,10 @@ impl Constraints {
         }
     }
 
-    pub fn sub_max_width(&self, len: usize) -> Result<(), TooWideError> {
+    pub fn sub_max_width(&self, len: usize) -> Result<(), WidthLimitExceededError> {
         if let Some(max_width) = self.max_width.get() {
             self.max_width
-                .set(Some(max_width.checked_sub(len).ok_or(TooWideError)?));
+                .set(Some(max_width.checked_sub(len).ok_or(WidthLimitExceededError)?));
         }
         Ok(())
     }

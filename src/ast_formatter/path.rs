@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::source_formatter::FormatResult;
+use crate::error::FormatResult;
 
 use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::{AngleBracketedListConfig, list};
@@ -17,7 +17,7 @@ impl AstFormatter {
         path: &ast::Path,
         end: Tail<'_>,
     ) -> FormatResult {
-        if let Some(qself) = qself.as_deref() {
+        if let Some(_qself) = qself.as_deref() {
             todo!();
         }
         self.path_end(path, end)
@@ -47,7 +47,7 @@ impl AstFormatter {
                         &args.args,
                         |arg| match arg {
                             ast::AngleBracketedArg::Arg(arg) => self.generic_arg(arg),
-                            ast::AngleBracketedArg::Constraint(AssocItemConstraint) => todo!(),
+                            ast::AngleBracketedArg::Constraint(_assoc_item_constraint) => todo!(),
                         },
                         AngleBracketedListConfig,
                     )
@@ -57,7 +57,7 @@ impl AstFormatter {
                 ast::Parenthesized(parenthesized_args) => {
                     self.parenthesized_args(parenthesized_args)?;
                 }
-                ast::ParenthesizedElided(Span) => todo!(),
+                ast::ParenthesizedElided(_span) => todo!(),
             }
         }
         Ok(())
@@ -67,7 +67,7 @@ impl AstFormatter {
         match &arg {
             ast::GenericArg::Lifetime(lifetime) => self.lifetime(lifetime),
             ast::GenericArg::Type(ty) => self.ty(ty),
-            ast::GenericArg::Const(anon_const) => todo!(),
+            ast::GenericArg::Const(_anon_const) => todo!(),
         }
     }
 }

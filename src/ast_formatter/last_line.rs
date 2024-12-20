@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::source_formatter::FormatResult;
+use crate::error::FormatResult;
 
 #[derive(Clone, Copy)]
 pub struct Tail<'a>(TailImpl<'a>);

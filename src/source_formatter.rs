@@ -1,23 +1,15 @@
-use crate::constraint_writer::{ConstraintError, ConstraintWriter, ConstraintWriterSnapshot};
+use crate::constraint_writer::{ConstraintWriter, ConstraintWriterSnapshot};
 use crate::constraints::Constraints;
 use crate::source_reader::SourceReader;
 use std::cell::Cell;
-
 use rustc_lexer::TokenKind;
 use rustc_span::{BytePos, Pos, Span};
+use crate::error::{FormatError, FormatErrorKind, FormatResult};
 
 pub struct SourceFormatterSnapshot {
     writer_snapshot: ConstraintWriterSnapshot,
     pos: BytePos,
     next_is_whitespace_or_comments: bool,
-}
-
-pub type FormatResult<T = ()> = Result<T, FormatError>;
-
-#[derive(Clone, Copy, Debug)]
-pub struct FormatError {
-    pub kind: ConstraintError,
-    pub pos: BytePos,
 }
 
 pub struct SourceFormatter {
@@ -68,7 +60,7 @@ impl SourceFormatter {
             .set(next_is_whitespace_or_comments);
     }
 
-    pub fn last_line_width(&self) -> usize {
+    pub fn last_line_len(&self) -> usize {
         self.out.last_line_len()
     }
 
@@ -89,10 +81,11 @@ impl SourceFormatter {
         self.source.source.as_bytes()[pos.to_usize() - 1]
     }
 
-    pub fn skip_token(&self, token: &str) {
+    pub fn skip_token(&self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
-        self.source.eat(token);
-        self.next_is_whitespace_or_comments.set(false);
+        self.source.eat(token).map_err(|e| self.format_error(e))?;
+        self.next_is_whitespace_or_comments.set(true);
+        Ok(())
     }
 
     pub fn skip_token_if_present(&self, token: &str) {
@@ -112,12 +105,22 @@ impl SourceFormatter {
         }
     }
 
+
+    /** Writes a space and accounts for spaces and comments in source */
+    pub fn eat_token(&self) -> FormatResult {
+        self.handle_whitespace_and_comments_if_needed();
+        let token = self.source.eat_next_token();
+        self.token_out(token)?;
+        self.next_is_whitespace_or_comments.set(true);
+        Ok(())
+    }
+
     /** Writes a space and accounts for spaces and comments in source */
     pub fn space(&self) -> FormatResult {
         if !self.handle_whitespace_and_comments() {
             self.out
                 .token(" ")
-                .map_err(|e| self.lift_constraint_err(e))?;
+                .map_err(|e| self.format_error(e))?;
         }
         Ok(())
     }
@@ -125,16 +128,20 @@ impl SourceFormatter {
     /** Write a token, asserting it is next in source and has the given position */
     pub fn token_at(&self, token: &str, pos: BytePos) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
-        self.source.expect_pos(pos);
+        self.expect_source_pos(pos)?;
         self.token_unchecked(token)?;
         Ok(())
+    }
+    
+    fn expect_source_pos(&self, pos: BytePos) -> FormatResult {
+        self.source.expect_pos(pos).map_err(|e| self.format_error(e))
     }
 
     /** Write a token, asserting it is next in source and has the given ending position */
     pub fn token_end_at(&self, token: &str, end_pos: BytePos) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
         self.token_unchecked(token)?;
-        self.source.expect_pos(end_pos);
+        self.expect_source_pos(end_pos)?;
         Ok(())
     }
 
@@ -153,7 +160,7 @@ impl SourceFormatter {
      */
     pub fn token_expect(&self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
-        self.source.eat(token);
+        self.source.eat(token).map_err(|e| self.format_error(e))?;
         self.next_is_whitespace_or_comments.set(true);
         self.token_out(token)?;
         Ok(())
@@ -172,26 +179,23 @@ impl SourceFormatter {
     /** Copy a token from source */
     pub fn token_from_source(&self, span: Span) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
-        self.source.expect_pos(span.lo());
+        self.expect_source_pos(span.lo())?;
         let token = self.source.get_span(span);
         self.token_unchecked(token)?;
         Ok(())
     }
 
-    pub fn lift_constraint_err(&self, out_err: impl Into<ConstraintError>) -> FormatError {
-        FormatError {
-            kind: out_err.into(),
-            pos: self.source.pos.get(),
-        }
+    pub fn format_error(&self, kind: impl Into<FormatErrorKind>) -> FormatError {
+        self.source.format_error(kind)
     }
 
     fn handle_whitespace_and_comments(&self) -> bool {
         let mut len = 0usize;
         let mut len_without_trailing_whitespace = 0;
         for token in rustc_lexer::tokenize(self.source.remaining()) {
-            let token_start = len;
-            let token_end = token_start + token.len as usize;
-            let token_str = &self.source.remaining()[token_start..token_end];
+            // let token_start = len;
+            // let token_end = token_start + token.len as usize;
+            // let token_str = &self.source.remaining()[token_start..token_end];
             match token.kind {
                 TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
                     len += token.len as usize;
@@ -252,11 +256,11 @@ impl SourceFormatter {
     }
 
     fn newline(&self) -> FormatResult {
-        self.out.newline().map_err(|e| self.lift_constraint_err(e))
+        self.out.newline().map_err(|e| self.format_error(e))
     }
 
     fn indent(&self) -> FormatResult {
-        self.out.indent().map_err(|e| self.lift_constraint_err(e))
+        self.out.indent().map_err(|e| self.format_error(e))
     }
 
     fn copy(&self, len: usize) {
@@ -265,10 +269,11 @@ impl SourceFormatter {
         self.source.advance(len);
     }
 
-    pub fn copy_span(&self, span: Span) {
+    pub fn copy_span(&self, span: Span) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed();
-        self.source.expect_pos(span.lo());
-        self.copy(span.hi().to_usize() - span.lo().to_usize())
+        self.expect_source_pos(span.lo())?;
+        self.copy(span.hi().to_usize() - span.lo().to_usize());
+        Ok(())
     }
 
     pub fn copy_to(&self, pos: BytePos) {
@@ -279,7 +284,7 @@ impl SourceFormatter {
     fn token_out(&self, token: &str) -> FormatResult {
         self.out
             .token(&token)
-            .map_err(|e| self.lift_constraint_err(e))
+            .map_err(|e| self.format_error(e))
     }
 
     /** Write a token assuming it is next in source */

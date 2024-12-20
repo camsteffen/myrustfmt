@@ -1,43 +1,44 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{list, param_list_config};
-use crate::source_formatter::FormatResult;
+use crate::error::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter {
     pub fn ty(&self, ty: &ast::Ty) -> FormatResult {
         match &ty.kind {
-            ast::TyKind::Slice(ty) => todo!(),
-            ast::TyKind::Array(ty, length) => todo!(),
-            ast::TyKind::Ptr(mut_ty) => todo!(),
+            ast::TyKind::Slice(_ty) => todo!(),
+            ast::TyKind::Array(_ty, _length) => todo!(),
+            ast::TyKind::Ptr(_mut_ty) => todo!(),
             ast::TyKind::Ref(lifetime, mut_ty) => {
                 self.out.token_at("&", ty.span.lo())?;
                 if let Some(lifetime) = lifetime {
                     self.lifetime(lifetime)?;
+                    self.out.space()?;
                 }
                 self.mut_ty(mut_ty)?;
                 Ok(())
             }
-            ast::TyKind::PinnedRef(lifetime, mut_ty) => todo!(),
-            ast::TyKind::BareFn(ty) => todo!(),
+            ast::TyKind::PinnedRef(_lifetime, _mut_ty) => todo!(),
+            ast::TyKind::BareFn(_ty) => todo!(),
             ast::TyKind::Never => todo!(),
             ast::TyKind::Tup(elements) => {
                 list(elements, |ty| self.ty(ty), param_list_config(None)).format(self)
             }
             ast::TyKind::Path(qself, path) => self.qpath(qself, path),
-            ast::TyKind::TraitObject(bounds, syntax) => todo!(),
+            ast::TyKind::TraitObject(_bounds, _syntax) => todo!(),
             ast::TyKind::ImplTrait(_, bounds) => {
                 self.out.token_at("impl", ty.span.lo())?;
                 self.out.space()?;
                 self.generic_bounds(bounds)?;
                 Ok(())
             }
-            ast::TyKind::Paren(ty) => todo!(),
-            ast::TyKind::Typeof(anon_const) => todo!(),
+            ast::TyKind::Paren(_ty) => todo!(),
+            ast::TyKind::Typeof(_anon_const) => todo!(),
             ast::TyKind::Infer => todo!(),
             ast::TyKind::ImplicitSelf => self.out.token_at("self", ty.span.lo()),
-            ast::TyKind::MacCall(mac_call) => todo!(),
+            ast::TyKind::MacCall(_mac_call) => todo!(),
             ast::TyKind::CVarArgs => todo!(),
-            ast::TyKind::Pat(ty, pat) => todo!(),
+            ast::TyKind::Pat(_ty, _pat) => todo!(),
             ast::TyKind::Dummy => todo!(),
             ast::TyKind::Err(_) => todo!(),
         }
@@ -57,8 +58,8 @@ impl<'a> AstFormatter {
         for bound in bounds {
             match bound {
                 ast::GenericBound::Trait(poly_trait_ref) => self.poly_trait_ref(poly_trait_ref)?,
-                ast::GenericBound::Outlives(lifetime) => todo!(),
-                ast::GenericBound::Use(capture_args, span) => todo!(),
+                ast::GenericBound::Outlives(_lifetime) => todo!(),
+                ast::GenericBound::Use(_capture_args, _span) => todo!(),
             }
         }
         Ok(())
@@ -69,7 +70,7 @@ impl<'a> AstFormatter {
     }
 
     fn poly_trait_ref(&self, poly_trait_ref: &ast::PolyTraitRef) -> FormatResult {
-        for param in &poly_trait_ref.bound_generic_params {
+        for _param in &poly_trait_ref.bound_generic_params {
             todo!();
         }
         // poly_trait_ref.modifiers;

@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraint_writer::ConstraintError;
-use crate::source_formatter::{FormatResult, SourceFormatter, SourceFormatterSnapshot};
+use crate::error::{FormatErrorKind, FormatResult};
+use crate::source_formatter::{SourceFormatter, SourceFormatterSnapshot};
 
 pub fn fallback_chain<Finally>(
     out: &SourceFormatter,
@@ -44,16 +44,23 @@ where
     Finally: Fn() -> FormatResult,
 {
     pub fn next(&mut self, f: impl FnOnce() -> FormatResult) {
-        if matches!(self.result, Some(Ok(_))) {
+        let is_final_result = match &self.result {
+            None => false,
+            Some(result) => match result {
+                Ok(()) => true,
+                Err(e) => match e.kind {
+                    FormatErrorKind::Constraint(_) => false,
+                    FormatErrorKind::Parse(_) => true,
+                }
+            }
+        };
+        if is_final_result {
             return;
         }
-        let result = f().and_then(|()| (self.finally)());
-        if let Err(e) = result {
-            // future-proof: only recover from constraint errors
-            let _: ConstraintError = e.kind;
-
+        if self.result.is_some() {
             self.out.restore(&self.snapshot);
         }
+        let result = f().and_then(|()| (self.finally)());
         self.result = Some(result);
     }
 }
