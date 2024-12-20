@@ -60,14 +60,23 @@ impl<'a> AstFormatter {
     }
 
     pub fn generic_bounds(&self, bounds: &[ast::GenericBound]) -> FormatResult {
-        for bound in bounds {
-            match bound {
-                ast::GenericBound::Trait(poly_trait_ref) => self.poly_trait_ref(poly_trait_ref)?,
-                ast::GenericBound::Outlives(_lifetime) => todo!(),
-                ast::GenericBound::Use(_capture_args, _span) => todo!(),
-            }
+        let (first, rest) = bounds.split_first().unwrap();
+        self.generic_bound(first)?;
+        for bound in rest {
+            self.out.space()?;
+            self.out.token_expect("+")?;
+            self.out.space()?;
+            self.generic_bound(bound)?;
         }
         Ok(())
+    }
+    
+    fn generic_bound(&self, bound: &ast::GenericBound) -> FormatResult {
+        match bound {
+            ast::GenericBound::Trait(poly_trait_ref) => self.poly_trait_ref(poly_trait_ref),
+            ast::GenericBound::Outlives(lifetime) => self.lifetime(lifetime),
+            ast::GenericBound::Use(_capture_args, _span) => todo!(),
+        }
     }
 
     pub fn generic_arg(&self, arg: &ast::GenericArg) -> FormatResult {

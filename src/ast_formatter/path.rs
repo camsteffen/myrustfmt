@@ -40,14 +40,14 @@ impl AstFormatter {
 
     pub fn path_segment(&self, segment: &ast::PathSegment) -> FormatResult {
         self.ident(segment.ident)?;
-        self.generic_args(segment.args.as_deref())?;
+        if let Some(generic_args) = segment.args.as_deref() {
+            self.out.token_expect("::")?;
+            self.generic_args(generic_args)?;
+        };
         Ok(())
     }
 
-    fn generic_args(&self, generic_args: Option<&ast::GenericArgs>) -> FormatResult {
-        let Some(generic_args) = generic_args else {
-            return Ok(());
-        };
+    fn generic_args(&self, generic_args: &ast::GenericArgs) -> FormatResult {
         match generic_args {
             ast::GenericArgs::AngleBracketed(args) => list(
                 &args.args,
@@ -74,7 +74,9 @@ impl AstFormatter {
 
     fn assoc_item_constraint(&self, constraint: &ast::AssocItemConstraint) -> FormatResult {
         self.ident(constraint.ident)?;
-        self.generic_args(constraint.gen_args.as_ref())?;
+        if let Some(generic_args) = &constraint.gen_args {
+            self.generic_args(generic_args)?;
+        }
         match &constraint.kind {
             ast::AssocItemConstraintKind::Bound { bounds } => self.generic_bounds(bounds),
             ast::AssocItemConstraintKind::Equality { term } => {
@@ -82,7 +84,7 @@ impl AstFormatter {
                 self.out.token_expect("=")?;
                 self.out.space()?;
                 match term {
-                    ast::Term::Const(anon_const) => todo!(),
+                    ast::Term::Const(_anon_const) => todo!(),
                     ast::Term::Ty(ty) => self.ty(ty),
                 }
             },

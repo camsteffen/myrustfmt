@@ -3,7 +3,7 @@ use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{list, param_list_config, struct_field_list_config};
+use crate::ast_formatter::list::{list, param_list_config, struct_field_list_config, ListRest};
 use crate::error::FormatResult;
 
 impl<'a> AstFormatter {
@@ -73,14 +73,13 @@ impl<'a> AstFormatter {
     ) -> FormatResult {
         self.qpath(qself, path)?;
         self.out.space()?;
-        let has_rest = matches!(rest, ast::PatFieldsRest::Rest);
-        let single_line_block = self.config().rustfmt_quirks && has_rest;
+        let single_line_block = self.config().rustfmt_quirks && matches!(rest, ast::PatFieldsRest::Rest);
         list(
             fields,
             |f| self.pat_field(f),
             struct_field_list_config(single_line_block),
         )
-        .rest(has_rest)
+        .rest(ListRest::from(rest))
         .tail(end)
         .format(self)
     }

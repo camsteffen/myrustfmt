@@ -156,7 +156,7 @@ where
 {
     ListBuilder {
         list,
-        rest: false,
+        rest: ListRest::None,
         format_item,
         config,
         tail: Tail::NONE,
@@ -164,17 +164,17 @@ where
     }
 }
 
-pub struct ListBuilder<'list, 'tail, Item, FormatItem, Config, Overflow> {
-    list: &'list [Item],
-    rest: bool,
+pub struct ListBuilder<'ast, 'tail, Item, FormatItem, Config, Overflow> {
+    list: &'ast [Item],
+    rest: ListRest<'ast>,
     format_item: FormatItem,
     config: Config,
     tail: Tail<'tail>,
     overflow: Overflow,
 }
 
-impl<'a, 'list, 'tail, Item, FormatItem, Config, Overflow>
-    ListBuilder<'list, 'tail, Item, FormatItem, Config, Overflow>
+impl<'a, 'ast, 'tail, Item, FormatItem, Config, Overflow>
+    ListBuilder<'ast, 'tail, Item, FormatItem, Config, Overflow>
 where
     Config: ListConfig,
     FormatItem: Fn(&Item) -> FormatResult,
@@ -182,10 +182,10 @@ where
 {
     pub fn overflow(
         self,
-    ) -> ListBuilder<'list, 'tail, Item, FormatItem, Config, ListOverflowYes<Item>> {
+    ) -> ListBuilder<'ast, 'tail, Item, FormatItem, Config, ListOverflowYes<Item>> {
         ListBuilder {
             list: self.list,
-            rest: false,
+            rest: ListRest::None,
             format_item: self.format_item,
             config: self.config,
             tail: self.tail,
@@ -193,14 +193,14 @@ where
         }
     }
 
-    pub fn rest(self, rest: bool) -> Self {
+    pub fn rest(self, rest: ListRest<'ast>) -> Self {
         ListBuilder { rest, ..self }
     }
 
     pub fn tail<'tail_new>(
         self,
         tail: Tail<'tail_new>,
-    ) -> ListBuilder<'list, 'tail_new, Item, FormatItem, Config, Overflow> {
+    ) -> ListBuilder<'ast, 'tail_new, Item, FormatItem, Config, Overflow> {
         ListBuilder {
             list: self.list,
             rest: self.rest,
@@ -231,6 +231,32 @@ where
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum ListRest<'a> {
+    None,
+    Rest,
+    Base(&'a ast::Expr),
+}
+
+impl From<ast::PatFieldsRest> for ListRest<'static> {
+    fn from(rest: ast::PatFieldsRest) -> Self {
+        match rest {
+            ast::PatFieldsRest::None => ListRest::None,
+            ast::PatFieldsRest::Rest => ListRest::Rest,
+        }
+    }
+}
+
+impl<'a> From<&'a ast::StructRest> for ListRest<'a> {
+    fn from(rest: &'a ast::StructRest) -> Self {
+        match rest {
+            ast::StructRest::None => ListRest::None,
+            ast::StructRest::Rest(_) => ListRest::Rest,
+            ast::StructRest::Base(expr) => ListRest::Base(expr),
+        }
+    }
+}
+
 impl<'a> AstFormatter {
     pub fn list_separate_lines<T>(
         &self,
@@ -243,7 +269,7 @@ impl<'a> AstFormatter {
             start_brace,
             end_brace,
             list.is_empty(),
-            |tail| self.list_contents_separate_lines(list, false, format_item, tail),
+            |tail| self.list_contents_separate_lines(list, ListRest::None, format_item, tail),
             Tail::NONE,
         )
     }
@@ -272,7 +298,7 @@ impl<'a> AstFormatter {
     fn list_contents<T, Config>(
         &self,
         list: &[T],
-        rest: bool,
+        rest: ListRest<'_>,
         format_item: impl Fn(&T) -> FormatResult,
         overflow: impl ListOverflow<Item = T>,
         config: Config,
@@ -310,7 +336,10 @@ impl<'a> AstFormatter {
                 }
                 match Config::wrap_to_fit() {
                     ListWrapToFitConfig::Yes { max_element_width } => {
-                        assert_eq!(rest, false, "rest with wrap-to-fit not implemented");
+                        assert!(
+                            matches!(rest, ListRest::None),
+                            "rest cannot be used with wrap-to-fit"
+                        );
                         chain.next(|| {
                             self.list_contents_wrap_to_fit(
                                 list,
@@ -332,7 +361,7 @@ impl<'a> AstFormatter {
     fn list_contents_single_line<Item, Overflow: ListOverflow<Item = Item>>(
         &self,
         list: &[Item],
-        rest: bool,
+        rest: ListRest<'_>,
         tail: Tail,
         format_item: impl Fn(&Item) -> FormatResult,
         _overflow: Overflow,
@@ -349,21 +378,25 @@ impl<'a> AstFormatter {
                 self.out.token_maybe_missing(",")?;
                 self.out.space()?;
             }
-            if !rest && self.allow_overflow.get() {
-                if let Some(result) = Overflow::format_if_overflow(self, last, list.len() == 1) {
-                    result?;
-                } else {
-                    format_item(last)?;
-                }
+            let overflow_result = if matches!(rest, ListRest::None) && self.allow_overflow.get() {
+                Overflow::format_if_overflow(self, last, list.len() == 1)
+            } else {
+                None
+            };
+            if let Some(result) = overflow_result {
+                result?;
             } else {
                 format_item(last)?;
-            }
-            if rest {
+            };
+            if matches!(rest, ListRest::None) {
+                self.out.skip_token_if_present(",")?;
+            } else {
                 self.out.token_maybe_missing(",")?;
                 self.out.space()?;
                 self.out.token_expect("..")?;
-            } else {
-                self.out.skip_token_if_present(",");
+                if let ListRest::Base(expr) = rest {
+                    self.expr(expr)?;
+                }
             }
             if pad_contents {
                 self.out.space()?;
@@ -388,12 +421,16 @@ impl<'a> AstFormatter {
     fn list_contents_single_line_block<Item>(
         &self,
         list: &[Item],
-        rest: bool,
+        rest: ListRest<'_>,
         tail: Tail,
         format_item: impl Fn(&Item) -> FormatResult,
         max_width: Option<usize>,
     ) -> FormatResult {
-        assert!(rest, "single line block mode is only implemented with rest");
+        // single line block only exists for a specific case of rustfmt compatibility
+        assert!(
+            matches!(rest, ListRest::Rest),
+            "single line block list can only be used with ListRest::Rest"
+        );
         let (last, until_last) = list.split_last().unwrap();
         self.indented(|| {
             self.out.newline_indent()?;
@@ -470,7 +507,7 @@ impl<'a> AstFormatter {
     fn list_contents_separate_lines<T>(
         &self,
         list: &[T],
-        rest: bool,
+        rest: ListRest<'_>,
         format_item: impl Fn(&T) -> FormatResult,
         tail: Tail<'_>,
     ) -> FormatResult {
@@ -480,9 +517,12 @@ impl<'a> AstFormatter {
                 format_item(item)?;
                 self.out.token_maybe_missing(",")?;
             }
-            if rest {
+            if !matches!(rest, ListRest::None) {
                 self.out.newline_indent()?;
                 self.out.token_expect("..")?;
+                if let ListRest::Base(expr) = rest {
+                    self.expr(expr)?;
+                }
             }
             Ok(())
         })?;

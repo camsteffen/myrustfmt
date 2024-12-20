@@ -31,6 +31,8 @@ impl<'a> AstFormatter {
             } else {
                 self.block(body, Tail::NONE)?;
             }
+        } else {
+            self.out.token_expect(";")?;
         }
         Ok(())
     }

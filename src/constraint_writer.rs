@@ -80,12 +80,19 @@ impl ConstraintWriter {
 
     // #[instrument(skip(self))]
     pub fn token(&self, token: &str) -> Result<(), WidthLimitExceededError> {
-        self.write_unchecked(token);
+        self.with_buffer(|b| b.push_str(token));
         self.check_width_constraints()
     }
 
-    pub fn write_unchecked(&self, source: &str) {
-        self.with_buffer(|b| b.push_str(source));
+    pub fn write_possibly_multiline(&self, source: &str) -> Result<(), WidthLimitExceededError> {
+        for c in source.chars() {
+            self.with_buffer(|b| b.push(c));
+            if c == '\n' {
+                self.last_line_start.set(self.len());
+            }
+            self.check_width_constraints()?;
+        }
+        Ok(())
     }
 
     pub fn newline(&self) -> Result<(), NewlineNotAllowedError> {

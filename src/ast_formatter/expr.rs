@@ -1,6 +1,6 @@
-use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{list, param_list_config, struct_field_list_config, ArrayListConfig};
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::last_line::Tail;
+use crate::ast_formatter::list::{ArrayListConfig, list, param_list_config, struct_field_list_config, ListRest};
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
@@ -15,12 +15,10 @@ impl<'a> AstFormatter {
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: Tail<'_>) -> FormatResult {
         match expr.kind {
-            ast::ExprKind::Array(ref items) => {
-                list(items, |e| self.expr(e), ArrayListConfig)
-                    .overflow()
-                    .tail(tail)
-                    .format(self)
-            }
+            ast::ExprKind::Array(ref items) => list(items, |e| self.expr(e), ArrayListConfig)
+                .overflow()
+                .tail(tail)
+                .format(self),
             ast::ExprKind::ConstBlock(_) => todo!(),
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, tail),
             ast::ExprKind::Field(..) | ast::ExprKind::MethodCall(_) => {
@@ -246,7 +244,8 @@ impl<'a> AstFormatter {
         self.out.space()?;
         self.fallback_chain(
             |chain| {
-                chain.next(|| self.with_single_line(|| self.expr_tail(scrutinee, Tail::OPEN_BLOCK)));
+                chain
+                    .next(|| self.with_single_line(|| self.expr_tail(scrutinee, Tail::OPEN_BLOCK)));
                 chain.next(|| {
                     self.expr(scrutinee)?;
                     self.out.newline_indent()?;
@@ -312,7 +311,7 @@ impl<'a> AstFormatter {
             self.out.space()?;
             self.expr(body)?;
             if self.out.char_ending_at(body.span.hi()) == b'}' {
-                self.out.skip_token_if_present(",");
+                self.out.skip_token_if_present(",")?;
             } else {
                 self.out.token_expect(",")?;
             }
@@ -330,6 +329,7 @@ impl<'a> AstFormatter {
             |f| self.expr_field(f),
             struct_field_list_config(false),
         )
+        .rest(ListRest::from(&struct_.rest))
         .tail(tail)
         .format(self)?;
         Ok(())
