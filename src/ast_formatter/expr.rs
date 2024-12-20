@@ -245,7 +245,7 @@ impl<'a> AstFormatter {
         self.out.token_expect("if")?;
         self.out.space()?;
         self.fallback(|| self.with_single_line(|| self.expr_tail(scrutinee, Tail::OPEN_BLOCK)))
-            .next(self, || {
+            .next(|| {
                 self.expr(scrutinee)?;
                 self.out.newline_indent()?;
                 self.out.token_expect("{")?;
@@ -309,7 +309,7 @@ impl<'a> AstFormatter {
                 guard()?;
                 Ok(())
             })
-            .next(self, || {
+            .next(|| {
                 self.indented(|| {
                     self.out.newline_indent()?;
                     guard()?;

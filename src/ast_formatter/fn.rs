@@ -120,7 +120,7 @@ impl<'a> AstFormatter {
             self.fallback(|| {
                 self.with_no_overflow(|| self.with_single_line(|| self.expr_tail(body, tail)))
             })
-            .next(self, || {
+            .next(|| {
                 self.out.token_missing("{")?;
                 self.indented(|| {
                     self.out.newline_indent()?;

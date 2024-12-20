@@ -317,7 +317,7 @@ impl<'a> AstFormatter {
             )
         });
         if config.single_line_block() {
-            fallback = fallback.next(self, || {
+            fallback = fallback.next(|| {
                 self.list_contents_single_line_block(
                     list,
                     rest,
@@ -333,16 +333,14 @@ impl<'a> AstFormatter {
                     matches!(rest, ListRest::None),
                     "rest cannot be used with wrap-to-fit"
                 );
-                fallback = fallback.next(self, || {
+                fallback = fallback.next(|| {
                     self.list_contents_wrap_to_fit(list, tail, &format_item, max_element_width)
                 });
             }
             ListWrapToFitConfig::No => {}
         }
         fallback
-            .next(self, || {
-                self.list_contents_separate_lines(list, rest, format_item, tail)
-            })
+            .next(|| self.list_contents_separate_lines(list, rest, format_item, tail))
             .result()
     }
 
@@ -477,7 +475,7 @@ impl<'a> AstFormatter {
                     item_comma()?;
                     Ok(())
                 })
-                .next(self, || {
+                .next(|| {
                     self.out.newline_indent()?;
                     item_comma()?;
                     Ok(())

@@ -42,7 +42,7 @@ impl<'a> AstFormatter {
             })
         })
         // wrap and indent then single line
-        .next(self, || {
+        .next(|| {
             self.indented(|| {
                 self.out.newline_indent()?;
                 self.with_single_line(|| self.expr(expr))?;
@@ -51,14 +51,14 @@ impl<'a> AstFormatter {
             })
         })
         // normal
-        .next(self, || {
+        .next(|| {
             self.out.space()?;
             self.expr(expr)?;
             self.tail(end)?;
             Ok(())
         })
         // wrap and indent
-        .next(self, || {
+        .next(|| {
             self.indented(|| {
                 self.out.newline_indent()?;
                 self.expr(expr)?;

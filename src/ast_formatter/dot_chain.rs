@@ -46,9 +46,7 @@ impl AstFormatter {
         tail: Tail<'_>,
     ) -> FormatResult {
         self.fallback(|| self.dot_chain_single_line(dot_chain, root_len, tail))
-            .next(self, || {
-                self.dot_chain_separate_lines(dot_chain, root_len, tail)
-            })
+            .next(|| self.dot_chain_separate_lines(dot_chain, root_len, tail))
             .result()
     }
 
@@ -72,7 +70,7 @@ impl AstFormatter {
                 if matches!(fallback.result_ref(), Ok(())) {
                     return fallback.result();
                 }
-                fallback = fallback.next(self, || {
+                fallback = fallback.next(|| {
                     self.indented(|| {
                         self.with_not_single_line(|| self.out.newline_indent())?;
                         self.with_no_overflow(|| self.dot_chain_item(last))?;
@@ -85,7 +83,7 @@ impl AstFormatter {
                     return Err(self.out.format_error(WidthLimitExceededError));
                 }
                 // try with overflow
-                fallback.next(self, || self.dot_chain_item(last)).result()
+                fallback.next(|| self.dot_chain_item(last)).result()
             })
         };
         if RUSTFMT_QUIRKS && dot_chain.len() == 1 {
