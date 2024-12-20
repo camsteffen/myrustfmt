@@ -8,6 +8,7 @@ use crate::ast_formatter::list::{
     ListConfig, ListWrapToFitConfig, list, param_list_config, struct_field_list_config,
 };
 use crate::error::FormatResult;
+use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 impl<'a> AstFormatter {
     pub fn item(&self, item: &ast::Item) -> FormatResult {
@@ -149,16 +150,22 @@ impl<'a> AstFormatter {
     }
 
     fn impl_(&self, impl_: &ast::Impl, item: &ast::Item) -> FormatResult {
+        let first_line = self.out.line();
         self.out.token_at("impl", item.span.lo())?;
         self.generic_params(&impl_.generics.params)?;
-        self.out.space()?;
-        if let Some(of_trait) = &impl_.of_trait {
-            self.trait_ref(of_trait)?;
-            self.out.space()?;
-            self.out.token_expect("for")?;
-            self.out.space()?;
-        }
-        self.ty(&impl_.self_ty)?;
+        self.line_break_indent_fallback_optional(self.out.line() == first_line, |broken| {
+            if let Some(of_trait) = &impl_.of_trait {
+                self.with_single_line_optional(!broken, || self.trait_ref(of_trait))?;
+                self.line_break_fallback_with_optional_indent(!broken, |for_ty_broken| {
+                    self.out.token_expect("for")?;
+                    self.out.space()?;
+                    self.with_single_line_optional(!for_ty_broken, || self.ty(&impl_.self_ty))?;
+                    Ok(())
+                })
+            } else {
+                self.with_single_line_optional(!broken, || self.ty(&impl_.self_ty))
+            }
+        })?;
         self.where_clause(&impl_.generics.where_clause)?;
         if impl_.generics.where_clause.is_empty() {
             self.out.space()?;
@@ -223,10 +230,12 @@ impl<'a> AstFormatter {
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         if !matches!(variants, ast::VariantData::Unit(_)) {
-            self.out.space()?;
             self.variant_data(variants)?;
         }
-        if matches!(variants, ast::VariantData::Unit(_) | ast::VariantData::Tuple(..)) {
+        if matches!(
+            variants,
+            ast::VariantData::Unit(_) | ast::VariantData::Tuple(..)
+        ) {
             self.out.token_expect(";")?;
         }
         Ok(())
@@ -238,18 +247,23 @@ impl<'a> AstFormatter {
         self.ident(item.ident)?;
         // self.generic_params(&trait_.generics.params)?;
         // self.generic_bounds(&trait_.bounds)?;
+        self.out.space()?;
         self.assoc_items(&trait_.items, item.span)?;
         Ok(())
     }
 
     fn variant_data(&self, variants: &ast::VariantData) -> FormatResult {
         match variants {
-            ast::VariantData::Struct { fields, .. } => list(
-                fields,
-                |f| self.field_def(f),
-                struct_field_list_config(false),
-            )
-            .format(self),
+            ast::VariantData::Struct { fields, .. } => {
+                self.out.space()?;
+                list(
+                    fields,
+                    |f| self.field_def(f),
+                    struct_field_list_config(false, RUSTFMT_CONFIG_DEFAULTS.struct_variant_width),
+                )
+                .format(self)?;
+                Ok(())
+            }
             ast::VariantData::Tuple(fields, _) => {
                 list(fields, |f| self.field_def(f), param_list_config(None)).format(self)
             }

@@ -14,6 +14,16 @@ impl AstFormatter {
         result
     }
 
+    pub fn indented_optional(&self, should_indent: bool, f: impl FnOnce() -> FormatResult) -> FormatResult {
+        if !should_indent {
+            return f();
+        }
+        self.constraints().increment_indent();
+        let result = f();
+        self.constraints().decrement_indent();
+        result
+    }
+
     pub fn with_no_overflow(&self, f: impl FnOnce() -> FormatResult) -> FormatResult {
         let allow_overflow_prev = self.allow_overflow.replace(false);
         let result = f();
@@ -26,6 +36,13 @@ impl AstFormatter {
         let result = f();
         self.constraints().single_line.set(single_line_prev);
         result
+    }
+
+    pub fn with_single_line_optional(&self, apply: bool, f: impl FnOnce() -> FormatResult) -> FormatResult {
+        if !apply {
+            return f();
+        }
+        self.with_single_line(f)
     }
 
     pub fn with_not_single_line(&self, f: impl FnOnce() -> FormatResult) -> FormatResult {

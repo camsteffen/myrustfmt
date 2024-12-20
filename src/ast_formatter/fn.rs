@@ -165,20 +165,27 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn fn_decl(
+    fn fn_decl<C: ListConfig>(
         &self,
         ast::FnDecl { inputs, output }: &ast::FnDecl,
-        input_list_config: impl ListConfig,
+        input_list_config: C,
         tail: Tail<'_>,
     ) -> FormatResult {
-        list(inputs, |param| self.param(param), input_list_config)
-            .tail(Tail::new(&|| {
-                self.fn_ret_ty(output)?;
-                self.tail(tail)?;
-                Ok(())
-            }))
-            .format(self)?;
-        Ok(())
+        self.fallback(|| {
+            self.list_single_line(inputs, |param| self.param(param), input_list_config)?;
+            self.with_single_line(|| self.fn_ret_ty(output))?;
+            self.tail(tail)?;
+            Ok(())
+        })
+        .next(|| {
+            self.list_separate_lines(inputs, C::START_BRACE, C::END_BRACE, |param| {
+                self.param(param)
+            })?;
+            self.fn_ret_ty(output)?;
+            self.tail(tail)?;
+            Ok(())
+        })
+        .result()
     }
 
     fn param(&self, param: &ast::Param) -> FormatResult {

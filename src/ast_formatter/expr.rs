@@ -113,7 +113,7 @@ impl<'a> AstFormatter {
                 self.range(start.as_deref(), end.as_deref(), limits, tail)
             }
             ast::ExprKind::Underscore => todo!(),
-            ast::ExprKind::Path(ref qself, ref path) => self.qpath_end(qself, path, true, tail),
+            ast::ExprKind::Path(ref qself, ref path) => self.qpath_tail(qself, path, true, tail),
             ast::ExprKind::AddrOf(borrow_kind, mutability, ref target) => {
                 self.addr_of(borrow_kind, mutability, expr)?;
                 self.expr_tail(target, tail)
@@ -297,11 +297,21 @@ impl<'a> AstFormatter {
     fn arm(&self, arm: &ast::Arm) -> FormatResult {
         self.attrs(&arm.attrs)?;
         self.pat(&arm.pat)?;
+        let arrow = || {
+            self.out.space()?;
+            self.out.token_expect("=>")?;
+            self.out.space()?;
+            Ok(())
+        };
         if let Some(guard) = arm.guard.as_deref() {
             let guard = || {
                 self.out.token_expect("if")?;
                 self.out.space()?;
-                self.expr(guard)?;
+                if arm.body.is_some() {
+                    self.expr_tail(guard, Tail::new(&arrow))?;
+                } else {
+                    self.expr(guard)?;
+                }
                 Ok(())
             };
             self.fallback(|| {
@@ -319,9 +329,9 @@ impl<'a> AstFormatter {
             .result()?;
         }
         if let Some(body) = arm.body.as_deref() {
-            self.out.space()?;
-            self.out.token_expect("=>")?;
-            self.out.space()?;
+            if arm.guard.is_none() {
+                arrow()?;
+            }
             self.expr(body)?;
             if is_plain_block(body) {
                 self.out.skip_token_if_present(",")?;
@@ -340,7 +350,7 @@ impl<'a> AstFormatter {
         list(
             &struct_.fields,
             |f| self.expr_field(f),
-            struct_field_list_config(false),
+            struct_field_list_config(false, RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
         )
         .rest(ListRest::from(&struct_.rest))
         .tail(tail)

@@ -13,6 +13,7 @@ impl AstFormatter {
         let mut dot_chain = Vec::new();
         build_dot_chain(&mut dot_chain, expr);
         let (root, mut dot_chain) = dot_chain.split_first().unwrap();
+        // todo usage is currently commented out
         if is_overflow {
             // single-line the whole thing
             self.with_single_line(|| {
@@ -40,8 +41,7 @@ impl AstFormatter {
             (next, dot_chain) = dot_chain.split_first().unwrap();
             self.dot_chain_item(next)?;
             if dot_chain.is_empty() {
-                self.tail(tail)?;
-                return Ok(());
+                return self.tail(tail);
             }
         };
         if same_line {

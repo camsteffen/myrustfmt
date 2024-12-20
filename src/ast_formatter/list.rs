@@ -72,9 +72,13 @@ pub fn param_list_config(single_line_max_contents_width: Option<usize>) -> impl 
     }
 }
 
-pub fn struct_field_list_config(single_line_block: bool) -> impl ListConfig {
+pub fn struct_field_list_config(
+    single_line_block: bool,
+    single_line_max_contents_width: usize,
+) -> impl ListConfig {
     pub struct StructFieldListConfig {
         single_line_block: bool,
+        single_line_max_contents_width: usize,
     }
     impl ListConfig for StructFieldListConfig {
         const START_BRACE: &'static str = "{";
@@ -86,10 +90,13 @@ pub fn struct_field_list_config(single_line_block: bool) -> impl ListConfig {
         }
 
         fn single_line_max_contents_width(&self) -> Option<usize> {
-            Some(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
+            Some(self.single_line_max_contents_width)
         }
     }
-    StructFieldListConfig { single_line_block }
+    StructFieldListConfig {
+        single_line_block,
+        single_line_max_contents_width,
+    }
 }
 
 pub struct StructFieldListConfig;
@@ -256,6 +263,31 @@ impl<'a> From<&'a ast::StructRest> for ListRest<'a> {
 }
 
 impl<'a> AstFormatter {
+    pub fn list_single_line<T, C: ListConfig>(
+        &self,
+        list: &[T],
+        format_item: impl Fn(&T) -> FormatResult,
+        config: C,
+    ) -> FormatResult {
+        self.format_list(
+            C::START_BRACE,
+            C::END_BRACE,
+            list.is_empty(),
+            |tail| {
+                self.list_contents_single_line(
+                    list,
+                    ListRest::None,
+                    format_item,
+                    tail,
+                    ListOverflowNo(PhantomData),
+                    C::PAD_CONTENTS,
+                    config.single_line_max_contents_width(),
+                )
+            },
+            Tail::NONE,
+        )
+    }
+
     pub fn list_separate_lines<T>(
         &self,
         list: &[T],
@@ -277,7 +309,7 @@ impl<'a> AstFormatter {
         start_brace: &'static str,
         end_brace: &'static str,
         is_empty: bool,
-        non_empty: impl FnOnce(Tail) -> FormatResult + 'b,
+        contents: impl FnOnce(Tail) -> FormatResult + 'b,
         end: Tail<'_>,
     ) -> FormatResult {
         self.out.token_expect(start_brace)?;
@@ -286,7 +318,7 @@ impl<'a> AstFormatter {
             self.tail(end)?;
             return Ok(());
         }
-        non_empty(Tail::new(&move || {
+        contents(Tail::new(&move || {
             self.out.token_expect(end_brace)?;
             self.tail(end)?;
             Ok(())
@@ -309,8 +341,8 @@ impl<'a> AstFormatter {
             self.list_contents_single_line(
                 list,
                 rest,
-                tail,
                 &format_item,
+                tail,
                 overflow,
                 Config::PAD_CONTENTS,
                 config.single_line_max_contents_width(),
@@ -349,8 +381,8 @@ impl<'a> AstFormatter {
         &self,
         list: &[Item],
         rest: ListRest<'_>,
-        tail: Tail,
         format_item: impl Fn(&Item) -> FormatResult,
+        tail: Tail,
         _overflow: Overflow,
         pad_contents: bool,
         max_width: Option<usize>,
@@ -388,7 +420,6 @@ impl<'a> AstFormatter {
             if pad_contents {
                 self.out.space()?;
             }
-            self.tail(tail)?;
             Ok(())
         };
         let format = || self.with_single_line(format);
@@ -397,6 +428,7 @@ impl<'a> AstFormatter {
         } else {
             format()?;
         }
+        self.tail(tail)?;
         Ok(())
     }
 

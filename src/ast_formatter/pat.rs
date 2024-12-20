@@ -3,8 +3,9 @@ use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{list, param_list_config, struct_field_list_config, ListRest};
+use crate::ast_formatter::list::{ListRest, list, param_list_config, struct_field_list_config};
 use crate::error::FormatResult;
+use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 impl<'a> AstFormatter {
     pub fn pat(&self, pat: &ast::Pat) -> FormatResult {
@@ -52,7 +53,7 @@ impl<'a> AstFormatter {
                     self.pat(pat)?;
                 }
                 Ok(())
-            },
+            }
             ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false),
             ast::PatKind::Tuple(ref fields) => {
                 list(fields, |pat| self.pat(pat), param_list_config(None))
@@ -83,11 +84,12 @@ impl<'a> AstFormatter {
     ) -> FormatResult {
         self.qpath(qself, path, false)?;
         self.out.space()?;
-        let single_line_block = self.config().rustfmt_quirks && matches!(rest, ast::PatFieldsRest::Rest);
+        let single_line_block =
+            self.config().rustfmt_quirks && matches!(rest, ast::PatFieldsRest::Rest);
         list(
             fields,
             |f| self.pat_field(f),
-            struct_field_list_config(single_line_block),
+            struct_field_list_config(single_line_block, RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
         )
         .rest(ListRest::from(rest))
         .tail(end)

@@ -4,6 +4,7 @@ pub struct RustfmtConfig {
     pub chain_width: usize,
     pub fn_call_width: usize,
     pub struct_lit_width: usize,
+    pub struct_variant_width: usize,
 }
 
 pub const RUSTFMT_CONFIG_DEFAULTS: RustfmtConfig = RustfmtConfig {
@@ -12,4 +13,5 @@ pub const RUSTFMT_CONFIG_DEFAULTS: RustfmtConfig = RustfmtConfig {
     chain_width: 60,
     fn_call_width: 60,
     struct_lit_width: 18,
+    struct_variant_width: 35,
 };
