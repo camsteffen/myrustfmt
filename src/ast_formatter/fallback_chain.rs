@@ -51,8 +51,8 @@ where
                 Err(e) => match e.kind {
                     FormatErrorKind::Constraint(_) => false,
                     FormatErrorKind::Parse(_) => true,
-                }
-            }
+                },
+            },
         };
         if is_final_result {
             return;

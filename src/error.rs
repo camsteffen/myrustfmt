@@ -86,6 +86,12 @@ impl FormatError {
     }
 }
 
+impl From<ConstraintError> for FormatErrorKind {
+    fn from(e: ConstraintError) -> Self {
+        FormatErrorKind::Constraint(e)
+    }
+}
+
 impl From<ParseError> for FormatErrorKind {
     fn from(e: ParseError) -> Self {
         FormatErrorKind::Parse(e)

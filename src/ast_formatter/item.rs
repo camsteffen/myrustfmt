@@ -97,7 +97,7 @@ impl<'a> AstFormatter {
             } => {
                 self.out.token_at("pub", vis.span.lo())?;
                 self.out.space()?;
-                self.path(path)?;
+                self.path(path, false)?;
                 self.out.space()?;
             }
             ast::VisibilityKind::Inherited => {}
@@ -270,7 +270,7 @@ impl<'a> AstFormatter {
     }
 
     fn use_tree(&self, use_tree: &ast::UseTree) -> FormatResult {
-        self.path(&use_tree.prefix)?;
+        self.path(&use_tree.prefix, false)?;
         match use_tree.kind {
             ast::UseTreeKind::Simple(None) => {}
             ast::UseTreeKind::Simple(Some(rename)) => {

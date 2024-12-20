@@ -193,19 +193,12 @@ impl SourceFormatter {
         let mut len = 0usize;
         let mut len_without_trailing_whitespace = 0;
         for token in rustc_lexer::tokenize(self.source.remaining()) {
-            // let token_start = len;
-            // let token_end = token_start + token.len as usize;
-            // let token_str = &self.source.remaining()[token_start..token_end];
             match token.kind {
                 TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
                     len += token.len as usize;
                     len_without_trailing_whitespace = len;
                 }
                 TokenKind::Whitespace => {
-                    // if let Some(newline_index) = token_str.find('\n') {
-                    //     len += newline_index;
-                    //     break;
-                    // }
                     len += token.len as usize;
                 }
                 _ => break,
@@ -213,7 +206,9 @@ impl SourceFormatter {
         }
         if len_without_trailing_whitespace > 0 {
             // copy up to trailing whitespace
-            self.copy(len_without_trailing_whitespace)?;
+            // no width limit for comments, but newline limit may apply
+            self.constraints()
+                .with_no_width_limit(|| self.copy(len_without_trailing_whitespace))?;
         }
         // skip trailing whitespace
         self.source.advance(len - len_without_trailing_whitespace);
@@ -227,7 +222,8 @@ impl SourceFormatter {
             let token_str = &self.source.remaining()[..token.len as usize];
             match token.kind {
                 TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
-                    self.copy(token.len as usize)?;
+                    self.constraints()
+                        .with_no_width_limit(|| self.copy(token.len as usize))?;
                 }
                 TokenKind::Whitespace => {
                     let newline_count = token_str.bytes().filter(|&b| b == b'\n').count();

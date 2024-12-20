@@ -29,7 +29,7 @@ impl<'a> AstFormatter {
             ast::TyKind::Tup(elements) => {
                 list(elements, |ty| self.ty(ty), param_list_config(None)).format(self)
             }
-            ast::TyKind::Path(qself, path) => self.qpath(qself, path),
+            ast::TyKind::Path(qself, path) => self.qpath(qself, path, false),
             ast::TyKind::TraitObject(_bounds, _syntax) => todo!(),
             ast::TyKind::ImplTrait(_, bounds) => {
                 self.out.token_at("impl", ty.span.lo())?;
@@ -88,7 +88,7 @@ impl<'a> AstFormatter {
     }
 
     pub fn trait_ref(&self, trait_ref: &ast::TraitRef) -> FormatResult {
-        self.path(&trait_ref.path)
+        self.path(&trait_ref.path, false)
     }
 
     fn poly_trait_ref(&self, poly_trait_ref: &ast::PolyTraitRef) -> FormatResult {

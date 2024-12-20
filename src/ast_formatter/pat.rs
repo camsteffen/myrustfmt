@@ -37,13 +37,23 @@ impl<'a> AstFormatter {
                 self.struct_pat(qself, path, fields, rest, end)
             }
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
-                self.qpath(qself, path)?;
+                self.qpath(qself, path, false)?;
                 list(fields, |pat| self.pat(pat), param_list_config(None))
                     .tail(end)
                     .format(self)
             }
-            ast::PatKind::Or(_) => todo!(),
-            ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path),
+            ast::PatKind::Or(ref pats) => {
+                let (first, rest) = pats.split_first().unwrap();
+                self.pat(first)?;
+                for pat in rest {
+                    self.out.space()?;
+                    self.out.token_expect("|")?;
+                    self.out.space()?;
+                    self.pat(pat)?;
+                }
+                Ok(())
+            },
+            ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false),
             ast::PatKind::Tuple(ref fields) => {
                 list(fields, |pat| self.pat(pat), param_list_config(None))
                     .tail(end)
@@ -55,7 +65,7 @@ impl<'a> AstFormatter {
             ast::PatKind::Lit(_) => todo!(),
             ast::PatKind::Range(_, _, _) => todo!(),
             ast::PatKind::Slice(_) => todo!(),
-            ast::PatKind::Rest => todo!(),
+            ast::PatKind::Rest => self.out.token_expect(".."),
             ast::PatKind::Never => todo!(),
             ast::PatKind::Paren(_) => todo!(),
             ast::PatKind::MacCall(_) => todo!(),
@@ -71,7 +81,7 @@ impl<'a> AstFormatter {
         rest: ast::PatFieldsRest,
         end: Tail<'_>,
     ) -> FormatResult {
-        self.qpath(qself, path)?;
+        self.qpath(qself, path, false)?;
         self.out.space()?;
         let single_line_block = self.config().rustfmt_quirks && matches!(rest, ast::PatFieldsRest::Rest);
         list(

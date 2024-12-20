@@ -119,7 +119,7 @@ impl AstFormatter {
         match expr.kind {
             ast::ExprKind::Field(_, ident) => self.ident(ident),
             ast::ExprKind::MethodCall(ref method_call) => {
-                self.path_segment(&method_call.seg)?;
+                self.path_segment(&method_call.seg, true)?;
                 list(
                     &method_call.args,
                     |arg| self.expr(arg),

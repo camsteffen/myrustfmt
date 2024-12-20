@@ -40,7 +40,7 @@ impl AstFormatter {
 
     pub fn meta_item(&self, meta: &ast::MetaItem) -> FormatResult {
         self.safety(&meta.unsafety)?;
-        self.path(&meta.path)?;
+        self.path(&meta.path, false)?;
         match &meta.kind {
             ast::MetaItemKind::Word => Ok(()),
             ast::MetaItemKind::List(items) => {

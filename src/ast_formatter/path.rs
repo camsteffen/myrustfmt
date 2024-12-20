@@ -7,41 +7,44 @@ use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
 impl AstFormatter {
-    pub fn qpath(&self, qself: &Option<P<ast::QSelf>>, path: &ast::Path) -> FormatResult {
-        self.qpath_end(qself, path, Tail::NONE)
+    pub fn qpath(&self, qself: &Option<P<ast::QSelf>>, path: &ast::Path, is_expr: bool) -> FormatResult {
+        self.qpath_end(qself, path, is_expr, Tail::NONE)
     }
 
     pub fn qpath_end(
         &self,
         qself: &Option<P<ast::QSelf>>,
         path: &ast::Path,
+        is_expr: bool,
         end: Tail<'_>,
     ) -> FormatResult {
         if let Some(_qself) = qself.as_deref() {
             todo!();
         }
-        self.path_end(path, end)
+        self.path_end(path, is_expr, end)
     }
 
-    pub fn path(&self, path: &ast::Path) -> FormatResult {
-        self.path_end(path, Tail::NONE)
+    pub fn path(&self, path: &ast::Path, is_expr: bool) -> FormatResult {
+        self.path_end(path, is_expr, Tail::NONE)
     }
 
-    pub fn path_end(&self, path: &ast::Path, end: Tail<'_>) -> FormatResult {
+    pub fn path_end(&self, path: &ast::Path, is_expr: bool, end: Tail<'_>) -> FormatResult {
         if let [first_segment, rest @ ..] = &path.segments[..] {
-            self.path_segment(first_segment)?;
+            self.path_segment(first_segment, is_expr)?;
             for segment in rest {
                 self.out.token_expect("::")?;
-                self.path_segment(segment)?;
+                self.path_segment(segment, is_expr)?;
             }
         }
         self.tail(end)
     }
 
-    pub fn path_segment(&self, segment: &ast::PathSegment) -> FormatResult {
+    pub fn path_segment(&self, segment: &ast::PathSegment, is_expr: bool) -> FormatResult {
         self.ident(segment.ident)?;
         if let Some(generic_args) = segment.args.as_deref() {
-            self.out.token_expect("::")?;
+            if is_expr {
+                self.out.token_expect("::")?;
+            }
             self.generic_args(generic_args)?;
         };
         Ok(())

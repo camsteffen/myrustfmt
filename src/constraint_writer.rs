@@ -1,7 +1,7 @@
 use crate::constraints::Constraints;
 use std::cell::Cell;
 use tracing::info;
-use crate::error::{NewlineNotAllowedError, WidthLimitExceededError};
+use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededError};
 
 pub struct ConstraintWriter {
     constraints: Constraints,
@@ -84,13 +84,14 @@ impl ConstraintWriter {
         self.check_width_constraints()
     }
 
-    pub fn write_possibly_multiline(&self, source: &str) -> Result<(), WidthLimitExceededError> {
+    pub fn write_possibly_multiline(&self, source: &str) -> Result<(), ConstraintError> {
         for c in source.chars() {
-            self.with_buffer(|b| b.push(c));
             if c == '\n' {
-                self.last_line_start.set(self.len());
+                self.newline()?;
+            } else {
+                self.with_buffer(|b| b.push(c));
+                self.check_width_constraints()?;
             }
-            self.check_width_constraints()?;
         }
         Ok(())
     }

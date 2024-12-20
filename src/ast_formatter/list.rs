@@ -629,13 +629,13 @@ impl Overflow for ast::Expr {
             // | ast::ExprKind::Tup(..) if is_only_list_item => H::overflows(|| this.expr(expr, Tail::None)),
             // | ast::ExprKind::MethodCall(..) if is_only_list_item => H::overflows(|| this.dot_chain(expr, Tail::NONE, true)),
             // prefix
-            ast::ExprKind::AddrOf(borrow_kind, mutability, ref inner)
+            ast::ExprKind::AddrOf(borrow_kind, mutability, ref target)
                 if H::FORMATTING
-                    || Overflow::check_if_overflows(this, inner, is_only_list_item) =>
+                    || Overflow::check_if_overflows(this, target, is_only_list_item) =>
             {
                 H::overflows(|| {
                     this.addr_of(borrow_kind, mutability, expr)?;
-                    Overflow::format(this, inner, is_only_list_item)
+                    Overflow::format(this, target, is_only_list_item)
                 })
             }
             ast::ExprKind::Cast(ref target, _)

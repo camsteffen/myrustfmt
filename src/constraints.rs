@@ -1,4 +1,4 @@
-use crate::error::WidthLimitExceededError;
+use crate::error::{FormatResult, WidthLimitExceededError};
 use std::cell::Cell;
 
 pub const INDENT_WIDTH: usize = 4;
@@ -54,9 +54,17 @@ impl Constraints {
 
     pub fn sub_max_width(&self, len: usize) -> Result<(), WidthLimitExceededError> {
         if let Some(max_width) = self.max_width.get() {
-            self.max_width
-                .set(Some(max_width.checked_sub(len).ok_or(WidthLimitExceededError)?));
+            self.max_width.set(Some(
+                max_width.checked_sub(len).ok_or(WidthLimitExceededError)?,
+            ));
         }
         Ok(())
+    }
+
+    pub fn with_no_width_limit(&self, f: impl FnOnce() -> FormatResult) -> FormatResult {
+        let max_width_prev = self.max_width.replace(None);
+        let result = f();
+        self.max_width.set(max_width_prev);
+        result
     }
 }

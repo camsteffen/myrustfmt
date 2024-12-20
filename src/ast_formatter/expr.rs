@@ -1,6 +1,8 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{ArrayListConfig, list, param_list_config, struct_field_list_config, ListRest};
+use crate::ast_formatter::list::{
+    ArrayListConfig, ListRest, list, param_list_config, struct_field_list_config,
+};
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
@@ -29,8 +31,8 @@ impl<'a> AstFormatter {
                 |item| self.expr(item),
                 param_list_config(Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)),
             )
-            .tail(tail)
-            .format(self),
+                .tail(tail)
+                .format(self),
             ast::ExprKind::Binary(op, ref left, ref right) => self.binop(left, op, right, tail),
             ast::ExprKind::Unary(op, ref target) => {
                 self.out.token_expect(op.as_str())?;
@@ -111,7 +113,7 @@ impl<'a> AstFormatter {
                 self.range(start.as_deref(), end.as_deref(), limits, tail)
             }
             ast::ExprKind::Underscore => todo!(),
-            ast::ExprKind::Path(ref qself, ref path) => self.qpath_end(qself, path, tail),
+            ast::ExprKind::Path(ref qself, ref path) => self.qpath_end(qself, path, true, tail),
             ast::ExprKind::AddrOf(borrow_kind, mutability, ref target) => {
                 self.addr_of(borrow_kind, mutability, expr)?;
                 self.expr_tail(target, tail)
@@ -223,9 +225,9 @@ impl<'a> AstFormatter {
             |arg| self.expr(arg),
             param_list_config(Some(single_line_max_contents_width)),
         )
-        .overflow()
-        .tail(end)
-        .format(self)
+            .overflow()
+            .tail(end)
+            .format(self)
     }
 
     fn delim_args(&self, delim_args: &ast::DelimArgs, end: Tail<'_>) -> FormatResult {
@@ -269,7 +271,7 @@ impl<'a> AstFormatter {
     }
 
     pub fn mac_call(&self, mac_call: &ast::MacCall, end: Tail<'_>) -> FormatResult {
-        self.path(&mac_call.path)?;
+        self.path(&mac_call.path, true)?;
         self.out.token_expect("!")?;
         self.delim_args(&mac_call.args, end)
     }
@@ -310,7 +312,7 @@ impl<'a> AstFormatter {
             self.out.token_expect("=>")?;
             self.out.space()?;
             self.expr(body)?;
-            if self.out.char_ending_at(body.span.hi()) == b'}' {
+            if is_plain_block(body) {
                 self.out.skip_token_if_present(",")?;
             } else {
                 self.out.token_expect(",")?;
@@ -322,16 +324,16 @@ impl<'a> AstFormatter {
     }
 
     fn struct_expr(&self, struct_: &ast::StructExpr, tail: Tail<'_>) -> FormatResult {
-        self.qpath(&struct_.qself, &struct_.path)?;
+        self.qpath(&struct_.qself, &struct_.path, true)?;
         self.out.space()?;
         list(
             &struct_.fields,
             |f| self.expr_field(f),
             struct_field_list_config(false),
         )
-        .rest(ListRest::from(&struct_.rest))
-        .tail(tail)
-        .format(self)?;
+            .rest(ListRest::from(&struct_.rest))
+            .tail(tail)
+            .format(self)?;
         Ok(())
     }
 
@@ -344,5 +346,12 @@ impl<'a> AstFormatter {
             self.expr(&field.expr)?;
         }
         Ok(())
+    }
+}
+
+fn is_plain_block(expr: &ast::Expr) -> bool {
+    match &expr.kind {
+        ast::ExprKind::Block(block, None) => matches!(block.rules, ast::BlockCheckMode::Default),
+        _ => false,
     }
 }
