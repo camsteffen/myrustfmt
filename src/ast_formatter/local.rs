@@ -1,4 +1,5 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::fallback_chain::ResultFallback;
 use crate::ast_formatter::last_line::Tail;
 use crate::error::FormatResult;
 use rustc_ast::ast;
@@ -32,39 +33,38 @@ impl<'a> AstFormatter {
         self.out.space()?;
         self.out.token_expect("=")?;
         // todo do all these cases apply with else clause?
-        self.fallback_chain(
-            |chain| {
-                // single line
-                chain.next(|| {
-                    self.with_single_line(|| {
-                        self.out.space()?;
-                        self.expr(expr)?;
-                        Ok(())
-                    })
-                });
-                // wrap and indent then single line
-                chain.next(|| {
-                    self.indented(|| {
-                        self.out.newline_indent()?;
-                        self.with_single_line(|| self.expr(expr))
-                    })
-                });
-                // normal
-                chain.next(|| {
-                    self.out.space()?;
-                    self.expr(expr)?;
+        let snapshot = &self.out.snapshot();
+        // single line
+        self.with_single_line(|| {
+            self.out.space()?;
+            self.expr(expr)?;
+            self.tail(end)?;
+            Ok(())
+        })
+            // wrap and indent then single line
+            .fallback(self, snapshot, || {
+                self.indented(|| {
+                    self.out.newline_indent()?;
+                    self.with_single_line(|| self.expr(expr))?
+                    self.tail(end)?;
                     Ok(())
-                });
-                // wrap and indent
-                chain.next(|| {
-                    self.indented(|| {
-                        self.out.newline_indent()?;
-                        self.expr(expr)?;
-                        Ok(())
-                    })
-                });
-            },
-            || self.tail(end),
-        )
+                })
+            })
+            // normal
+            .fallback(self, snapshot, || {
+                self.out.space()?;
+                self.expr(expr)?;
+                self.tail(end)?;
+                Ok(())
+            })
+            // wrap and indent
+            .fallback(self, snapshot, || {
+                self.indented(|| {
+                    self.out.newline_indent()?;
+                    self.expr(expr)?;
+                    self.tail(end)?;
+                    Ok(())
+                })
+            })
     }
 }

@@ -2,65 +2,64 @@ use crate::ast_formatter::AstFormatter;
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::source_formatter::{SourceFormatter, SourceFormatterSnapshot};
 
-pub fn fallback_chain<Finally>(
-    out: &SourceFormatter,
-    chain: impl FnOnce(&mut FallbackChain<'_, Finally>),
-    finally: Finally,
-) -> FormatResult
-where
-    Finally: Fn() -> FormatResult,
-{
-    let mut builder = FallbackChain {
-        out,
-        result: None,
-        snapshot: out.snapshot(),
-        finally,
-    };
-    chain(&mut builder);
-    builder
-        .result
-        .expect("fallback chain must be used at least once")
+pub trait ResultFallback<T> {
+    fn fallback(
+        self,
+        af: &AstFormatter,
+        snapshot: &SourceFormatterSnapshot,
+        fallback: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T>;
 }
 
-impl<'a> AstFormatter {
-    pub fn fallback_chain<'b, F: Fn() -> FormatResult>(
-        &self,
-        chain: impl FnOnce(&mut FallbackChain<F>),
-        finally: F,
-    ) -> FormatResult {
-        fallback_chain(&self.out, chain, finally)
+impl<T> ResultFallback<T> for FormatResult<T> {
+    fn fallback(
+        self,
+        af: &AstFormatter,
+        snapshot: &SourceFormatterSnapshot,
+        fallback: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
+        let should_fallback = match &self {
+            Ok(_) => false,
+            Err(e) => match e.kind {
+                FormatErrorKind::Parse(_) => false,
+                FormatErrorKind::Constraint(_) => true,
+            },
+        };
+        if !should_fallback {
+            return self;
+        }
+        af.out.restore(snapshot);
+        fallback()
     }
 }
 
-pub struct FallbackChain<'a, Finally> {
-    out: &'a SourceFormatter,
-    result: Option<FormatResult>,
-    snapshot: SourceFormatterSnapshot,
-    finally: Finally,
+impl AstFormatter {
+    fn fallback<T>(&self, first: impl FnOnce() -> FormatResult<T>) -> FallbackResult<T> {
+        let snapshot = self.out.snapshot();
+        let result = first();
+        FallbackResult { snapshot, result }
+    }
 }
 
-impl<'a, Finally> FallbackChain<'a, Finally>
-where
-    Finally: Fn() -> FormatResult,
-{
-    pub fn next(&mut self, f: impl FnOnce() -> FormatResult) {
-        let is_final_result = match &self.result {
-            None => false,
-            Some(result) => match result {
-                Ok(()) => true,
-                Err(e) => match e.kind {
-                    FormatErrorKind::Constraint(_) => false,
-                    FormatErrorKind::Parse(_) => true,
-                },
+struct FallbackResult<T> {
+    snapshot: SourceFormatterSnapshot,
+    result: FormatResult<T>,
+}
+
+impl<T> FallbackResult<T> {
+    fn next(mut self, af: &AstFormatter, fallback: impl FnOnce() -> FormatResult<T>) -> Self {
+        let should_fallback = match &self.result {
+            Ok(_) => false,
+            Err(e) => match e.kind {
+                FormatErrorKind::Parse(_) => false,
+                FormatErrorKind::Constraint(_) => true,
             },
         };
-        if is_final_result {
-            return;
+        if !should_fallback {
+            return self;
         }
-        if self.result.is_some() {
-            self.out.restore(&self.snapshot);
-        }
-        let result = f().and_then(|()| (self.finally)());
-        self.result = Some(result);
+        af.out.restore(&self.snapshot);
+        self.result = fallback();
+        self
     }
 }

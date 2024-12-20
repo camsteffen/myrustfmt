@@ -1,12 +1,14 @@
-use rustc_ast::ast;
+use crate::RUSTFMT_QUIRKS;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::{list, param_list_config};
-use crate::error::{WidthLimitExceededError};
 use crate::constraints::INDENT_WIDTH;
 use crate::error::FormatResult;
-use crate::RUSTFMT_QUIRKS;
+use crate::error::WidthLimitExceededError;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
+use rustc_ast::ast;
+use crate::ast_formatter::fallback_chain::ResultFallback;
+
 impl AstFormatter {
     pub fn dot_chain(&self, expr: &ast::Expr, tail: Tail<'_>, is_overflow: bool) -> FormatResult {
         let mut dot_chain = Vec::new();
@@ -44,73 +46,83 @@ impl AstFormatter {
         root_len: usize,
         tail: Tail<'_>,
     ) -> FormatResult {
-        self.fallback_chain(
-            |chain| {
-                // single line
-                chain.next(|| {
-                    let format = || {
-                        let (last, until_last) = dot_chain.split_last().unwrap();
-                        self.with_single_line(|| {
-                            self.with_no_overflow(|| {
-                                for item in until_last {
-                                    self.dot_chain_item(item)?;
-                                }
-                                Ok(())
-                            })?;
-                            let before_last = self.out.snapshot();
-                            let no_overflow_result =
-                                self.with_no_overflow(|| self.dot_chain_item(last));
-                            if matches!(no_overflow_result, Ok(())) {
-                                return Ok(());
-                            }
-                            self.out.restore(&before_last);
-                            let wrap_result = self.indented(|| {
-                                self.with_not_single_line(|| self.out.newline_indent())?;
-                                self.with_no_overflow(|| self.dot_chain_item(last))?;
-                                Ok(())
-                            });
-                            if wrap_result.is_ok() {
-                                // if wrapping makes the last item fit on one line,
-                                // abort the single-line approach
-                                return Err(self.out.format_error(WidthLimitExceededError));
-                            }
-                            self.out.restore(&before_last);
-                            // try with overflow
-                            self.dot_chain_item(last)?;
-                            Ok(())
-                        })
-                    };
-                    if RUSTFMT_QUIRKS && dot_chain.len() == 1 {
-                        format()
-                    } else {
-                        let Some(width) = RUSTFMT_CONFIG_DEFAULTS.chain_width.checked_sub(root_len)
-                        else {
-                            return Err(self.out.format_error(WidthLimitExceededError));
-                        };
-                        self.with_width_limit_first_line(width, format)
+        let snapshot = &self.out.snapshot();
+        self.dot_chain_single_line(dot_chain, root_len, tail)
+            .fallback(self, snapshot, || {
+                self.dot_chain_separate_lines(dot_chain, root_len, tail)
+            })
+    }
+
+    fn dot_chain_single_line(
+        &self,
+        dot_chain: &[&ast::Expr],
+        root_len: usize,
+        tail: Tail<'_>,
+    ) -> FormatResult {
+        let format = || {
+            let (last, until_last) = dot_chain.split_last().unwrap();
+            self.with_single_line(|| {
+                self.with_no_overflow(|| {
+                    for item in until_last {
+                        self.dot_chain_item(item)?;
                     }
-                });
-                // wrap and indent each item
-                chain.next(|| {
-                    let rest = if root_len > INDENT_WIDTH {
-                        dot_chain
-                    } else {
-                        let (first, rest) = dot_chain.split_first().unwrap();
-                        self.dot_chain_item(first)?;
-                        rest
-                    };
-                    self.indented(|| {
-                        for item in rest {
-                            self.out.newline_indent()?;
-                            self.dot_chain_item(item)?;
-                        }
-                        Ok(())
-                    })?;
                     Ok(())
-                })
-            },
-            || self.tail(tail),
-        )?;
+                })?;
+                let before_last = self.out.snapshot();
+                let no_overflow_result = self.with_no_overflow(|| self.dot_chain_item(last));
+                if matches!(no_overflow_result, Ok(())) {
+                    return Ok(());
+                }
+                self.out.restore(&before_last);
+                let wrap_result = self.indented(|| {
+                    self.with_not_single_line(|| self.out.newline_indent())?;
+                    self.with_no_overflow(|| self.dot_chain_item(last))?;
+                    Ok(())
+                });
+                if wrap_result.is_ok() {
+                    // if wrapping makes the last item fit on one line,
+                    // abort the single-line approach
+                    return Err(self.out.format_error(WidthLimitExceededError));
+                }
+                self.out.restore(&before_last);
+                // try with overflow
+                self.dot_chain_item(last)?;
+                Ok(())
+            })
+        };
+        if RUSTFMT_QUIRKS && dot_chain.len() == 1 {
+            format()?;
+        } else {
+            let Some(width) = RUSTFMT_CONFIG_DEFAULTS.chain_width.checked_sub(root_len) else {
+                return Err(self.out.format_error(WidthLimitExceededError));
+            };
+            self.with_width_limit_first_line(width, format)?;
+        }
+        self.tail(tail)?;
+        Ok(())
+    }
+
+    fn dot_chain_separate_lines(
+        &self,
+        dot_chain: &[&ast::Expr],
+        root_len: usize,
+        tail: Tail<'_>,
+    ) -> FormatResult {
+        let rest = if root_len > INDENT_WIDTH {
+            dot_chain
+        } else {
+            let (first, rest) = dot_chain.split_first().unwrap();
+            self.dot_chain_item(first)?;
+            rest
+        };
+        self.indented(|| {
+            for item in rest {
+                self.out.newline_indent()?;
+                self.dot_chain_item(item)?;
+            }
+            Ok(())
+        })?;
+        self.tail(tail)?;
         Ok(())
     }
 

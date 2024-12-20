@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::fallback_chain::fallback_chain;
+use crate::ast_formatter::fallback_chain::{ResultFallback, };
 use crate::ast_formatter::last_line::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -307,54 +307,42 @@ impl<'a> AstFormatter {
     where
         Config: ListConfig,
     {
-        fallback_chain(
-            &self.out,
-            |chain| {
-                chain.next(|| {
-                    self.list_contents_single_line(
-                        list,
-                        rest,
-                        tail,
-                        &format_item,
-                        overflow,
-                        Config::PAD_CONTENTS,
-                        config.single_line_max_contents_width(),
-                    )
+        let snapshot = &self.out.snapshot();
+        let mut result = self.list_contents_single_line(
+            list,
+            rest,
+            tail,
+            &format_item,
+            overflow,
+            Config::PAD_CONTENTS,
+            config.single_line_max_contents_width(),
+        );
+        if config.single_line_block() {
+            result = result.fallback(self, snapshot, || {
+                self.list_contents_single_line_block(
+                    list,
+                    rest,
+                    tail,
+                    &format_item,
+                    config.single_line_max_contents_width(),
+                )
+            })
+        }
+        match Config::wrap_to_fit() {
+            ListWrapToFitConfig::Yes { max_element_width } => {
+                assert!(
+                    matches!(rest, ListRest::None),
+                    "rest cannot be used with wrap-to-fit"
+                );
+                result = result.fallback(self, snapshot, || {
+                    self.list_contents_wrap_to_fit(list, tail, &format_item, max_element_width)
                 });
-                if config.single_line_block() {
-                    chain.next(|| {
-                        let r = self.list_contents_single_line_block(
-                            list,
-                            rest,
-                            tail,
-                            &format_item,
-                            config.single_line_max_contents_width(),
-                        );
-                        info!("single line block: {r:?}");
-                        r
-                    })
-                }
-                match Config::wrap_to_fit() {
-                    ListWrapToFitConfig::Yes { max_element_width } => {
-                        assert!(
-                            matches!(rest, ListRest::None),
-                            "rest cannot be used with wrap-to-fit"
-                        );
-                        chain.next(|| {
-                            self.list_contents_wrap_to_fit(
-                                list,
-                                tail,
-                                &format_item,
-                                max_element_width,
-                            )
-                        });
-                    }
-                    ListWrapToFitConfig::No => {}
-                }
-                chain.next(|| self.list_contents_separate_lines(list, rest, format_item, tail));
-            },
-            || Ok(()),
-        )
+            }
+            ListWrapToFitConfig::No => {}
+        }
+        result.fallback(self, snapshot, || {
+            self.list_contents_separate_lines(list, rest, format_item, tail)
+        })
     }
 
     /* [item, item, item] */
@@ -478,17 +466,20 @@ impl<'a> AstFormatter {
             format_item(first)?;
             self.out.token_maybe_missing(",")?;
             for item in rest {
-                self.fallback_chain(
-                    |chain| {
-                        chain.next(|| self.out.space());
-                        chain.next(|| self.out.newline_indent());
-                    },
-                    || {
-                        format_item(item)?;
-                        self.out.token_maybe_missing(",")?;
+                let snapshot = &self.out.snapshot();
+                let item_comma = || {
+                    format_item(item)?;
+                    self.out.token_maybe_missing(",")?;
+                    Ok(())
+                };
+                self.out
+                    .space()
+                    .and_then(|()| item_comma())
+                    .fallback(self, snapshot, || {
+                        self.out.newline_indent()?;
+                        item_comma()?;
                         Ok(())
-                    },
-                )?;
+                    })?;
             }
             Ok(())
         })?;

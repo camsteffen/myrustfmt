@@ -3,6 +3,7 @@ use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::{ListConfig, list, param_list_config};
 use crate::error::FormatResult;
 
+use crate::ast_formatter::fallback_chain::ResultFallback;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter {
@@ -114,32 +115,23 @@ impl<'a> AstFormatter {
                 _ => false,
             }
         }
-        let with_block = || {
-            self.out.token_missing("{")?;
-            self.indented(|| {
-                self.out.newline_indent()?;
-                self.expr(body)?;
-                Ok(())
-            })?;
-            self.out.newline_indent()?;
-            self.out.token_missing("}")?;
-            self.tail(tail)?;
-            Ok(())
-        };
         if is_block_like(body) {
             self.expr_tail(body, tail)
         } else {
-            self.fallback_chain(
-                |chain| {
-                    chain.next(|| {
-                        self.with_no_overflow(|| {
-                            self.with_single_line(|| self.expr_tail(body, tail))
-                        })
-                    });
-                    chain.next(with_block);
-                },
-                || Ok(()),
-            )
+            let snapshot = &self.out.snapshot();
+            self.with_no_overflow(|| self.with_single_line(|| self.expr_tail(body, tail)))
+                .fallback(self, snapshot, || {
+                    self.out.token_missing("{")?;
+                    self.indented(|| {
+                        self.out.newline_indent()?;
+                        self.expr(body)?;
+                        Ok(())
+                    })?;
+                    self.out.newline_indent()?;
+                    self.out.token_missing("}")?;
+                    self.tail(tail)?;
+                    Ok(())
+                })
         }
     }
 
