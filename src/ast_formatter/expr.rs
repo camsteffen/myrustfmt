@@ -6,7 +6,6 @@ use crate::ast_formatter::list::{
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
-use crate::ast_formatter::fallback_chain::ResultFallback;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 use rustc_span::source_map::Spanned;
@@ -245,14 +244,14 @@ impl<'a> AstFormatter {
     ) -> FormatResult {
         self.out.token_expect("if")?;
         self.out.space()?;
-        let snapshot = &self.out.snapshot();
-        self.with_single_line(|| self.expr_tail(scrutinee, Tail::OPEN_BLOCK))
-            .fallback(self, snapshot, || {
+        self.fallback(|| self.with_single_line(|| self.expr_tail(scrutinee, Tail::OPEN_BLOCK)))
+            .next(self, || {
                 self.expr(scrutinee)?;
                 self.out.newline_indent()?;
                 self.out.token_expect("{")?;
                 Ok(())
-            })?;
+            })
+            .result()?;
 
         match else_ {
             None => self.block_after_open_brace(block, tail)?,
@@ -305,19 +304,19 @@ impl<'a> AstFormatter {
                 self.expr(guard)?;
                 Ok(())
             };
-            let snapshot = &self.out.snapshot();
-            (|| {
+            self.fallback(|| {
                 self.out.space()?;
                 guard()?;
                 Ok(())
-            })()
-            .fallback(self, snapshot, || {
+            })
+            .next(self, || {
                 self.indented(|| {
                     self.out.newline_indent()?;
                     guard()?;
                     Ok(())
                 })
-            })?;
+            })
+            .result()?;
         }
         if let Some(body) = arm.body.as_deref() {
             self.out.space()?;

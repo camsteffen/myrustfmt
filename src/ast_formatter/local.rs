@@ -1,5 +1,4 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::fallback_chain::ResultFallback;
 use crate::ast_formatter::last_line::Tail;
 use crate::error::FormatResult;
 use rustc_ast::ast;
@@ -33,38 +32,40 @@ impl<'a> AstFormatter {
         self.out.space()?;
         self.out.token_expect("=")?;
         // todo do all these cases apply with else clause?
-        let snapshot = &self.out.snapshot();
         // single line
-        self.with_single_line(|| {
-            self.out.space()?;
-            self.expr(expr)?;
-            self.tail(end)?;
-            Ok(())
-        })
-            // wrap and indent then single line
-            .fallback(self, snapshot, || {
-                self.indented(|| {
-                    self.out.newline_indent()?;
-                    self.with_single_line(|| self.expr(expr))?
-                    self.tail(end)?;
-                    Ok(())
-                })
-            })
-            // normal
-            .fallback(self, snapshot, || {
+        self.fallback(|| {
+            self.with_single_line(|| {
                 self.out.space()?;
                 self.expr(expr)?;
                 self.tail(end)?;
                 Ok(())
             })
-            // wrap and indent
-            .fallback(self, snapshot, || {
-                self.indented(|| {
-                    self.out.newline_indent()?;
-                    self.expr(expr)?;
-                    self.tail(end)?;
-                    Ok(())
-                })
+        })
+        // wrap and indent then single line
+        .next(self, || {
+            self.indented(|| {
+                self.out.newline_indent()?;
+                self.with_single_line(|| self.expr(expr))?;
+                self.tail(end)?;
+                Ok(())
             })
+        })
+        // normal
+        .next(self, || {
+            self.out.space()?;
+            self.expr(expr)?;
+            self.tail(end)?;
+            Ok(())
+        })
+        // wrap and indent
+        .next(self, || {
+            self.indented(|| {
+                self.out.newline_indent()?;
+                self.expr(expr)?;
+                self.tail(end)?;
+                Ok(())
+            })
+        })
+        .result()
     }
 }
