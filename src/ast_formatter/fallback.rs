@@ -3,31 +3,24 @@ use crate::error::{FormatErrorKind, FormatResult};
 use crate::source_formatter::{SourceFormatter, SourceFormatterSnapshot};
 
 impl AstFormatter {
-    pub fn fallback<T>(&self, first: impl FnOnce() -> FormatResult<T>) -> FallbackResult<T> {
+    pub fn fallback<T>(&self, first: impl FnOnce() -> FormatResult<T>) -> Fallback<T> {
         let out = &self.out;
         let snapshot = out.snapshot();
         let result = first();
-        FallbackResult { out, snapshot, result }
+        Fallback { out, snapshot, result }
     }
 }
 
 #[must_use]
-pub struct FallbackResult<'a, T> {
+pub struct Fallback<'a, T> {
     out: &'a SourceFormatter,
     snapshot: SourceFormatterSnapshot,
     result: FormatResult<T>,
 }
 
-impl<T> FallbackResult<'_, T> {
+impl<T> Fallback<'_, T> {
     pub fn next(mut self, fallback: impl FnOnce() -> FormatResult<T>) -> Self {
-        let should_fallback = match &self.result {
-            Ok(_) => false,
-            Err(e) => match e.kind {
-                FormatErrorKind::Parse(_) => false,
-                FormatErrorKind::Constraint(_) => true,
-            },
-        };
-        if !should_fallback {
+        if self.is_done() {
             return self;
         }
         self.out.restore(&self.snapshot);
@@ -35,11 +28,22 @@ impl<T> FallbackResult<'_, T> {
         self
     }
 
+    /// Returns true if the result is either Ok or a non-recoverable error
+    pub fn is_done(&self) -> bool {
+        match &self.result {
+            Ok(_) => true,
+            Err(e) => match e.kind {
+                FormatErrorKind::Parse(_) => true,
+                FormatErrorKind::Constraint(_) => false,
+            },
+        }
+    }
+
     pub fn result(self) -> FormatResult<T> {
         self.result
     }
-
-    pub fn result_ref(&self) -> &FormatResult<T> {
+    
+    pub fn peek_result(&self) -> &FormatResult<T> {
         &self.result
     }
 }

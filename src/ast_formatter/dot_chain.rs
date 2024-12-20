@@ -12,7 +12,7 @@ impl AstFormatter {
     pub fn dot_chain(&self, expr: &ast::Expr, tail: Tail<'_>, is_overflow: bool) -> FormatResult {
         let mut dot_chain = Vec::new();
         build_dot_chain(&mut dot_chain, expr);
-        let (root, dot_chain) = dot_chain.split_first().unwrap();
+        let (root, mut dot_chain) = dot_chain.split_first().unwrap();
         if is_overflow {
             // single-line the whole thing
             self.with_single_line(|| {
@@ -25,9 +25,28 @@ impl AstFormatter {
             self.tail(tail)?;
             return Ok(());
         }
-        let (len, height) = self.with_dimensions(|| self.expr(root))?;
-        if height == 0 {
-            self.dot_chain_single_line_root(dot_chain, len, tail)
+        let len_before_root = self.out.len();
+        let line_before_root = self.out.line();
+        self.expr(root)?;
+        // write items while they start within the indent margin
+        let same_line = loop {
+            if self.out.line() != line_before_root {
+                break false;
+            }
+            if self.out.len() > len_before_root + INDENT_WIDTH {
+                break true;
+            }
+            let next;
+            (next, dot_chain) = dot_chain.split_first().unwrap();
+            self.dot_chain_item(next)?;
+            if dot_chain.is_empty() {
+                self.tail(tail)?;
+                return Ok(());
+            }
+        };
+        if same_line {
+            let start_len = self.out.len() - len_before_root;
+            self.dot_chain_single_line_root(dot_chain, start_len, tail)
         } else {
             // each item on a separate line, no indent
             for item in dot_chain {
@@ -42,21 +61,29 @@ impl AstFormatter {
     fn dot_chain_single_line_root(
         &self,
         dot_chain: &[&ast::Expr],
-        root_len: usize,
+        start_len: usize,
         tail: Tail<'_>,
     ) -> FormatResult {
-        self.fallback(|| self.dot_chain_single_line(dot_chain, root_len, tail))
-            .next(|| self.dot_chain_separate_lines(dot_chain, root_len, tail))
+        self.fallback(|| self.dot_chain_single_line(dot_chain, start_len, tail))
+            .next(|| self.dot_chain_hanging_indent(dot_chain, tail))
             .result()
     }
 
     fn dot_chain_single_line(
         &self,
         dot_chain: &[&ast::Expr],
-        root_len: usize,
+        start_len: usize,
         tail: Tail<'_>,
     ) -> FormatResult {
-        let format = || {
+        let width_limit = if RUSTFMT_QUIRKS && dot_chain.len() == 1 {
+            None
+        } else {
+            match RUSTFMT_CONFIG_DEFAULTS.chain_width.checked_sub(start_len) {
+                None => return Err(self.out.format_error(WidthLimitExceededError)),
+                Some(width) => Some(width),
+            }
+        };
+        self.with_width_limit_first_line_opt(width_limit, || {
             let (last, until_last) = dot_chain.split_last().unwrap();
             self.with_single_line(|| {
                 self.with_no_overflow(|| {
@@ -67,7 +94,7 @@ impl AstFormatter {
                 })?;
                 let mut fallback =
                     self.fallback(|| self.with_no_overflow(|| self.dot_chain_item(last)));
-                if matches!(fallback.result_ref(), Ok(())) {
+                if fallback.is_done() {
                     return fallback.result();
                 }
                 fallback = fallback.next(|| {
@@ -77,7 +104,7 @@ impl AstFormatter {
                         Ok(())
                     })
                 });
-                if fallback.result_ref().is_ok() {
+                if fallback.peek_result().is_ok() {
                     // if wrapping makes the last item fit on one line,
                     // abort the single-line approach
                     return Err(self.out.format_error(WidthLimitExceededError));
@@ -85,34 +112,14 @@ impl AstFormatter {
                 // try with overflow
                 fallback.next(|| self.dot_chain_item(last)).result()
             })
-        };
-        if RUSTFMT_QUIRKS && dot_chain.len() == 1 {
-            format()?;
-        } else {
-            let Some(width) = RUSTFMT_CONFIG_DEFAULTS.chain_width.checked_sub(root_len) else {
-                return Err(self.out.format_error(WidthLimitExceededError));
-            };
-            self.with_width_limit_first_line(width, format)?;
-        }
+        })?;
         self.tail(tail)?;
         Ok(())
     }
 
-    fn dot_chain_separate_lines(
-        &self,
-        dot_chain: &[&ast::Expr],
-        root_len: usize,
-        tail: Tail<'_>,
-    ) -> FormatResult {
-        let rest = if root_len > INDENT_WIDTH {
-            dot_chain
-        } else {
-            let (first, rest) = dot_chain.split_first().unwrap();
-            self.dot_chain_item(first)?;
-            rest
-        };
+    fn dot_chain_hanging_indent(&self, dot_chain: &[&ast::Expr], tail: Tail<'_>) -> FormatResult {
         self.indented(|| {
-            for item in rest {
+            for item in dot_chain {
                 self.out.newline_indent()?;
                 self.dot_chain_item(item)?;
             }

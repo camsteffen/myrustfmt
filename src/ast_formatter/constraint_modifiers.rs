@@ -35,7 +35,11 @@ impl AstFormatter {
         result
     }
 
-    pub fn with_height_limit(&self, height: usize, f: impl FnOnce() -> FormatResult) -> FormatResult {
+    pub fn with_height_limit(
+        &self,
+        height: usize,
+        f: impl FnOnce() -> FormatResult,
+    ) -> FormatResult {
         let newlines = height - 1;
         if self
             .constraints()
@@ -51,7 +55,10 @@ impl AstFormatter {
         result
     }
 
-    pub fn with_dimensions(&self, f: impl FnOnce() -> FormatResult) -> FormatResult<(usize, usize)> {
+    pub fn with_dimensions(
+        &self,
+        f: impl FnOnce() -> FormatResult,
+    ) -> FormatResult<(usize, usize)> {
         let len = self.out.len();
         let line = self.out.line();
         f()?;
@@ -80,6 +87,17 @@ impl AstFormatter {
         let result = f();
         self.constraints().max_width_first_line.set(max_width_prev);
         result
+    }
+
+    pub fn with_width_limit_first_line_opt(
+        &self,
+        width_limit: Option<usize>,
+        f: impl FnOnce() -> FormatResult,
+    ) -> FormatResult {
+        match width_limit {
+            None => f(),
+            Some(width_limit) => self.with_width_limit_first_line(width_limit, f),
+        }
     }
 
     pub fn with_width_limit(
