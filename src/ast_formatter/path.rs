@@ -40,34 +40,52 @@ impl AstFormatter {
 
     pub fn path_segment(&self, segment: &ast::PathSegment) -> FormatResult {
         self.ident(segment.ident)?;
-        if let Some(args) = &segment.args.as_deref() {
-            match args {
-                ast::AngleBracketed(args) => {
-                    list(
-                        &args.args,
-                        |arg| match arg {
-                            ast::AngleBracketedArg::Arg(arg) => self.generic_arg(arg),
-                            ast::AngleBracketedArg::Constraint(_assoc_item_constraint) => todo!(),
-                        },
-                        AngleBracketedListConfig,
-                    )
-                    .format(self)?;
-                }
-                // (A, B) -> C
-                ast::Parenthesized(parenthesized_args) => {
-                    self.parenthesized_args(parenthesized_args)?;
-                }
-                ast::ParenthesizedElided(_span) => todo!(),
-            }
-        }
+        self.generic_args(segment.args.as_deref())?;
         Ok(())
     }
 
-    fn generic_arg(&self, arg: &ast::GenericArg) -> FormatResult {
-        match &arg {
-            ast::GenericArg::Lifetime(lifetime) => self.lifetime(lifetime),
-            ast::GenericArg::Type(ty) => self.ty(ty),
-            ast::GenericArg::Const(_anon_const) => todo!(),
+    fn generic_args(&self, generic_args: Option<&ast::GenericArgs>) -> FormatResult {
+        let Some(generic_args) = generic_args else {
+            return Ok(());
+        };
+        match generic_args {
+            ast::GenericArgs::AngleBracketed(args) => list(
+                &args.args,
+                |arg| self.angle_bracketed_arg(arg),
+                AngleBracketedListConfig,
+            )
+            .format(self),
+            // (A, B) -> C
+            ast::GenericArgs::Parenthesized(parenthesized_args) => {
+                self.parenthesized_args(parenthesized_args)
+            }
+            ast::GenericArgs::ParenthesizedElided(_span) => todo!(),
+        }
+    }
+
+    fn angle_bracketed_arg(&self, arg: &ast::AngleBracketedArg) -> FormatResult {
+        match arg {
+            ast::AngleBracketedArg::Arg(arg) => self.generic_arg(arg),
+            ast::AngleBracketedArg::Constraint(constraint) => {
+                self.assoc_item_constraint(constraint)
+            }
+        }
+    }
+
+    fn assoc_item_constraint(&self, constraint: &ast::AssocItemConstraint) -> FormatResult {
+        self.ident(constraint.ident)?;
+        self.generic_args(constraint.gen_args.as_ref())?;
+        match &constraint.kind {
+            ast::AssocItemConstraintKind::Bound { bounds } => self.generic_bounds(bounds),
+            ast::AssocItemConstraintKind::Equality { term } => {
+                self.out.space()?;
+                self.out.token_expect("=")?;
+                self.out.space()?;
+                match term {
+                    ast::Term::Const(anon_const) => todo!(),
+                    ast::Term::Ty(ty) => self.ty(ty),
+                }
+            },
         }
     }
 }

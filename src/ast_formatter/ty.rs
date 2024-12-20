@@ -6,7 +6,12 @@ use rustc_ast::ast;
 impl<'a> AstFormatter {
     pub fn ty(&self, ty: &ast::Ty) -> FormatResult {
         match &ty.kind {
-            ast::TyKind::Slice(_ty) => todo!(),
+            ast::TyKind::Slice(elem) => {
+                self.out.token_expect("[")?;
+                self.ty(elem)?;
+                self.out.token_expect("]")?;
+                Ok(())
+            },
             ast::TyKind::Array(_ty, _length) => todo!(),
             ast::TyKind::Ptr(_mut_ty) => todo!(),
             ast::TyKind::Ref(lifetime, mut_ty) => {
@@ -63,6 +68,14 @@ impl<'a> AstFormatter {
             }
         }
         Ok(())
+    }
+
+    pub fn generic_arg(&self, arg: &ast::GenericArg) -> FormatResult {
+        match &arg {
+            ast::GenericArg::Lifetime(lifetime) => self.lifetime(lifetime),
+            ast::GenericArg::Type(ty) => self.ty(ty),
+            ast::GenericArg::Const(_anon_const) => todo!(),
+        }
     }
 
     pub fn trait_ref(&self, trait_ref: &ast::TraitRef) -> FormatResult {

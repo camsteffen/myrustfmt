@@ -42,14 +42,21 @@ pub enum ParseError {
 
 impl FormatError {
     pub fn display(&self, source: &str) -> impl Display {
-        struct FormatErrorDisplay<'err> {
+        struct FormatErrorDisplay<'err, 'source> {
             error: &'err FormatError,
+            source: &'source str,
             line: usize,
             col: usize,
         }
-        impl Display for FormatErrorDisplay<'_> {
+        impl Display for FormatErrorDisplay<'_, '_> {
             fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
                 write!(f, "Error formatting at {}:{}, ", self.line, self.col)?;
+                let next_token = |f: &mut Formatter<'_>| {
+                    let remaining = &self.source[self.error.pos.to_usize()..];
+                    let token = rustc_lexer::tokenize(remaining).next().unwrap();
+                    let token_str = &remaining[..token.len as usize];
+                    write!(f, ". Next token is `{token_str}`")
+                };
                 match self.error.kind {
                     FormatErrorKind::Constraint(ConstraintError::WidthLimitExceeded) => {
                         write!(f, "width limit exceeded")?
@@ -57,21 +64,25 @@ impl FormatError {
                     FormatErrorKind::Constraint(ConstraintError::NewlineNotAllowed) => {
                         write!(f, "width limit exceeded")?
                     }
-                    FormatErrorKind::Parse(ParseError::ExpectedPosition(pos)) => write!(
-                        f,
-                        "expected position is {} bytes {}",
-                        pos.abs_diff(self.error.pos.to_usize()),
-                        if pos > self.error.pos.to_usize() { "ahead" } else { "behind" }
-                    )?,
+                    FormatErrorKind::Parse(ParseError::ExpectedPosition(pos)) => {
+                        write!(
+                            f,
+                            "expected position is {} bytes {}",
+                            pos.abs_diff(self.error.pos.to_usize()),
+                            if pos > self.error.pos.to_usize() { "ahead" } else { "behind" }
+                        )?;
+                        next_token(f)?;
+                    },
                     FormatErrorKind::Parse(ParseError::ExpectedToken(ref token)) => {
-                        write!(f, "expected token: {}", token)?
+                        write!(f, "expected token: `{}`", token)?;
+                        next_token(f)?;
                     }
                 }
                 Ok(())
             }
         }
         let (line, col) = line_col(source, self.pos.to_usize());
-        FormatErrorDisplay { error: self, line, col }
+        FormatErrorDisplay { error: self, source, line, col }
     }
 }
 
