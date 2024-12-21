@@ -22,7 +22,8 @@ impl<'a> AstFormatter {
                 self.out.space()?;
                 self.out.token_expect("else")?;
                 self.out.space()?;
-                self.block(else_, tail)?;
+                self.block(else_)?;
+                self.tail(tail)?;
                 Ok(())
             }
         }

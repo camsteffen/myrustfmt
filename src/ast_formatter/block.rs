@@ -4,25 +4,42 @@ use crate::error::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter {
-    pub fn block(&self, block: &ast::Block, tail: Tail<'_>) -> FormatResult {
+    pub fn block(&self, block: &ast::Block) -> FormatResult {
         self.out.token_at("{", block.span.lo())?;
-        self.block_after_open_brace(block, tail)?;
+        self.block_after_open_brace(block)?;
         Ok(())
     }
 
-    pub fn block_after_open_brace(&self, block: &ast::Block, end: Tail<'_>) -> FormatResult {
-        if !block.stmts.is_empty() {
+    pub fn block_after_open_brace(&self, block: &ast::Block) -> FormatResult {
+        self.block_generic_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))
+    }
+
+    pub fn block_generic<T>(
+        &self,
+        items: &[T],
+        format_item: impl Fn(&T) -> FormatResult,
+    ) -> FormatResult {
+        self.out.token_expect("{")?;
+        self.block_generic_after_open_brace(items, format_item)?;
+        Ok(())
+    }
+
+    pub fn block_generic_after_open_brace<T>(
+        &self,
+        items: &[T],
+        format_item: impl Fn(&T) -> FormatResult,
+    ) -> FormatResult {
+        if !items.is_empty() {
             self.indented(|| {
-                for stmt in &block.stmts {
+                for item in items {
                     self.out.newline_indent()?;
-                    self.stmt(stmt)?;
+                    format_item(item)?;
                 }
                 Ok(())
             })?;
             self.out.newline_indent()?;
         }
-        self.out.token_end_at("}", block.span.hi())?;
-        self.tail(end)?;
+        self.out.token_expect("}")?;
         Ok(())
     }
 

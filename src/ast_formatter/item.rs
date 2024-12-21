@@ -1,6 +1,4 @@
 use rustc_ast::ast;
-use rustc_ast::ptr::P;
-use rustc_span::Span;
 use rustc_span::symbol::Ident;
 
 use crate::ast_formatter::AstFormatter;
@@ -58,8 +56,7 @@ impl<'a> AstFormatter {
                 match mod_kind {
                     ast::ModKind::Loaded(items, ast::Inline::Yes, _mod_spans) => {
                         self.out.space()?;
-                        list(Braces::CURLY, items, |item| self.item(item))
-                            .format_separate_lines(self)?;
+                        self.block_generic(items, |item| self.item(item))?;
                     }
                     ast::ModKind::Loaded(_, ast::Inline::No, _) | ast::ModKind::Unloaded => {
                         self.out.token_end_at(";", item.span.hi())?;
@@ -82,7 +79,6 @@ impl<'a> AstFormatter {
             ast::ItemKind::Delegation(_) => todo!(),
             ast::ItemKind::DelegationMac(_) => todo!(),
         }
-        self.out.newline_indent()?;
         Ok(())
     }
 
@@ -171,23 +167,7 @@ impl<'a> AstFormatter {
         if impl_.generics.where_clause.is_empty() {
             self.out.space()?;
         }
-        self.assoc_items(&impl_.items, item.span)?;
-        Ok(())
-    }
-
-    fn assoc_items(&self, items: &[P<ast::AssocItem>], item_span: Span) -> FormatResult {
-        self.out.token_expect("{")?;
-        if !items.is_empty() {
-            self.indented(|| {
-                for item in items {
-                    self.out.newline_indent()?;
-                    self.assoc_item(item)?;
-                }
-                Ok(())
-            })?;
-            self.out.newline_indent()?;
-        }
-        self.out.token_end_at("}", item_span.hi())?;
+        self.block_generic(&impl_.items, |item| self.assoc_item(item))?;
         Ok(())
     }
 
@@ -249,7 +229,7 @@ impl<'a> AstFormatter {
         // self.generic_params(&trait_.generics.params)?;
         // self.generic_bounds(&trait_.bounds)?;
         self.out.space()?;
-        self.assoc_items(&trait_.items, item.span)?;
+        self.block_generic(&trait_.items, |item| self.assoc_item(item))?;
         Ok(())
     }
 

@@ -76,7 +76,8 @@ impl<'a> AstFormatter {
                 self.out.space()?;
                 self.expr(iter)?;
                 self.out.space()?;
-                self.block(body, tail)?;
+                self.block(body)?;
+                self.tail(tail)?;
                 Ok(())
             }
             ast::ExprKind::Loop(_, _, _) => todo!(),
@@ -87,7 +88,9 @@ impl<'a> AstFormatter {
             ast::ExprKind::Closure(ref closure) => self.closure(closure, false, tail),
             ast::ExprKind::Block(ref block, label) => {
                 self.label(label)?;
-                self.block(block, tail)
+                self.block(block)?;
+                self.tail(tail)?;
+                Ok(())
             }
             ast::ExprKind::Gen(_, _, _, _) => todo!(),
             ast::ExprKind::Await(_, _) => todo!(),
@@ -252,9 +255,12 @@ impl<'a> AstFormatter {
             .result()?;
 
         match else_ {
-            None => self.block_after_open_brace(block, tail)?,
+            None => {
+                self.block_after_open_brace(block)?;
+                self.tail(tail)?;
+            },
             Some(else_) => {
-                self.block_after_open_brace(block, Tail::NONE)?;
+                self.block_after_open_brace(block)?;
                 self.out.space()?;
                 self.out.token_expect("else")?;
                 self.out.space()?;
@@ -280,15 +286,7 @@ impl<'a> AstFormatter {
         self.out.token_at("match", expr.span.lo())?;
         self.out.space()?;
         self.expr_tail(scrutinee, Tail::OPEN_BLOCK)?;
-        self.indented(|| {
-            for arm in arms {
-                self.out.newline_indent()?;
-                self.arm(arm)?;
-            }
-            Ok(())
-        })?;
-        self.out.newline_indent()?;
-        self.out.token_expect("}")?;
+        self.block_generic_after_open_brace(arms, |arm| self.arm(arm))?;
         self.tail(end)
     }
 

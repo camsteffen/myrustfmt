@@ -34,9 +34,9 @@ impl<'a> AstFormatter {
         self.where_clause(&generics.where_clause)?;
         if let Some(body) = body {
             if opened_block {
-                self.block_after_open_brace(body, Tail::NONE)?;
+                self.block_after_open_brace(body)?;
             } else {
-                self.block(body, Tail::NONE)?;
+                self.block(body)?;
             }
         } else {
             self.out.token_expect(";")?;
@@ -178,6 +178,7 @@ impl<'a> AstFormatter {
         input_list_config: &C,
         tail: Tail<'_>,
     ) -> FormatResult {
+        // args and return type all on one line
         self.fallback(|| {
             list(braces, inputs, |param| self.param(param))
                 .config(input_list_config)
@@ -186,6 +187,7 @@ impl<'a> AstFormatter {
             self.tail(tail)?;
             Ok(())
         })
+        // args on separate lines
         .next(|| {
             list(braces, inputs, |param| self.param(param))
                 .config(input_list_config)

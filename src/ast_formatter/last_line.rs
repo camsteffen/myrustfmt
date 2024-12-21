@@ -4,8 +4,8 @@ use crate::error::FormatResult;
 /// Used to add trailing tokens to a formatted node, ensuring that
 /// the formatting pattern allows room for them.
 /// 
-/// Formatting functions should only accept a Tail argument if it contains
-/// fallbacks.
+/// Formatting functions should only accept a Tail argument if it will be used
+/// to fall back to a different format when it doesn't fit.
 #[derive(Clone, Copy)]
 pub struct Tail<'a>(TailImpl<'a>);
 
