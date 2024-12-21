@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::{
-    ArrayListConfig, ListRest, list, param_list_config, struct_field_list_config,
+    ArrayListConfig, Braces, ListRest, ParamListConfig, list, struct_field_list_config,
 };
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -17,7 +17,8 @@ impl<'a> AstFormatter {
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: Tail<'_>) -> FormatResult {
         match expr.kind {
-            ast::ExprKind::Array(ref items) => list(items, |e| self.expr(e), ArrayListConfig)
+            ast::ExprKind::Array(ref items) => list(Braces::SQUARE, items, |e| self.expr(e))
+                .config(&ArrayListConfig)
                 .overflow()
                 .tail(tail)
                 .format(self),
@@ -26,13 +27,12 @@ impl<'a> AstFormatter {
             ast::ExprKind::Field(..) | ast::ExprKind::MethodCall(_) => {
                 self.dot_chain(expr, tail, false)
             }
-            ast::ExprKind::Tup(ref items) => list(
-                items,
-                |item| self.expr(item),
-                param_list_config(Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)),
-            )
-            .tail(tail)
-            .format(self),
+            ast::ExprKind::Tup(ref items) => list(Braces::PARENS, items, |item| self.expr(item))
+                .config(&ParamListConfig {
+                    single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
+                })
+                .tail(tail)
+                .format(self),
             ast::ExprKind::Binary(op, ref left, ref right) => self.binop(left, op, right, tail),
             ast::ExprKind::Unary(op, ref target) => {
                 self.out.token_expect(op.as_str())?;
@@ -219,15 +219,13 @@ impl<'a> AstFormatter {
 
     fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], end: Tail<'_>) -> FormatResult {
         self.expr(func)?;
-        let single_line_max_contents_width = RUSTFMT_CONFIG_DEFAULTS.fn_call_width;
-        list(
-            args,
-            |arg| self.expr(arg),
-            param_list_config(Some(single_line_max_contents_width)),
-        )
-        .overflow()
-        .tail(end)
-        .format(self)
+        list(Braces::PARENS, args, |arg| self.expr(arg))
+            .config(&ParamListConfig {
+                single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
+            })
+            .overflow()
+            .tail(end)
+            .format(self)
     }
 
     fn delim_args(&self, delim_args: &ast::DelimArgs, end: Tail<'_>) -> FormatResult {
@@ -347,14 +345,14 @@ impl<'a> AstFormatter {
     fn struct_expr(&self, struct_: &ast::StructExpr, tail: Tail<'_>) -> FormatResult {
         self.qpath(&struct_.qself, &struct_.path, true)?;
         self.out.space()?;
-        list(
-            &struct_.fields,
-            |f| self.expr_field(f),
-            struct_field_list_config(false, RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
-        )
-        .rest(ListRest::from(&struct_.rest))
-        .tail(tail)
-        .format(self)?;
+        list(Braces::CURLY, &struct_.fields, |f| self.expr_field(f))
+            .config(&struct_field_list_config(
+                false,
+                RUSTFMT_CONFIG_DEFAULTS.struct_lit_width,
+            ))
+            .rest(ListRest::from(&struct_.rest))
+            .tail(tail)
+            .format(self)?;
         Ok(())
     }
 

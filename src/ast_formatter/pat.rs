@@ -3,7 +3,9 @@ use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{ListRest, list, param_list_config, struct_field_list_config};
+use crate::ast_formatter::list::{
+    Braces, ListRest, ParamListConfig, list, struct_field_list_config,
+};
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
@@ -39,7 +41,10 @@ impl<'a> AstFormatter {
             }
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 self.qpath(qself, path, false)?;
-                list(fields, |pat| self.pat(pat), param_list_config(None))
+                list(Braces::PARENS, fields, |pat| self.pat(pat))
+                    .config(&ParamListConfig {
+                        single_line_max_contents_width: None,
+                    })
                     .tail(end)
                     .format(self)
             }
@@ -55,11 +60,12 @@ impl<'a> AstFormatter {
                 Ok(())
             }
             ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false),
-            ast::PatKind::Tuple(ref fields) => {
-                list(fields, |pat| self.pat(pat), param_list_config(None))
-                    .tail(end)
-                    .format(self)
-            }
+            ast::PatKind::Tuple(ref fields) => list(Braces::PARENS, fields, |pat| self.pat(pat))
+                .config(&ParamListConfig {
+                    single_line_max_contents_width: None,
+                })
+                .tail(end)
+                .format(self),
             ast::PatKind::Box(_) => todo!(),
             ast::PatKind::Deref(_) => todo!(),
             ast::PatKind::Ref(_, _) => todo!(),
@@ -86,14 +92,14 @@ impl<'a> AstFormatter {
         self.out.space()?;
         let single_line_block =
             self.config().rustfmt_quirks && matches!(rest, ast::PatFieldsRest::Rest);
-        list(
-            fields,
-            |f| self.pat_field(f),
-            struct_field_list_config(single_line_block, RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
-        )
-        .rest(ListRest::from(rest))
-        .tail(end)
-        .format(self)
+        list(Braces::CURLY, fields, |f| self.pat_field(f))
+            .config(&struct_field_list_config(
+                single_line_block,
+                RUSTFMT_CONFIG_DEFAULTS.struct_lit_width,
+            ))
+            .rest(ListRest::from(rest))
+            .tail(end)
+            .format(self)
     }
 
     fn pat_field(&self, pat_field: &ast::PatField) -> FormatResult {

@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{ListConfig, list, param_list_config};
+use crate::ast_formatter::list::{Braces, DefaultListConfig, ListConfig, ParamListConfig, list};
 use crate::error::FormatResult;
 
 use rustc_ast::ast;
@@ -23,7 +23,14 @@ impl<'a> AstFormatter {
         } else {
             (Tail::NONE, false)
         };
-        self.fn_decl(&sig.decl, param_list_config(None), decl_tail)?;
+        self.fn_decl(
+            &sig.decl,
+            Braces::PARENS,
+            &ParamListConfig {
+                single_line_max_contents_width: None,
+            },
+            decl_tail,
+        )?;
         self.where_clause(&generics.where_clause)?;
         if let Some(body) = body {
             if opened_block {
@@ -67,7 +74,7 @@ impl<'a> AstFormatter {
         if let Some(coroutine_kind) = coroutine_kind {
             self.coroutine_kind(coroutine_kind)?;
         }
-        self.fn_decl(fn_decl, ClosureParamListConfig, Tail::NONE)?;
+        self.fn_decl(fn_decl, Braces::PIPE, &DefaultListConfig, Tail::NONE)?;
         self.out.space()?;
 
         if is_overflow {
@@ -137,12 +144,11 @@ impl<'a> AstFormatter {
     }
 
     pub fn parenthesized_args(&self, parenthesized_args: &ast::ParenthesizedArgs) -> FormatResult {
-        list(
-            &parenthesized_args.inputs,
-            |ty| self.ty(ty),
-            param_list_config(None),
-        )
-        .format(self)?;
+        list(Braces::PARENS, &parenthesized_args.inputs, |ty| self.ty(ty))
+            .config(&ParamListConfig {
+                single_line_max_contents_width: None,
+            })
+            .format(self)?;
         self.fn_ret_ty(&parenthesized_args.output)?;
         Ok(())
     }
@@ -168,19 +174,22 @@ impl<'a> AstFormatter {
     fn fn_decl<C: ListConfig>(
         &self,
         ast::FnDecl { inputs, output }: &ast::FnDecl,
-        input_list_config: C,
+        braces: &'static Braces,
+        input_list_config: &C,
         tail: Tail<'_>,
     ) -> FormatResult {
         self.fallback(|| {
-            self.list_single_line(inputs, |param| self.param(param), input_list_config)?;
+            list(braces, inputs, |param| self.param(param))
+                .config(input_list_config)
+                .format_single_line(self)?;
             self.with_single_line(|| self.fn_ret_ty(output))?;
             self.tail(tail)?;
             Ok(())
         })
         .next(|| {
-            self.list_separate_lines(inputs, C::START_BRACE, C::END_BRACE, |param| {
-                self.param(param)
-            })?;
+            list(braces, inputs, |param| self.param(param))
+                .config(input_list_config)
+                .format_separate_lines(self)?;
             self.fn_ret_ty(output)?;
             self.tail(tail)?;
             Ok(())
@@ -264,12 +273,4 @@ impl<'a> AstFormatter {
             }
         }
     }
-}
-
-struct ClosureParamListConfig;
-
-impl ListConfig for ClosureParamListConfig {
-    const START_BRACE: &'static str = "|";
-    const END_BRACE: &'static str = "|";
-    const PAD_CONTENTS: bool = false;
 }

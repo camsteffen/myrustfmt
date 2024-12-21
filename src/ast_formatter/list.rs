@@ -6,11 +6,26 @@ use rustc_ast::ast;
 use rustc_ast::ptr::P;
 use std::marker::PhantomData;
 
-pub trait ListConfig {
-    const START_BRACE: &'static str;
-    const END_BRACE: &'static str;
-    const PAD_CONTENTS: bool;
+pub struct Braces {
+    start: &'static str,
+    end: &'static str,
+    pad: bool,
+}
 
+impl Braces {
+    pub const ANGLE: &'static Braces = &Braces::new("<", ">", false);
+    pub const CURLY: &'static Braces = &Braces::new("{", "}", true);
+    pub const CURLY_NO_PAD: &'static Braces = &Braces::new("{", "}", false);
+    pub const PARENS: &'static Braces = &Braces::new("(", ")", false);
+    pub const PIPE: &'static Braces = &Braces::new("|", "|", false);
+    pub const SQUARE: &'static Braces = &Braces::new("[", "]", false);
+
+    const fn new(start: &'static str, end: &'static str, pad: bool) -> Braces {
+        Braces { start, end, pad }
+    }
+}
+
+pub trait ListConfig {
     fn single_line_block(&self) -> bool {
         false
     }
@@ -24,51 +39,33 @@ pub trait ListConfig {
     }
 }
 
+pub struct DefaultListConfig;
+impl ListConfig for DefaultListConfig {}
+
 pub enum ListWrapToFitConfig {
     No,
     Yes { max_element_width: Option<usize> },
 }
 
-pub struct AngleBracketedListConfig;
-impl ListConfig for AngleBracketedListConfig {
-    const START_BRACE: &'static str = "<";
-    const END_BRACE: &'static str = ">";
-    const PAD_CONTENTS: bool = false;
-}
-
 pub struct ArrayListConfig;
 impl ListConfig for ArrayListConfig {
-    const START_BRACE: &'static str = "[";
-    const END_BRACE: &'static str = "]";
-    const PAD_CONTENTS: bool = false;
-
     fn single_line_max_contents_width(&self) -> Option<usize> {
         Some(RUSTFMT_CONFIG_DEFAULTS.array_width)
     }
 
     fn wrap_to_fit() -> ListWrapToFitConfig {
-        // short_array_element_width_threshold in rustfmt
         ListWrapToFitConfig::Yes {
-            max_element_width: Some(10),
+            max_element_width: Some(RUSTFMT_CONFIG_DEFAULTS.short_array_element_width_threshold),
         }
     }
 }
 
-pub fn param_list_config(single_line_max_contents_width: Option<usize>) -> impl ListConfig {
-    struct ParamListConfig {
-        single_line_max_contents_width: Option<usize>,
-    }
-    impl ListConfig for ParamListConfig {
-        const START_BRACE: &'static str = "(";
-        const END_BRACE: &'static str = ")";
-        const PAD_CONTENTS: bool = false;
-
-        fn single_line_max_contents_width(&self) -> Option<usize> {
-            self.single_line_max_contents_width
-        }
-    }
-    ParamListConfig {
-        single_line_max_contents_width,
+pub struct ParamListConfig {
+    pub single_line_max_contents_width: Option<usize>,
+}
+impl ListConfig for ParamListConfig {
+    fn single_line_max_contents_width(&self) -> Option<usize> {
+        self.single_line_max_contents_width
     }
 }
 
@@ -81,10 +78,6 @@ pub fn struct_field_list_config(
         single_line_max_contents_width: usize,
     }
     impl ListConfig for StructFieldListConfig {
-        const START_BRACE: &'static str = "{";
-        const END_BRACE: &'static str = "}";
-        const PAD_CONTENTS: bool = true;
-
         fn single_line_block(&self) -> bool {
             self.single_line_block
         }
@@ -96,18 +89,6 @@ pub fn struct_field_list_config(
     StructFieldListConfig {
         single_line_block,
         single_line_max_contents_width,
-    }
-}
-
-pub struct StructFieldListConfig;
-
-impl ListConfig for StructFieldListConfig {
-    const START_BRACE: &'static str = "{";
-    const END_BRACE: &'static str = "}";
-    const PAD_CONTENTS: bool = true;
-
-    fn single_line_max_contents_width(&self) -> Option<usize> {
-        Some(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
     }
 }
 
@@ -150,50 +131,67 @@ impl<T: Overflow> ListOverflow for ListOverflowYes<T> {
     }
 }
 
-pub fn list<'a, 'list, Item, FormatItem, Config>(
+pub fn list<'a, 'list, Item, FormatItem>(
+    braces: &'static Braces,
     list: &'list [Item],
     format_item: FormatItem,
-    config: Config,
-) -> ListBuilder<'list, 'static, Item, FormatItem, Config, ListOverflowNo<Item>>
+) -> ListBuilder<'list, 'static, 'static, Item, FormatItem, DefaultListConfig, ListOverflowNo<Item>>
 where
-    Config: ListConfig,
     FormatItem: Fn(&Item) -> FormatResult,
 {
     ListBuilder {
+        braces,
         list,
         rest: ListRest::None,
         format_item,
-        config,
         tail: Tail::NONE,
+        config: &DefaultListConfig,
         overflow: ListOverflowNo(PhantomData),
     }
 }
 
-pub struct ListBuilder<'ast, 'tail, Item, FormatItem, Config, Overflow> {
+pub struct ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, Overflow> {
+    braces: &'static Braces,
     list: &'ast [Item],
-    rest: ListRest<'ast>,
     format_item: FormatItem,
-    config: Config,
+    rest: ListRest<'ast>,
     tail: Tail<'tail>,
+    config: &'config Config,
     overflow: Overflow,
 }
 
-impl<'a, 'ast, 'tail, Item, FormatItem, Config, Overflow>
-    ListBuilder<'ast, 'tail, Item, FormatItem, Config, Overflow>
+impl<'a, 'ast, 'tail, 'config, Item, FormatItem, Config, Overflow>
+    ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, Overflow>
 where
     Config: ListConfig,
     FormatItem: Fn(&Item) -> FormatResult,
     Overflow: ListOverflow<Item = Item>,
 {
+    pub fn config<'config_new, ConfigNew: ListConfig>(
+        self,
+        config: &'config_new ConfigNew,
+    ) -> ListBuilder<'ast, 'tail, 'config_new, Item, FormatItem, ConfigNew, Overflow> {
+        ListBuilder {
+            braces: self.braces,
+            list: self.list,
+            format_item: self.format_item,
+            rest: self.rest,
+            tail: self.tail,
+            config,
+            overflow: self.overflow,
+        }
+    }
+
     pub fn overflow(
         self,
-    ) -> ListBuilder<'ast, 'tail, Item, FormatItem, Config, ListOverflowYes<Item>> {
+    ) -> ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, ListOverflowYes<Item>> {
         ListBuilder {
+            braces: self.braces,
             list: self.list,
-            rest: ListRest::None,
             format_item: self.format_item,
-            config: self.config,
+            rest: self.rest,
             tail: self.tail,
+            config: self.config,
             overflow: ListOverflowYes(PhantomData),
         }
     }
@@ -205,32 +203,61 @@ where
     pub fn tail<'tail_new>(
         self,
         tail: Tail<'tail_new>,
-    ) -> ListBuilder<'ast, 'tail_new, Item, FormatItem, Config, Overflow> {
+    ) -> ListBuilder<'ast, 'tail_new, 'config, Item, FormatItem, Config, Overflow> {
         ListBuilder {
+            braces: self.braces,
             list: self.list,
-            rest: self.rest,
             format_item: self.format_item,
+            rest: self.rest,
+            tail,
             config: self.config,
             overflow: self.overflow,
-            tail,
         }
     }
 
     pub fn format(self, this: &AstFormatter) -> FormatResult {
         this.format_list(
-            Config::START_BRACE,
-            Config::END_BRACE,
+            self.braces,
             self.list.is_empty(),
             |tail| {
                 this.list_contents(
                     self.list,
-                    self.rest,
                     self.format_item,
+                    self.rest,
+                    tail,
                     self.overflow,
                     self.config,
-                    tail,
+                    self.braces.pad,
                 )
             },
+            self.tail,
+        )
+    }
+
+    pub fn format_single_line(self, this: &AstFormatter) -> FormatResult {
+        this.format_list(
+            self.braces,
+            self.list.is_empty(),
+            |tail| {
+                this.list_contents_single_line(
+                    self.list,
+                    self.format_item,
+                    self.rest,
+                    tail,
+                    self.overflow,
+                    self.braces.pad,
+                    self.config.single_line_max_contents_width(),
+                )
+            },
+            self.tail,
+        )
+    }
+
+    pub fn format_separate_lines(self, this: &AstFormatter) -> FormatResult {
+        this.format_list(
+            self.braces,
+            self.list.is_empty(),
+            |tail| this.list_contents_separate_lines(self.list, self.format_item, self.rest, tail),
             self.tail,
         )
     }
@@ -263,63 +290,21 @@ impl<'a> From<&'a ast::StructRest> for ListRest<'a> {
 }
 
 impl<'a> AstFormatter {
-    pub fn list_single_line<T, C: ListConfig>(
-        &self,
-        list: &[T],
-        format_item: impl Fn(&T) -> FormatResult,
-        config: C,
-    ) -> FormatResult {
-        self.format_list(
-            C::START_BRACE,
-            C::END_BRACE,
-            list.is_empty(),
-            |tail| {
-                self.list_contents_single_line(
-                    list,
-                    ListRest::None,
-                    format_item,
-                    tail,
-                    ListOverflowNo(PhantomData),
-                    C::PAD_CONTENTS,
-                    config.single_line_max_contents_width(),
-                )
-            },
-            Tail::NONE,
-        )
-    }
-
-    pub fn list_separate_lines<T>(
-        &self,
-        list: &[T],
-        start_brace: &'static str,
-        end_brace: &'static str,
-        format_item: impl Fn(&T) -> FormatResult,
-    ) -> FormatResult {
-        self.format_list(
-            start_brace,
-            end_brace,
-            list.is_empty(),
-            |tail| self.list_contents_separate_lines(list, ListRest::None, format_item, tail),
-            Tail::NONE,
-        )
-    }
-
     fn format_list<'b, 'c>(
         &self,
-        start_brace: &'static str,
-        end_brace: &'static str,
+        braces: &'static Braces,
         is_empty: bool,
         contents: impl FnOnce(Tail) -> FormatResult + 'b,
         end: Tail<'_>,
     ) -> FormatResult {
-        self.out.token_expect(start_brace)?;
+        self.out.token_expect(braces.start)?;
         if is_empty {
-            self.out.token_expect(end_brace)?;
+            self.out.token_expect(braces.end)?;
             self.tail(end)?;
             return Ok(());
         }
         contents(Tail::new(&move || {
-            self.out.token_expect(end_brace)?;
+            self.out.token_expect(braces.end)?;
             self.tail(end)?;
             Ok(())
         }))
@@ -328,11 +313,12 @@ impl<'a> AstFormatter {
     fn list_contents<T, Config>(
         &self,
         list: &[T],
-        rest: ListRest<'_>,
         format_item: impl Fn(&T) -> FormatResult,
-        overflow: impl ListOverflow<Item = T>,
-        config: Config,
+        rest: ListRest<'_>,
         tail: Tail<'_>,
+        overflow: impl ListOverflow<Item = T>,
+        config: &Config,
+        pad: bool,
     ) -> FormatResult
     where
         Config: ListConfig,
@@ -340,11 +326,11 @@ impl<'a> AstFormatter {
         let mut fallback = self.fallback(|| {
             self.list_contents_single_line(
                 list,
-                rest,
                 &format_item,
+                rest,
                 tail,
                 overflow,
-                Config::PAD_CONTENTS,
+                pad,
                 config.single_line_max_contents_width(),
             )
         });
@@ -372,7 +358,7 @@ impl<'a> AstFormatter {
             ListWrapToFitConfig::No => {}
         }
         fallback
-            .next(|| self.list_contents_separate_lines(list, rest, format_item, tail))
+            .next(|| self.list_contents_separate_lines(list, format_item, rest, tail))
             .result()
     }
 
@@ -380,14 +366,14 @@ impl<'a> AstFormatter {
     fn list_contents_single_line<Item, Overflow: ListOverflow<Item = Item>>(
         &self,
         list: &[Item],
-        rest: ListRest<'_>,
         format_item: impl Fn(&Item) -> FormatResult,
+        rest: ListRest<'_>,
         tail: Tail,
         _overflow: Overflow,
-        pad_contents: bool,
+        pad: bool,
         max_width: Option<usize>,
     ) -> FormatResult {
-        if pad_contents {
+        if pad {
             self.out.space()?;
         }
         let (last, until_last) = list.split_last().unwrap();
@@ -417,7 +403,7 @@ impl<'a> AstFormatter {
                     self.expr(expr)?;
                 }
             }
-            if pad_contents {
+            if pad {
                 self.out.space()?;
             }
             Ok(())
@@ -531,8 +517,8 @@ impl<'a> AstFormatter {
     fn list_contents_separate_lines<T>(
         &self,
         list: &[T],
-        rest: ListRest<'_>,
         format_item: impl Fn(&T) -> FormatResult,
+        rest: ListRest<'_>,
         tail: Tail<'_>,
     ) -> FormatResult {
         self.indented(|| {

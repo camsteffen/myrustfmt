@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 
-use crate::ast_formatter::list::{list, param_list_config};
+use crate::ast_formatter::list::{Braces, ParamListConfig, list};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 
@@ -32,9 +32,7 @@ impl AstFormatter {
                     Ok(())
                 }
             },
-            ast::AttrKind::DocComment(_comment_kind, _symbol) => {
-                self.out.copy_span(attr.span)
-            }
+            ast::AttrKind::DocComment(_comment_kind, _symbol) => self.out.copy_span(attr.span),
         }
     }
 
@@ -43,19 +41,15 @@ impl AstFormatter {
         self.path(&meta.path, false)?;
         match &meta.kind {
             ast::MetaItemKind::Word => Ok(()),
-            ast::MetaItemKind::List(items) => {
-                let single_line_max_contents_width = RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width;
-                list(
-                    items,
-                    |item| match item {
-                        ast::MetaItemInner::MetaItem(item) => self.meta_item(item),
-                        ast::MetaItemInner::Lit(lit) => self.meta_item_lit(lit),
-                    },
-                    param_list_config(Some(single_line_max_contents_width)),
-                )
-                .overflow()
-                .format(self)
-            }
+            ast::MetaItemKind::List(items) => list(Braces::PARENS, items, |item| match item {
+                ast::MetaItemInner::MetaItem(item) => self.meta_item(item),
+                ast::MetaItemInner::Lit(lit) => self.meta_item_lit(lit),
+            })
+            .config(&ParamListConfig {
+                single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
+            })
+            .overflow()
+            .format(self),
             ast::MetaItemKind::NameValue(lit) => self.meta_item_lit(lit),
         }
     }

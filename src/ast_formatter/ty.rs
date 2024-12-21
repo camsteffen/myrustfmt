@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{list, param_list_config};
+use crate::ast_formatter::list::{Braces, ParamListConfig, list};
 use crate::error::FormatResult;
 use rustc_ast::ast;
 
@@ -11,7 +11,7 @@ impl<'a> AstFormatter {
                 self.ty(elem)?;
                 self.out.token_expect("]")?;
                 Ok(())
-            },
+            }
             ast::TyKind::Array(_ty, _length) => todo!(),
             ast::TyKind::Ptr(_mut_ty) => todo!(),
             ast::TyKind::Ref(lifetime, mut_ty) => {
@@ -26,9 +26,11 @@ impl<'a> AstFormatter {
             ast::TyKind::PinnedRef(_lifetime, _mut_ty) => todo!(),
             ast::TyKind::BareFn(_ty) => todo!(),
             ast::TyKind::Never => todo!(),
-            ast::TyKind::Tup(elements) => {
-                list(elements, |ty| self.ty(ty), param_list_config(None)).format(self)
-            }
+            ast::TyKind::Tup(elements) => list(Braces::PARENS, elements, |ty| self.ty(ty))
+                .config(&ParamListConfig {
+                    single_line_max_contents_width: None,
+                })
+                .format(self),
             ast::TyKind::Path(qself, path) => self.qpath(qself, path, false),
             ast::TyKind::TraitObject(_bounds, _syntax) => todo!(),
             ast::TyKind::ImplTrait(_, bounds) => {
@@ -70,7 +72,7 @@ impl<'a> AstFormatter {
         }
         Ok(())
     }
-    
+
     fn generic_bound(&self, bound: &ast::GenericBound) -> FormatResult {
         match bound {
             ast::GenericBound::Trait(poly_trait_ref) => self.poly_trait_ref(poly_trait_ref),

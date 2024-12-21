@@ -2,7 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{AngleBracketedListConfig, list};
+use crate::ast_formatter::list::{Braces, list};
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
@@ -73,11 +73,9 @@ impl AstFormatter {
 
     fn generic_args(&self, generic_args: &ast::GenericArgs) -> FormatResult {
         match generic_args {
-            ast::GenericArgs::AngleBracketed(args) => list(
-                &args.args,
-                |arg| self.angle_bracketed_arg(arg),
-                AngleBracketedListConfig,
-            )
+            ast::GenericArgs::AngleBracketed(args) => list(Braces::ANGLE, &args.args, |arg| {
+                self.angle_bracketed_arg(arg)
+            })
             .format(self),
             // (A, B) -> C
             ast::GenericArgs::Parenthesized(parenthesized_args) => {

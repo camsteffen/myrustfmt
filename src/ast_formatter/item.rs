@@ -5,7 +5,7 @@ use rustc_span::symbol::Ident;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{
-    ListConfig, ListWrapToFitConfig, list, param_list_config, struct_field_list_config,
+    Braces, ListConfig, ListWrapToFitConfig, ParamListConfig, list, struct_field_list_config,
 };
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -58,7 +58,8 @@ impl<'a> AstFormatter {
                 match mod_kind {
                     ast::ModKind::Loaded(items, ast::Inline::Yes, _mod_spans) => {
                         self.out.space()?;
-                        self.list_separate_lines(items, "{", "}", |item| self.item(item))?;
+                        list(Braces::CURLY, items, |item| self.item(item))
+                            .format_separate_lines(self)?;
                     }
                     ast::ModKind::Loaded(_, ast::Inline::No, _) | ast::ModKind::Unloaded => {
                         self.out.token_end_at(";", item.span.hi())?;
@@ -134,7 +135,7 @@ impl<'a> AstFormatter {
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         self.out.space()?;
-        self.list_separate_lines(variants, "{", "}", |v| self.variant(v))?;
+        list(Braces::CURLY, variants, |v| self.variant(v)).format_separate_lines(self)?;
         Ok(())
     }
 
@@ -256,16 +257,20 @@ impl<'a> AstFormatter {
         match variants {
             ast::VariantData::Struct { fields, .. } => {
                 self.out.space()?;
-                list(
-                    fields,
-                    |f| self.field_def(f),
-                    struct_field_list_config(false, RUSTFMT_CONFIG_DEFAULTS.struct_variant_width),
-                )
-                .format(self)?;
+                list(Braces::CURLY, fields, |f| self.field_def(f))
+                    .config(&struct_field_list_config(
+                        false,
+                        RUSTFMT_CONFIG_DEFAULTS.struct_variant_width,
+                    ))
+                    .format(self)?;
                 Ok(())
             }
             ast::VariantData::Tuple(fields, _) => {
-                list(fields, |f| self.field_def(f), param_list_config(None)).format(self)
+                list(Braces::PARENS, fields, |f| self.field_def(f))
+                    .config(&ParamListConfig {
+                        single_line_max_contents_width: None,
+                    })
+                    .format(self)
             }
             ast::VariantData::Unit(_) => Ok(()),
         }
@@ -299,15 +304,15 @@ impl<'a> AstFormatter {
                     .iter()
                     .any(|(item, _)| matches!(item.kind, ast::UseTreeKind::Nested { .. }));
                 if has_nested {
-                    self.list_separate_lines(items, "{", "}", |(use_tree, _)| {
+                    list(Braces::CURLY, items, |(use_tree, _)| {
                         self.use_tree(use_tree)
-                    })?
+                    })
+                    .format_separate_lines(self)?
                 } else {
-                    list(
-                        items,
-                        |(use_tree, _)| self.use_tree(use_tree),
-                        UseTreeListConfig,
-                    )
+                    list(Braces::CURLY_NO_PAD, items, |(use_tree, _)| {
+                        self.use_tree(use_tree)
+                    })
+                    .config(&UseTreeListConfig)
                     .format(self)?
                 }
             }
@@ -320,10 +325,6 @@ impl<'a> AstFormatter {
 struct UseTreeListConfig;
 
 impl ListConfig for UseTreeListConfig {
-    const START_BRACE: &'static str = "{";
-    const END_BRACE: &'static str = "}";
-    const PAD_CONTENTS: bool = false;
-
     fn wrap_to_fit() -> ListWrapToFitConfig {
         ListWrapToFitConfig::Yes {
             max_element_width: None,

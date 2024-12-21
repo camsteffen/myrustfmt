@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{AngleBracketedListConfig, list};
+use crate::ast_formatter::list::{list, Braces};
 use crate::error::FormatResult;
 
 use rustc_ast::ast;
@@ -9,7 +9,7 @@ impl AstFormatter {
         if params.is_empty() {
             return Ok(());
         }
-        list(params, |p| self.generic_param(p), AngleBracketedListConfig).format(self)
+        list(Braces::ANGLE, params, |p| self.generic_param(p)).format(self)
     }
 
     fn generic_param(&self, param: &ast::GenericParam) -> FormatResult {

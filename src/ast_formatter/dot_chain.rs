@@ -1,7 +1,7 @@
 use crate::RUSTFMT_QUIRKS;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{list, param_list_config};
+use crate::ast_formatter::list::{Braces, ParamListConfig, list};
 use crate::constraints::INDENT_WIDTH;
 use crate::error::FormatResult;
 use crate::error::WidthLimitExceededError;
@@ -135,14 +135,15 @@ impl AstFormatter {
             ast::ExprKind::Field(_, ident) => self.ident(ident),
             ast::ExprKind::MethodCall(ref method_call) => {
                 self.path_segment(&method_call.seg, true)?;
-                list(
-                    &method_call.args,
-                    |arg| self.expr(arg),
-                    // param_list_config(Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)),
-                    param_list_config(None),
-                )
-                .overflow()
-                .format(self)?;
+                list(Braces::PARENS, &method_call.args, |arg| self.expr(arg))
+                    .config(
+                        // param_list_config(Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)),
+                        &ParamListConfig {
+                            single_line_max_contents_width: None,
+                        },
+                    )
+                    .overflow()
+                    .format(self)?;
                 Ok(())
             }
             _ => unreachable!("invalid dot chain item ExprKind"),
