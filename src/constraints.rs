@@ -3,11 +3,19 @@ use std::cell::Cell;
 
 pub const INDENT_WIDTH: usize = 4;
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug)]
+pub struct MaxWidthForLine {
+    pub line: usize,
+    pub max_width: usize,
+}
+
+#[derive(Clone, Debug)]
 pub struct Constraints {
     pub single_line: Cell<bool>,
     pub max_width: Cell<Option<usize>>,
-    pub max_width_first_line: Cell<Option<usize>>,
+    /// Used to set the max width for the current line, so it no longer applies after a newline
+    /// character is printed
+    pub max_width_for_line: Cell<Option<MaxWidthForLine>>,
     pub indent: Cell<usize>,
     pub newline_budget: Cell<Option<usize>>,
 }
@@ -17,7 +25,7 @@ impl Constraints {
         Constraints {
             indent: Cell::new(0),
             max_width: Cell::new(Some(max_width)),
-            max_width_first_line: Cell::new(None),
+            max_width_for_line: Cell::new(None),
             newline_budget: Cell::new(None),
             single_line: Cell::new(false),
         }
@@ -27,13 +35,13 @@ impl Constraints {
         let Constraints {
             indent,
             max_width,
-            max_width_first_line,
+            max_width_for_line: max_width_first_line,
             newline_budget,
             single_line,
         } = other;
         self.indent.set(indent.get());
         self.max_width.set(max_width.get());
-        self.max_width_first_line.set(max_width_first_line.get());
+        self.max_width_for_line.set(max_width_first_line.get());
         self.newline_budget.set(newline_budget.get());
         self.single_line.set(single_line.get());
     }

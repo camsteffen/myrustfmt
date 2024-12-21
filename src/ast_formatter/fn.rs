@@ -1,11 +1,11 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{Braces,  list};
+use crate::ast_formatter::list::{Braces, list};
 use crate::error::FormatResult;
 
+use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ParamListConfig};
 use rustc_ast::ast;
 use rustc_span::symbol::kw;
-use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ParamListConfig};
 
 impl<'a> AstFormatter {
     pub fn fn_<K>(&self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
@@ -80,7 +80,7 @@ impl<'a> AstFormatter {
         self.out.space()?;
 
         if is_overflow {
-            self.with_not_single_line(|| self.closure_body(body, end))?;
+            self.with_do_overflow(|| self.closure_body(body, end))?;
         } else {
             self.closure_body(body, end)?;
         }
@@ -127,7 +127,12 @@ impl<'a> AstFormatter {
         // self.extern_(&bare_fn_ty.ext)?;
         // self.generic_params(&bare_fn_ty.generic_params)?;
         self.out.token_expect("fn")?;
-        self.fn_decl(&bare_fn_ty.decl, Braces::PARENS, &DefaultListConfig, Tail::NONE)?;
+        self.fn_decl(
+            &bare_fn_ty.decl,
+            Braces::PARENS,
+            &DefaultListConfig,
+            Tail::NONE,
+        )?;
         Ok(())
     }
 
@@ -193,7 +198,7 @@ impl<'a> AstFormatter {
             if matches!(ident.name, kw::Empty | kw::SelfLower) {
                 // type only; e.g. `&self` or `fn(String)`
                 self.ty(&param.ty)?;
-                return Ok(())
+                return Ok(());
             }
         }
         self.pat(&param.pat)?;

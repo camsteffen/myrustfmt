@@ -111,24 +111,63 @@ where
         }
     }
 
-    pub fn format(self, this: &AstFormatter) -> FormatResult {
-        let tail = self.tail;
-        this.format_list(
-            self.braces,
-            self.list.is_empty(),
-            |tail| this.list_contents(self, tail),
-            tail,
-        )
+    pub fn format(self, af: &AstFormatter) -> FormatResult {
+        self.do_format(af, Self::contents_default)
     }
 
-    pub fn format_single_line(self, this: &AstFormatter) -> FormatResult {
-        this.format_list(
-            self.braces,
-            self.list.is_empty(),
-            |tail| {
-                this.list_contents_single_line(
+    pub fn format_single_line(self, af: &AstFormatter) -> FormatResult {
+        self.do_format(af, Self::contents_single_line)
+    }
+
+    pub fn format_separate_lines(self, af: &AstFormatter) -> FormatResult {
+        self.do_format(af, Self::contents_separate_lines)
+    }
+
+    fn do_format(
+        &self,
+        af: &AstFormatter,
+        contents: impl FnOnce(&Self, &AstFormatter, Tail) -> FormatResult,
+    ) -> FormatResult {
+        af.out.token_expect(self.braces.start)?;
+        let end = || {
+            af.out.token_expect(self.braces.end)?;
+            af.tail(self.tail)?;
+            return Ok(());
+        };
+        if self.list.is_empty() {
+            end()
+        } else {
+            contents(self, af, Tail::new(&end))
+        }
+    }
+
+    fn contents_default(&self, af: &AstFormatter, tail: Tail<'_>) -> FormatResult {
+        let mut fallback = af.fallback(|| self.contents_single_line(af, tail));
+        if self.config.single_line_block() {
+            fallback = fallback.next(|| self.contents_single_line_block(af, tail))
+        }
+        match Config::wrap_to_fit() {
+            ListWrapToFitConfig::Yes { max_element_width } => {
+                assert!(
+                    matches!(self.rest, ListRest::None),
+                    "rest cannot be used with wrap-to-fit"
+                );
+                fallback = fallback.next(|| self.contents_wrap_to_fit(af, tail, max_element_width));
+            }
+            ListWrapToFitConfig::No => {}
+        }
+        fallback
+            .next(|| self.contents_separate_lines(af, tail))
+            .result()
+    }
+
+    fn contents_single_line(&self, af: &AstFormatter, tail: Tail<'_>) -> FormatResult {
+        af.with_reduce_width_limit(
+            self.config.single_line_reduce_max_width(af.config()),
+            || {
+                af.list_contents_single_line(
                     self.list,
-                    self.format_item,
+                    &self.format_item,
                     self.rest,
                     tail,
                     self.overflow,
@@ -136,17 +175,30 @@ where
                     self.config.single_line_max_contents_width(),
                 )
             },
-            self.tail,
         )
     }
 
-    pub fn format_separate_lines(self, this: &AstFormatter) -> FormatResult {
-        this.format_list(
-            self.braces,
-            self.list.is_empty(),
-            |tail| this.list_contents_separate_lines(self.list, self.format_item, self.rest, tail),
-            self.tail,
+    fn contents_single_line_block(&self, af: &AstFormatter, tail: Tail<'_>) -> FormatResult {
+        af.list_contents_single_line_block(
+            self.list,
+            self.rest,
+            tail,
+            &self.format_item,
+            self.config.single_line_max_contents_width(),
         )
+    }
+
+    fn contents_wrap_to_fit(
+        &self,
+        af: &AstFormatter,
+        tail: Tail<'_>,
+        max_element_width: Option<usize>,
+    ) -> FormatResult {
+        af.list_contents_wrap_to_fit(self.list, tail, &self.format_item, max_element_width)
+    }
+
+    fn contents_separate_lines(&self, af: &AstFormatter, tail: Tail<'_>) -> FormatResult {
+        af.list_contents_separate_lines(self.list, &self.format_item, self.rest, tail)
     }
 }
 
@@ -177,84 +229,6 @@ impl<'a> From<&'a ast::StructRest> for ListRest<'a> {
 }
 
 impl<'a> AstFormatter {
-    fn format_list<'b, 'c>(
-        &self,
-        braces: &'static Braces,
-        is_empty: bool,
-        contents: impl FnOnce(Tail) -> FormatResult + 'b,
-        end: Tail<'_>,
-    ) -> FormatResult {
-        self.out.token_expect(braces.start)?;
-        if is_empty {
-            self.out.token_expect(braces.end)?;
-            self.tail(end)?;
-            return Ok(());
-        }
-        contents(Tail::new(&move || {
-            self.out.token_expect(braces.end)?;
-            self.tail(end)?;
-            Ok(())
-        }))
-    }
-
-    fn list_contents<Item, FormatItem, Config, Overflow>(
-        &self,
-        builder: ListBuilder<'_, '_, '_, Item, FormatItem, Config, Overflow>,
-        tail: Tail<'_>,
-    ) -> FormatResult
-    where
-        Config: ListConfig,
-        FormatItem: Fn(&Item) -> FormatResult,
-        Overflow: ListOverflow<Item = Item>,
-    {
-        let ListBuilder {
-            braces,
-            list,
-            format_item,
-            rest,
-            tail: _,
-            config,
-            overflow,
-        } = builder;
-        let mut fallback = self.fallback(|| {
-            self.list_contents_single_line(
-                list,
-                &format_item,
-                rest,
-                tail,
-                overflow,
-                braces.pad,
-                config.single_line_max_contents_width(),
-            )
-        });
-        if config.single_line_block() {
-            fallback = fallback.next(|| {
-                self.list_contents_single_line_block(
-                    list,
-                    rest,
-                    tail,
-                    &format_item,
-                    config.single_line_max_contents_width(),
-                )
-            })
-        }
-        match Config::wrap_to_fit() {
-            ListWrapToFitConfig::Yes { max_element_width } => {
-                assert!(
-                    matches!(rest, ListRest::None),
-                    "rest cannot be used with wrap-to-fit"
-                );
-                fallback = fallback.next(|| {
-                    self.list_contents_wrap_to_fit(list, tail, &format_item, max_element_width)
-                });
-            }
-            ListWrapToFitConfig::No => {}
-        }
-        fallback
-            .next(|| self.list_contents_separate_lines(list, format_item, rest, tail))
-            .result()
-    }
-
     /* [item, item, item] */
     fn list_contents_single_line<Item, Overflow: ListOverflow<Item = Item>>(
         &self,

@@ -1,7 +1,7 @@
 use crate::constraints::Constraints;
+use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededError};
 use std::cell::Cell;
 use tracing::info;
-use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededError};
 
 pub struct ConstraintWriter {
     constraints: Constraints,
@@ -109,7 +109,7 @@ impl ConstraintWriter {
         self.with_buffer(|b| b.push('\n'));
         self.last_line_start.set(self.len());
         self.line.set(self.line.get() + 1);
-        self.constraints.max_width_first_line.set(None);
+        self.constraints.max_width_for_line.set(None);
         Ok(())
     }
 
@@ -129,10 +129,14 @@ impl ConstraintWriter {
     }
 
     pub fn max_width(&self) -> Option<usize> {
-        match (
-            self.constraints.max_width.get(),
-            self.constraints.max_width_first_line.get(),
-        ) {
+        let max_width = self.constraints.max_width.get();
+        let max_width_for_current_line = self
+            .constraints
+            .max_width_for_line
+            .get()
+            .filter(|m| m.line == self.line())
+            .map(|m| m.max_width);
+        match (max_width, max_width_for_current_line) {
             (Some(a), Some(b)) => Some(a.min(b)),
             (a, b) => a.or(b),
         }

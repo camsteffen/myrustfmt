@@ -1,6 +1,7 @@
+use tracing::info;
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::Constraints;
-use crate::error::FormatResult;
+use crate::constraints::{Constraints, MaxWidthForLine};
+use crate::error::{FormatResult, WidthLimitExceededError};
 
 impl AstFormatter {
     fn constraints(&self) -> &Constraints {
@@ -14,7 +15,11 @@ impl AstFormatter {
         result
     }
 
-    pub fn indented_optional(&self, should_indent: bool, f: impl FnOnce() -> FormatResult) -> FormatResult {
+    pub fn indented_optional(
+        &self,
+        should_indent: bool,
+        f: impl FnOnce() -> FormatResult,
+    ) -> FormatResult {
         if !should_indent {
             return f();
         }
@@ -38,7 +43,11 @@ impl AstFormatter {
         result
     }
 
-    pub fn with_single_line_optional(&self, apply: bool, f: impl FnOnce() -> FormatResult) -> FormatResult {
+    pub fn with_single_line_optional(
+        &self,
+        apply: bool,
+        f: impl FnOnce() -> FormatResult,
+    ) -> FormatResult {
         if !apply {
             return f();
         }
@@ -50,6 +59,19 @@ impl AstFormatter {
         let result = f();
         self.constraints().single_line.set(single_line_prev);
         result
+    }
+
+    pub fn with_do_overflow(&self, f: impl Fn() -> FormatResult) -> FormatResult {
+        if self.config().rustfmt_quirks {
+            self.fallback(&f)
+                .next(|| {
+                    info!("{:?}",self.constraints());
+                    self.with_reduce_max_width_for_line(2, || self.with_not_single_line(f))
+                })
+                .result()
+        } else {
+            f()
+        }
     }
 
     pub fn with_height_limit(
@@ -82,28 +104,65 @@ impl AstFormatter {
         Ok((self.out.len() - len, self.out.line() - line))
     }
 
+    pub fn with_reduce_width_limit(
+        &self,
+        amount: usize,
+        f: impl FnOnce() -> FormatResult,
+    ) -> FormatResult {
+        let Some(current) = self.constraints().max_width.get() else {
+            return f();
+        };
+        let Some(new_limit) = current.checked_sub(amount) else {
+            return Err(self.out.format_error(WidthLimitExceededError));
+        };
+        self.with_width_limit(new_limit, f)
+    }
+
+    pub fn with_reduce_max_width_for_line(
+        &self,
+        amount: usize,
+        f: impl FnOnce() -> FormatResult,
+    ) -> FormatResult {
+        let Some(max_width_for_line) = self.constraints().max_width_for_line.get() else {
+            return f();
+        };
+        if max_width_for_line.line != self.out.line() {
+            return f();
+        }
+        let Some(new_max_width) = max_width_for_line.max_width.checked_sub(amount) else {
+            return Err(self.out.format_error(WidthLimitExceededError));
+        };
+        self.with_set_max_width_for_line(new_max_width, f)
+    }
+    
+    fn with_set_max_width_for_line(&self, max_width: usize, f: impl FnOnce() -> FormatResult) -> FormatResult {
+        let line = self.out.line();
+        let max_width_prev = self
+            .constraints()
+            .max_width_for_line
+            .replace(Some(MaxWidthForLine { line, max_width }));
+        let result = f();
+        self.constraints().max_width_for_line.set(max_width_prev);
+        result
+    }
+
     /** Enforces a max number of characters until a newline is printed */
     pub fn with_width_limit_first_line(
         &self,
         width_limit: usize,
         f: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
+        let line = self.out.line();
         let max_width = self.out.last_line_len() + width_limit;
         if self
             .constraints()
-            .max_width_first_line
+            .max_width_for_line
             .get()
-            .is_some_and(|m| m <= max_width)
+            .is_some_and(|m| m.line == line && m.max_width <= max_width)
         {
             return f();
         }
-        let max_width_prev = self
-            .constraints()
-            .max_width_first_line
-            .replace(Some(max_width));
-        let result = f();
-        self.constraints().max_width_first_line.set(max_width_prev);
-        result
+        self.with_set_max_width_for_line(max_width, f)
     }
 
     pub fn with_width_limit_first_line_opt(

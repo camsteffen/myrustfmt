@@ -137,9 +137,8 @@ impl AstFormatter {
                 self.path_segment(&method_call.seg, true)?;
                 list(Braces::PARENS, &method_call.args, |arg| self.expr(arg))
                     .config(
-                        // param_list_config(Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)),
                         &ParamListConfig {
-                            single_line_max_contents_width: None,
+                            single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
                         },
                     )
                     .overflow()
