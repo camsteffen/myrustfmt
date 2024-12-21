@@ -1,6 +1,26 @@
-pub struct Config {
-    pub max_width: usize,
-    pub rustfmt_quirks: bool,
+macro_rules! config {
+    ($($name:ident: $ty:ty = $default:expr,)*) => {
+        pub struct Config {
+            $(pub $name: $ty,)*
+        }
+
+        impl Default for Config {
+            fn default() -> Self {
+                Config {
+                    $($name: $default,)*
+                }
+            }
+        }
+        
+        impl Config {
+            $(pub fn $name(self, $name: $ty) -> Config {
+                Config { $name, ..self }
+            })*
+        }
+    };
 }
 
-pub const DEFAULT_CONFIG: Config = Config { max_width: 100, rustfmt_quirks: true };
+config! {
+    max_width: usize = 100,
+    rustfmt_quirks: bool = true,
+}

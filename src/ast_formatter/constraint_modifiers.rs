@@ -7,7 +7,7 @@ impl AstFormatter {
         self.out.constraints()
     }
 
-    pub fn indented(&self, f: impl FnOnce() -> FormatResult) -> FormatResult {
+    pub fn indented<T>(&self, f: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         self.constraints().increment_indent();
         let result = f();
         self.constraints().decrement_indent();
@@ -31,7 +31,7 @@ impl AstFormatter {
         result
     }
 
-    pub fn with_single_line(&self, f: impl FnOnce() -> FormatResult) -> FormatResult {
+    pub fn with_single_line<T>(&self, f: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         let single_line_prev = self.constraints().single_line.replace(true);
         let result = f();
         self.constraints().single_line.set(single_line_prev);

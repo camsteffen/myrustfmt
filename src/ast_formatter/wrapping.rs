@@ -19,20 +19,20 @@ impl AstFormatter {
         .result()
     }
 
-    pub fn line_break_indent_fallback(
+    pub fn line_break_indent_fallback<T>(
         &self,
-        format: impl Fn(/*broken: */ bool) -> FormatResult,
-    ) -> FormatResult {
+        format: impl Fn(/*broken: */ bool) -> FormatResult<T>,
+    ) -> FormatResult<T> {
         self.fallback(|| {
-            self.out.space()?;
-            format(false)?;
-            Ok(())
+            self.with_single_line(|| {
+                self.out.space()?;
+                format(false)
+            })
         })
         .next(|| {
             self.indented(|| {
                 self.out.newline_indent()?;
-                format(true)?;
-                Ok(())
+                format(true)
             })
         })
         .result()
@@ -43,11 +43,10 @@ impl AstFormatter {
         apply: bool,
         format: impl Fn(/*broken: */ bool) -> FormatResult,
     ) -> FormatResult {
-        if apply {
-            self.line_break_indent_fallback(format)
-        } else {
-            format(false)
+        if !apply {
+            return format(false);
         }
+        self.line_break_indent_fallback(format)
     }
 
     pub fn line_break_fallback_with_optional_indent(
@@ -55,18 +54,8 @@ impl AstFormatter {
         should_indent: bool,
         format: impl Fn(/*broken: */ bool) -> FormatResult,
     ) -> FormatResult {
-        self.fallback(|| {
-            self.out.space()?;
-            format(false)?;
-            Ok(())
+        self.line_break_fallback(|broken| {
+            self.indented_optional(should_indent && broken, || format(broken))
         })
-        .next(|| {
-            self.indented_optional(should_indent, || {
-                self.out.newline_indent()?;
-                format(true)?;
-                Ok(())
-            })
-        })
-        .result()
     }
 }

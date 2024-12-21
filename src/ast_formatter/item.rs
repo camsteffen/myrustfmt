@@ -3,8 +3,10 @@ use rustc_span::symbol::Ident;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{
-    Braces, ListConfig, ListWrapToFitConfig, ParamListConfig, list, struct_field_list_config,
+    Braces, list
 };
+use crate::ast_formatter::list::config::{struct_field_list_config, ListConfig, ListWrapToFitConfig, ParamListConfig};
+use crate::config::Config;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
@@ -152,7 +154,8 @@ impl<'a> AstFormatter {
         self.generic_params(&impl_.generics.params)?;
         self.line_break_indent_fallback_optional(self.out.line() == first_line, |broken| {
             if let Some(of_trait) = &impl_.of_trait {
-                self.with_single_line_optional(!broken, || self.trait_ref(of_trait))?;
+                // self.with_single_line_optional(!broken, || self.trait_ref(of_trait))?;
+                self.trait_ref(of_trait)?;
                 self.line_break_fallback_with_optional_indent(!broken, |for_ty_broken| {
                     self.out.token_expect("for")?;
                     self.out.space()?;
@@ -160,7 +163,8 @@ impl<'a> AstFormatter {
                     Ok(())
                 })
             } else {
-                self.with_single_line_optional(!broken, || self.ty(&impl_.self_ty))
+                self.ty(&impl_.self_ty)
+                // self.with_single_line_optional(!broken, || self.ty(&impl_.self_ty))
             }
         })?;
         self.where_clause(&impl_.generics.where_clause)?;
@@ -283,17 +287,14 @@ impl<'a> AstFormatter {
                 let has_nested = items
                     .iter()
                     .any(|(item, _)| matches!(item.kind, ast::UseTreeKind::Nested { .. }));
+                let list = list(Braces::CURLY_NO_PAD, items, |(use_tree, _)| {
+                    self.use_tree(use_tree)
+                })
+                .config(&UseTreeListConfig);
                 if has_nested {
-                    list(Braces::CURLY, items, |(use_tree, _)| {
-                        self.use_tree(use_tree)
-                    })
-                    .format_separate_lines(self)?
+                    list.format_separate_lines(self)?
                 } else {
-                    list(Braces::CURLY_NO_PAD, items, |(use_tree, _)| {
-                        self.use_tree(use_tree)
-                    })
-                    .config(&UseTreeListConfig)
-                    .format(self)?
+                    list.format(self)?
                 }
             }
             ast::UseTreeKind::Glob => todo!(),
@@ -305,6 +306,10 @@ impl<'a> AstFormatter {
 struct UseTreeListConfig;
 
 impl ListConfig for UseTreeListConfig {
+    fn single_line_reduce_max_width(&self, config: &Config) -> usize {
+        if config.rustfmt_quirks { 2 } else { 0 }
+    }
+
     fn wrap_to_fit() -> ListWrapToFitConfig {
         ListWrapToFitConfig::Yes {
             max_element_width: None,

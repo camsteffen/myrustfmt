@@ -1,6 +1,6 @@
 use crate::constraint_writer::{ConstraintWriter, ConstraintWriterSnapshot};
 use crate::constraints::Constraints;
-use crate::error::{FormatError, FormatErrorKind, FormatResult};
+use crate::error::{FormatError, FormatErrorKind, FormatResult, WidthLimitExceededError};
 use crate::source_reader::SourceReader;
 use rustc_lexer::TokenKind;
 use rustc_span::{BytePos, Pos, Span};
@@ -189,31 +189,37 @@ impl SourceFormatter {
         self.source.format_error(kind)
     }
 
+    pub fn require_width(&self, width: usize) -> Result<(), FormatError> {
+        self.out
+            .remaining_width()
+            .and_then(|remaining| match remaining {
+                Some(r) if r < width => Err(WidthLimitExceededError),
+                _ => Ok(()),
+            })
+            .map_err(|e| self.format_error(e))
+    }
+
     fn handle_whitespace_and_comments(&self) -> FormatResult<bool> {
-        let mut len = 0usize;
-        let mut len_without_trailing_whitespace = 0;
+        let mut whitespace_len = 0usize;
+        let mut comments_happened = false;
         for token in rustc_lexer::tokenize(self.source.remaining()) {
             match token.kind {
                 TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
-                    len += token.len as usize;
-                    len_without_trailing_whitespace = len;
+                    self.constraints()
+                        .with_no_width_limit(|| self.copy(whitespace_len + token.len as usize))?;
+                    whitespace_len = 0;
+                    comments_happened = true;
                 }
                 TokenKind::Whitespace => {
-                    len += token.len as usize;
+                    whitespace_len += token.len as usize;
                 }
                 _ => break,
             }
         }
-        if len_without_trailing_whitespace > 0 {
-            // copy up to trailing whitespace
-            // no width limit for comments, but newline limit may apply
-            self.constraints()
-                .with_no_width_limit(|| self.copy(len_without_trailing_whitespace))?;
-        }
         // skip trailing whitespace
-        self.source.advance(len - len_without_trailing_whitespace);
+        self.source.advance(whitespace_len);
         self.next_is_whitespace_or_comments.set(false);
-        Ok(len_without_trailing_whitespace > 0)
+        Ok(comments_happened)
     }
 
     fn handle_whitespace_and_comments_for_newline(&self) -> FormatResult {

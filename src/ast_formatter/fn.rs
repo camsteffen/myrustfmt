@@ -1,9 +1,11 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{Braces, DefaultListConfig, ListConfig, ParamListConfig, list};
+use crate::ast_formatter::list::{Braces,  list};
 use crate::error::FormatResult;
 
 use rustc_ast::ast;
+use rustc_span::symbol::kw;
+use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ParamListConfig};
 
 impl<'a> AstFormatter {
     pub fn fn_<K>(&self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
@@ -86,24 +88,6 @@ impl<'a> AstFormatter {
     }
 
     fn closure_body(&self, body: &ast::Expr, tail: Tail<'_>) -> FormatResult {
-        let mut inner_expr = None;
-        if let ast::ExprKind::Block(block, None) = &body.kind {
-            if matches!(block.rules, ast::BlockCheckMode::Default) {
-                if let [stmt] = &block.stmts[..] {
-                    if let ast::StmtKind::Expr(expr) = &stmt.kind {
-                        if expr.attrs.is_empty() {
-                            inner_expr = Some(expr);
-                        }
-                    }
-                }
-            }
-        }
-        if let Some(expr) = inner_expr {
-            self.out.skip_token("{")?;
-            self.closure_body(expr, tail)?;
-            self.out.skip_token("}")?;
-            return Ok(());
-        }
         fn is_block_like(expr: &ast::Expr) -> bool {
             match expr.kind {
                 ast::ExprKind::Match(..)
@@ -121,26 +105,30 @@ impl<'a> AstFormatter {
                 _ => false,
             }
         }
-        if is_block_like(body) {
-            self.expr_tail(body, tail)
-        } else {
-            self.fallback(|| {
-                self.with_no_overflow(|| self.with_single_line(|| self.expr_tail(body, tail)))
-            })
-            .next(|| {
-                self.out.token_missing("{")?;
-                self.indented(|| {
-                    self.out.newline_indent()?;
-                    self.expr(body)?;
+        self.skip_single_expr_blocks(body, |body| {
+            if is_block_like(body) {
+                self.expr_tail(body, tail)
+            } else {
+                self.fallback(|| {
+                    self.with_no_overflow(|| self.with_single_line(|| self.expr_tail(body, tail)))
+                })
+                .next(|| {
+                    self.add_block(|| self.expr(body))?;
+                    self.tail(tail)?;
                     Ok(())
-                })?;
-                self.out.newline_indent()?;
-                self.out.token_missing("}")?;
-                self.tail(tail)?;
-                Ok(())
-            })
-            .result()
-        }
+                })
+                .result()
+            }
+        })
+    }
+
+    pub fn bare_fn_ty(&self, bare_fn_ty: &ast::BareFnTy) -> FormatResult {
+        // self.safety(&bare_fn_ty.safety)?;
+        // self.extern_(&bare_fn_ty.ext)?;
+        // self.generic_params(&bare_fn_ty.generic_params)?;
+        self.out.token_expect("fn")?;
+        self.fn_decl(&bare_fn_ty.decl, Braces::PARENS, &DefaultListConfig, Tail::NONE)?;
+        Ok(())
     }
 
     pub fn parenthesized_args(&self, parenthesized_args: &ast::ParenthesizedArgs) -> FormatResult {
@@ -173,26 +161,26 @@ impl<'a> AstFormatter {
 
     fn fn_decl<C: ListConfig>(
         &self,
-        ast::FnDecl { inputs, output }: &ast::FnDecl,
+        fn_decl: &ast::FnDecl,
         braces: &'static Braces,
         input_list_config: &C,
         tail: Tail<'_>,
     ) -> FormatResult {
         // args and return type all on one line
         self.fallback(|| {
-            list(braces, inputs, |param| self.param(param))
+            list(braces, &fn_decl.inputs, |param| self.param(param))
                 .config(input_list_config)
                 .format_single_line(self)?;
-            self.with_single_line(|| self.fn_ret_ty(output))?;
+            self.with_single_line(|| self.fn_ret_ty(&fn_decl.output))?;
             self.tail(tail)?;
             Ok(())
         })
         // args on separate lines
         .next(|| {
-            list(braces, inputs, |param| self.param(param))
+            list(braces, &fn_decl.inputs, |param| self.param(param))
                 .config(input_list_config)
                 .format_separate_lines(self)?;
-            self.fn_ret_ty(output)?;
+            self.fn_ret_ty(&fn_decl.output)?;
             self.tail(tail)?;
             Ok(())
         })
@@ -201,9 +189,12 @@ impl<'a> AstFormatter {
 
     fn param(&self, param: &ast::Param) -> FormatResult {
         self.attrs(&param.attrs)?;
-        if param.is_self() {
-            self.ty(&param.ty)?;
-            return Ok(());
+        if let ast::PatKind::Ident(_, ident, _) = param.pat.kind {
+            if matches!(ident.name, kw::Empty | kw::SelfLower) {
+                // type only; e.g. `&self` or `fn(String)`
+                self.ty(&param.ty)?;
+                return Ok(())
+            }
         }
         self.pat(&param.pat)?;
         if !matches!(param.ty.kind, ast::TyKind::Infer) {

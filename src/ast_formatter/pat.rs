@@ -3,18 +3,17 @@ use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{
-    Braces, ListRest, ParamListConfig, list, struct_field_list_config,
-};
+use crate::ast_formatter::list::{Braces, ListRest, list};
+use crate::ast_formatter::list::config::{struct_field_list_config, ParamListConfig};
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 impl<'a> AstFormatter {
     pub fn pat(&self, pat: &ast::Pat) -> FormatResult {
-        self.pat_end(pat, Tail::NONE)
+        self.pat_tail(pat, Tail::NONE)
     }
 
-    pub fn pat_end(&self, pat: &ast::Pat, end: Tail<'_>) -> FormatResult {
+    pub fn pat_tail(&self, pat: &ast::Pat, end: Tail<'_>) -> FormatResult {
         match pat.kind {
             ast::PatKind::Wild => self.out.token_expect("_"),
             ast::PatKind::Ident(ast::BindingMode(by_ref, mutbl), ident, ref pat) => {

@@ -18,10 +18,8 @@ extern crate thin_vec;
 #[allow(unused_extern_crates)]
 extern crate rustc_driver;
 
-const RUSTFMT_QUIRKS: bool = true;
-
 pub mod ast_formatter;
-mod config;
+pub mod config;
 pub mod constraint_writer;
 mod constraints;
 mod error;
@@ -42,23 +40,26 @@ use std::fs;
 use std::path::Path;
 
 use crate::ast_formatter::AstFormatter;
-use crate::config::DEFAULT_CONFIG;
+use crate::config::Config;
 use crate::constraints::Constraints;
 use source_formatter::SourceFormatter;
 
 pub fn format_file(path: impl AsRef<Path>) -> String {
     let string = fs::read_to_string(path).unwrap();
-    format_str(&string, DEFAULT_CONFIG.max_width)
+    format_str_config(&string, Config::default())
 }
 
 pub fn format_str_defaults(source: &str) -> String {
-    format_str(source, DEFAULT_CONFIG.max_width)
+    format_str_config(source, Config::default())
 }
 
 pub fn format_str(source: &str, max_width: usize) -> String {
+    format_str_config(source, Config::default().max_width(max_width))
+}
+
+pub fn format_str_config(source: &str, config: Config) -> String {
     parse_ast_then(String::from(source), |crate_| {
-        let config = DEFAULT_CONFIG;
-        let constraints = Constraints::new(max_width);
+        let constraints = Constraints::new(config.max_width);
         let source_formatter = SourceFormatter::new(String::from(source), constraints);
         let ast_formatter = AstFormatter::new(config, source_formatter);
         match ast_formatter.crate_(&crate_) {

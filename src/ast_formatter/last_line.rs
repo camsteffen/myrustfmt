@@ -12,13 +12,13 @@ pub struct Tail<'a>(TailImpl<'a>);
 #[derive(Clone, Copy)]
 enum TailImpl<'a> {
     None,
+    Const(fn(&AstFormatter) -> FormatResult),
     Dyn(&'a dyn Fn() -> FormatResult),
-    Static(fn(&AstFormatter) -> FormatResult),
 }
 
 impl<'a> Tail<'a> {
     pub const NONE: Tail<'static> = Tail(TailImpl::None);
-    pub const OPEN_BLOCK: Tail<'static> = Tail(TailImpl::Static(|this| {
+    pub const OPEN_BLOCK: Tail<'static> = Tail(TailImpl::Const(|this| {
         this.out.space()?;
         this.out.token_expect("{")?;
         Ok(())
@@ -27,6 +27,10 @@ impl<'a> Tail<'a> {
     pub fn new(f: &'a (dyn Fn() -> FormatResult + 'a)) -> Self {
         Tail(TailImpl::Dyn(f))
     }
+
+    pub const fn new_const(f: fn(&AstFormatter) -> FormatResult) -> Self {
+        Tail(TailImpl::Const(f))
+    }
 }
 
 impl AstFormatter {
@@ -34,7 +38,7 @@ impl AstFormatter {
         match tail.0 {
             TailImpl::None => Ok(()),
             TailImpl::Dyn(f) => f(),
-            TailImpl::Static(f) => f(self),
+            TailImpl::Const(f) => f(self),
         }
     }
 }

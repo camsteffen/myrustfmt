@@ -1,12 +1,12 @@
-use crate::RUSTFMT_QUIRKS;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{Braces, ParamListConfig, list};
+use crate::ast_formatter::list::{Braces,  list};
 use crate::constraints::INDENT_WIDTH;
 use crate::error::FormatResult;
 use crate::error::WidthLimitExceededError;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
+use crate::ast_formatter::list::config::ParamListConfig;
 
 impl AstFormatter {
     pub fn dot_chain(&self, expr: &ast::Expr, tail: Tail<'_>, is_overflow: bool) -> FormatResult {
@@ -75,7 +75,7 @@ impl AstFormatter {
         start_len: usize,
         tail: Tail<'_>,
     ) -> FormatResult {
-        let width_limit = if RUSTFMT_QUIRKS && dot_chain.len() == 1 {
+        let width_limit = if self.config().rustfmt_quirks && dot_chain.len() == 1 {
             None
         } else {
             match RUSTFMT_CONFIG_DEFAULTS.chain_width.checked_sub(start_len) {

@@ -1,5 +1,7 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{Braces, ParamListConfig, list};
+use crate::ast_formatter::list::Braces;
+use crate::ast_formatter::list::config::ParamListConfig;
+use crate::ast_formatter::list::list;
 use crate::error::FormatResult;
 use rustc_ast::ast;
 
@@ -24,7 +26,7 @@ impl<'a> AstFormatter {
                 Ok(())
             }
             ast::TyKind::PinnedRef(_lifetime, _mut_ty) => todo!(),
-            ast::TyKind::BareFn(_ty) => todo!(),
+            ast::TyKind::BareFn(bare_fn_ty) => self.bare_fn_ty(bare_fn_ty),
             ast::TyKind::Never => todo!(),
             ast::TyKind::Tup(elements) => list(Braces::PARENS, elements, |ty| self.ty(ty))
                 .config(&ParamListConfig {
@@ -32,14 +34,30 @@ impl<'a> AstFormatter {
                 })
                 .format(self),
             ast::TyKind::Path(qself, path) => self.qpath(qself, path, false),
-            ast::TyKind::TraitObject(_bounds, _syntax) => todo!(),
+            ast::TyKind::TraitObject(bounds, syntax) => {
+                match syntax {
+                    ast::TraitObjectSyntax::Dyn => {
+                        self.out.token_expect("dyn")?;
+                        self.out.space()?;
+                    }
+                    ast::TraitObjectSyntax::DynStar => todo!(),
+                    ast::TraitObjectSyntax::None => todo!(),
+                }
+                self.generic_bounds(bounds)?;
+                Ok(())
+            }
             ast::TyKind::ImplTrait(_, bounds) => {
                 self.out.token_at("impl", ty.span.lo())?;
                 self.out.space()?;
                 self.generic_bounds(bounds)?;
                 Ok(())
             }
-            ast::TyKind::Paren(_ty) => todo!(),
+            ast::TyKind::Paren(ty) => {
+                self.out.token_expect("(")?;
+                self.ty(ty)?;
+                self.out.token_expect(")")?;
+                Ok(())
+            }
             ast::TyKind::Typeof(_anon_const) => todo!(),
             ast::TyKind::Infer => todo!(),
             ast::TyKind::ImplicitSelf => self.out.token_at("self", ty.span.lo()),

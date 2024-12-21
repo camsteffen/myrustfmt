@@ -1,21 +1,23 @@
 use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 
-use crate::ast_formatter::list::{Braces, ParamListConfig, list};
+use crate::ast_formatter::list::{Braces,  list};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
+use crate::ast_formatter::list::config::ParamListConfig;
 
 impl AstFormatter {
     pub fn attrs(&self, attrs: &[ast::Attribute]) -> FormatResult {
         for attr in attrs {
             self.attr(attr)?;
-            self.out.newline_indent()?;
         }
         Ok(())
     }
 
     fn attr(&self, attr: &ast::Attribute) -> FormatResult {
         match attr.kind {
+            // comments are handled by SourceFormatter
+            ast::AttrKind::DocComment(_comment_kind, _symbol) => Ok(()),
             ast::AttrKind::Normal(_) => match attr.meta() {
                 None => todo!(),
                 Some(meta) => {
@@ -29,10 +31,10 @@ impl AstFormatter {
                     self.out.token_expect("[")?;
                     self.meta_item(&meta)?;
                     self.out.token_expect("]")?;
+                    self.out.newline_indent()?;
                     Ok(())
                 }
             },
-            ast::AttrKind::DocComment(_comment_kind, _symbol) => self.out.copy_span(attr.span),
         }
     }
 

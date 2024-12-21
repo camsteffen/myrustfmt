@@ -1,16 +1,14 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::{
-    ArrayListConfig, Braces, ListRest, ParamListConfig, list, struct_field_list_config,
+     Braces, ListRest,  list, 
 };
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
-use crate::RUSTFMT_QUIRKS;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
-use rustc_ast::util::parser::AssocOp;
-use rustc_span::source_map::Spanned;
+use crate::ast_formatter::list::config::{struct_field_list_config, ArrayListConfig, ParamListConfig};
 
 impl<'a> AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
@@ -164,91 +162,6 @@ impl<'a> AstFormatter {
         }
     }
 
-    fn binary(
-        &self,
-        left: &ast::Expr,
-        right: &ast::Expr,
-        op: Spanned<ast::BinOpKind>,
-        tail: Tail,
-    ) -> FormatResult {
-        fn collect<'a>(
-            left: &'a ast::Expr,
-            right: &'a ast::Expr,
-            top_op: Spanned<ast::BinOpKind>,
-        ) -> (&'a ast::Expr, Vec<(ast::BinOpKind, &'a ast::Expr)>) {
-            let mut first = None;
-            let mut chain = Vec::new();
-            let mut stack = vec![right];
-            let mut operators = vec![top_op.node];
-            let precedence = AssocOp::from_ast_binop(top_op.node).precedence();
-            let mut current = left;
-
-            let op_matches = |op: ast::BinOp| {
-                if RUSTFMT_QUIRKS {
-                    op.node == top_op.node
-                } else {
-                    AssocOp::from_ast_binop(op.node).precedence() == precedence
-                }
-            };
-
-            loop {
-                match current.kind {
-                    ast::ExprKind::Binary(op, ref left, ref right) if op_matches(op) => {
-                        operators.push(op.node);
-                        current = left;
-                        stack.push(right);
-                    }
-                    _ => {
-                        if first.is_none() {
-                            first = Some(current);
-                        } else {
-                            let op = operators.pop().unwrap();
-                            chain.push((op, current));
-                        }
-                        match stack.pop() {
-                            None => break,
-                            Some(expr) => {
-                                current = expr;
-                            }
-                        }
-                    }
-                }
-            }
-            (first.unwrap(), chain)
-        }
-
-        let (first, chain) = collect(left, right, op);
-
-        self.expr(first)?;
-        self.fallback(|| {
-            self.with_single_line(|| {
-                chain.iter().try_for_each(|(op, expr)| {
-                    self.out.space()?;
-                    self.out.token_expect(op.as_str())?;
-                    self.out.space()?;
-                    self.expr(expr)?;
-                    Ok(())
-                })?;
-                self.tail(tail)?;
-                Ok(())
-            })
-        })
-        .next(|| {
-            self.indented(|| {
-                chain.iter().try_for_each(|(op, expr)| {
-                    self.out.newline_indent()?;
-                    self.out.token_expect(op.as_str())?;
-                    self.out.space()?;
-                    self.expr(expr)?;
-                    Ok(())
-                })?;
-                self.tail(tail)?;
-                Ok(())
-            })
-        })
-        .result()
-    }
-
     fn label(&self, label: Option<ast::Label>) -> FormatResult {
         if let Some(label) = label {
             self.ident(label.ident)?;
@@ -348,70 +261,6 @@ impl<'a> AstFormatter {
         self.delim_args(&mac_call.args, end)
     }
 
-    fn match_(
-        &self,
-        scrutinee: &ast::Expr,
-        arms: &[ast::Arm],
-        expr: &ast::Expr,
-        end: Tail<'_>,
-    ) -> FormatResult {
-        self.out.token_at("match", expr.span.lo())?;
-        self.out.space()?;
-        self.expr_tail(scrutinee, Tail::OPEN_BLOCK)?;
-        self.block_generic_after_open_brace(arms, |arm| self.arm(arm))?;
-        self.tail(end)
-    }
-
-    fn arm(&self, arm: &ast::Arm) -> FormatResult {
-        self.attrs(&arm.attrs)?;
-        self.pat(&arm.pat)?;
-        let arrow = || {
-            self.out.space()?;
-            self.out.token_expect("=>")?;
-            self.out.space()?;
-            Ok(())
-        };
-        if let Some(guard) = arm.guard.as_deref() {
-            let guard = || {
-                self.out.token_expect("if")?;
-                self.out.space()?;
-                if arm.body.is_some() {
-                    self.expr_tail(guard, Tail::new(&arrow))?;
-                } else {
-                    self.expr(guard)?;
-                }
-                Ok(())
-            };
-            self.fallback(|| {
-                self.out.space()?;
-                guard()?;
-                Ok(())
-            })
-            .next(|| {
-                self.indented(|| {
-                    self.out.newline_indent()?;
-                    guard()?;
-                    Ok(())
-                })
-            })
-            .result()?;
-        }
-        if let Some(body) = arm.body.as_deref() {
-            if arm.guard.is_none() {
-                arrow()?;
-            }
-            self.expr(body)?;
-            if is_plain_block(body) {
-                self.out.skip_token_if_present(",")?;
-            } else {
-                self.out.token_expect(",")?;
-            }
-        } else {
-            todo!();
-        }
-        Ok(())
-    }
-
     fn struct_expr(&self, struct_: &ast::StructExpr, tail: Tail<'_>) -> FormatResult {
         self.qpath(&struct_.qself, &struct_.path, true)?;
         self.out.space()?;
@@ -436,11 +285,47 @@ impl<'a> AstFormatter {
         }
         Ok(())
     }
-}
 
-fn is_plain_block(expr: &ast::Expr) -> bool {
-    match &expr.kind {
-        ast::ExprKind::Block(block, None) => matches!(block.rules, ast::BlockCheckMode::Default),
-        _ => false,
+    pub fn expr_force_block(&self, expr: &ast::Expr) -> FormatResult {
+        self.skip_single_expr_blocks(expr, |expr| self.add_block(|| self.expr(expr)))
+    }
+
+    pub fn add_block(&self, inside: impl FnOnce() -> FormatResult) -> FormatResult {
+        self.out.token_missing("{")?;
+        self.indented(|| {
+            self.out.newline_indent()?;
+            inside()?;
+            Ok(())
+        })?;
+        self.out.newline_indent()?;
+        self.out.token_missing("}")?;
+        Ok(())
+    }
+
+    pub fn skip_single_expr_blocks(
+        &self,
+        expr: &ast::Expr,
+        format: impl FnOnce(&ast::Expr) -> FormatResult,
+    ) -> FormatResult {
+        let mut inner_expr = None;
+        if let ast::ExprKind::Block(block, None) = &expr.kind {
+            if matches!(block.rules, ast::BlockCheckMode::Default) {
+                if let [stmt] = &block.stmts[..] {
+                    if let ast::StmtKind::Expr(expr) = &stmt.kind {
+                        if expr.attrs.is_empty() {
+                            inner_expr = Some(expr);
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(expr) = inner_expr {
+            self.out.skip_token("{")?;
+            self.skip_single_expr_blocks(expr, format)?;
+            self.out.skip_token("}")?;
+        } else {
+            format(expr)?
+        }
+        Ok(())
     }
 }

@@ -11,7 +11,7 @@ impl<'a> AstFormatter {
         let pos = span.lo();
         self.out.token_at_space("let", pos)?;
         match kind {
-            ast::LocalKind::Decl => self.pat_end(pat, tail),
+            ast::LocalKind::Decl => self.pat_tail(pat, tail),
             ast::LocalKind::Init(init) => {
                 self.pat(pat)?;
                 self.local_init(init, tail)
