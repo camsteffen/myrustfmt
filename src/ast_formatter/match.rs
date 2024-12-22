@@ -22,7 +22,7 @@ impl AstFormatter {
     fn arm(&self, arm: &ast::Arm) -> FormatResult {
         self.attrs(&arm.attrs)?;
         self.pat(&arm.pat)?;
-        let arrow = || {
+        let arrow = || -> FormatResult {
             self.out.space()?;
             self.out.token_expect("=>")?;
             Ok(())

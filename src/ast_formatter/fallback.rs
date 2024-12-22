@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::error::{FormatErrorKind, FormatResult};
+use crate::error::{FormatError, FormatResult};
 use crate::source_formatter::{SourceFormatter, SourceFormatterSnapshot};
 
 impl AstFormatter {
@@ -32,9 +32,9 @@ impl<T> Fallback<'_, T> {
     pub fn is_done(&self) -> bool {
         match &self.result {
             Ok(_) => true,
-            Err(e) => match e.kind {
-                FormatErrorKind::Parse(_) => true,
-                FormatErrorKind::Constraint(_) => false,
+            Err(e) => match e {
+                FormatError::Parse(_) => true,
+                FormatError::Constraint(_) => false,
             },
         }
     }

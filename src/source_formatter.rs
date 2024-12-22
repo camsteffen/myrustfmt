@@ -1,6 +1,6 @@
 use crate::constraint_writer::{ConstraintWriter, ConstraintWriterSnapshot};
 use crate::constraints::Constraints;
-use crate::error::{FormatError, FormatErrorKind, FormatResult, WidthLimitExceededError};
+use crate::error::{FormatError, FormatResult, WidthLimitExceededError};
 use crate::source_reader::SourceReader;
 use rustc_lexer::TokenKind;
 use rustc_span::{BytePos, Pos, Span};
@@ -72,6 +72,10 @@ impl SourceFormatter {
         self.out.line()
     }
 
+    pub fn pos(&self) -> usize {
+        self.source.pos.get().to_usize()
+    }
+
     /** Writes a newline character and indent characters according to the current indent level */
     pub fn newline_indent(&self) -> FormatResult {
         self.handle_whitespace_and_comments_for_newline()
@@ -83,7 +87,7 @@ impl SourceFormatter {
 
     pub fn skip_token(&self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed()?;
-        self.source.eat(token).map_err(|e| self.format_error(e))?;
+        self.source.eat(token)?;
         self.next_is_whitespace_or_comments.set(true);
         Ok(())
     }
@@ -118,7 +122,7 @@ impl SourceFormatter {
     /** Writes a space and accounts for spaces and comments in source */
     pub fn space(&self) -> FormatResult {
         if !self.handle_whitespace_and_comments()? {
-            self.out.token(" ").map_err(|e| self.format_error(e))?;
+            self.out.token(" ")?;
         }
         Ok(())
     }
@@ -126,22 +130,16 @@ impl SourceFormatter {
     /** Write a token, asserting it is next in source and has the given position */
     pub fn token_at(&self, token: &str, pos: BytePos) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed()?;
-        self.expect_source_pos(pos)?;
+        self.source.expect_pos(pos)?;
         self.token_unchecked(token)?;
         Ok(())
-    }
-
-    fn expect_source_pos(&self, pos: BytePos) -> FormatResult {
-        self.source
-            .expect_pos(pos)
-            .map_err(|e| self.format_error(e))
     }
 
     /** Write a token, asserting it is next in source and has the given ending position */
     pub fn token_end_at(&self, token: &str, end_pos: BytePos) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed()?;
         self.token_unchecked(token)?;
-        self.expect_source_pos(end_pos)?;
+        self.source.expect_pos(end_pos)?;
         Ok(())
     }
 
@@ -160,7 +158,7 @@ impl SourceFormatter {
      */
     pub fn token_expect(&self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed()?;
-        self.source.eat(token).map_err(|e| self.format_error(e))?;
+        self.source.eat(token)?;
         self.next_is_whitespace_or_comments.set(true);
         self.token_out(token)?;
         Ok(())
@@ -179,14 +177,10 @@ impl SourceFormatter {
     /** Copy a token from source */
     pub fn token_from_source(&self, span: Span) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed()?;
-        self.expect_source_pos(span.lo())?;
+        self.source.expect_pos(span.lo())?;
         let token = self.source.get_span(span);
         self.token_unchecked(token)?;
         Ok(())
-    }
-
-    pub fn format_error(&self, kind: impl Into<FormatErrorKind>) -> FormatError {
-        self.source.format_error(kind)
     }
 
     pub fn require_width(&self, width: usize) -> Result<(), FormatError> {
@@ -195,8 +189,8 @@ impl SourceFormatter {
             .and_then(|remaining| match remaining {
                 Some(r) if r < width => Err(WidthLimitExceededError),
                 _ => Ok(()),
-            })
-            .map_err(|e| self.format_error(e))
+            })?;
+        Ok(())
     }
 
     fn handle_whitespace_and_comments(&self) -> FormatResult<bool> {
@@ -259,25 +253,25 @@ impl SourceFormatter {
     }
 
     fn newline(&self) -> FormatResult {
-        self.out.newline().map_err(|e| self.format_error(e))
+        self.out.newline()?;
+        Ok(())
     }
 
     fn indent(&self) -> FormatResult {
-        self.out.indent().map_err(|e| self.format_error(e))
+        self.out.indent()?;
+        Ok(())
     }
 
     fn copy(&self, len: usize) -> FormatResult {
         let segment = &self.source.remaining()[..len];
-        self.out
-            .write_possibly_multiline(segment)
-            .map_err(|e| self.format_error(e))?;
+        self.out.write_possibly_multiline(segment)?;
         self.source.advance(len);
         Ok(())
     }
 
     pub fn copy_span(&self, span: Span) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed()?;
-        self.expect_source_pos(span.lo())?;
+        self.source.expect_pos(span.lo())?;
         self.copy(span.hi().to_usize() - span.lo().to_usize())?;
         Ok(())
     }
@@ -288,7 +282,8 @@ impl SourceFormatter {
 
     /** Write a token */
     fn token_out(&self, token: &str) -> FormatResult {
-        self.out.token(&token).map_err(|e| self.format_error(e))
+        self.out.token(&token)?;
+        Ok(())
     }
 
     /** Write a token assuming it is next in source */

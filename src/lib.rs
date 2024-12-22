@@ -64,7 +64,7 @@ pub fn format_str_config(source: &str, config: Config) -> String {
         let ast_formatter = AstFormatter::new(config, source_formatter);
         match ast_formatter.crate_(&crate_) {
             Ok(()) => {}
-            Err(e) => panic!("{}", e.display(source)),
+            Err(e) => panic!("{}", e.display(source, ast_formatter.pos())),
         }
         ast_formatter.finish()
     })

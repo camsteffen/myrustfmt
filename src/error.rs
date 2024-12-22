@@ -1,17 +1,10 @@
-use rustc_span::{BytePos, Pos};
 use std::fmt::{Display, Formatter};
 use thiserror::Error;
 
 pub type FormatResult<T = ()> = Result<T, FormatError>;
 
-#[derive(Debug)]
-pub struct FormatError {
-    pub kind: FormatErrorKind,
-    pub pos: BytePos,
-}
-
 #[derive(Clone, Debug)]
-pub enum FormatErrorKind {
+pub enum FormatError {
     Constraint(ConstraintError),
     Parse(ParseError),
 }
@@ -41,10 +34,11 @@ pub enum ParseError {
 }
 
 impl FormatError {
-    pub fn display(&self, source: &str) -> impl Display {
+    pub fn display(&self, source: &str, pos: usize) -> impl Display {
         struct FormatErrorDisplay<'err, 'source> {
             error: &'err FormatError,
             source: &'source str,
+            pos: usize,
             line: usize,
             col: usize,
         }
@@ -52,28 +46,28 @@ impl FormatError {
             fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
                 write!(f, "Error formatting at {}:{}, ", self.line, self.col)?;
                 let next_token = |f: &mut Formatter<'_>| {
-                    let remaining = &self.source[self.error.pos.to_usize()..];
+                    let remaining = &self.source[self.pos..];
                     let token = rustc_lexer::tokenize(remaining).next().unwrap();
                     let token_str = &remaining[..token.len as usize];
                     write!(f, ". Next token is `{token_str}`")
                 };
-                match self.error.kind {
-                    FormatErrorKind::Constraint(ConstraintError::WidthLimitExceeded) => {
+                match *self.error {
+                    FormatError::Constraint(ConstraintError::WidthLimitExceeded) => {
                         write!(f, "width limit exceeded")?
                     }
-                    FormatErrorKind::Constraint(ConstraintError::NewlineNotAllowed) => {
+                    FormatError::Constraint(ConstraintError::NewlineNotAllowed) => {
                         write!(f, "width limit exceeded")?
                     }
-                    FormatErrorKind::Parse(ParseError::ExpectedPosition(pos)) => {
+                    FormatError::Parse(ParseError::ExpectedPosition(pos)) => {
                         write!(
                             f,
                             "expected position is {} bytes {}",
-                            pos.abs_diff(self.error.pos.to_usize()),
-                            if pos > self.error.pos.to_usize() { "ahead" } else { "behind" }
+                            pos.abs_diff(self.pos),
+                            if pos > self.pos { "ahead" } else { "behind" }
                         )?;
                         next_token(f)?;
                     },
-                    FormatErrorKind::Parse(ParseError::ExpectedToken(ref token)) => {
+                    FormatError::Parse(ParseError::ExpectedToken(ref token)) => {
                         write!(f, "expected token: `{}`", token)?;
                         next_token(f)?;
                     }
@@ -81,20 +75,20 @@ impl FormatError {
                 Ok(())
             }
         }
-        let (line, col) = line_col(source, self.pos.to_usize());
-        FormatErrorDisplay { error: self, source, line, col }
+        let (line, col) = line_col(source, pos);
+        FormatErrorDisplay { error: self, source, pos, line, col }
     }
 }
 
-impl From<ConstraintError> for FormatErrorKind {
+impl From<ConstraintError> for FormatError {
     fn from(e: ConstraintError) -> Self {
-        FormatErrorKind::Constraint(e)
+        FormatError::Constraint(e)
     }
 }
 
-impl From<ParseError> for FormatErrorKind {
+impl From<ParseError> for FormatError {
     fn from(e: ParseError) -> Self {
-        FormatErrorKind::Parse(e)
+        FormatError::Parse(e)
     }
 }
 
@@ -110,15 +104,15 @@ impl From<WidthLimitExceededError> for ConstraintError {
     }
 }
 
-impl From<NewlineNotAllowedError> for FormatErrorKind {
+impl From<NewlineNotAllowedError> for FormatError {
     fn from(e: NewlineNotAllowedError) -> Self {
-        FormatErrorKind::Constraint(ConstraintError::from(e))
+        FormatError::Constraint(ConstraintError::from(e))
     }
 }
 
-impl From<WidthLimitExceededError> for FormatErrorKind {
+impl From<WidthLimitExceededError> for FormatError {
     fn from(e: WidthLimitExceededError) -> Self {
-        FormatErrorKind::Constraint(ConstraintError::from(e))
+        FormatError::Constraint(ConstraintError::from(e))
     }
 }
 

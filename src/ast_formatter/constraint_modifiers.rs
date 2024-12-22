@@ -113,7 +113,7 @@ impl AstFormatter {
             return f();
         };
         let Some(new_limit) = current.checked_sub(amount) else {
-            return Err(self.out.format_error(WidthLimitExceededError));
+            return Err(WidthLimitExceededError.into());
         };
         self.with_width_limit(new_limit, f)
     }
@@ -130,11 +130,11 @@ impl AstFormatter {
             return f();
         }
         let Some(new_max_width) = max_width_for_line.max_width.checked_sub(amount) else {
-            return Err(self.out.format_error(WidthLimitExceededError));
+            return Err(WidthLimitExceededError.into());
         };
         self.with_set_max_width_for_line(new_max_width, f)
     }
-    
+
     fn with_set_max_width_for_line(&self, max_width: usize, f: impl FnOnce() -> FormatResult) -> FormatResult {
         let line = self.out.line();
         let max_width_prev = self

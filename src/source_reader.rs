@@ -1,13 +1,12 @@
 use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
 
-use crate::error::{FormatError, FormatErrorKind, ParseError, ParseResult};
+use crate::error::{ParseError, ParseResult};
+
 pub struct SourceReader {
     pub source: String,
     pub pos: Cell<BytePos>,
 }
-
-impl SourceReader {}
 
 impl SourceReader {
     pub fn new(source: String) -> SourceReader {
@@ -15,17 +14,6 @@ impl SourceReader {
             source,
             pos: Cell::new(BytePos(0)),
         }
-    }
-
-    pub(crate) fn format_error(&self, kind: impl Into<FormatErrorKind>) -> FormatError {
-        let e = FormatError {
-            kind: kind.into(),
-            pos: self.pos.get(),
-        };
-        if matches!(e.kind, FormatErrorKind::Parse(_)) {
-            panic!("{}", e.display(&self.source))
-        }
-        e
     }
 
     pub fn advance(&self, len: usize) {
@@ -73,5 +61,4 @@ impl SourceReader {
             .get(span.lo().to_usize()..span.hi().to_usize())
             .expect("source string should include the span")
     }
-
 }

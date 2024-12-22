@@ -79,7 +79,7 @@ impl AstFormatter {
             None
         } else {
             match RUSTFMT_CONFIG_DEFAULTS.chain_width.checked_sub(start_len) {
-                None => return Err(self.out.format_error(WidthLimitExceededError)),
+                None => return Err(WidthLimitExceededError.into()),
                 Some(width) => Some(width),
             }
         };
@@ -107,7 +107,7 @@ impl AstFormatter {
                 if fallback.peek_result().is_ok() {
                     // if wrapping makes the last item fit on one line,
                     // abort the single-line approach
-                    return Err(self.out.format_error(WidthLimitExceededError));
+                    return Err(WidthLimitExceededError.into());
                 }
                 // try with overflow
                 fallback.next(|| self.dot_chain_item(last)).result()

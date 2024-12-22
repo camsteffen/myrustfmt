@@ -12,7 +12,7 @@ impl AstFormatter {
         self.fallback(|| {
             self.with_single_line(|| {
                 format_item(first)?;
-                rest.iter().try_for_each(|item| {
+                rest.iter().try_for_each(|item| -> FormatResult {
                     self.out.space()?;
                     self.out.token_expect(token)?;
                     self.out.space()?;

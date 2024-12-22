@@ -350,7 +350,7 @@ impl<'a> AstFormatter {
             format_item(first)?;
             self.out.token_maybe_missing(",")?;
             for item in rest {
-                let item_comma = || {
+                let item_comma = || -> FormatResult {
                     format_item(item)?;
                     self.out.token_maybe_missing(",")?;
                     Ok(())
