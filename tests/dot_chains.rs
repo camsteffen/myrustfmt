@@ -5,7 +5,7 @@ use tracing_test::traced_test;
 
 #[traced_test]
 #[test]
-fn dot_chain_overflow() {
+fn dot_chain_wrap_instead_of_overflow() {
     let source = r#"
 fn test() {
     if self.constraints_mut().newline_budget.is_some_and(|h| h <= newlines) {

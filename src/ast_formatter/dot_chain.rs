@@ -1,12 +1,12 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::{Braces,  list};
+use crate::ast_formatter::list::config::ParamListConfig;
+use crate::ast_formatter::list::{Braces, list};
 use crate::constraints::INDENT_WIDTH;
 use crate::error::FormatResult;
 use crate::error::WidthLimitExceededError;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
-use crate::ast_formatter::list::config::ParamListConfig;
 
 impl AstFormatter {
     pub fn dot_chain(&self, expr: &ast::Expr, tail: Tail<'_>, is_overflow: bool) -> FormatResult {
@@ -136,11 +136,9 @@ impl AstFormatter {
             ast::ExprKind::MethodCall(ref method_call) => {
                 self.path_segment(&method_call.seg, true)?;
                 list(Braces::PARENS, &method_call.args, |arg| self.expr(arg))
-                    .config(
-                        &ParamListConfig {
-                            single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
-                        },
-                    )
+                    .config(&ParamListConfig {
+                        single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
+                    })
                     .overflow()
                     .format(self)?;
                 Ok(())

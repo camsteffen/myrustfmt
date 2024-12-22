@@ -159,12 +159,12 @@ impl Overflow for ast::Expr {
             // | ast::ExprKind::Match(..)
             // | ast::ExprKind::While(..)
             // list
-            // | ast::ExprKind::Array(..)
-            // | ast::ExprKind::Call(..)
-            // | ast::ExprKind::MacCall(..)
-            // | ast::ExprKind::Struct(..)
-            // | ast::ExprKind::Tup(..) if is_only_list_item => H::overflows(|| this.expr(expr, Tail::None)),
-            // | ast::ExprKind::MethodCall(..) if is_only_list_item => H::overflows(|| this.dot_chain(expr, Tail::NONE, true)),
+            | ast::ExprKind::Array(..)
+            | ast::ExprKind::Call(..)
+            | ast::ExprKind::MacCall(..)
+            | ast::ExprKind::Struct(..)
+            | ast::ExprKind::Tup(..) if is_only_list_item => H::overflows(|| af.expr(expr)),
+            // | ast::ExprKind::MethodCall(..) if is_only_list_item => H::overflows(|| af.dot_chain(expr, Tail::NONE, true)),
             // prefix
             ast::ExprKind::AddrOf(borrow_kind, mutability, ref target)
                 if H::FORMATTING || Overflow::check_if_overflows(af, target, is_only_list_item) =>

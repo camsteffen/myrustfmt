@@ -3,8 +3,8 @@ use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
+use crate::ast_formatter::list::config::{ParamListConfig, struct_field_list_config};
 use crate::ast_formatter::list::{Braces, ListRest, list};
-use crate::ast_formatter::list::config::{struct_field_list_config, ParamListConfig};
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
