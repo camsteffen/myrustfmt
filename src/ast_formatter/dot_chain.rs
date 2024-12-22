@@ -1,12 +1,13 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
-use crate::ast_formatter::list::config::ParamListConfig;
+use crate::ast_formatter::list::config::{ListConfig, ParamListConfig};
 use crate::ast_formatter::list::{Braces, list};
 use crate::constraints::INDENT_WIDTH;
 use crate::error::FormatResult;
 use crate::error::WidthLimitExceededError;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
+use crate::config::Config;
 
 impl AstFormatter {
     pub fn dot_chain(&self, expr: &ast::Expr, tail: Tail<'_>, is_overflow: bool) -> FormatResult {
@@ -20,7 +21,7 @@ impl AstFormatter {
                 self.expr(root)?;
                 dot_chain
                     .iter()
-                    .try_for_each(|item| self.dot_chain_item(item))?;
+                    .try_for_each(|item| self.dot_chain_item(item, false))?;
                 Ok(())
             })?;
             self.tail(tail)?;
@@ -39,7 +40,7 @@ impl AstFormatter {
             }
             let next;
             (next, dot_chain) = dot_chain.split_first().unwrap();
-            self.dot_chain_item(next)?;
+            self.dot_chain_item(next, true)?;
             if dot_chain.is_empty() {
                 return self.tail(tail);
             }
@@ -51,7 +52,7 @@ impl AstFormatter {
             // each item on a separate line, no indent
             for item in dot_chain {
                 self.out.newline_indent()?;
-                self.dot_chain_item(item)?;
+                self.dot_chain_item(item, false)?;
             }
             self.tail(tail)?;
             Ok(())
@@ -88,19 +89,19 @@ impl AstFormatter {
             self.with_single_line(|| {
                 self.with_no_overflow(|| {
                     for item in until_last {
-                        self.dot_chain_item(item)?;
+                        self.dot_chain_item(item, false)?;
                     }
                     Ok(())
                 })?;
                 let mut fallback =
-                    self.fallback(|| self.with_no_overflow(|| self.dot_chain_item(last)));
+                    self.fallback(|| self.with_no_overflow(|| self.dot_chain_item(last, false)));
                 if fallback.is_done() {
                     return fallback.result();
                 }
                 fallback = fallback.next(|| {
                     self.indented(|| {
                         self.with_not_single_line(|| self.out.newline_indent())?;
-                        self.with_no_overflow(|| self.dot_chain_item(last))?;
+                        self.with_no_overflow(|| self.dot_chain_item(last, false))?;
                         Ok(())
                     })
                 });
@@ -110,7 +111,7 @@ impl AstFormatter {
                     return Err(WidthLimitExceededError.into());
                 }
                 // try with overflow
-                fallback.next(|| self.dot_chain_item(last)).result()
+                fallback.next(|| self.dot_chain_item(last, false)).result()
             })
         })?;
         self.tail(tail)?;
@@ -121,7 +122,7 @@ impl AstFormatter {
         self.indented(|| {
             for item in dot_chain {
                 self.out.newline_indent()?;
-                self.dot_chain_item(item)?;
+                self.dot_chain_item(item, false)?;
             }
             Ok(())
         })?;
@@ -129,16 +130,14 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn dot_chain_item(&self, expr: &ast::Expr) -> FormatResult {
+    fn dot_chain_item(&self, expr: &ast::Expr, is_first_line: bool) -> FormatResult {
         self.out.token_expect(".")?;
         match expr.kind {
             ast::ExprKind::Field(_, ident) => self.ident(ident),
             ast::ExprKind::MethodCall(ref method_call) => {
                 self.path_segment(&method_call.seg, true)?;
                 list(Braces::PARENS, &method_call.args, |arg| self.expr(arg))
-                    .config(&ParamListConfig {
-                        single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
-                    })
+                    .config(&MethodCallParamsListConfig { is_first_line })
                     .overflow()
                     .format(self)?;
                 Ok(())
@@ -159,3 +158,46 @@ fn build_dot_chain<'a>(chain: &mut Vec<&'a ast::Expr>, expr: &'a ast::Expr) {
     }
     chain.push(expr);
 }
+
+pub struct MethodCallParamsListConfig {
+    is_first_line: bool,
+}
+
+impl ListConfig for MethodCallParamsListConfig {
+    fn single_line_max_contents_width(&self) -> Option<usize> {
+        if self.is_first_line {
+            None
+        } else {
+            Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
+        }
+    }
+
+    fn overflow_max_first_line_contents_width(&self, config: &Config) -> Option<usize> {
+        if config.rustfmt_quirks {
+            Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width - 2)
+        } else {
+            Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
+        }
+    }
+}
+
+/*
+impl X {
+    fn test() {
+        self.out.token_expect("if")?;
+        self.out.space()?;
+        self.fallback(|| self.with_single_line(|| self.expr_tail(scrutinee, Tail::OPEN_BLOCK)))
+            .next(|| {
+                self.expr(scrutinee)?;
+                self.out.newline_indent()?;
+                self.out.token_expect("{")?;
+                Ok(())
+            })
+            .result()?;
+        self.fallback(|| self.with_single_line(|| self.expr_tail(scrutinee, Tail::OPEN_BLOCK)));
+        self.x()
+            .fallback(|| self.with_single_line(|| self.expr_tail(scrutinee, Tail::OPEN_BLOCK)))
+            .x();
+    }
+}
+*/

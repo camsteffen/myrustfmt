@@ -5,6 +5,7 @@ use crate::error::FormatResult;
 
 use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ParamListConfig};
 use rustc_ast::ast;
+use rustc_ast::BindingMode;
 use rustc_span::symbol::kw;
 
 impl<'a> AstFormatter {
@@ -194,14 +195,30 @@ impl<'a> AstFormatter {
 
     fn param(&self, param: &ast::Param) -> FormatResult {
         self.attrs(&param.attrs)?;
-        if let ast::PatKind::Ident(_, ident, _) = param.pat.kind {
-            if matches!(ident.name, kw::Empty | kw::SelfLower) {
-                // type only; e.g. `&self` or `fn(String)`
-                self.ty(&param.ty)?;
-                return Ok(());
+        if let ast::PatKind::Ident(BindingMode(_, mutbl), ident, _) = param.pat.kind {
+            match ident.name {
+                kw::Empty => return self.ty(&param.ty),
+                kw::SelfLower => {
+                    match param.ty.kind {
+                        ast::TyKind::ImplicitSelf => {
+                            self.mutability(mutbl)?;
+                            self.ty(&param.ty)?;
+                            return Ok(());
+                        }
+                        ast::TyKind::Ref(..) | ast::TyKind::PinnedRef(..) => {
+                            return self.ty(&param.ty);
+                        }
+                        _ => {
+                            self.mutability(mutbl)?;
+                            self.out.token_expect("self")?;
+                        }
+                    };
+                }
+                _ => self.pat(&param.pat)?,
             }
+        } else {
+            self.pat(&param.pat)?;
         }
-        self.pat(&param.pat)?;
         if !matches!(param.ty.kind, ast::TyKind::Infer) {
             self.out.token_expect(":")?;
             self.out.space()?;

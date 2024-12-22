@@ -70,7 +70,9 @@ impl<'a> AstFormatter {
             ast::PatKind::Ref(_, _) => todo!(),
             ast::PatKind::Lit(_) => todo!(),
             ast::PatKind::Range(_, _, _) => todo!(),
-            ast::PatKind::Slice(_) => todo!(),
+            ast::PatKind::Slice(ref elements) => {
+                list(Braces::SQUARE, elements, |pat| self.pat(pat)).format(self)
+            }
             ast::PatKind::Rest => self.out.token_expect(".."),
             ast::PatKind::Never => todo!(),
             ast::PatKind::Paren(_) => todo!(),

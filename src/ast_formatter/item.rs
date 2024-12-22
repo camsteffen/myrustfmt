@@ -2,10 +2,11 @@ use rustc_ast::ast;
 use rustc_span::symbol::Ident;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{
-    Braces, list
+use crate::ast_formatter::last_line::Tail;
+use crate::ast_formatter::list::config::{
+    ListConfig, ListWrapToFitConfig, ParamListConfig, struct_field_list_config,
 };
-use crate::ast_formatter::list::config::{struct_field_list_config, ListConfig, ListWrapToFitConfig, ParamListConfig};
+use crate::ast_formatter::list::{Braces, list};
 use crate::config::Config;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -44,8 +45,7 @@ impl<'a> AstFormatter {
             }
             ast::ItemKind::Use(use_tree) => {
                 self.out.token_at_space("use", item.span.lo())?;
-                self.use_tree(use_tree)?;
-                self.out.token_end_at(";", item.span.hi())?;
+                self.use_tree(use_tree, Tail::SEMICOLON)?;
             }
             ast::ItemKind::Static(_) => todo!(),
             ast::ItemKind::Const(const_item) => self.const_item(const_item, item.ident)?,
@@ -272,15 +272,17 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn use_tree(&self, use_tree: &ast::UseTree) -> FormatResult {
+    fn use_tree(&self, use_tree: &ast::UseTree, tail: Tail<'_>) -> FormatResult {
         self.path(&use_tree.prefix, false)?;
         match use_tree.kind {
-            ast::UseTreeKind::Simple(None) => {}
-            ast::UseTreeKind::Simple(Some(rename)) => {
-                self.out.space()?;
-                self.out.token_expect("as")?;
-                self.out.space()?;
-                self.ident(rename)?;
+            ast::UseTreeKind::Simple(rename) => {
+                if let Some(rename) = rename {
+                    self.out.space()?;
+                    self.out.token_expect("as")?;
+                    self.out.space()?;
+                    self.ident(rename)?;
+                }
+                self.tail(tail)?;
             }
             ast::UseTreeKind::Nested { ref items, span: _ } => {
                 self.out.token_expect("::")?;
@@ -288,9 +290,10 @@ impl<'a> AstFormatter {
                     .iter()
                     .any(|(item, _)| matches!(item.kind, ast::UseTreeKind::Nested { .. }));
                 let list = list(Braces::CURLY_NO_PAD, items, |(use_tree, _)| {
-                    self.use_tree(use_tree)
+                    self.use_tree(use_tree, Tail::NONE)
                 })
-                .config(&UseTreeListConfig);
+                .config(&UseTreeListConfig)
+                .tail(tail);
                 if has_nested {
                     list.format_separate_lines(self)?
                 } else {

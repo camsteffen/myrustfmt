@@ -7,7 +7,11 @@ impl AstFormatter {
         let out = &self.out;
         let snapshot = out.snapshot();
         let result = first();
-        Fallback { out, snapshot, result }
+        Fallback {
+            out,
+            snapshot,
+            result,
+        }
     }
 }
 
@@ -42,8 +46,12 @@ impl<T> Fallback<'_, T> {
     pub fn result(self) -> FormatResult<T> {
         self.result
     }
-    
+
     pub fn peek_result(&self) -> &FormatResult<T> {
         &self.result
+    }
+
+    pub fn snapshot(&self) -> &SourceFormatterSnapshot {
+        &self.snapshot
     }
 }

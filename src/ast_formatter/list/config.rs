@@ -14,6 +14,10 @@ pub trait ListConfig {
         None
     }
 
+    fn overflow_max_first_line_contents_width(&self, _config: &Config) -> Option<usize> {
+        None
+    }
+
     fn wrap_to_fit() -> ListWrapToFitConfig {
         ListWrapToFitConfig::No
     }

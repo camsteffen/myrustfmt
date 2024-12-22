@@ -8,12 +8,20 @@ use std::marker::PhantomData;
 pub trait ListOverflow: Copy {
     type Item;
 
-    fn format_if_overflow(
+    fn can_overflow(
         _ast_formatter: &AstFormatter,
         _item: &Self::Item,
         _is_only_item: bool,
-    ) -> Option<FormatResult> {
-        None
+    ) -> bool {
+        false
+    }
+
+    fn format_overflow(
+        _ast_formatter: &AstFormatter,
+        _item: &Self::Item,
+        _is_only_item: bool,
+    ) -> FormatResult {
+        panic!("not supported")
     }
 }
 
@@ -46,25 +54,21 @@ impl<T> Default for ListOverflowYes<T> {
 
 impl<T> ListOverflow for ListOverflowNo<T> {
     type Item = T;
-
-    fn format_if_overflow(
-        _ast_formatter: &AstFormatter,
-        _item: &Self::Item,
-        _is_only_item: bool,
-    ) -> Option<FormatResult> {
-        None
-    }
 }
 
 impl<T: Overflow> ListOverflow for ListOverflowYes<T> {
     type Item = T;
 
-    fn format_if_overflow(
+    fn can_overflow(ast_formatter: &AstFormatter, item: &Self::Item, is_only_item: bool) -> bool {
+        Overflow::check_if_overflows(ast_formatter, item, is_only_item)
+    }
+
+    fn format_overflow(
         ast_formatter: &AstFormatter,
         item: &Self::Item,
         is_only_item: bool,
-    ) -> Option<FormatResult> {
-        Overflow::format_if_overflow(ast_formatter, item, is_only_item)
+    ) -> FormatResult {
+        Overflow::format(ast_formatter, item, is_only_item)
     }
 }
 

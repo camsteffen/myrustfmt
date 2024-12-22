@@ -4,7 +4,7 @@ mod overflow;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ListWrapToFitConfig};
-use crate::error::FormatResult;
+use crate::error::{FormatResult, WidthLimitExceededError};
 use overflow::{ListOverflow, ListOverflowNo, ListOverflowYes};
 use rustc_ast::ast;
 
@@ -173,6 +173,7 @@ where
                     self.overflow,
                     self.braces.pad,
                     self.config.single_line_max_contents_width(),
+                    self.config.overflow_max_first_line_contents_width(af.config()),
                 )
             },
         )
@@ -239,27 +240,40 @@ impl<'a> AstFormatter {
         _overflow: Overflow,
         pad: bool,
         max_width: Option<usize>,
+        max_width_overflow: Option<usize>,
     ) -> FormatResult {
         if pad {
             self.out.space()?;
         }
         let (last, until_last) = list.split_last().unwrap();
         let format = || {
+            let start = self.out.len();
             for item in until_last {
                 format_item(item)?;
                 self.out.token_maybe_missing(",")?;
                 self.out.space()?;
             }
-            let overflow_result = if matches!(rest, ListRest::None) && self.allow_overflow.get() {
-                Overflow::format_if_overflow(self, last, list.len() == 1)
-            } else {
-                None
-            };
-            if let Some(result) = overflow_result {
-                result?;
+            if matches!(rest, ListRest::None)
+                && self.allow_overflow.get()
+                && Overflow::can_overflow(self, last, list.len() == 1)
+            {
+                self.fallback(|| format_item(last))
+                    .next(|| {
+                        let max_width = max_width_overflow
+                            .map(|max_width| {
+                                max_width
+                                    .checked_sub(self.out.len() - start)
+                                    .ok_or(WidthLimitExceededError)
+                            })
+                            .transpose()?;
+                        self.with_width_limit_first_line_opt(max_width, || {
+                            Overflow::format_overflow(self, last, list.len() == 1)
+                        })
+                    })
+                    .result()?;
             } else {
                 format_item(last)?;
-            };
+            }
             if matches!(rest, ListRest::None) {
                 self.out.skip_token_if_present(",")?;
             } else {

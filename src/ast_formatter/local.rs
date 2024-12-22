@@ -46,7 +46,7 @@ impl<'a> AstFormatter {
         .next(|| {
             self.indented(|| {
                 self.out.newline_indent()?;
-                self.with_single_line(|| self.expr(expr))?;
+                self.with_single_line(|| self.with_no_overflow(|| self.expr(expr)))?;
                 self.tail(end)?;
                 Ok(())
             })
