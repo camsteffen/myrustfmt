@@ -152,7 +152,7 @@ impl<'a> AstFormatter {
         let first_line = self.out.line();
         self.out.token_at("impl", item.span.lo())?;
         self.generic_params(&impl_.generics.params)?;
-        self.line_break_indent_fallback_optional(self.out.line() == first_line, |broken| {
+        self.single_line_or_line_break_indent_optional(self.out.line() == first_line, |broken| {
             if let Some(of_trait) = &impl_.of_trait {
                 // self.with_single_line_optional(!broken, || self.trait_ref(of_trait))?;
                 self.trait_ref(of_trait)?;

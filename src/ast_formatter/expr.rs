@@ -80,7 +80,14 @@ impl<'a> AstFormatter {
                 self.tail(tail)?;
                 Ok(())
             }
-            ast::ExprKind::Loop(_, _, _) => todo!(),
+            ast::ExprKind::Loop(ref block, label, _) => {
+                self.label(label)?;
+                self.out.token_expect("loop")?;
+                self.out.space()?;
+                self.block(block)?;
+                self.tail(tail)?;
+                Ok(())
+            }
             ast::ExprKind::Match(ref scrutinee, ref arms, ast::MatchKind::Prefix) => {
                 self.match_(scrutinee, arms, expr, tail)
             }
@@ -121,7 +128,18 @@ impl<'a> AstFormatter {
                 self.addr_of(borrow_kind, mutability, expr)?;
                 self.expr_tail(target, tail)
             }
-            ast::ExprKind::Break(_, _) => todo!(),
+            ast::ExprKind::Break(label, ref inner) => {
+                self.out.token_expect("break")?;
+                if label.is_some() || inner.is_some() {
+                    self.out.space()?;
+                }
+                self.label(label)?;
+                match inner {
+                    None => self.tail(tail)?,
+                    Some(inner) => self.expr_tail(inner, tail)?,
+                }
+                Ok(())
+            }
             ast::ExprKind::Continue(_) => todo!(),
             ast::ExprKind::Ret(ref target) => {
                 self.out.token_expect("return")?;
@@ -319,9 +337,9 @@ impl<'a> AstFormatter {
                 }
             }
         }
-        if let Some(expr) = inner_expr {
+        if let Some(inner) = inner_expr {
             self.out.skip_token("{")?;
-            self.skip_single_expr_blocks(expr, format)?;
+            self.skip_single_expr_blocks(inner, format)?;
             self.out.skip_token("}")?;
         } else {
             format(expr)?

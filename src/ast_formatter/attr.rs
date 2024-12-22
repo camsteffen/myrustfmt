@@ -1,10 +1,10 @@
 use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 
-use crate::ast_formatter::list::{Braces,  list};
+use crate::ast_formatter::list::config::ParamListConfig;
+use crate::ast_formatter::list::{Braces, list};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
-use crate::ast_formatter::list::config::ParamListConfig;
 
 impl AstFormatter {
     pub fn attrs(&self, attrs: &[ast::Attribute]) -> FormatResult {

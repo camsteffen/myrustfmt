@@ -27,46 +27,56 @@ impl AstFormatter {
             self.out.token_expect("=>")?;
             Ok(())
         };
-        let broken_guard = if let Some(guard) = arm.guard.as_deref() {
-            let broken = self.line_break_indent_fallback(|broken| {
+        let comma = |body| {
+            if is_plain_block(body) {
+                self.out.skip_token_if_present(",")
+            } else {
+                self.out.token_expect(",")
+            }
+        };
+        if let Some(guard) = arm.guard.as_deref() {
+            let if_guard = || -> FormatResult {
                 self.out.token_expect("if")?;
                 self.out.space()?;
-                self.expr_tail(
-                    guard,
-                    Tail::new(&|| {
-                        arrow()?;
-                        if !broken || self.config.rustfmt_quirks {
-                            self.out.require_width(" {".len())?;
-                        }
-                        Ok(())
-                    }),
-                )?;
-                Ok(broken)
-            })?;
-            if broken {
-                self.out.newline_indent()?;
-            }
-            broken
-        } else {
-            false
-        };
-        if let Some(body) = arm.body.as_deref() {
-            if arm.guard.is_none() {
-                arrow()?;
+                self.expr(guard)?;
+                Ok(())
+            };
+            self.fallback(|| {
                 self.out.space()?;
-                self.expr(body)?;
-            } else if broken_guard {
-                self.expr_force_block(body)?;
-            } else {
-                self.expr(body)?;
-            }
-            if is_plain_block(body) {
-                self.out.skip_token_if_present(",")?;
-            } else {
-                self.out.token_expect(",")?;
-            }
-        } else {
-            todo!();
+                if_guard()?;
+                if let Some(body) = arm.body.as_deref() {
+                    arrow()?;
+                    self.out.space()?;
+                    self.fallback(|| self.expr(body))
+                        .next(|| self.expr_force_block(body))
+                        .result()?;
+                    comma(body)?;
+                }
+                Ok(())
+            })
+            .next(|| {
+                self.indented(|| {
+                    self.out.newline_indent()?;
+                    if_guard()?;
+                    Ok(())
+                })?;
+                if let Some(body) = arm.body.as_deref() {
+                    arrow()?;
+                    if self.config.rustfmt_quirks {
+                        self.out.require_width(" {".len())?;
+                    }
+                    self.out.newline_indent()?;
+                    self.expr_force_block(body)?;
+                    comma(body)?;
+                }
+                Ok(())
+            })
+            .result()?;
+        } else if let Some(body) = arm.body.as_deref() {
+            arrow()?;
+            self.out.space()?;
+            self.expr(body)?;
+            comma(body)?;
         }
         Ok(())
     }

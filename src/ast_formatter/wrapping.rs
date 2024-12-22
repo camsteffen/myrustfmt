@@ -19,7 +19,7 @@ impl AstFormatter {
         .result()
     }
 
-    pub fn line_break_indent_fallback<T>(
+    pub fn single_line_or_line_break_indent<T>(
         &self,
         format: impl Fn(/*broken: */ bool) -> FormatResult<T>,
     ) -> FormatResult<T> {
@@ -38,7 +38,7 @@ impl AstFormatter {
         .result()
     }
 
-    pub fn line_break_indent_fallback_optional(
+    pub fn single_line_or_line_break_indent_optional(
         &self,
         apply: bool,
         format: impl Fn(/*broken: */ bool) -> FormatResult,
@@ -46,7 +46,7 @@ impl AstFormatter {
         if !apply {
             return format(false);
         }
-        self.line_break_indent_fallback(format)
+        self.single_line_or_line_break_indent(format)
     }
 
     pub fn line_break_fallback_with_optional_indent(
