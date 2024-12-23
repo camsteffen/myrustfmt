@@ -33,7 +33,7 @@ fn dogfood_test_dir(dir: &Path) -> io::Result<()> {
 fn dogfood_test_file(path: impl AsRef<Path>) {
     let path = path.as_ref();
     println!("Testing file {}", path.display());
-    let result = format_file(path);
+    let result = format_file(path).unwrap();
     let original = fs::read_to_string(path).unwrap();
     assert_eq!(result, original)
 }

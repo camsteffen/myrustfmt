@@ -1,5 +1,7 @@
+use std::backtrace::Backtrace;
 use crate::error::{FormatResult, WidthLimitExceededError};
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 
 pub const INDENT_WIDTH: usize = 4;
 
@@ -12,6 +14,7 @@ pub struct MaxWidthForLine {
 #[derive(Clone, Debug)]
 pub struct Constraints {
     pub single_line: Cell<bool>,
+    pub single_line_backtrace: RefCell<Option<Rc<Backtrace>>>,
     pub max_width: Cell<Option<usize>>,
     /// Used to set the max width for the current line, so it no longer applies after a newline
     /// character is printed
@@ -28,6 +31,7 @@ impl Constraints {
             max_width_for_line: Cell::new(None),
             newline_budget: Cell::new(None),
             single_line: Cell::new(false),
+            single_line_backtrace: RefCell::new(None),
         }
     }
 
@@ -38,12 +42,14 @@ impl Constraints {
             max_width_for_line: max_width_first_line,
             newline_budget,
             single_line,
+            single_line_backtrace,
         } = other;
         self.indent.set(indent.get());
         self.max_width.set(max_width.get());
         self.max_width_for_line.set(max_width_first_line.get());
         self.newline_budget.set(newline_budget.get());
         self.single_line.set(single_line.get());
+        self.single_line_backtrace.replace(single_line_backtrace.borrow().clone());
     }
 
     pub fn increment_indent(&self) {

@@ -34,6 +34,7 @@ use rustc_session::parse::ParseSess;
 use rustc_span::edition::Edition;
 use rustc_span::{
     FileName,
+    ErrorGuaranteed,
     source_map::{FilePathMapping, SourceMap},
 };
 use std::fs;
@@ -44,20 +45,20 @@ use crate::config::Config;
 use crate::constraints::Constraints;
 use source_formatter::SourceFormatter;
 
-pub fn format_file(path: impl AsRef<Path>) -> String {
+pub fn format_file(path: impl AsRef<Path>) -> Result<String, ErrorGuaranteed> {
     let string = fs::read_to_string(path).unwrap();
     format_str_config(&string, Config::default())
 }
 
-pub fn format_str_defaults(source: &str) -> String {
+pub fn format_str_defaults(source: &str) -> Result<String, ErrorGuaranteed> {
     format_str_config(source, Config::default())
 }
 
-pub fn format_str(source: &str, max_width: usize) -> String {
+pub fn format_str(source: &str, max_width: usize) -> Result<String, ErrorGuaranteed> {
     format_str_config(source, Config::default().max_width(max_width))
 }
 
-pub fn format_str_config(source: &str, config: Config) -> String {
+pub fn format_str_config(source: &str, config: Config) -> Result<String, ErrorGuaranteed> {
     parse_ast_then(String::from(source), |crate_| {
         let constraints = Constraints::new(config.max_width);
         let source_formatter = SourceFormatter::new(String::from(source), constraints);
@@ -70,7 +71,10 @@ pub fn format_str_config(source: &str, config: Config) -> String {
     })
 }
 
-fn parse_ast_then<T>(string: String, f: impl FnOnce(rustc_ast::ast::Crate) -> T) -> T {
+fn parse_ast_then<T>(
+    string: String,
+    f: impl FnOnce(rustc_ast::ast::Crate) -> T,
+) -> Result<T, ErrorGuaranteed> {
     let source_map = Lrc::new(SourceMap::new(FilePathMapping::empty()));
     let dcx = dcx(source_map.clone());
     rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
@@ -81,11 +85,13 @@ fn parse_ast_then<T>(string: String, f: impl FnOnce(rustc_ast::ast::Crate) -> T)
             string,
         )
         .unwrap();
-        let crate_ = parser.parse_crate_mod().unwrap_or_else(|err| {
-            err.emit();
-            panic!("ur done");
-        });
-        f(crate_)
+        let crate_ = parser.parse_crate_mod().map_err(|err| {
+            err.emit()
+        })?;
+        if let Some(error) = psess.dcx().has_errors() {
+            return Err(error);
+        }
+        Ok(f(crate_))
     })
 }
 

@@ -284,16 +284,12 @@ impl<'a> AstFormatter {
                     self.expr(expr)?;
                 }
             }
-            if pad {
-                self.out.space()?;
-            }
-            Ok(())
+            FormatResult::Ok(())
         };
         let format = || self.with_single_line(format);
-        if let Some(max_width) = max_width {
-            self.with_width_limit_first_line(max_width, format)?;
-        } else {
-            format()?;
+        self.with_width_limit_first_line_opt(max_width, format)?;
+        if pad {
+            self.out.space()?;
         }
         self.tail(tail)?;
         Ok(())

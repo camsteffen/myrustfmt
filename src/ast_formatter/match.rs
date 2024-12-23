@@ -41,6 +41,7 @@ impl AstFormatter {
                 self.expr(guard)?;
                 Ok(())
             };
+            // guard on same line
             self.fallback(|| {
                 self.out.space()?;
                 if_guard()?;
@@ -54,6 +55,7 @@ impl AstFormatter {
                 }
                 Ok(())
             })
+            // guard on separate line
             .next(|| {
                 self.indented(|| {
                     self.out.newline_indent()?;

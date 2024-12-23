@@ -11,7 +11,7 @@ fn binary_operators_rustfmt_quirks() {
         111111111111111111 * 11111111111111111 + 1111111111111111 - 1111111111111111 + 2222222222222222 * 333333;
         }";
     assert_eq!(
-        format_str_config(source, Config::default().max_width(48).rustfmt_quirks(true)),
+        format_str_config(source, Config::default().max_width(48).rustfmt_quirks(true)).unwrap(),
         "
 fn main() {
     111111111111111111 - 11111111111111111
@@ -37,7 +37,7 @@ fn binary_operators_no_rustfmt_quirks() {
         format_str_config(
             source,
             Config::default().max_width(48).rustfmt_quirks(false)
-        ),
+        ).unwrap(),
         "
 fn main() {
     111111111111111111
@@ -50,6 +50,28 @@ fn main() {
         + 2222222222222222 * 333333;
 }
 "
+        .trim_start()
+    );
+}
+
+#[test]
+fn no_overflow() {
+    let source = r#"fn test() {
+            let something = a == b && call_meeeeeeeeeeeeeeeeee(|line| { let x; });
+        }"#;
+    assert_eq!(
+        format_str_config(
+            source,
+            Config::default()
+        ).unwrap(),
+        r#"
+fn test() {
+    let something = a == b
+        && call_meeeeeeeeeeeeeeeeee(|line| {
+            let x;
+        });
+}
+"#
         .trim_start()
     );
 }

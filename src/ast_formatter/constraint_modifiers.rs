@@ -1,7 +1,9 @@
-use tracing::info;
+use std::backtrace::Backtrace;
+use std::rc::Rc;
 use crate::ast_formatter::AstFormatter;
 use crate::constraints::{Constraints, MaxWidthForLine};
 use crate::error::{FormatResult, WidthLimitExceededError};
+use tracing::info;
 
 impl AstFormatter {
     fn constraints(&self) -> &Constraints {
@@ -36,10 +38,16 @@ impl AstFormatter {
         result
     }
 
-    pub fn with_single_line<T>(&self, f: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        let single_line_prev = self.constraints().single_line.replace(true);
+    pub fn with_single_line<T>(&self, f: impl FnOnce() -> T) -> T {
+        self.with_replace_single_line(true, f)
+    }
+
+    pub fn with_replace_single_line<T>(&self, value: bool, f: impl FnOnce() -> T) -> T {
+        let single_line_prev = self.constraints().single_line.replace(value);
+        let bp = self.constraints().single_line_backtrace.replace(Some(Rc::new(Backtrace::capture())));
         let result = f();
         self.constraints().single_line.set(single_line_prev);
+        self.constraints().single_line_backtrace.replace(bp);
         result
     }
 
@@ -55,17 +63,14 @@ impl AstFormatter {
     }
 
     pub fn with_not_single_line(&self, f: impl FnOnce() -> FormatResult) -> FormatResult {
-        let single_line_prev = self.constraints().single_line.replace(false);
-        let result = f();
-        self.constraints().single_line.set(single_line_prev);
-        result
+        self.with_replace_single_line(false, f)
     }
 
     pub fn with_do_overflow(&self, f: impl Fn() -> FormatResult) -> FormatResult {
         if self.config().rustfmt_quirks {
             self.fallback(&f)
                 .next(|| {
-                    info!("{:?}",self.constraints());
+                    info!("{:?}", self.constraints());
                     self.with_reduce_max_width_for_line(2, || self.with_not_single_line(f))
                 })
                 .result()
@@ -135,7 +140,7 @@ impl AstFormatter {
         self.with_set_max_width_for_line(new_max_width, f)
     }
 
-    fn with_set_max_width_for_line(&self, max_width: usize, f: impl FnOnce() -> FormatResult) -> FormatResult {
+    fn with_set_max_width_for_line<T>(&self, max_width: usize, f: impl FnOnce() -> T) -> T {
         let line = self.out.line();
         let max_width_prev = self
             .constraints()
@@ -147,11 +152,7 @@ impl AstFormatter {
     }
 
     /** Enforces a max number of characters until a newline is printed */
-    pub fn with_width_limit_first_line(
-        &self,
-        width_limit: usize,
-        f: impl FnOnce() -> FormatResult,
-    ) -> FormatResult {
+    pub fn with_width_limit_first_line<T>(&self, width_limit: usize, f: impl FnOnce() -> T) -> T {
         let line = self.out.line();
         let max_width = self.out.last_line_len() + width_limit;
         if self
@@ -165,22 +166,38 @@ impl AstFormatter {
         self.with_set_max_width_for_line(max_width, f)
     }
 
-    pub fn with_width_limit_first_line_opt(
+    pub fn with_width_limit_first_line_opt<T>(
         &self,
         width_limit: Option<usize>,
-        f: impl FnOnce() -> FormatResult,
-    ) -> FormatResult {
+        f: impl FnOnce() -> T,
+    ) -> T {
         match width_limit {
             None => f(),
             Some(width_limit) => self.with_width_limit_first_line(width_limit, f),
         }
     }
 
-    pub fn with_width_limit(
+    pub fn with_width_limit_from_start_first_line_opt<T>(
+        &self,
+        line_start_pos: usize,
+        width_limit: Option<usize>,
+        f: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
+        let Some(width_limit) = width_limit else {
+            return f();
+        };
+        let Some(remaining) = width_limit.checked_sub(self.out.last_line_len() - line_start_pos)
+        else {
+            return Err(WidthLimitExceededError.into());
+        };
+        self.with_width_limit(remaining, f)
+    }
+
+    pub fn with_width_limit<T>(
         &self,
         width_limit: usize,
-        f: impl FnOnce() -> FormatResult,
-    ) -> FormatResult {
+        f: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
         let max_width = self.out.last_line_len() + width_limit;
         if self
             .constraints()

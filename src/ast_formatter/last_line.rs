@@ -1,11 +1,11 @@
 use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 
-/// Used to add trailing tokens to a formatted node, ensuring that
-/// the formatting pattern allows room for them.
-///
-/// Formatting functions should only accept a Tail argument if it will be used
-/// to fall back to a different format when it doesn't fit.
+/// Used to add trailing tokens to a formatted node
+/// 
+/// * DO accept a Tail argument to make a node narrower to make room for trailing tokens
+/// * DON'T accept a Tail argument if it is not used to trigger fallback formats
+/// * DON'T pass a Tail argument when the single-line constraint is invariably enabled
 #[derive(Clone, Copy)]
 pub struct Tail<'a>(TailImpl<'a>);
 

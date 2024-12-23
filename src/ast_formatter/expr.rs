@@ -24,9 +24,7 @@ impl<'a> AstFormatter {
                 .format(self),
             ast::ExprKind::ConstBlock(_) => todo!(),
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, tail),
-            ast::ExprKind::Field(..) | ast::ExprKind::MethodCall(_) => {
-                self.dot_chain(expr, tail, false)
-            }
+            ast::ExprKind::Field(..) | ast::ExprKind::MethodCall(_) => self.dot_chain(expr, tail),
             ast::ExprKind::Tup(ref items) => list(Braces::PARENS, items, |item| self.expr(item))
                 .config(&ParamListConfig {
                     single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
@@ -56,8 +54,8 @@ impl<'a> AstFormatter {
                 self.expr_tail(init, tail)?;
                 Ok(())
             }
-            ast::ExprKind::If(ref scrutinee, ref block, ref else_) => {
-                self.if_(scrutinee, block, else_.as_deref(), tail)
+            ast::ExprKind::If(ref condition, ref block, ref else_) => {
+                self.if_(condition, block, else_.as_deref(), tail)
             }
             ast::ExprKind::While(_, _, _) => todo!(),
             ast::ExprKind::ForLoop {
@@ -241,21 +239,41 @@ impl<'a> AstFormatter {
 
     fn if_(
         &self,
-        scrutinee: &ast::Expr,
+        condition: &ast::Expr,
         block: &ast::Block,
         else_: Option<&ast::Expr>,
         tail: Tail,
     ) -> FormatResult {
+        let first_line = self.out.line();
         self.out.token_expect("if")?;
         self.out.space()?;
-        self.fallback(|| self.with_single_line(|| self.expr_tail(scrutinee, Tail::OPEN_BLOCK)))
-            .next(|| {
-                self.expr(scrutinee)?;
-                self.out.newline_indent()?;
-                self.out.token_expect("{")?;
-                Ok(())
+        self.expr(condition)?;
+        let force_newline = self.out.line() != first_line
+            && self.out.with_last_line(|line| {
+                let after_indent = &line[self.out.constraints().indent.get()..];
+                after_indent.starts_with(' ')
+                    || !after_indent
+                        .chars()
+                        .all(|c| matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
+            });
+        let newline_open_block = || {
+            self.out.newline_indent()?;
+            self.out.token_expect("{")?;
+            Ok(())
+        };
+        if force_newline {
+            newline_open_block()?;
+        } else {
+            self.fallback(|| {
+                self.with_single_line(|| {
+                    self.out.space()?;
+                    self.out.token_expect("{")?;
+                    Ok(())
+                })
             })
+            .next(newline_open_block)
             .result()?;
+        }
 
         match else_ {
             None => {

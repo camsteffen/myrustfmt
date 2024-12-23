@@ -192,6 +192,10 @@ impl SourceFormatter {
             })?;
         Ok(())
     }
+    
+    pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T {
+        self.out.with_last_line(f)
+    }
 
     fn handle_whitespace_and_comments(&self) -> FormatResult<bool> {
         let mut whitespace_len = 0usize;

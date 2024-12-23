@@ -152,21 +152,52 @@ impl<'a> AstFormatter {
         let first_line = self.out.line();
         self.out.token_at("impl", item.span.lo())?;
         self.generic_params(&impl_.generics.params)?;
-        self.single_line_or_line_break_indent_optional(self.out.line() == first_line, |broken| {
-            if let Some(of_trait) = &impl_.of_trait {
-                // self.with_single_line_optional(!broken, || self.trait_ref(of_trait))?;
-                self.trait_ref(of_trait)?;
-                self.line_break_fallback_with_optional_indent(!broken, |for_ty_broken| {
-                    self.out.token_expect("for")?;
+        let first_part = || match &impl_.of_trait {
+            Some(of_trait) => self.trait_ref(of_trait),
+            None => self.ty(&impl_.self_ty),
+        };
+        let indented = if self.out.line() == first_line || self.config().rustfmt_quirks {
+            self.fallback(|| {
+                self.with_single_line(|| {
                     self.out.space()?;
-                    self.with_single_line_optional(!for_ty_broken, || self.ty(&impl_.self_ty))?;
+                    first_part()?;
+                    Ok(false)
+                })
+            })
+            .next(|| {
+                self.indented(|| {
+                    self.out.newline_indent()?;
+                    first_part()?;
+                    Ok(true)
+                })
+            })
+            .result()?
+        } else {
+            self.out.space()?;
+            first_part()?;
+            false
+        };
+        if impl_.of_trait.is_some() {
+            let for_ty = || -> FormatResult {
+                self.out.token_expect("for")?;
+                self.out.space()?;
+                self.ty(&impl_.self_ty)?;
+                Ok(())
+            };
+            self.fallback(|| {
+                self.out.space()?;
+                for_ty()?;
+                Ok(())
+            })
+            .next(|| {
+                self.indented_optional(!indented, || {
+                    self.out.newline_indent()?;
+                    for_ty()?;
                     Ok(())
                 })
-            } else {
-                self.ty(&impl_.self_ty)
-                // self.with_single_line_optional(!broken, || self.ty(&impl_.self_ty))
-            }
-        })?;
+            })
+            .result()?;
+        }
         self.where_clause(&impl_.generics.where_clause)?;
         if impl_.generics.where_clause.is_empty() {
             self.out.space()?;

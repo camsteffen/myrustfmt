@@ -127,18 +127,6 @@ trait Overflow {
     fn format(this: &AstFormatter, t: &Self, is_only_list_item: bool) -> FormatResult {
         Self::format_or_check_if_overflow::<OverflowDoFormat>(this, t, is_only_list_item)
     }
-
-    fn format_if_overflow(
-        this: &AstFormatter,
-        t: &Self,
-        is_only_list_item: bool,
-    ) -> Option<FormatResult> {
-        if Self::check_if_overflows(this, t, is_only_list_item) {
-            Some(Self::format(this, t, is_only_list_item))
-        } else {
-            None
-        }
-    }
 }
 
 impl Overflow for ast::Expr {

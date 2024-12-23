@@ -3,6 +3,22 @@ use thiserror::Error;
 
 pub type FormatResult<T = ()> = Result<T, FormatError>;
 
+pub trait FormatResultExt {
+    fn is_ok_or_parse_error(&self) -> bool;
+}
+
+impl<T> FormatResultExt for FormatResult<T> {
+    fn is_ok_or_parse_error(&self) -> bool {
+        match self {
+            Ok(_) => true,
+            Err(e) => match e {
+                FormatError::Parse(_) => true,
+                FormatError::Constraint(_) => false,
+            },
+        }
+    } 
+}
+
 #[derive(Clone, Debug)]
 pub enum FormatError {
     Constraint(ConstraintError),

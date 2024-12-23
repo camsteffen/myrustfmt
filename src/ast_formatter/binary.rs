@@ -1,9 +1,9 @@
-use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::last_line::Tail;
 use crate::error::FormatResult;
 
-use rustc_ast::util::parser::AssocOp;
 use rustc_ast::ast;
+use rustc_ast::util::parser::AssocOp;
 use rustc_span::source_map::Spanned;
 
 impl AstFormatter {
@@ -22,7 +22,7 @@ impl AstFormatter {
                     self.out.space()?;
                     self.out.token_expect(op.as_str())?;
                     self.out.space()?;
-                    self.expr(expr)?;
+                    self.with_no_overflow(|| self.expr(expr))?;
                     Ok(())
                 })?;
                 self.tail(tail)?;
