@@ -1,8 +1,8 @@
 #![feature(rustc_private)]
 
-use tracing_test::traced_test;
 use myrustfmt::config::Config;
 use myrustfmt::format_str_config;
+use tracing_test::traced_test;
 
 #[traced_test]
 #[test]
@@ -14,14 +14,15 @@ fn test() {
     });
 }"#;
     assert_eq!(
-        format_str_config(source, Config::default().rustfmt_quirks(false)),
+        format_str_config(source, Config::default().rustfmt_quirks(false)).unwrap(),
         r#"
 fn test() {
     asdfasddfasdf(asdfasdfasdfasdfasdfasasfasfasdfasdfafasdfasdfasdfadfa, || {
         let x;
     });
 }
-"#.trim_start()
+"#
+        .trim_start()
     );
 }
 
@@ -35,7 +36,7 @@ fn test() {
     });
 }"#;
     assert_eq!(
-        format_str_config(source, Config::default().rustfmt_quirks(true)),
+        format_str_config(source, Config::default().rustfmt_quirks(true)).unwrap(),
         r#"
 fn test() {
     asdfasddfasdf(
@@ -45,6 +46,29 @@ fn test() {
         },
     );
 }
-"#.trim_start()
+"#
+        .trim_start()
+    );
+}
+
+#[test]
+#[traced_test]
+fn call_with_just_a_closure_can_exceed_fn_call_width() {
+    let source = r#"
+fn test() {
+    let has_nested = items
+        .iter()
+        .any(|(item, _)| aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa);
+}"#;
+    assert_eq!(
+        format_str_config(source, Config::default()).unwrap(),
+        r#"
+fn test() {
+    let has_nested = items
+        .iter()
+        .any(|(item, _)| aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa);
+}
+"#
+        .trim_start()
     );
 }

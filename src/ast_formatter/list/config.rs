@@ -75,4 +75,3 @@ pub fn struct_field_list_config(
         single_line_max_contents_width,
     }
 }
-

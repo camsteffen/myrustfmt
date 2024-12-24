@@ -104,6 +104,7 @@ impl ConstraintWriter {
             self.constraints.newline_budget.set(Some(n));
         }
         if self.constraints.single_line.get() {
+            info!("too wide: \"{}\"", self.last_line_to_string());
             return Err(NewlineNotAllowedError);
         }
         self.with_buffer(|b| b.push('\n'));

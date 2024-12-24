@@ -31,11 +31,18 @@ impl AstFormatter {
         result
     }
 
-    pub fn with_no_overflow(&self, f: impl FnOnce() -> FormatResult) -> FormatResult {
-        let allow_overflow_prev = self.allow_overflow.replace(false);
+    pub fn with_no_multiline_overflow(&self, f: impl FnOnce() -> FormatResult) -> FormatResult {
+        let allow_overflow_prev = self.allow_multiline_overflow.replace(false);
         let result = f();
-        self.allow_overflow.set(allow_overflow_prev);
+        self.allow_multiline_overflow.set(allow_overflow_prev);
         result
+    }
+
+    pub fn with_no_multiline_overflow_optional(&self, apply: bool, f: impl FnOnce() -> FormatResult) -> FormatResult {
+        if !apply {
+            return f();
+        }
+        self.with_no_multiline_overflow(f)
     }
 
     pub fn with_single_line<T>(&self, f: impl FnOnce() -> T) -> T {
@@ -75,7 +82,7 @@ impl AstFormatter {
                 })
                 .result()
         } else {
-            f()
+            self.with_not_single_line(f)
         }
     }
 
@@ -190,7 +197,7 @@ impl AstFormatter {
         else {
             return Err(WidthLimitExceededError.into());
         };
-        self.with_width_limit(remaining, f)
+        self.with_width_limit_first_line(remaining, f)
     }
 
     pub fn with_width_limit<T>(

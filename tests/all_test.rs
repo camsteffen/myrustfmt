@@ -9,7 +9,7 @@ fn long_list_of_short_items() {
     let source =
         "fn main() { let asdfasdf = [aaaaa, aaaaa, aaaaa, aaaaa, aaaaa, aaaaa, aaaaa, aaaaa]; }";
     assert_eq!(
-        format_str(source, 44),
+        format_str(source, 44).unwrap(),
         "
 fn main() {
     let asdfasdf = [
@@ -27,7 +27,7 @@ fn main() {
 fn long_list_of_slightly_long_items() {
     let source = "fn main() { let asdfasdf = [aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa]; }";
     assert_eq!(
-        format_str(source, 20),
+        format_str(source, 20).unwrap(),
         "
 fn main() {
     let asdfasdf = [
@@ -49,16 +49,8 @@ fn main() {
 fn test_list_formats() {
     let source =
         "fn main() {let asdfasdf = [aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa];}";
-
-    //     assert_eq!(
-    //         format_str(source, 100),
-    //         "
-    // fn main() {
-    //     let asdfasdf = [aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa];
-    // }".trim_start()
-    //     );
     assert_eq!(
-        format_str(source, 68),
+        format_str(source, 68).unwrap(),
         "
 fn main() {
     let asdfasdf = [
@@ -76,7 +68,7 @@ fn assign_wrap_long_list() {
     let source =
         "fn main() {let asdfasdfasdfasf=[aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa,aaaaaaaaaaa];}";
     assert_eq!(
-        format_str(source, 25),
+        format_str(source, 25).unwrap(),
         "
 fn main() {
     let asdfasdfasdfasf =
@@ -98,7 +90,7 @@ fn assign_wrap() {
     let source =
         "fn main() {let asdfasdf = [aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa];}";
     assert_eq!(
-        format_str(source, 72),
+        format_str(source, 72).unwrap(),
         "
 fn main() {
     let asdfasdf =
@@ -112,7 +104,7 @@ fn main() {
 #[test]
 fn short_struct_pat_single_line() {
     assert_eq!(
-        format_str("fn test() { let Struct { a, b, c: ccccccccc } = foo; }", 80),
+        format_str("fn test() { let Struct { a, b, c: ccccccccc } = foo; }", 80).unwrap(),
         "
 fn test() {
     let Struct { a, b, c: ccccccccc } = foo;
@@ -128,7 +120,8 @@ fn long_struct_pat_multiple_lines() {
         format_str(
             "fn test() { let Struct { a, b, c: cccccccccc } = foo; }",
             80
-        ),
+        )
+        .unwrap(),
         "
 fn test() {
     let Struct {

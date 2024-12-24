@@ -22,7 +22,7 @@ impl AstFormatter {
                     self.out.space()?;
                     self.out.token_expect(op.as_str())?;
                     self.out.space()?;
-                    self.with_no_overflow(|| self.expr(expr))?;
+                    self.with_no_multiline_overflow(|| self.expr(expr))?;
                     Ok(())
                 })?;
                 self.tail(tail)?;

@@ -27,7 +27,7 @@ mod r#match;
 pub struct AstFormatter {
     config: Config,
     out: SourceFormatter,
-    allow_overflow: Cell<bool>,
+    allow_multiline_overflow: Cell<bool>,
 }
 
 impl<'a> AstFormatter {
@@ -35,7 +35,7 @@ impl<'a> AstFormatter {
         AstFormatter {
             config,
             out,
-            allow_overflow: Cell::new(true),
+            allow_multiline_overflow: Cell::new(true),
         }
     }
 

@@ -29,7 +29,7 @@ impl AstFormatter {
             info!("in the margin");
             let next;
             (next, dot_chain) = dot_chain.split_first().unwrap();
-            self.dot_chain_item(next, true, true)?;
+            self.dot_chain_item(next, true, true, true)?;
             if dot_chain.is_empty() {
                 return self.tail(tail);
             }
@@ -42,7 +42,7 @@ impl AstFormatter {
             // each item on a separate line, no indent
             for item in dot_chain {
                 self.out.newline_indent()?;
-                self.dot_chain_item(item, false, true)?;
+                self.dot_chain_item(item, false, true, true)?;
             }
             self.tail(tail)?;
             Ok(())
@@ -64,15 +64,16 @@ impl AstFormatter {
         self.with_width_limit_from_start_first_line_opt(start_pos, width_limit, || {
             self.with_single_line(|| {
                 for item in until_last {
-                    self.dot_chain_item(item, false, false)?;
+                    self.dot_chain_item(item, false, false, false)?;
                 }
                 Ok(())
             })
         })?;
         let snapshot = self.out.snapshot();
+        // no multiline overflow
         let result = self
             .with_width_limit_from_start_first_line_opt(start_pos, width_limit, || {
-                self.with_single_line(|| self.dot_chain_item(last, false, false))
+                self.with_single_line(|| self.dot_chain_item(last, false, false, false))
             })
             .and_then(|()| self.tail(tail));
         if result.is_ok_or_parse_error() {
@@ -91,7 +92,7 @@ impl AstFormatter {
             info!("initial wrapped length: {}", self.out.last_line_len());
             info!("max width: {:?}", self.out.constraints().max_width.get());
             self.with_single_line(|| {
-                self.dot_chain_item(last, false, false)?;
+                self.dot_chain_item(last, false, false, false)?;
                 self.tail(tail)?;
                 FormatResult::Ok(())
             })?;
@@ -107,7 +108,7 @@ impl AstFormatter {
             self.with_single_line(|| {
                 // try with overflow
                 info!("trying overflow");
-                self.dot_chain_item(last, false, true)
+                self.dot_chain_item(last, false, true, true)
             })
         })?;
         self.tail(tail)?;
@@ -123,7 +124,7 @@ impl AstFormatter {
         self.indented(|| {
             for item in dot_chain {
                 self.out.newline_indent()?;
-                self.dot_chain_item(item, false, true)?;
+                self.dot_chain_item(item, false, true, true)?;
             }
             Ok(())
         })?;
@@ -136,21 +137,25 @@ impl AstFormatter {
         expr: &ast::Expr,
         is_first_line: bool,
         overflow: bool,
+        allow_multiline_overflow: bool,
     ) -> FormatResult {
         self.out.token_expect(".")?;
         match expr.kind {
             ast::ExprKind::Field(_, ident) => self.ident(ident),
+            // todo share code with ExprKind::Call?
             ast::ExprKind::MethodCall(ref method_call) => {
-                self.path_segment(&method_call.seg, true)?;
-                let list_config = MethodCallParamsListConfig { is_first_line };
-                let list = list(Braces::PARENS, &method_call.args, |arg| self.expr(arg))
-                    .config(&list_config);
-                if overflow {
-                    list.overflow().format(self)?;
-                } else {
-                    list.format(self)?;
-                }
-                Ok(())
+                self.with_no_multiline_overflow_optional(!allow_multiline_overflow, || {
+                    self.path_segment(&method_call.seg, true)?;
+                    let list_config = MethodCallParamsListConfig { is_first_line };
+                    let list = list(Braces::PARENS, &method_call.args, |arg| self.expr(arg))
+                        .config(&list_config);
+                    if overflow || true {
+                        list.overflow().format(self)?;
+                    } else {
+                        list.format(self)?;
+                    }
+                    Ok(())
+                })
             }
             _ => unreachable!(),
         }

@@ -57,7 +57,7 @@ mod modA {
     }
 }"#;
     assert_eq!(
-        format_str(source, 800),
+        format_str(source, 800).unwrap(),
         "
 
 "

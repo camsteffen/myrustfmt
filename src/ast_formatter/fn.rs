@@ -111,7 +111,7 @@ impl<'a> AstFormatter {
                 self.expr_tail(body, tail)
             } else {
                 self.fallback(|| {
-                    self.with_no_overflow(|| self.with_single_line(|| self.expr_tail(body, tail)))
+                    self.with_no_multiline_overflow(|| self.with_single_line(|| self.expr_tail(body, tail)))
                 })
                 .next(|| {
                     self.add_block(|| self.expr(body))?;

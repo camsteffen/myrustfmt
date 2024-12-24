@@ -4,9 +4,10 @@ mod overflow;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ListWrapToFitConfig};
-use crate::error::{FormatResult, WidthLimitExceededError};
+use crate::error::FormatResult;
 use overflow::{ListOverflow, ListOverflowNo, ListOverflowYes};
 use rustc_ast::ast;
+use tracing::info;
 
 pub struct Braces {
     start: &'static str,
@@ -173,7 +174,8 @@ where
                     self.overflow,
                     self.braces.pad,
                     self.config.single_line_max_contents_width(),
-                    self.config.overflow_max_first_line_contents_width(af.config()),
+                    self.config
+                        .overflow_max_first_line_contents_width(af.config()),
                 )
             },
         )
@@ -239,36 +241,46 @@ impl<'a> AstFormatter {
         tail: Tail,
         _overflow: Overflow,
         pad: bool,
-        max_width: Option<usize>,
-        max_width_overflow: Option<usize>,
+        mut max_width: Option<usize>,
+        mut max_width_overflow: Option<usize>,
     ) -> FormatResult {
         if pad {
             self.out.space()?;
         }
+
         let (last, until_last) = list.split_last().unwrap();
+
+        let last_can_overflow = Overflow::can_overflow(self, last, list.len() == 1);
+        let can_overflow = matches!(rest, ListRest::None)
+            && self.allow_multiline_overflow.get()
+            && last_can_overflow;
+        dbg!(can_overflow);
+        info!("allow oeverflow: {}", self.allow_multiline_overflow.get());
+        dbg!(last_can_overflow);
+        if list.len() == 1 && matches!(rest, ListRest::None) && last_can_overflow {
+            info!("taking the limits away");
+            max_width = None;
+            // max_width_overflow.take();
+        } else {
+            info!("the limits stay");
+        }
+        dbg!(max_width);
+
         let format = || {
-            let start = self.out.len();
+            let start = self.out.last_line_len();
             for item in until_last {
                 format_item(item)?;
                 self.out.token_maybe_missing(",")?;
                 self.out.space()?;
             }
-            if matches!(rest, ListRest::None)
-                && self.allow_overflow.get()
-                && Overflow::can_overflow(self, last, list.len() == 1)
-            {
+            if can_overflow {
                 self.fallback(|| format_item(last))
                     .next(|| {
-                        let max_width = max_width_overflow
-                            .map(|max_width| {
-                                max_width
-                                    .checked_sub(self.out.len() - start)
-                                    .ok_or(WidthLimitExceededError)
-                            })
-                            .transpose()?;
-                        self.with_width_limit_first_line_opt(max_width, || {
-                            Overflow::format_overflow(self, last, list.len() == 1)
-                        })
+                        self.with_width_limit_from_start_first_line_opt(
+                            start,
+                            max_width_overflow,
+                            || Overflow::format_overflow(self, last, list.len() == 1),
+                        )
                     })
                     .result()?;
             } else {
