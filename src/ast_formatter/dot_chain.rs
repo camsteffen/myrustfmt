@@ -184,7 +184,6 @@ impl ListConfig for MethodCallParamsListConfig {
     fn single_line_max_contents_width(&self) -> Option<usize> {
         self.apply_max_contents_width
             .then_some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
-        // Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
     }
 }
 

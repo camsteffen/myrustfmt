@@ -38,10 +38,6 @@ fn read_significant_comments(file_name: &Path) -> HashMap<String, String> {
 
 #[test]
 fn slow_test() {
-    let mut files = Vec::new();
-    get_test_files(&Path::new("./tests/rustfmt_tests"), &mut files);
-    for file in files {}
-
     let source = r#"
 mod modA {
     mod modB {

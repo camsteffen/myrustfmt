@@ -141,7 +141,7 @@ impl<'a> AstFormatter {
         self.attrs(&variant.attrs)?;
         self.vis(&variant.vis)?;
         self.ident(variant.ident)?;
-        self.variant_data(&variant.data)?;
+        self.variant_data(&variant.data, true)?;
         if let Some(_discriminant) = &variant.disr_expr {
             todo!()
         }
@@ -246,7 +246,7 @@ impl<'a> AstFormatter {
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         if !matches!(variants, ast::VariantData::Unit(_)) {
-            self.variant_data(variants)?;
+            self.variant_data(variants, false)?;
         }
         if matches!(
             variants,
@@ -262,22 +262,24 @@ impl<'a> AstFormatter {
         self.out.space()?;
         self.ident(item.ident)?;
         // self.generic_params(&trait_.generics.params)?;
-        // self.generic_bounds(&trait_.bounds)?;
+        self.generic_bounds_optional(&trait_.bounds)?;
         self.out.space()?;
         self.block_generic(&trait_.items, |item| self.assoc_item(item))?;
         Ok(())
     }
 
-    fn variant_data(&self, variants: &ast::VariantData) -> FormatResult {
+    fn variant_data(&self, variants: &ast::VariantData, is_enum: bool) -> FormatResult {
         match variants {
             ast::VariantData::Struct { fields, .. } => {
                 self.out.space()?;
-                list(Braces::CURLY, fields, |f| self.field_def(f))
-                    .config(&struct_field_list_config(
-                        false,
-                        RUSTFMT_CONFIG_DEFAULTS.struct_variant_width,
-                    ))
-                    .format(self)?;
+                let config =
+                    struct_field_list_config(false, RUSTFMT_CONFIG_DEFAULTS.struct_variant_width);
+                let list = list(Braces::CURLY, fields, |f| self.field_def(f)).config(&config);
+                if is_enum {
+                    list.format(self)?;
+                } else {
+                    list.format_separate_lines(self)?;
+                }
                 Ok(())
             }
             ast::VariantData::Tuple(fields, _) => {

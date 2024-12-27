@@ -21,6 +21,7 @@ impl AstFormatter {
 
     fn arm(&self, arm: &ast::Arm) -> FormatResult {
         self.attrs(&arm.attrs)?;
+        let first_line = self.out.line();
         self.pat(&arm.pat)?;
         let arrow = || -> FormatResult {
             self.out.space()?;
@@ -41,10 +42,12 @@ impl AstFormatter {
                 self.expr(guard)?;
                 Ok(())
             };
-            // guard on same line
-            self.fallback(|| {
-                self.out.space()?;
-                if_guard()?;
+            let guard_same_line = || {
+                self.with_single_line(|| -> FormatResult {
+                    self.out.space()?;
+                    if_guard()?;
+                    Ok(())
+                })?;
                 if let Some(body) = arm.body.as_deref() {
                     arrow()?;
                     self.out.space()?;
@@ -54,9 +57,8 @@ impl AstFormatter {
                     comma(body)?;
                 }
                 Ok(())
-            })
-            // guard on separate line
-            .next(|| {
+            };
+            let guard_separate_line = || {
                 self.indented(|| {
                     self.out.newline_indent()?;
                     if_guard()?;
@@ -72,8 +74,14 @@ impl AstFormatter {
                     comma(body)?;
                 }
                 Ok(())
-            })
-            .result()?;
+            };
+            if self.out.line() == first_line {
+                self.fallback(guard_same_line)
+                    .next(guard_separate_line)
+                    .result()?;
+            } else {
+                guard_separate_line()?;
+            }
         } else if let Some(body) = arm.body.as_deref() {
             arrow()?;
             self.out.space()?;

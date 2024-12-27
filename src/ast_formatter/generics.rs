@@ -14,11 +14,7 @@ impl AstFormatter {
 
     fn generic_param(&self, param: &ast::GenericParam) -> FormatResult {
         self.ident(param.ident)?;
-        if !param.bounds.is_empty() {
-            self.out.token_expect(":")?;
-            self.out.space()?;
-            self.generic_bounds(&param.bounds)?;
-        }
+        self.generic_bounds_optional(&param.bounds)?;
         match param.kind {
             ast::GenericParamKind::Const {
                 ref ty,

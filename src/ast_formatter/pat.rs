@@ -47,17 +47,7 @@ impl<'a> AstFormatter {
                     .tail(end)
                     .format(self)
             }
-            ast::PatKind::Or(ref pats) => {
-                let (first, rest) = pats.split_first().unwrap();
-                self.pat(first)?;
-                for pat in rest {
-                    self.out.space()?;
-                    self.out.token_expect("|")?;
-                    self.out.space()?;
-                    self.pat(pat)?;
-                }
-                Ok(())
-            }
+            ast::PatKind::Or(ref pats) => self.infix_chain("|", pats, |pat| self.pat(pat), false),
             ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false),
             ast::PatKind::Tuple(ref fields) => list(Braces::PARENS, fields, |pat| self.pat(pat))
                 .config(&ParamListConfig {

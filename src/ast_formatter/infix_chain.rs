@@ -7,6 +7,7 @@ impl AstFormatter {
         token: &str,
         items: &[T],
         format_item: impl Fn(&T) -> FormatResult,
+        should_indent: bool,
     ) -> FormatResult {
         let (first, rest) = items.split_first().unwrap();
         self.fallback(|| {
@@ -24,7 +25,7 @@ impl AstFormatter {
         })
         .next(|| {
             format_item(first)?;
-            self.indented(|| {
+            self.indented_optional(should_indent, || {
                 rest.iter().try_for_each(|item| {
                     self.out.newline_indent()?;
                     self.out.token_expect(token)?;

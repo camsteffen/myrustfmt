@@ -79,8 +79,17 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
+    pub fn generic_bounds_optional(&self, bounds: &[ast::GenericBound]) -> FormatResult {
+        if !bounds.is_empty() {
+            self.out.token_expect(":")?;
+            self.out.space()?;
+            self.generic_bounds(bounds)?;
+        }
+        Ok(())
+    }
+
     pub fn generic_bounds(&self, bounds: &[ast::GenericBound]) -> FormatResult {
-        self.infix_chain("+", bounds, |b| self.generic_bound(b))
+        self.infix_chain("+", bounds, |b| self.generic_bound(b), true)
     }
 
     fn generic_bound(&self, bound: &ast::GenericBound) -> FormatResult {
