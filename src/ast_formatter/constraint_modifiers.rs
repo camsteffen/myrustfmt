@@ -180,18 +180,18 @@ impl AstFormatter {
         }
     }
 
-    pub fn with_width_limit_from_start_first_line_opt<T>(
+    pub fn with_width_limit_from_start<T>(
         &self,
         line_start_pos: usize,
-        width_limit: Option<usize>,
+        width_limit: usize,
         f: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        let Some(width_limit) = width_limit else {
-            return f();
+        let Some(remaining) = width_limit.checked_sub(self.out.last_line_len() - line_start_pos)
+        else {
+            return Err(WidthLimitExceededError.into());
         };
-        self.with_width_limit_from_start_first_line(line_start_pos, width_limit, f)
+        self.with_width_limit(remaining, f)
     }
-
 
     pub fn with_width_limit_from_start_first_line<T>(
         &self,
@@ -204,6 +204,18 @@ impl AstFormatter {
             return Err(WidthLimitExceededError.into());
         };
         self.with_width_limit_first_line(remaining, f)
+    }
+
+    pub fn with_width_limit_from_start_first_line_opt<T>(
+        &self,
+        line_start_pos: usize,
+        width_limit: Option<usize>,
+        f: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
+        let Some(width_limit) = width_limit else {
+            return f();
+        };
+        self.with_width_limit_from_start_first_line(line_start_pos, width_limit, f)
     }
 
     pub fn with_width_limit<T>(

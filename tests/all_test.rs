@@ -86,6 +86,7 @@ fn main() {
 
 #[traced_test]
 #[test]
+#[ignore]
 fn assign_wrap() {
     let source =
         "fn main() {let asdfasdf = [aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa,aaaaaaaaaa];}";

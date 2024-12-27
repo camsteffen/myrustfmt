@@ -6,6 +6,21 @@ use tracing_test::traced_test;
 
 #[traced_test]
 #[test]
+fn single_line() {
+    let source = r#"fn test() { let x = if a { x } else { y }; }"#;
+    assert_eq!(
+        format_str_config(source, Config::default().max_width(65)).unwrap(),
+        r#"
+fn test() {
+    let x = if a { x } else { y };
+}
+"#
+        .trim_start()
+    );
+}
+
+#[traced_test]
+#[test]
 fn if_open_block_on_same_line_as_condition() {
     let source = r#"
 fn test() {

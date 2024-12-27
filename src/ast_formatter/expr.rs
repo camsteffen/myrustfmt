@@ -7,6 +7,7 @@ use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::ast_formatter::list::config::{
     ArrayListConfig, CallParamListConfig, ParamListConfig, struct_field_list_config,
 };
+use crate::ast_utils::expr_only_block;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
@@ -243,6 +244,7 @@ impl<'a> AstFormatter {
         tail: Tail,
     ) -> FormatResult {
         let first_line = self.out.line();
+        let start_pos = self.out.last_line_len();
         self.out.token_expect("if")?;
         self.out.space()?;
         self.expr(condition)?;
@@ -273,17 +275,67 @@ impl<'a> AstFormatter {
             .result()?;
         }
 
-        match else_ {
-            None => {
-                self.block_after_open_brace(block)?;
-                self.tail(tail)?;
+        let multiline = || {
+            self.block_after_open_brace(block)?;
+            match else_ {
+                None => self.tail(tail)?,
+                Some(else_) => {
+                    self.out.space()?;
+                    self.out.token_expect("else")?;
+                    self.out.space()?;
+                    self.expr_tail(else_, tail)?;
+                }
             }
-            Some(else_) => {
-                self.block_after_open_brace(block)?;
-                self.out.space()?;
-                self.out.token_expect("else")?;
-                self.out.space()?;
-                self.expr_tail(else_, tail)?;
+            Ok(())
+        };
+
+        let single_line_parts = (|| {
+            if self.out.line() != first_line {
+                return None;
+            }
+            let Some(block_expr) = expr_only_block(block) else {
+                return None;
+            };
+            let Some(else_) = else_ else {
+                return None;
+            };
+            let ast::ExprKind::Block(block, _) = &else_.kind else {
+                return None;
+            };
+            let Some(else_expr) = expr_only_block(block) else {
+                return None;
+            };
+            Some((block_expr, else_expr))
+        })();
+
+        match single_line_parts {
+            None => multiline()?,
+            Some((block_expr, else_expr)) => {
+                self.fallback(|| {
+                    self.with_single_line(|| {
+                        self.with_width_limit_from_start(
+                            start_pos,
+                            RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
+                            || {
+                                self.out.space()?;
+                                self.expr(block_expr)?;
+                                self.out.space()?;
+                                self.out.token_expect("}")?;
+                                self.out.space()?;
+                                self.out.token_expect("else")?;
+                                self.out.space()?;
+                                self.out.token_expect("{")?;
+                                self.out.space()?;
+                                self.expr(else_expr)?;
+                                self.out.space()?;
+                                self.out.token_expect("}")?;
+                                Ok(())
+                            },
+                        )
+                    })
+                })
+                .next(multiline)
+                .result()?;
             }
         }
         Ok(())
@@ -344,12 +396,8 @@ impl<'a> AstFormatter {
         let mut inner_expr = None;
         if let ast::ExprKind::Block(block, None) = &expr.kind {
             if matches!(block.rules, ast::BlockCheckMode::Default) {
-                if let [stmt] = &block.stmts[..] {
-                    if let ast::StmtKind::Expr(expr) = &stmt.kind {
-                        if expr.attrs.is_empty() {
-                            inner_expr = Some(expr);
-                        }
-                    }
+                if let Some(expr) = expr_only_block(block) {
+                    inner_expr = Some(expr);
                 }
             }
         }

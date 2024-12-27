@@ -26,6 +26,7 @@ mod error;
 mod rustfmt_config_defaults;
 pub mod source_formatter;
 mod source_reader;
+mod ast_utils;
 
 use rustc_data_structures::sync::Lrc;
 use rustc_errors::emitter::{HumanEmitter, stderr_destination};
