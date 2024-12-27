@@ -58,7 +58,9 @@ impl<'a> AstFormatter {
             ast::ExprKind::If(ref condition, ref block, ref else_) => {
                 self.if_(condition, block, else_.as_deref(), tail)
             }
-            ast::ExprKind::While(_, _, _) => todo!(),
+            ast::ExprKind::While(ref condition, ref block, _label) => {
+                self.while_(condition, block, tail)
+            }
             ast::ExprKind::ForLoop {
                 ref pat,
                 ref iter,
@@ -243,11 +245,82 @@ impl<'a> AstFormatter {
         else_: Option<&ast::Expr>,
         tail: Tail,
     ) -> FormatResult {
-        let first_line = self.out.line();
         let start_pos = self.out.last_line_len();
-        self.out.token_expect("if")?;
+        let is_single_line_cond = self.token_expr_open_brace("if", condition)?;
+
+        let multiline = || {
+            self.block_after_open_brace(block)?;
+            match else_ {
+                None => self.tail(tail)?,
+                Some(else_) => {
+                    self.out.space()?;
+                    self.out.token_expect("else")?;
+                    self.out.space()?;
+                    self.expr_tail(else_, tail)?;
+                }
+            }
+            Ok(())
+        };
+
+        let single_line_parts = || {
+            if !is_single_line_cond {
+                return None;
+            }
+            let Some(block_expr) = expr_only_block(block) else {
+                return None;
+            };
+            let Some(else_) = else_ else {
+                return None;
+            };
+            let ast::ExprKind::Block(block, _) = &else_.kind else {
+                return None;
+            };
+            let Some(else_expr) = expr_only_block(block) else {
+                return None;
+            };
+            Some((block_expr, else_expr))
+        };
+
+        if !is_single_line_cond {
+            multiline()?;
+        } else if let Some((block_expr, else_expr)) = single_line_parts() {
+            self.fallback(|| {
+                self.with_single_line(|| {
+                    self.with_width_limit_from_start(
+                        start_pos,
+                        RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
+                        || {
+                            self.out.space()?;
+                            self.expr(block_expr)?;
+                            self.out.space()?;
+                            self.out.token_expect("}")?;
+                            self.out.space()?;
+                            self.out.token_expect("else")?;
+                            self.out.space()?;
+                            self.out.token_expect("{")?;
+                            self.out.space()?;
+                            self.expr(else_expr)?;
+                            self.out.space()?;
+                            self.out.token_expect("}")?;
+                            self.tail(tail)?;
+                            Ok(())
+                        },
+                    )
+                })
+            })
+            .next(multiline)
+            .result()?;
+        } else {
+            multiline()?;
+        }
+        Ok(())
+    }
+
+    fn token_expr_open_brace(&self, token: &str, expr: &ast::Expr) -> FormatResult<bool> {
+        let first_line = self.out.line();
+        self.out.token_expect(token)?;
         self.out.space()?;
-        self.expr(condition)?;
+        self.expr(expr)?;
         let force_newline = self.out.line() != first_line
             && self.out.with_last_line(|line| {
                 let after_indent = &line[self.out.constraints().indent.get()..];
@@ -274,71 +347,7 @@ impl<'a> AstFormatter {
             .next(newline_open_block)
             .result()?;
         }
-
-        let multiline = || {
-            self.block_after_open_brace(block)?;
-            match else_ {
-                None => self.tail(tail)?,
-                Some(else_) => {
-                    self.out.space()?;
-                    self.out.token_expect("else")?;
-                    self.out.space()?;
-                    self.expr_tail(else_, tail)?;
-                }
-            }
-            Ok(())
-        };
-
-        let single_line_parts = (|| {
-            if self.out.line() != first_line {
-                return None;
-            }
-            let Some(block_expr) = expr_only_block(block) else {
-                return None;
-            };
-            let Some(else_) = else_ else {
-                return None;
-            };
-            let ast::ExprKind::Block(block, _) = &else_.kind else {
-                return None;
-            };
-            let Some(else_expr) = expr_only_block(block) else {
-                return None;
-            };
-            Some((block_expr, else_expr))
-        })();
-
-        match single_line_parts {
-            None => multiline()?,
-            Some((block_expr, else_expr)) => {
-                self.fallback(|| {
-                    self.with_single_line(|| {
-                        self.with_width_limit_from_start(
-                            start_pos,
-                            RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
-                            || {
-                                self.out.space()?;
-                                self.expr(block_expr)?;
-                                self.out.space()?;
-                                self.out.token_expect("}")?;
-                                self.out.space()?;
-                                self.out.token_expect("else")?;
-                                self.out.space()?;
-                                self.out.token_expect("{")?;
-                                self.out.space()?;
-                                self.expr(else_expr)?;
-                                self.out.space()?;
-                                self.out.token_expect("}")?;
-                                Ok(())
-                            },
-                        )
-                    })
-                })
-                .next(multiline)
-                .result()?;
-            }
-        }
-        Ok(())
+        Ok(self.out.line() == first_line)
     }
 
     pub fn mac_call(&self, mac_call: &ast::MacCall, end: Tail<'_>) -> FormatResult {
@@ -371,6 +380,15 @@ impl<'a> AstFormatter {
         }
         Ok(())
     }
+
+    pub fn while_(&self, condition: &ast::Expr, block: &ast::Block, tail: Tail) -> FormatResult {
+        self.token_expr_open_brace("while", condition)?;
+        self.block_after_open_brace(block)?;
+        self.tail(tail)?;
+        Ok(())
+    }
+
+    // utils
 
     pub fn expr_force_block(&self, expr: &ast::Expr) -> FormatResult {
         self.skip_single_expr_blocks(expr, |expr| self.add_block(|| self.expr(expr)))
