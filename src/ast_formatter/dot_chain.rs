@@ -34,7 +34,7 @@ impl AstFormatter {
             info!("in the margin");
             let next;
             (next, dot_chain) = dot_chain.split_first().unwrap();
-            self.dot_chain_item(next, true, true, true)?;
+            self.dot_chain_item(next, true)?;
             if dot_chain.is_empty() {
                 return self.tail(tail);
             }
@@ -47,7 +47,7 @@ impl AstFormatter {
             // each item on a separate line, no indent
             for item in dot_chain {
                 self.out.newline_indent()?;
-                self.dot_chain_item(item, false, true, true)?;
+                self.dot_chain_item(item, true)?;
             }
             self.tail(tail)?;
             Ok(())
@@ -65,7 +65,7 @@ impl AstFormatter {
         self.with_width_limit_from_start_first_line_opt(start_pos, width_limit, || {
             self.with_single_line(|| {
                 for item in until_last {
-                    self.dot_chain_item(item, false, false, false)?;
+                    self.dot_chain_item(item, false)?;
                 }
                 Ok(())
             })
@@ -74,7 +74,7 @@ impl AstFormatter {
         // no multiline overflow
         let result = self
             .with_width_limit_from_start_first_line_opt(start_pos, width_limit, || {
-                self.with_single_line(|| self.dot_chain_item(last, false, false, false))
+                self.with_single_line(|| self.dot_chain_item(last, false))
             })
             .and_then(|()| self.tail(tail));
         if result.is_ok_or_parse_error() {
@@ -93,7 +93,7 @@ impl AstFormatter {
             info!("initial wrapped length: {}", self.out.last_line_len());
             info!("max width: {:?}", self.out.constraints().max_width.get());
             self.with_single_line(|| {
-                self.dot_chain_item(last, false, false, false)?;
+                self.dot_chain_item(last, false)?;
                 self.tail(tail)?;
                 FormatResult::Ok(())
             })?;
@@ -108,7 +108,7 @@ impl AstFormatter {
         self.with_width_limit_from_start_first_line_opt(start_pos, width_limit, || {
             // try with overflow
             info!("trying overflow");
-            self.dot_chain_item(last, false, true, true)
+            self.dot_chain_item(last, true)
         })?;
         self.tail(tail)?;
         Ok(())
@@ -123,7 +123,7 @@ impl AstFormatter {
         self.indented(|| {
             for item in dot_chain {
                 self.out.newline_indent()?;
-                self.dot_chain_item(item, false, true, true)?;
+                self.dot_chain_item(item, true)?;
             }
             Ok(())
         })?;
@@ -131,13 +131,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn dot_chain_item(
-        &self,
-        expr: &ast::Expr,
-        is_first_line: bool,
-        overflow: bool,
-        allow_multiline_overflow: bool,
-    ) -> FormatResult {
+    fn dot_chain_item(&self, expr: &ast::Expr, allow_multiline_overflow: bool) -> FormatResult {
         self.out.token_expect(".")?;
         match expr.kind {
             ast::ExprKind::Field(_, ident) => self.ident(ident),
@@ -145,14 +139,15 @@ impl AstFormatter {
             ast::ExprKind::MethodCall(ref method_call) => {
                 self.with_no_multiline_overflow_optional(!allow_multiline_overflow, || {
                     self.path_segment(&method_call.seg, true)?;
-                    let list_config = MethodCallParamsListConfig { is_first_line };
-                    let list = list(Braces::PARENS, &method_call.args, |arg| self.expr(arg))
-                        .config(&list_config);
-                    if overflow || true {
-                        list.overflow().format(self)?;
-                    } else {
-                        list.format(self)?;
-                    }
+                    let args_max_width_exempt = self.config().rustfmt_quirks
+                        && matches!(&*method_call.args, [arg] if !is_call(arg));
+                    let list_config = MethodCallParamsListConfig {
+                        apply_max_contents_width: !args_max_width_exempt,
+                    };
+                    list(Braces::PARENS, &method_call.args, |arg| self.expr(arg))
+                        .config(&list_config)
+                        .overflow()
+                        .format(self)?;
                     Ok(())
                 })
             }
@@ -174,7 +169,7 @@ fn build_dot_chain<'a>(chain: &mut Vec<&'a ast::Expr>, expr: &'a ast::Expr) {
 }
 
 pub struct MethodCallParamsListConfig {
-    is_first_line: bool,
+    apply_max_contents_width: bool,
 }
 
 impl ListConfig for MethodCallParamsListConfig {
@@ -187,10 +182,19 @@ impl ListConfig for MethodCallParamsListConfig {
     }
 
     fn single_line_max_contents_width(&self) -> Option<usize> {
-        // if self.is_first_line {
-        //     None
-        // } else {
-        Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
-        // }
+        self.apply_max_contents_width
+            .then_some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
+        // Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
+    }
+}
+
+fn is_call(expr: &ast::Expr) -> bool {
+    match expr.kind {
+        ast::ExprKind::Call(..) | ast::ExprKind::MacCall(..) => true,
+        ast::ExprKind::AddrOf(_, _, ref expr)
+        | ast::ExprKind::Try(ref expr)
+        | ast::ExprKind::Unary(_, ref expr)
+        | ast::ExprKind::Cast(ref expr, _) => is_call(expr),
+        _ => false,
     }
 }

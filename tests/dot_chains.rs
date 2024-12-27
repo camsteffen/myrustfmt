@@ -131,19 +131,39 @@ fn test() {
     );
 }
 
-
 #[test]
 fn overflow_last_item() {
     assert_eq!(
         format_str_defaults(
             "fn test() { chain.iter().try_for_each(|(op, expr)| -> FormatResult { let x; })?; }",
         )
-            .unwrap(),
+        .unwrap(),
         "
 fn test() {
     chain.iter().try_for_each(|(op, expr)| -> FormatResult {
         let x;
     })?;
+}
+"
+        .trim_start()
+    );
+}
+
+#[test]
+fn fn_call_width_exceeded_in_chain() {
+    assert_eq!(
+        format_str_defaults(
+            "fn test() { list(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) .config(aaaaaaaaaaaaaaaaaaaaaaaa( false, bbbbbbbbbbbbbbbbbbbbbbbbbbbb, )) .format()?; }",
+        )
+            .unwrap(),
+        "
+fn test() {
+    list(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)
+        .config(aaaaaaaaaaaaaaaaaaaaaaaa(
+            false,
+            bbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+        ))
+        .format()?;
 }
 "
             .trim_start()

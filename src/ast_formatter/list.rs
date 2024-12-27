@@ -240,7 +240,7 @@ impl<'a> AstFormatter {
         tail: Tail,
         _overflow: Overflow,
         pad: bool,
-        mut max_width: Option<usize>,
+        max_width: Option<usize>,
         max_width_overflow: Option<usize>,
     ) -> FormatResult {
         if pad {
@@ -253,9 +253,6 @@ impl<'a> AstFormatter {
         let can_overflow = matches!(rest, ListRest::None)
             && self.allow_multiline_overflow.get()
             && last_can_overflow;
-        if list.len() == 1 && matches!(rest, ListRest::None) && last_can_overflow {
-            max_width = None;
-        }
 
         let format = || {
             let start = self.out.last_line_len();

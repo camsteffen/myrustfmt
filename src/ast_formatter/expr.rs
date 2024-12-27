@@ -4,7 +4,9 @@ use crate::ast_formatter::list::{Braces, ListRest, list};
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
-use crate::ast_formatter::list::config::{ArrayListConfig, ParamListConfig, struct_field_list_config, CallParamListConfig};
+use crate::ast_formatter::list::config::{
+    ArrayListConfig, CallParamListConfig, ParamListConfig, struct_field_list_config,
+};
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 

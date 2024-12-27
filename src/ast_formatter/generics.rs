@@ -33,8 +33,9 @@ impl AstFormatter {
             }
             ast::GenericParamKind::Lifetime => {}
             ast::GenericParamKind::Type { ref default } => {
-                if let Some(_default) = default {
-                    todo!()
+                if let Some(default) = default {
+                    self.out.token_expect("=")?;
+                    self.ty(default)?;
                 }
             }
         }
