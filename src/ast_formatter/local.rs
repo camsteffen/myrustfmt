@@ -34,26 +34,26 @@ impl<'a> AstFormatter {
         self.out.token_expect("=")?;
         // todo do all these cases apply with else clause?
         // single line
-        // self.fallback(|| {
-        //     self.with_single_line(|| {
-        //         self.out.space()?;
-        //         self.expr(expr)?;
-        //         self.tail(end)?;
-        //         Ok(())
-        //     })
-        // })
-        // wrap and indent then single line
-        // .next(|| {
-        //     self.indented(|| {
-        //         self.out.newline_indent()?;
-        //         self.with_single_line(|| self.with_no_overflow(|| self.expr(expr)))?;
-        //         self.tail(end)?;
-        //         Ok(())
-        //     })
-        // })
-        // normal
         self.fallback(|| {
-        // .next(|| {
+            self.with_single_line(|| {
+                self.out.space()?;
+                self.expr(expr)?;
+                self.tail(end)?;
+                Ok(())
+            })
+        })
+        // wrap and indent then single line
+        .next(|| {
+            self.indented(|| {
+                self.out.newline_indent()?;
+                self.with_single_line(|| self.expr(expr))?;
+                self.tail(end)?;
+                Ok(())
+            })
+        })
+        // normal
+        .next(|| {
+            // self.fallback(|| {
             self.out.space()?;
             self.expr(expr)?;
             self.tail(end)?;

@@ -21,6 +21,11 @@ impl AstFormatter {
         let mut dot_chain = Vec::new();
         build_dot_chain(&mut dot_chain, expr);
         let (root, mut dot_chain) = dot_chain.split_first().unwrap();
+        let width_limit = if self.config().rustfmt_quirks && dot_chain.len() == 1 {
+            None
+        } else {
+            Some(RUSTFMT_CONFIG_DEFAULTS.chain_width)
+        };
         let first_line = self.out.line();
         let start_pos = self.out.last_line_len();
         self.expr(root)?;
@@ -35,7 +40,7 @@ impl AstFormatter {
             }
         }
         if self.out.line() == first_line {
-            self.fallback(|| self.dot_chain_single_line(dot_chain, start_pos, tail))
+            self.fallback(|| self.dot_chain_single_line(dot_chain, start_pos, width_limit, tail))
                 .next(|| self.dot_chain_separate_lines_indented(dot_chain, tail))
                 .result()
         } else {
@@ -53,13 +58,9 @@ impl AstFormatter {
         &self,
         dot_chain: &[&ast::Expr],
         start_pos: usize,
+        width_limit: Option<usize>,
         tail: Tail<'_>,
     ) -> FormatResult {
-        let width_limit = if self.config().rustfmt_quirks && dot_chain.len() == 1 {
-            None
-        } else {
-            Some(RUSTFMT_CONFIG_DEFAULTS.chain_width)
-        };
         let (last, until_last) = dot_chain.split_last().unwrap();
         self.with_width_limit_from_start_first_line_opt(start_pos, width_limit, || {
             self.with_single_line(|| {
@@ -105,11 +106,9 @@ impl AstFormatter {
         }
         self.out.restore(&snapshot);
         self.with_width_limit_from_start_first_line_opt(start_pos, width_limit, || {
-            self.with_single_line(|| {
-                // try with overflow
-                info!("trying overflow");
-                self.dot_chain_item(last, false, true, true)
-            })
+            // try with overflow
+            info!("trying overflow");
+            self.dot_chain_item(last, false, true, true)
         })?;
         self.tail(tail)?;
         Ok(())
@@ -179,19 +178,19 @@ pub struct MethodCallParamsListConfig {
 }
 
 impl ListConfig for MethodCallParamsListConfig {
-    fn single_line_max_contents_width(&self) -> Option<usize> {
-        if self.is_first_line {
-            None
-        } else {
-            Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
-        }
-    }
-
     fn overflow_max_first_line_contents_width(&self, config: &Config) -> Option<usize> {
         if config.rustfmt_quirks {
             Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width - 2)
         } else {
             Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
         }
+    }
+
+    fn single_line_max_contents_width(&self) -> Option<usize> {
+        // if self.is_first_line {
+        //     None
+        // } else {
+        Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
+        // }
     }
 }

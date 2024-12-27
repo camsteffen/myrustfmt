@@ -4,9 +4,7 @@ use crate::ast_formatter::list::{Braces, ListRest, list};
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
-use crate::ast_formatter::list::config::{
-    ArrayListConfig, ParamListConfig, struct_field_list_config,
-};
+use crate::ast_formatter::list::config::{ArrayListConfig, ParamListConfig, struct_field_list_config, CallParamListConfig};
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
@@ -224,9 +222,7 @@ impl<'a> AstFormatter {
     fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], end: Tail<'_>) -> FormatResult {
         self.expr(func)?;
         list(Braces::PARENS, args, |arg| self.expr(arg))
-            .config(&ParamListConfig {
-                single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
-            })
+            .config(&CallParamListConfig)
             .overflow()
             .tail(end)
             .format(self)

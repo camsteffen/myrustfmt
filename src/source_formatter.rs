@@ -1,11 +1,10 @@
 use crate::constraint_writer::{ConstraintWriter, ConstraintWriterSnapshot};
 use crate::constraints::Constraints;
-use crate::error::{FormatError, FormatResult, NewlineNotAllowedError, WidthLimitExceededError};
+use crate::error::{FormatError, FormatResult, WidthLimitExceededError};
 use crate::source_reader::SourceReader;
 use rustc_lexer::TokenKind;
 use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
-use tracing::info;
 
 pub struct SourceFormatterSnapshot {
     writer_snapshot: ConstraintWriterSnapshot,
@@ -193,7 +192,7 @@ impl SourceFormatter {
             })?;
         Ok(())
     }
-    
+
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T {
         self.out.with_last_line(f)
     }

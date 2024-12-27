@@ -7,7 +7,6 @@ use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ListWrap
 use crate::error::FormatResult;
 use overflow::{ListOverflow, ListOverflowNo, ListOverflowYes};
 use rustc_ast::ast;
-use tracing::info;
 
 pub struct Braces {
     start: &'static str,
@@ -242,7 +241,7 @@ impl<'a> AstFormatter {
         _overflow: Overflow,
         pad: bool,
         mut max_width: Option<usize>,
-        mut max_width_overflow: Option<usize>,
+        max_width_overflow: Option<usize>,
     ) -> FormatResult {
         if pad {
             self.out.space()?;
@@ -254,27 +253,22 @@ impl<'a> AstFormatter {
         let can_overflow = matches!(rest, ListRest::None)
             && self.allow_multiline_overflow.get()
             && last_can_overflow;
-        dbg!(can_overflow);
-        info!("allow oeverflow: {}", self.allow_multiline_overflow.get());
-        dbg!(last_can_overflow);
         if list.len() == 1 && matches!(rest, ListRest::None) && last_can_overflow {
-            info!("taking the limits away");
             max_width = None;
-            // max_width_overflow.take();
-        } else {
-            info!("the limits stay");
         }
-        dbg!(max_width);
 
         let format = || {
             let start = self.out.last_line_len();
-            for item in until_last {
-                format_item(item)?;
-                self.out.token_maybe_missing(",")?;
-                self.out.space()?;
-            }
+            self.with_single_line(|| -> FormatResult {
+                for item in until_last {
+                    format_item(item)?;
+                    self.out.token_maybe_missing(",")?;
+                    self.out.space()?;
+                }
+                Ok(())
+            })?;
             if can_overflow {
-                self.fallback(|| format_item(last))
+                self.fallback(|| self.with_single_line(|| format_item(last)))
                     .next(|| {
                         self.with_width_limit_from_start_first_line_opt(
                             start,
@@ -284,21 +278,24 @@ impl<'a> AstFormatter {
                     })
                     .result()?;
             } else {
-                format_item(last)?;
+                self.with_single_line(|| format_item(last))?;
             }
             if matches!(rest, ListRest::None) {
                 self.out.skip_token_if_present(",")?;
             } else {
-                self.out.token_maybe_missing(",")?;
-                self.out.space()?;
-                self.out.token_expect("..")?;
-                if let ListRest::Base(expr) = rest {
-                    self.expr(expr)?;
-                }
+                self.with_single_line(|| -> FormatResult {
+                    self.out.token_maybe_missing(",")?;
+                    self.out.space()?;
+                    self.out.token_expect("..")?;
+                    if let ListRest::Base(expr) = rest {
+                        self.expr(expr)?;
+                    }
+                    Ok(())
+                })?;
             }
             FormatResult::Ok(())
         };
-        let format = || self.with_single_line(format);
+        // let format = || self.with_single_line(format);
         self.with_width_limit_first_line_opt(max_width, format)?;
         if pad {
             self.out.space()?;

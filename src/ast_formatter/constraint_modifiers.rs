@@ -69,20 +69,16 @@ impl AstFormatter {
         self.with_single_line(f)
     }
 
-    pub fn with_not_single_line(&self, f: impl FnOnce() -> FormatResult) -> FormatResult {
-        self.with_replace_single_line(false, f)
-    }
-
     pub fn with_do_overflow(&self, f: impl Fn() -> FormatResult) -> FormatResult {
         if self.config().rustfmt_quirks {
             self.fallback(&f)
                 .next(|| {
                     info!("{:?}", self.constraints());
-                    self.with_reduce_max_width_for_line(2, || self.with_not_single_line(f))
+                    self.with_reduce_max_width_for_line(2, f)
                 })
                 .result()
         } else {
-            self.with_not_single_line(f)
+            f()
         }
     }
 
@@ -193,6 +189,16 @@ impl AstFormatter {
         let Some(width_limit) = width_limit else {
             return f();
         };
+        self.with_width_limit_from_start_first_line(line_start_pos, width_limit, f)
+    }
+
+
+    pub fn with_width_limit_from_start_first_line<T>(
+        &self,
+        line_start_pos: usize,
+        width_limit: usize,
+        f: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
         let Some(remaining) = width_limit.checked_sub(self.out.last_line_len() - line_start_pos)
         else {
             return Err(WidthLimitExceededError.into());

@@ -2,6 +2,10 @@ use crate::config::Config;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 pub trait ListConfig {
+    fn overflow_max_first_line_contents_width(&self, _config: &Config) -> Option<usize> {
+        None
+    }
+
     fn single_line_block(&self) -> bool {
         false
     }
@@ -11,10 +15,6 @@ pub trait ListConfig {
     }
 
     fn single_line_max_contents_width(&self) -> Option<usize> {
-        None
-    }
-
-    fn overflow_max_first_line_contents_width(&self, _config: &Config) -> Option<usize> {
         None
     }
 
@@ -41,6 +41,22 @@ impl ListConfig for ArrayListConfig {
         ListWrapToFitConfig::Yes {
             max_element_width: Some(RUSTFMT_CONFIG_DEFAULTS.short_array_element_width_threshold),
         }
+    }
+}
+
+pub struct CallParamListConfig;
+
+impl ListConfig for CallParamListConfig {
+    fn overflow_max_first_line_contents_width(&self, config: &Config) -> Option<usize> {
+        if config.rustfmt_quirks {
+            Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width - 2)
+        } else {
+            Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
+        }
+    }
+
+    fn single_line_max_contents_width(&self) -> Option<usize> {
+        Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
     }
 }
 

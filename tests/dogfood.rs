@@ -4,9 +4,7 @@ use std::ffi::OsStr;
 use myrustfmt::format_file;
 use std::{fs, io};
 use std::path::Path;
-use tracing_test::traced_test;
 
-#[traced_test]
 #[test]
 fn dogfood_test() -> io::Result<()> {
     dogfood_test_dir("./src".as_ref())?;

@@ -75,3 +75,77 @@ fn test() {
         .trim_start()
     );
 }
+
+#[test]
+fn dot_chain_single_child_can_exceed_chain_width() {
+    assert_eq!(
+        format_str_defaults(
+            "fn test() { fallback = fallback.next(|| self.contents_wrap_to_fit(af, tail, max_element_width)); }",
+        )
+            .unwrap(),
+        "
+fn test() {
+    fallback = fallback.next(|| self.contents_wrap_to_fit(af, tail, max_element_width));
+}
+"
+            .trim_start()
+    );
+}
+
+#[traced_test]
+#[test]
+fn dot_chain_over_chain_width() {
+    assert_eq!(
+        format_str_defaults(
+            "fn test() { self.config.overflow_max_first_line_contents_width(affconfig()); }",
+        )
+        .unwrap(),
+        "
+fn test() {
+    self.config
+        .overflow_max_first_line_contents_width(affconfig());
+}
+"
+        .trim_start()
+    );
+}
+
+#[traced_test]
+#[test]
+fn first_item_within_margin_may_exceed_width() {
+    assert_eq!(
+        format_str_defaults(
+            "fn test() { self.falasdfasdflback(|| self.with_single_line(|| format_item(last))) .next(|| { let x; }) .result()?; }",
+        )
+            .unwrap(),
+        "
+fn test() {
+    self.falasdfasdflback(|| self.with_single_line(|| format_item(last)))
+        .next(|| {
+            let x;
+        })
+        .result()?;
+}
+"
+            .trim_start()
+    );
+}
+
+
+#[test]
+fn overflow_last_item() {
+    assert_eq!(
+        format_str_defaults(
+            "fn test() { chain.iter().try_for_each(|(op, expr)| -> FormatResult { let x; })?; }",
+        )
+            .unwrap(),
+        "
+fn test() {
+    chain.iter().try_for_each(|(op, expr)| -> FormatResult {
+        let x;
+    })?;
+}
+"
+            .trim_start()
+    );
+}
