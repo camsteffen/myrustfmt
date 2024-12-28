@@ -21,14 +21,8 @@ impl<'a> AstFormatter {
 
     pub fn safety(&self, safety: &ast::Safety) -> FormatResult {
         match *safety {
-            ast::Safety::Unsafe(span) => {
-                let pos = span.lo();
-                self.out.token_space("unsafe")
-            }
-            ast::Safety::Safe(span) => {
-                let pos = span.lo();
-                self.out.token_space("safe")
-            }
+            ast::Safety::Unsafe(_) => self.out.token_space("unsafe"),
+            ast::Safety::Safe(_) => self.out.token_space("safe"),
             ast::Safety::Default => Ok(()),
         }
     }

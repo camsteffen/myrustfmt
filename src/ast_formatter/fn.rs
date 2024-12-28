@@ -65,7 +65,7 @@ impl<'a> AstFormatter {
         }
         match capture_clause {
             ast::CaptureBy::Ref => {}
-            ast::CaptureBy::Value { move_kw } => self.out.token_space("move")?,
+            ast::CaptureBy::Value { .. } => self.out.token_space("move")?,
         }
         self.constness(constness)?;
         if let Some(coroutine_kind) = coroutine_kind {
@@ -235,10 +235,7 @@ impl<'a> AstFormatter {
 
     fn constness(&self, constness: ast::Const) -> FormatResult {
         match constness {
-            ast::Const::Yes(span) => {
-                let pos = span.lo();
-                self.out.token_space("const")
-            }
+            ast::Const::Yes(_) => self.out.token_space("const"),
             ast::Const::No => Ok(()),
         }
     }
@@ -246,12 +243,8 @@ impl<'a> AstFormatter {
     fn extern_(&self, ext: &ast::Extern) -> FormatResult {
         match *ext {
             ast::Extern::None => {}
-            ast::Extern::Implicit(span) => {
-                let pos = span.lo();
-                self.out.token_space("extern")?;
-            }
-            ast::Extern::Explicit(ref abi, span) => {
-                let pos = span.lo();
+            ast::Extern::Implicit(_) => self.out.token_space("extern")?,
+            ast::Extern::Explicit(ref abi, _) => {
                 self.out.token_space("extern")?;
                 self.strlit(abi)?;
                 self.out.space()?;

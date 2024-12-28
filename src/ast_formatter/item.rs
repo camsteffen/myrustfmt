@@ -70,7 +70,7 @@ impl<'a> AstFormatter {
             ast::ItemKind::Union(_, _) => todo!(),
             ast::ItemKind::Trait(trait_) => self.trait_(trait_, item)?,
             ast::ItemKind::TraitAlias(_, _) => todo!(),
-            ast::ItemKind::Impl(impl_) => self.impl_(impl_, item)?,
+            ast::ItemKind::Impl(impl_) => self.impl_(impl_)?,
             ast::ItemKind::MacCall(_) => todo!(),
             ast::ItemKind::MacroDef(_) => todo!(),
             ast::ItemKind::Delegation(_) => todo!(),
@@ -136,7 +136,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn impl_(&self, impl_: &ast::Impl, item: &ast::Item) -> FormatResult {
+    fn impl_(&self, impl_: &ast::Impl) -> FormatResult {
         let first_line = self.out.line();
         self.out.token("impl")?;
         self.generic_params(&impl_.generics.params)?;

@@ -18,8 +18,8 @@ impl AstFormatter {
         match param.kind {
             ast::GenericParamKind::Const {
                 ref ty,
-                kw_span,
                 ref default,
+                ..
             } => {
                 self.out.token_space("const")?;
                 if let Some(_default) = default {

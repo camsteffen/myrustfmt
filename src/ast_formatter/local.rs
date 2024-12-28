@@ -5,10 +5,7 @@ use rustc_ast::ast;
 
 impl<'a> AstFormatter {
     pub fn local(&self, local: &ast::Local, tail: &Tail) -> FormatResult {
-        let ast::Local {
-            pat, kind, span, ..
-        } = local;
-        let pos = span.lo();
+        let ast::Local { pat, kind, .. } = local;
         self.out.token_space("let")?;
         match kind {
             ast::LocalKind::Decl => self.pat_tail(pat, tail),

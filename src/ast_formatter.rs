@@ -13,7 +13,6 @@ mod expr;
 mod fallback;
 mod r#fn;
 mod generics;
-mod infix_chain;
 mod item;
 pub mod list;
 mod local;
@@ -22,7 +21,6 @@ mod pat;
 mod path;
 mod ty;
 mod util;
-mod wrapping;
 
 pub struct AstFormatter {
     config: Config,

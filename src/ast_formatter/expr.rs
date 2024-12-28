@@ -93,7 +93,7 @@ impl<'a> AstFormatter {
             ast::ExprKind::Gen(_, _, _, _) => todo!(),
             ast::ExprKind::Await(_, _) => todo!(),
             ast::ExprKind::TryBlock(_) => todo!(),
-            ast::ExprKind::Assign(ref left, ref right, eq_span) => {
+            ast::ExprKind::Assign(ref left, ref right, _) => {
                 self.expr(left)?;
                 self.out.space_token_space("=")?;
                 self.expr_tail(right, use_tail())?;
@@ -111,7 +111,7 @@ impl<'a> AstFormatter {
             ast::ExprKind::Underscore => todo!(),
             ast::ExprKind::Path(ref qself, ref path) => self.qpath(qself, path, true)?,
             ast::ExprKind::AddrOf(borrow_kind, mutability, ref target) => {
-                self.addr_of(borrow_kind, mutability, expr)?;
+                self.addr_of(borrow_kind, mutability)?;
                 self.expr_tail(target, use_tail())?;
             }
             ast::ExprKind::Break(label, ref inner) => {
@@ -193,7 +193,6 @@ impl<'a> AstFormatter {
         &self,
         borrow_kind: ast::BorrowKind,
         mutability: ast::Mutability,
-        expr: &ast::Expr,
     ) -> FormatResult {
         match borrow_kind {
             ast::BorrowKind::Raw => todo!(),

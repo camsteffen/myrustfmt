@@ -166,7 +166,7 @@ impl Overflow for ast::Expr {
                 if H::FORMATTING || Overflow::check_if_overflows(af, target, is_only_list_item) =>
             {
                 H::overflows(|| {
-                    af.addr_of(borrow_kind, mutability, expr)?;
+                    af.addr_of(borrow_kind, mutability)?;
                     Overflow::format(af, target, is_only_list_item)
                 })
             }
