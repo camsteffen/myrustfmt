@@ -1,7 +1,6 @@
 use crate::config::Config;
 use crate::error::FormatResult;
 use crate::source_formatter::SourceFormatter;
-use std::cell::Cell;
 
 mod attr;
 mod binary;
@@ -25,16 +24,11 @@ mod util;
 pub struct AstFormatter {
     config: Config,
     out: SourceFormatter,
-    allow_multiline_overflow: Cell<bool>,
 }
 
 impl<'a> AstFormatter {
     pub fn new(config: Config, out: SourceFormatter) -> Self {
-        AstFormatter {
-            config,
-            out,
-            allow_multiline_overflow: Cell::new(true),
-        }
+        AstFormatter { config, out }
     }
 
     pub fn finish(self) -> String {

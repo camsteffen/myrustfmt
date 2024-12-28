@@ -31,24 +31,6 @@ impl AstFormatter {
         result
     }
 
-    pub fn with_no_multiline_overflow(&self, f: impl FnOnce() -> FormatResult) -> FormatResult {
-        let allow_overflow_prev = self.allow_multiline_overflow.replace(false);
-        let result = f();
-        self.allow_multiline_overflow.set(allow_overflow_prev);
-        result
-    }
-
-    pub fn with_no_multiline_overflow_optional(
-        &self,
-        apply: bool,
-        f: impl FnOnce() -> FormatResult,
-    ) -> FormatResult {
-        if !apply {
-            return f();
-        }
-        self.with_no_multiline_overflow(f)
-    }
-
     pub fn with_single_line<T>(&self, f: impl FnOnce() -> T) -> T {
         self.with_replace_single_line(true, f)
     }

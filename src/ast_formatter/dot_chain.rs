@@ -35,7 +35,7 @@ impl AstFormatter {
             info!("in the margin");
             let next;
             (next, dot_chain) = dot_chain.split_first().unwrap();
-            self.dot_chain_item(next, true)?;
+            self.dot_chain_item(next)?;
             if dot_chain.is_empty() {
                 return self.tail(tail);
             }
@@ -48,7 +48,7 @@ impl AstFormatter {
             // each item on a separate line, no indent
             for item in dot_chain {
                 self.out.newline_indent()?;
-                self.dot_chain_item(item, true)?;
+                self.dot_chain_item(item)?;
             }
             self.tail(tail)?;
             Ok(())
@@ -66,7 +66,7 @@ impl AstFormatter {
         self.with_width_limit_from_start_opt(start_pos, width_limit, || {
             self.with_single_line(|| {
                 for item in until_last {
-                    self.dot_chain_item(item, false)?;
+                    self.dot_chain_item(item)?;
                 }
                 Ok(())
             })
@@ -75,7 +75,7 @@ impl AstFormatter {
         // no multiline overflow
         let result = self
             .with_width_limit_from_start_opt(start_pos, width_limit, || {
-                self.with_single_line(|| self.dot_chain_item(last, false))
+                self.with_single_line(|| self.dot_chain_item(last))
             })
             .and_then(|()| self.tail(tail));
         if result.is_ok_or_parse_error() {
@@ -94,7 +94,7 @@ impl AstFormatter {
             info!("initial wrapped length: {}", self.out.last_line_len());
             info!("max width: {:?}", self.out.constraints().max_width.get());
             self.with_single_line(|| {
-                self.dot_chain_item(last, false)?;
+                self.dot_chain_item(last)?;
                 self.tail(tail)?;
                 FormatResult::Ok(())
             })?;
@@ -109,7 +109,7 @@ impl AstFormatter {
         self.with_width_limit_from_start_first_line_opt(start_pos, width_limit, || {
             // try with overflow
             info!("trying overflow");
-            self.dot_chain_item(last, true)
+            self.dot_chain_item(last)
         })?;
         self.tail(tail)?;
         Ok(())
@@ -124,7 +124,7 @@ impl AstFormatter {
         self.indented(|| {
             for item in dot_chain {
                 self.out.newline_indent()?;
-                self.dot_chain_item(item, true)?;
+                self.dot_chain_item(item)?;
             }
             Ok(())
         })?;
@@ -132,25 +132,23 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn dot_chain_item(&self, expr: &ast::Expr, allow_multiline_overflow: bool) -> FormatResult {
+    fn dot_chain_item(&self, expr: &ast::Expr) -> FormatResult {
         self.out.token(".")?;
         match expr.kind {
             ast::ExprKind::Field(_, ident) => self.ident(ident),
             // todo share code with ExprKind::Call?
             ast::ExprKind::MethodCall(ref method_call) => {
-                self.with_no_multiline_overflow_optional(!allow_multiline_overflow, || {
-                    self.path_segment(&method_call.seg, true)?;
-                    let args_max_width_exempt = self.config().rustfmt_quirks
-                        && matches!(&*method_call.args, [arg] if !is_call_or_prefixed(arg));
-                    let list_config = MethodCallParamsListConfig {
-                        apply_max_contents_width: !args_max_width_exempt,
-                    };
-                    list(Braces::PARENS, &method_call.args, |arg| self.expr(arg))
-                        .config(&list_config)
-                        .overflow()
-                        .format(self)?;
-                    Ok(())
-                })
+                self.path_segment(&method_call.seg, true)?;
+                let args_max_width_exempt = self.config().rustfmt_quirks
+                    && matches!(&*method_call.args, [arg] if !is_call_or_prefixed(arg));
+                let list_config = MethodCallParamsListConfig {
+                    apply_max_contents_width: !args_max_width_exempt,
+                };
+                list(Braces::PARENS, &method_call.args, |arg| self.expr(arg))
+                    .config(&list_config)
+                    .overflow()
+                    .format(self)?;
+                Ok(())
             }
             _ => unreachable!(),
         }

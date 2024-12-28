@@ -104,17 +104,13 @@ impl<'a> AstFormatter {
             if is_block_like(body) {
                 self.expr_tail(body, tail)
             } else {
-                self.fallback(|| {
-                    self.with_no_multiline_overflow(|| {
-                        self.with_single_line(|| self.expr_tail(body, tail))
+                self.fallback(|| self.with_single_line(|| self.expr_tail(body, tail)))
+                    .next(|| {
+                        self.add_block(|| self.expr(body))?;
+                        self.tail(tail)?;
+                        Ok(())
                     })
-                })
-                .next(|| {
-                    self.add_block(|| self.expr(body))?;
-                    self.tail(tail)?;
-                    Ok(())
-                })
-                .result()
+                    .result()
             }
         })
     }

@@ -1,7 +1,7 @@
+mod braces;
 pub mod config;
 mod overflow;
 mod rest;
-mod braces;
 
 pub use braces::Braces;
 pub use rest::ListRest;
@@ -11,7 +11,6 @@ use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ListWrap
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use overflow::{ListOverflow, ListOverflowNo, ListOverflowYes};
-
 
 pub fn list<'a, 'list, Item, FormatItem>(
     braces: &'static Braces,
@@ -205,11 +204,6 @@ impl<'a> AstFormatter {
 
         let (last, until_last) = list.split_last().unwrap();
 
-        let last_can_overflow = Overflow::can_overflow(self, last, list.len() == 1);
-        let can_overflow = matches!(rest, ListRest::None)
-            && self.allow_multiline_overflow.get()
-            && last_can_overflow;
-
         let format = || {
             let start = self.out.last_line_len();
             self.with_single_line(|| -> FormatResult {
@@ -220,13 +214,15 @@ impl<'a> AstFormatter {
                 }
                 Ok(())
             })?;
+            let can_overflow = matches!(rest, ListRest::None)
+                && Overflow::can_overflow(self, last, list.len() == 1);
             if can_overflow {
                 self.fallback(|| self.with_single_line(|| format_item(last)))
                     .next(|| {
                         self.with_width_limit_from_start_first_line_opt(
                             start,
                             max_width_overflow,
-                            || Overflow::format_overflow(self, last, list.len() == 1),
+                            || Overflow::format_overflow(self, last),
                         )
                     })
                     .result()?;

@@ -8,21 +8,9 @@ use std::marker::PhantomData;
 pub trait ListOverflow: Copy {
     type Item;
 
-    fn can_overflow(
-        _ast_formatter: &AstFormatter,
-        _item: &Self::Item,
-        _is_only_item: bool,
-    ) -> bool {
-        false
-    }
+    fn can_overflow(ast_formatter: &AstFormatter, item: &Self::Item, is_only_item: bool) -> bool;
 
-    fn format_overflow(
-        _ast_formatter: &AstFormatter,
-        _item: &Self::Item,
-        _is_only_item: bool,
-    ) -> FormatResult {
-        panic!("not supported")
-    }
+    fn format_overflow(ast_formatter: &AstFormatter, item: &Self::Item) -> FormatResult;
 }
 
 pub struct ListOverflowNo<T>(PhantomData<T>);
@@ -54,6 +42,18 @@ impl<T> Default for ListOverflowYes<T> {
 
 impl<T> ListOverflow for ListOverflowNo<T> {
     type Item = T;
+
+    fn can_overflow(
+        _ast_formatter: &AstFormatter,
+        _item: &Self::Item,
+        _is_only_item: bool,
+    ) -> bool {
+        false
+    }
+
+    fn format_overflow(_ast_formatter: &AstFormatter, _item: &Self::Item) -> FormatResult {
+        panic!("overflow disabled")
+    }
 }
 
 impl<T: Overflow> ListOverflow for ListOverflowYes<T> {
@@ -63,12 +63,8 @@ impl<T: Overflow> ListOverflow for ListOverflowYes<T> {
         Overflow::check_if_overflows(ast_formatter, item, is_only_item)
     }
 
-    fn format_overflow(
-        ast_formatter: &AstFormatter,
-        item: &Self::Item,
-        is_only_item: bool,
-    ) -> FormatResult {
-        Overflow::format(ast_formatter, item, is_only_item)
+    fn format_overflow(ast_formatter: &AstFormatter, item: &Self::Item) -> FormatResult {
+        Overflow::format(ast_formatter, item)
     }
 }
 
@@ -79,9 +75,16 @@ trait OverflowHandler {
 
     fn no_overflow() -> Self::Result;
     fn overflows(format: impl Fn() -> FormatResult) -> Self::Result;
+    fn conditional_overflows(
+        self,
+        predicate: impl Fn(/*is_only_list_item*/ bool) -> bool,
+        format: impl Fn() -> FormatResult,
+    ) -> Self::Result;
 }
 
-struct CheckIfOverflow;
+struct CheckIfOverflow {
+    is_only_list_item: bool,
+}
 
 struct OverflowDoFormat;
 
@@ -97,6 +100,14 @@ impl OverflowHandler for CheckIfOverflow {
     fn overflows(_format: impl FnOnce() -> FormatResult) -> bool {
         true
     }
+
+    fn conditional_overflows(
+        self,
+        predicate: impl Fn(/*is_only_list_item*/ bool) -> bool,
+        _format: impl Fn() -> FormatResult,
+    ) -> bool {
+        predicate(self.is_only_list_item)
+    }
 }
 
 impl OverflowHandler for OverflowDoFormat {
@@ -111,21 +122,29 @@ impl OverflowHandler for OverflowDoFormat {
     fn overflows(format: impl Fn() -> FormatResult) -> FormatResult {
         format()
     }
+
+    fn conditional_overflows(
+        self,
+        _predicate: impl Fn(/*is_only_list_item*/ bool) -> bool,
+        format: impl Fn() -> FormatResult,
+    ) -> FormatResult {
+        format()
+    }
 }
 
 trait Overflow {
     fn format_or_check_if_overflow<H: OverflowHandler>(
         this: &AstFormatter,
-        t: &Self,
-        is_only_list_item: bool,
+        node: &Self,
+        handler: H,
     ) -> H::Result;
 
     fn check_if_overflows(this: &AstFormatter, t: &Self, is_only_list_item: bool) -> bool {
-        Self::format_or_check_if_overflow::<CheckIfOverflow>(this, t, is_only_list_item)
+        Self::format_or_check_if_overflow(this, t, CheckIfOverflow { is_only_list_item })
     }
 
-    fn format(this: &AstFormatter, t: &Self, is_only_list_item: bool) -> FormatResult {
-        Self::format_or_check_if_overflow::<OverflowDoFormat>(this, t, is_only_list_item)
+    fn format(this: &AstFormatter, t: &Self) -> FormatResult {
+        Self::format_or_check_if_overflow(this, t, OverflowDoFormat)
     }
 }
 
@@ -133,7 +152,7 @@ impl Overflow for ast::Expr {
     fn format_or_check_if_overflow<H: OverflowHandler>(
         af: &AstFormatter,
         expr: &Self,
-        is_only_list_item: bool,
+        handler: H,
     ) -> H::Result {
         if !expr.attrs.is_empty() {
             return H::no_overflow();
@@ -155,36 +174,32 @@ impl Overflow for ast::Expr {
             | ast::ExprKind::Call(..)
             | ast::ExprKind::MacCall(..)
             | ast::ExprKind::Struct(..)
-            | ast::ExprKind::Tup(..)
-                if is_only_list_item =>
-            {
-                H::overflows(|| af.with_do_overflow(|| af.expr(expr)))
-            }
+            | ast::ExprKind::Tup(..) => handler.conditional_overflows(
+                |is_only_list_item| is_only_list_item,
+                || af.with_do_overflow(|| af.expr(expr)),
+            ),
             // | ast::ExprKind::MethodCall(..) if is_only_list_item => H::overflows(|| af.dot_chain(expr, Tail::NONE, true)),
             // prefix
-            ast::ExprKind::AddrOf(borrow_kind, mutability, ref target)
-                if H::FORMATTING || Overflow::check_if_overflows(af, target, is_only_list_item) =>
-            {
-                H::overflows(|| {
-                    af.addr_of(borrow_kind, mutability)?;
-                    Overflow::format(af, target, is_only_list_item)
-                })
-            }
-            ast::ExprKind::Cast(ref target, _)
-                if H::FORMATTING || Overflow::check_if_overflows(af, target, is_only_list_item) =>
-            {
-                todo!()
-            }
-            ast::ExprKind::Try(ref target)
-                if H::FORMATTING || Overflow::check_if_overflows(af, target, is_only_list_item) =>
-            {
-                todo!()
-            }
-            ast::ExprKind::Unary(_, ref target)
-                if H::FORMATTING || Overflow::check_if_overflows(af, target, is_only_list_item) =>
-            {
-                todo!()
-            }
+            ast::ExprKind::AddrOf(borrow_kind, mutability, ref target) => handler
+                .conditional_overflows(
+                    |is_only_list_item| Overflow::check_if_overflows(af, target, is_only_list_item),
+                    || {
+                        af.addr_of(borrow_kind, mutability)?;
+                        Overflow::format(af, target)
+                    },
+                ),
+            ast::ExprKind::Cast(ref target, _) => handler.conditional_overflows(
+                |is_only_list_item| Overflow::check_if_overflows(af, target, is_only_list_item),
+                || todo!(),
+            ),
+            ast::ExprKind::Try(ref target) => handler.conditional_overflows(
+                |is_only_list_item| Overflow::check_if_overflows(af, target, is_only_list_item),
+                || todo!(),
+            ),
+            ast::ExprKind::Unary(_, ref target) => handler.conditional_overflows(
+                |is_only_list_item| Overflow::check_if_overflows(af, target, is_only_list_item),
+                || todo!(),
+            ),
             _ => H::no_overflow(),
         }
     }
@@ -194,7 +209,7 @@ impl Overflow for ast::MetaItemInner {
     fn format_or_check_if_overflow<H: OverflowHandler>(
         af: &AstFormatter,
         item: &Self,
-        _is_only_list_item: bool,
+        _handler: H,
     ) -> H::Result {
         match item {
             ast::MetaItemInner::Lit(..) => H::overflows(|| todo!()),
@@ -213,8 +228,8 @@ impl<T: Overflow> Overflow for P<T> {
     fn format_or_check_if_overflow<H: OverflowHandler>(
         this: &AstFormatter,
         t: &Self,
-        is_only_list_item: bool,
+        handler: H,
     ) -> H::Result {
-        <T as Overflow>::format_or_check_if_overflow::<H>(this, t, is_only_list_item)
+        <T as Overflow>::format_or_check_if_overflow(this, t, handler)
     }
 }

@@ -20,7 +20,7 @@ impl AstFormatter {
             self.with_single_line(|| {
                 chain.iter().try_for_each(|(op, expr)| -> FormatResult {
                     self.out.space_token_space(op.as_str())?;
-                    self.with_no_multiline_overflow(|| self.expr(expr))?;
+                    self.expr(expr)?;
                     Ok(())
                 })?;
                 self.tail(tail)?;
