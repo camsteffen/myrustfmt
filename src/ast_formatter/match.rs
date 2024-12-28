@@ -1,7 +1,6 @@
 use rustc_ast::ast;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::Tail;
 use crate::error::FormatResult;
 
 impl AstFormatter {
@@ -9,14 +8,10 @@ impl AstFormatter {
         &self,
         scrutinee: &ast::Expr,
         arms: &[ast::Arm],
-        expr: &ast::Expr,
-        end: Tail<'_>,
     ) -> FormatResult {
-        self.out.token_at("match", expr.span.lo())?;
-        self.out.space()?;
-        self.expr_tail(scrutinee, Tail::OPEN_BLOCK)?;
+        self.token_expr_open_brace("match", scrutinee)?;
         self.block_generic_after_open_brace(arms, |arm| self.arm(arm))?;
-        self.tail(end)
+        Ok(())
     }
 
     fn arm(&self, arm: &ast::Arm) -> FormatResult {

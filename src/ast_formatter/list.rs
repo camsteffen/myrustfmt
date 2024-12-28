@@ -129,16 +129,20 @@ where
         contents: impl FnOnce(&Self, &AstFormatter, Tail) -> FormatResult,
     ) -> FormatResult {
         af.out.token_expect(self.braces.start)?;
-        let end = || {
+        if self.list.is_empty() {
             af.out.token_expect(self.braces.end)?;
             af.tail(self.tail)?;
             return Ok(());
-        };
-        if self.list.is_empty() {
-            end()
-        } else {
-            contents(self, af, Tail::new(&end))
         }
+        contents(
+            self,
+            af,
+            Tail::new(&|| {
+                af.out.token_expect(self.braces.end)?;
+                af.tail(self.tail)?;
+                return Ok(());
+            }),
+        )
     }
 
     fn contents_default(&self, af: &AstFormatter, tail: Tail<'_>) -> FormatResult {

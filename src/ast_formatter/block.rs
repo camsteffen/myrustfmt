@@ -44,21 +44,22 @@ impl<'a> AstFormatter {
     }
 
     fn stmt(&self, stmt: &ast::Stmt) -> FormatResult {
-        let hi = stmt.span.hi();
-        let semicolon = move || self.out.token_end_at(";", hi);
-        let semicolon = Tail::new(&semicolon);
         match &stmt.kind {
-            ast::StmtKind::Let(local) => self.local(local, semicolon),
+            ast::StmtKind::Let(local) => self.local(local, Tail::SEMICOLON),
             ast::StmtKind::Item(item) => self.item(item),
             ast::StmtKind::Expr(expr) => self.expr(expr),
-            ast::StmtKind::Semi(expr) => self.expr_tail(expr, semicolon),
+            ast::StmtKind::Semi(expr) => self.expr_tail(expr, Tail::SEMICOLON),
             ast::StmtKind::Empty => self.out.token_expect(";"),
             ast::StmtKind::MacCall(mac_call_stmt) => {
                 self.attrs(&mac_call_stmt.attrs)?;
                 match mac_call_stmt.style {
-                    ast::MacStmtStyle::Semicolon => self.mac_call(&mac_call_stmt.mac, semicolon),
+                    ast::MacStmtStyle::Semicolon => {
+                        self.mac_call(&mac_call_stmt.mac)?;
+                        self.out.token_end_at(";", stmt.span.hi())?;
+                        Ok(())
+                    },
                     ast::MacStmtStyle::Braces | ast::MacStmtStyle::NoBraces => {
-                        self.mac_call(&mac_call_stmt.mac, Tail::NONE)
+                        self.mac_call(&mac_call_stmt.mac)
                     }
                 }
             }

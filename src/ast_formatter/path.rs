@@ -1,7 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 
-use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::{Braces, list};
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
@@ -12,16 +11,6 @@ impl AstFormatter {
         qself: &Option<P<ast::QSelf>>,
         path: &ast::Path,
         is_expr: bool,
-    ) -> FormatResult {
-        self.qpath_tail(qself, path, is_expr, Tail::NONE)
-    }
-
-    pub fn qpath_tail(
-        &self,
-        qself: &Option<P<ast::QSelf>>,
-        path: &ast::Path,
-        is_expr: bool,
-        tail: Tail<'_>,
     ) -> FormatResult {
         if let Some(qself) = qself.as_deref() {
             self.out.token_expect("<")?;
@@ -42,7 +31,6 @@ impl AstFormatter {
         } else {
             self.path(path, is_expr)?;
         }
-        self.tail(tail)?;
         Ok(())
     }
 
