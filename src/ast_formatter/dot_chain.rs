@@ -133,7 +133,7 @@ impl AstFormatter {
     }
 
     fn dot_chain_item(&self, expr: &ast::Expr, allow_multiline_overflow: bool) -> FormatResult {
-        self.out.token_expect(".")?;
+        self.out.token(".")?;
         match expr.kind {
             ast::ExprKind::Field(_, ident) => self.ident(ident),
             // todo share code with ExprKind::Call?

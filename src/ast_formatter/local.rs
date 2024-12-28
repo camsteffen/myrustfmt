@@ -9,7 +9,7 @@ impl<'a> AstFormatter {
             pat, kind, span, ..
         } = local;
         let pos = span.lo();
-        self.out.token_at_space("let", pos)?;
+        self.out.token_space("let")?;
         match kind {
             ast::LocalKind::Decl => self.pat_tail(pat, tail),
             ast::LocalKind::Init(init) => {
@@ -19,9 +19,7 @@ impl<'a> AstFormatter {
             ast::LocalKind::InitElse(init, else_) => {
                 self.pat(pat)?;
                 self.local_init(init, Tail::NONE)?;
-                self.out.space()?;
-                self.out.token_expect("else")?;
-                self.out.space()?;
+                self.out.space_token_space("else")?;
                 self.block(else_)?;
                 self.tail(tail)?;
                 Ok(())
@@ -30,8 +28,7 @@ impl<'a> AstFormatter {
     }
 
     fn local_init(&self, expr: &ast::Expr, end: &Tail) -> FormatResult {
-        self.out.space()?;
-        self.out.token_expect("=")?;
+        self.out.space_token("=")?;
         // todo do all these cases apply with else clause?
         // single line
         self.fallback(|| {

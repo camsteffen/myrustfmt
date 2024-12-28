@@ -14,22 +14,16 @@ impl AstFormatter {
         self.attrs(&arm.attrs)?;
         let first_line = self.out.line();
         self.pat(&arm.pat)?;
-        let arrow = || -> FormatResult {
-            self.out.space()?;
-            self.out.token_expect("=>")?;
-            Ok(())
-        };
         let comma = |body| {
             if is_plain_block(body) {
                 self.out.skip_token_if_present(",")
             } else {
-                self.out.token_expect(",")
+                self.out.token(",")
             }
         };
         if let Some(guard) = arm.guard.as_deref() {
             let if_guard = || -> FormatResult {
-                self.out.token_expect("if")?;
-                self.out.space()?;
+                self.out.token_space("if")?;
                 self.expr(guard)?;
                 Ok(())
             };
@@ -40,7 +34,7 @@ impl AstFormatter {
                     Ok(())
                 })?;
                 if let Some(body) = arm.body.as_deref() {
-                    arrow()?;
+                    self.out.space_token("=>")?;
                     self.out.space()?;
                     self.fallback(|| self.expr(body))
                         .next(|| self.expr_force_block(body))
@@ -56,7 +50,7 @@ impl AstFormatter {
                     Ok(())
                 })?;
                 if let Some(body) = arm.body.as_deref() {
-                    arrow()?;
+                    self.out.space_token("=>")?;
                     if self.config.rustfmt_quirks {
                         self.out.require_width(" {".len())?;
                     }
@@ -74,7 +68,7 @@ impl AstFormatter {
                 guard_separate_line()?;
             }
         } else if let Some(body) = arm.body.as_deref() {
-            arrow()?;
+            self.out.space_token("=>")?;
             self.out.space()?;
             self.expr(body)?;
             comma(body)?;

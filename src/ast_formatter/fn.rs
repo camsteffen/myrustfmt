@@ -17,19 +17,11 @@ impl<'a> AstFormatter {
             ..
         } = fn_;
         self.fn_header(&sig.header)?;
-        self.out.token_expect("fn")?;
-        self.out.space()?;
+        self.out.token_space("fn")?;
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         let (decl_tail, opened_block) = if generics.where_clause.is_empty() && body.is_some() {
-            (
-                &Tail::new(|af| {
-                    af.out.space()?;
-                    af.out.token_expect("{")?;
-                    Ok(())
-                }),
-                true,
-            )
+            (&Tail::new(|af| af.out.space_token("{")), true)
         } else {
             (Tail::NONE, false)
         };
@@ -49,7 +41,7 @@ impl<'a> AstFormatter {
                 self.block(body)?;
             }
         } else {
-            self.out.token_expect(";")?;
+            self.out.token(";")?;
         }
         Ok(())
     }
@@ -73,7 +65,7 @@ impl<'a> AstFormatter {
         }
         match capture_clause {
             ast::CaptureBy::Ref => {}
-            ast::CaptureBy::Value { move_kw } => self.out.token_at_space("move", move_kw.lo())?,
+            ast::CaptureBy::Value { move_kw } => self.out.token_space("move")?,
         }
         self.constness(constness)?;
         if let Some(coroutine_kind) = coroutine_kind {
@@ -131,7 +123,7 @@ impl<'a> AstFormatter {
         // self.safety(&bare_fn_ty.safety)?;
         // self.extern_(&bare_fn_ty.ext)?;
         // self.generic_params(&bare_fn_ty.generic_params)?;
-        self.out.token_expect("fn")?;
+        self.out.token("fn")?;
         self.fn_decl(
             &bare_fn_ty.decl,
             Braces::PARENS,
@@ -214,7 +206,7 @@ impl<'a> AstFormatter {
                         }
                         _ => {
                             self.mutability(mutbl)?;
-                            self.out.token_expect("self")?;
+                            self.out.token("self")?;
                         }
                     };
                 }
@@ -224,8 +216,7 @@ impl<'a> AstFormatter {
             self.pat(&param.pat)?;
         }
         if !matches!(param.ty.kind, ast::TyKind::Infer) {
-            self.out.token_expect(":")?;
-            self.out.space()?;
+            self.out.token_space(":")?;
             self.ty(&param.ty)?;
         }
         Ok(())
@@ -235,9 +226,7 @@ impl<'a> AstFormatter {
         match output {
             ast::FnRetTy::Default(_) => {}
             ast::FnRetTy::Ty(ty) => {
-                self.out.space()?;
-                self.out.token_expect("->")?;
-                self.out.space()?;
+                self.out.space_token_space("->")?;
                 self.ty(ty)?;
             }
         }
@@ -248,7 +237,7 @@ impl<'a> AstFormatter {
         match constness {
             ast::Const::Yes(span) => {
                 let pos = span.lo();
-                self.out.token_at_space("const", pos)
+                self.out.token_space("const")
             }
             ast::Const::No => Ok(()),
         }
@@ -259,11 +248,11 @@ impl<'a> AstFormatter {
             ast::Extern::None => {}
             ast::Extern::Implicit(span) => {
                 let pos = span.lo();
-                self.out.token_at_space("extern", pos)?;
+                self.out.token_space("extern")?;
             }
             ast::Extern::Explicit(ref abi, span) => {
                 let pos = span.lo();
-                self.out.token_at_space("extern", pos)?;
+                self.out.token_space("extern")?;
                 self.strlit(abi)?;
                 self.out.space()?;
             }
@@ -273,21 +262,11 @@ impl<'a> AstFormatter {
 
     fn coroutine_kind(&self, coroutine_kind: &ast::CoroutineKind) -> FormatResult {
         match *coroutine_kind {
-            ast::CoroutineKind::Async { span, .. } => {
-                let pos = span.lo();
-                self.out.token_at_space("async", pos)?;
-                Ok(())
-            }
-            ast::CoroutineKind::Gen { span, .. } => {
-                let pos = span.lo();
-                self.out.token_at_space("gen", pos)?;
-                Ok(())
-            }
-            ast::CoroutineKind::AsyncGen { span, .. } => {
-                let pos = span.lo();
-                self.out.token_at_space("async", pos)?;
-                self.out.token_expect("gen")?;
-                self.out.space()?;
+            ast::CoroutineKind::Async { .. } => self.out.token_space("async"),
+            ast::CoroutineKind::Gen { .. } => self.out.token_space("gen"),
+            ast::CoroutineKind::AsyncGen { .. } => {
+                self.out.token_space("async")?;
+                self.out.token_space("gen")?;
                 Ok(())
             }
         }

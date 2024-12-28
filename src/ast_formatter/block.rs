@@ -5,7 +5,7 @@ use rustc_ast::ast;
 
 impl<'a> AstFormatter {
     pub fn block(&self, block: &ast::Block) -> FormatResult {
-        self.out.token_at("{", block.span.lo())?;
+        self.out.token("{")?;
         self.block_after_open_brace(block)?;
         Ok(())
     }
@@ -19,7 +19,7 @@ impl<'a> AstFormatter {
         items: &[T],
         format_item: impl Fn(&T) -> FormatResult,
     ) -> FormatResult {
-        self.out.token_expect("{")?;
+        self.out.token("{")?;
         self.block_generic_after_open_brace(items, format_item)?;
         Ok(())
     }
@@ -39,7 +39,7 @@ impl<'a> AstFormatter {
             })?;
             self.out.newline_indent()?;
         }
-        self.out.token_expect("}")?;
+        self.out.token("}")?;
         Ok(())
     }
 
@@ -49,13 +49,13 @@ impl<'a> AstFormatter {
             ast::StmtKind::Item(item) => self.item(item),
             ast::StmtKind::Expr(expr) => self.expr(expr),
             ast::StmtKind::Semi(expr) => self.expr_tail(expr, &Tail::token(";")),
-            ast::StmtKind::Empty => self.out.token_expect(";"),
+            ast::StmtKind::Empty => self.out.token(";"),
             ast::StmtKind::MacCall(mac_call_stmt) => {
                 self.attrs(&mac_call_stmt.attrs)?;
                 match mac_call_stmt.style {
                     ast::MacStmtStyle::Semicolon => {
                         self.mac_call(&mac_call_stmt.mac)?;
-                        self.out.token_end_at(";", stmt.span.hi())?;
+                        self.out.token(";")?;
                         Ok(())
                     }
                     ast::MacStmtStyle::Braces | ast::MacStmtStyle::NoBraces => {

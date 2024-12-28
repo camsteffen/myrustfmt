@@ -14,9 +14,7 @@ impl AstFormatter {
             self.with_single_line(|| {
                 format_item(first)?;
                 rest.iter().try_for_each(|item| -> FormatResult {
-                    self.out.space()?;
-                    self.out.token_expect(token)?;
-                    self.out.space()?;
+                    self.out.space_token_space(token)?;
                     format_item(item)?;
                     Ok(())
                 })?;
@@ -28,8 +26,7 @@ impl AstFormatter {
             self.indented_optional(should_indent, || {
                 rest.iter().try_for_each(|item| {
                     self.out.newline_indent()?;
-                    self.out.token_expect(token)?;
-                    self.out.space()?;
+                    self.out.token_space(token)?;
                     format_item(item)?;
                     Ok(())
                 })

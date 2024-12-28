@@ -13,20 +13,18 @@ impl AstFormatter {
         is_expr: bool,
     ) -> FormatResult {
         if let Some(qself) = qself.as_deref() {
-            self.out.token_expect("<")?;
+            self.out.token("<")?;
             self.ty(&qself.ty)?;
             let rest = if qself.position > 0 {
-                self.out.space()?;
-                self.out.token_expect("as")?;
-                self.out.space()?;
+                self.out.space_token_space("as")?;
                 let (as_path, rest) = path.segments.split_at(qself.position);
                 self.path_segments(as_path, false)?;
                 rest
             } else {
                 &path.segments
             };
-            self.out.token_expect(">")?;
-            self.out.token_expect("::")?;
+            self.out.token(">")?;
+            self.out.token("::")?;
             self.path_segments(rest, is_expr)?;
         } else {
             self.path(path, is_expr)?;
@@ -42,7 +40,7 @@ impl AstFormatter {
         let (first, rest) = segments.split_first().unwrap();
         self.path_segment(first, is_expr)?;
         for segment in rest {
-            self.out.token_expect("::")?;
+            self.out.token("::")?;
             self.path_segment(segment, is_expr)?;
         }
         Ok(())
@@ -52,7 +50,7 @@ impl AstFormatter {
         self.ident(segment.ident)?;
         if let Some(generic_args) = segment.args.as_deref() {
             if is_expr {
-                self.out.token_expect("::")?;
+                self.out.token("::")?;
             }
             self.generic_args(generic_args)?;
         };
@@ -90,9 +88,7 @@ impl AstFormatter {
         match &constraint.kind {
             ast::AssocItemConstraintKind::Bound { bounds } => self.generic_bounds(bounds),
             ast::AssocItemConstraintKind::Equality { term } => {
-                self.out.space()?;
-                self.out.token_expect("=")?;
-                self.out.space()?;
+                self.out.space_token_space("=")?;
                 match term {
                     ast::Term::Const(_anon_const) => todo!(),
                     ast::Term::Ty(ty) => self.ty(ty),

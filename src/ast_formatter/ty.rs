@@ -9,15 +9,15 @@ impl<'a> AstFormatter {
     pub fn ty(&self, ty: &ast::Ty) -> FormatResult {
         match &ty.kind {
             ast::TyKind::Slice(elem) => {
-                self.out.token_expect("[")?;
+                self.out.token("[")?;
                 self.ty(elem)?;
-                self.out.token_expect("]")?;
+                self.out.token("]")?;
                 Ok(())
             }
             ast::TyKind::Array(_ty, _length) => todo!(),
             ast::TyKind::Ptr(_mut_ty) => todo!(),
             ast::TyKind::Ref(lifetime, mut_ty) => {
-                self.out.token_at("&", ty.span.lo())?;
+                self.out.token("&")?;
                 if let Some(lifetime) = lifetime {
                     self.lifetime(lifetime)?;
                     self.out.space()?;
@@ -37,8 +37,7 @@ impl<'a> AstFormatter {
             ast::TyKind::TraitObject(bounds, syntax) => {
                 match syntax {
                     ast::TraitObjectSyntax::Dyn => {
-                        self.out.token_expect("dyn")?;
-                        self.out.space()?;
+                        self.out.token_space("dyn")?;
                     }
                     ast::TraitObjectSyntax::DynStar => todo!(),
                     ast::TraitObjectSyntax::None => todo!(),
@@ -47,20 +46,19 @@ impl<'a> AstFormatter {
                 Ok(())
             }
             ast::TyKind::ImplTrait(_, bounds) => {
-                self.out.token_at("impl", ty.span.lo())?;
-                self.out.space()?;
+                self.out.token_space("impl")?;
                 self.generic_bounds(bounds)?;
                 Ok(())
             }
             ast::TyKind::Paren(ty) => {
-                self.out.token_expect("(")?;
+                self.out.token("(")?;
                 self.ty(ty)?;
-                self.out.token_expect(")")?;
+                self.out.token(")")?;
                 Ok(())
             }
             ast::TyKind::Typeof(_anon_const) => todo!(),
             ast::TyKind::Infer => todo!(),
-            ast::TyKind::ImplicitSelf => self.out.token_at("self", ty.span.lo()),
+            ast::TyKind::ImplicitSelf => self.out.token("self"),
             ast::TyKind::MacCall(_mac_call) => todo!(),
             ast::TyKind::CVarArgs => todo!(),
             ast::TyKind::Pat(_ty, _pat) => todo!(),
@@ -81,8 +79,7 @@ impl<'a> AstFormatter {
 
     pub fn generic_bounds_optional(&self, bounds: &[ast::GenericBound]) -> FormatResult {
         if !bounds.is_empty() {
-            self.out.token_expect(":")?;
-            self.out.space()?;
+            self.out.token_space(":")?;
             self.generic_bounds(bounds)?;
         }
         Ok(())

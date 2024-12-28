@@ -121,8 +121,8 @@ impl ConstraintWriter {
 
     pub fn check_width_constraints(&self) -> Result<(), WidthLimitExceededError> {
         match self.remaining_width() {
-            Ok(_width) => Ok(()),
-            Err(WidthLimitExceededError) => {
+            None | Some(Ok(_)) => Ok(()),
+            Some(Err(WidthLimitExceededError { .. })) => {
                 info!("too wide: \"{}\"", self.last_line_to_string());
                 Err(WidthLimitExceededError)
             }
@@ -143,14 +143,12 @@ impl ConstraintWriter {
         }
     }
 
-    pub fn remaining_width(&self) -> Result<Option<usize>, WidthLimitExceededError> {
-        self.max_width()
-            .map(|max_width| {
-                max_width
-                    .checked_sub(self.last_line_len())
-                    .ok_or(WidthLimitExceededError)
-            })
-            .transpose()
+    pub fn remaining_width(&self) -> Option<Result<usize, WidthLimitExceededError>> {
+        self.max_width().map(|max_width| {
+            max_width
+                .checked_sub(self.last_line_len())
+                .ok_or(WidthLimitExceededError)
+        })
     }
 
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T {

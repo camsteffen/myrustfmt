@@ -30,21 +30,17 @@ impl<'a> AstFormatter {
     pub fn item_kind(&self, kind: &ast::ItemKind, item: &ast::Item) -> FormatResult {
         match kind {
             ast::ItemKind::ExternCrate(name) => {
-                self.out.token_at("extern", item.span.lo())?;
-                self.out.space()?;
-                self.out.token_expect("crate")?;
-                self.out.space()?;
+                self.out.token_space("extern")?;
+                self.out.token_space("crate")?;
                 if name.is_some() {
-                    self.out.eat_token()?;
-                    self.out.space()?;
-                    self.out.token_expect("as")?;
-                    self.out.space()?;
+                    self.out.copy_next_token()?;
+                    self.out.space_token_space("as")?;
                 }
                 self.ident(item.ident)?;
-                self.out.token_end_at(";", item.span.hi())?;
+                self.out.token(";")?;
             }
             ast::ItemKind::Use(use_tree) => {
-                self.out.token_at_space("use", item.span.lo())?;
+                self.out.token_space("use")?;
                 self.use_tree(use_tree, &Tail::token(";"))?;
             }
             ast::ItemKind::Static(_) => todo!(),
@@ -52,8 +48,7 @@ impl<'a> AstFormatter {
             ast::ItemKind::Fn(fn_) => self.fn_(fn_, item)?,
             ast::ItemKind::Mod(safety, mod_kind) => {
                 self.safety(safety)?;
-                self.out.token_expect("mod")?;
-                self.out.space()?;
+                self.out.token_space("mod")?;
                 self.ident(item.ident)?;
                 match mod_kind {
                     ast::ModKind::Loaded(items, ast::Inline::Yes, _mod_spans) => {
@@ -61,7 +56,7 @@ impl<'a> AstFormatter {
                         self.block_generic(items, |item| self.item(item))?;
                     }
                     ast::ModKind::Loaded(_, ast::Inline::No, _) | ast::ModKind::Unloaded => {
-                        self.out.token_end_at(";", item.span.hi())?;
+                        self.out.token(";")?;
                     }
                 }
             }
@@ -87,16 +82,14 @@ impl<'a> AstFormatter {
     fn vis(&self, vis: &ast::Visibility) -> FormatResult {
         match vis.kind {
             ast::VisibilityKind::Public => {
-                self.out.token_at("pub", vis.span.lo())?;
-                self.out.space()?;
+                self.out.token_space("pub")?;
             }
             ast::VisibilityKind::Restricted {
                 ref path,
                 shorthand: _,
                 ..
             } => {
-                self.out.token_at("pub", vis.span.lo())?;
-                self.out.space()?;
+                self.out.token_space("pub")?;
                 self.path(path, false)?;
                 self.out.space()?;
             }
@@ -106,19 +99,15 @@ impl<'a> AstFormatter {
     }
 
     fn const_item(&self, const_item: &ast::ConstItem, ident: Ident) -> FormatResult {
-        self.out.token_expect("const")?;
-        self.out.space()?;
+        self.out.token_space("const")?;
         self.ident(ident)?;
-        self.out.token_expect(":")?;
-        self.out.space()?;
+        self.out.token_space(":")?;
         self.ty(&const_item.ty)?;
         if let Some(expr) = &const_item.expr {
-            self.out.space()?;
-            self.out.token_expect("=")?;
-            self.out.space()?;
+            self.out.space_token_space("=")?;
             self.expr(expr)?;
         }
-        self.out.token_expect(";")?;
+        self.out.token(";")?;
         Ok(())
     }
 
@@ -128,8 +117,7 @@ impl<'a> AstFormatter {
         generics: &ast::Generics,
         item: &ast::Item,
     ) -> FormatResult {
-        self.out.token_expect("enum")?;
-        self.out.space()?;
+        self.out.token_space("enum")?;
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         self.out.space()?;
@@ -150,7 +138,7 @@ impl<'a> AstFormatter {
 
     fn impl_(&self, impl_: &ast::Impl, item: &ast::Item) -> FormatResult {
         let first_line = self.out.line();
-        self.out.token_at("impl", item.span.lo())?;
+        self.out.token("impl")?;
         self.generic_params(&impl_.generics.params)?;
         let first_part = || match &impl_.of_trait {
             Some(of_trait) => self.trait_ref(of_trait),
@@ -179,8 +167,7 @@ impl<'a> AstFormatter {
         };
         if impl_.of_trait.is_some() {
             let for_ty = || -> FormatResult {
-                self.out.token_expect("for")?;
-                self.out.space()?;
+                self.out.token_space("for")?;
                 self.ty(&impl_.self_ty)?;
                 Ok(())
             };
@@ -222,16 +209,13 @@ impl<'a> AstFormatter {
     }
 
     fn ty_alias(&self, ty_alias: &ast::TyAlias, ident: Ident) -> FormatResult {
-        self.out.token_expect("type")?;
-        self.out.space()?;
+        self.out.token_space("type")?;
         self.ident(ident)?;
         if let Some(ty) = &ty_alias.ty {
-            self.out.space()?;
-            self.out.token_expect("=")?;
-            self.out.space()?;
+            self.out.space_token_space("=")?;
             self.ty(ty)?;
         }
-        self.out.token_expect(";")?;
+        self.out.token(";")?;
         Ok(())
     }
 
@@ -241,8 +225,7 @@ impl<'a> AstFormatter {
         generics: &ast::Generics,
         item: &ast::Item,
     ) -> FormatResult {
-        self.out.token_expect("struct")?;
-        self.out.space()?;
+        self.out.token_space("struct")?;
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         if !matches!(variants, ast::VariantData::Unit(_)) {
@@ -252,14 +235,13 @@ impl<'a> AstFormatter {
             variants,
             ast::VariantData::Unit(_) | ast::VariantData::Tuple(..)
         ) {
-            self.out.token_expect(";")?;
+            self.out.token(";")?;
         }
         Ok(())
     }
 
     fn trait_(&self, trait_: &ast::Trait, item: &ast::Item) -> FormatResult {
-        self.out.token_expect("trait")?;
-        self.out.space()?;
+        self.out.token_space("trait")?;
         self.ident(item.ident)?;
         // self.generic_params(&trait_.generics.params)?;
         self.generic_bounds_optional(&trait_.bounds)?;
@@ -298,8 +280,7 @@ impl<'a> AstFormatter {
         self.vis(&field.vis)?;
         if let Some(ident) = field.ident {
             self.ident(ident)?;
-            self.out.token_expect(":")?;
-            self.out.space()?;
+            self.out.token_space(":")?;
         }
         self.ty(&field.ty)?;
         Ok(())
@@ -310,15 +291,13 @@ impl<'a> AstFormatter {
         match use_tree.kind {
             ast::UseTreeKind::Simple(rename) => {
                 if let Some(rename) = rename {
-                    self.out.space()?;
-                    self.out.token_expect("as")?;
-                    self.out.space()?;
+                    self.out.space_token_space("as")?;
                     self.ident(rename)?;
                 }
                 self.tail(tail)?;
             }
             ast::UseTreeKind::Nested { ref items, span: _ } => {
-                self.out.token_expect("::")?;
+                self.out.token("::")?;
                 let has_nested = items
                     .iter()
                     .any(|(item, _)| matches!(item.kind, ast::UseTreeKind::Nested { .. }));

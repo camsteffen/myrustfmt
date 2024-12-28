@@ -21,16 +21,16 @@ impl AstFormatter {
             ast::AttrKind::Normal(_) => match attr.meta() {
                 None => todo!(),
                 Some(meta) => {
-                    self.out.token_at("#", attr.span.lo())?;
+                    self.out.token("#")?;
                     match attr.style {
                         ast::AttrStyle::Inner => {
-                            self.out.token_expect("!")?;
+                            self.out.token("!")?;
                         }
                         ast::AttrStyle::Outer => {}
                     }
-                    self.out.token_expect("[")?;
+                    self.out.token("[")?;
                     self.meta_item(&meta)?;
-                    self.out.token_expect("]")?;
+                    self.out.token("]")?;
                     self.out.newline_indent()?;
                     Ok(())
                 }

@@ -65,7 +65,7 @@ impl AstFormatter {
                 self.tail_inner(b)?;
             }
             TailImpl::Fn(f) => f(self)?,
-            TailImpl::Token(token) => self.out.token_expect(token)?,
+            TailImpl::Token(token) => self.out.token(token)?,
         }
         Ok(())
     }

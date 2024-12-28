@@ -1,6 +1,6 @@
 use crate::constraint_writer::{ConstraintWriter, ConstraintWriterSnapshot};
 use crate::constraints::Constraints;
-use crate::error::{FormatError, FormatResult, WidthLimitExceededError};
+use crate::error::{FormatResult, WidthLimitExceededError};
 use crate::source_reader::SourceReader;
 use rustc_lexer::TokenKind;
 use rustc_span::{BytePos, Pos, Span};
@@ -111,11 +111,25 @@ impl SourceFormatter {
     }
 
     /** Writes a space and accounts for spaces and comments in source */
-    pub fn eat_token(&self) -> FormatResult {
+    pub fn copy_next_token(&self) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed()?;
         let token = self.source.eat_next_token();
         self.token_out(token)?;
         self.next_is_whitespace_or_comments.set(true);
+        Ok(())
+    }
+
+    /**
+     * Write a token, asserting it is next in source.
+     *
+     * N.B. a token should not contain whitespace
+     * N.B. a token is indivisible (e.g. "::<" is two tokens since you can write "::   <")
+     */
+    pub fn token(&self, token: &str) -> FormatResult {
+        self.handle_whitespace_and_comments_if_needed()?;
+        self.source.eat(token)?;
+        self.next_is_whitespace_or_comments.set(true);
+        self.token_out(token)?;
         Ok(())
     }
 
@@ -127,40 +141,23 @@ impl SourceFormatter {
         Ok(())
     }
 
-    /** Write a token, asserting it is next in source and has the given position */
-    pub fn token_at(&self, token: &str, pos: BytePos) -> FormatResult {
-        self.handle_whitespace_and_comments_if_needed()?;
-        self.source.expect_pos(pos)?;
-        self.token_unchecked(token)?;
-        Ok(())
-    }
-
-    /** Write a token, asserting it is next in source and has the given ending position */
-    pub fn token_end_at(&self, token: &str, end_pos: BytePos) -> FormatResult {
-        self.handle_whitespace_and_comments_if_needed()?;
-        self.token_unchecked(token)?;
-        self.source.expect_pos(end_pos)?;
-        Ok(())
-    }
-
     /** Convenience for calling `token_at` followed by `space` */
-    pub fn token_at_space(&self, token: &'static str, pos: BytePos) -> FormatResult {
-        self.token_at(token, pos)?;
+    pub fn token_space(&self, token: &str) -> FormatResult {
+        self.token(token)?;
         self.space()?;
         Ok(())
     }
 
-    /**
-     * Write a token, asserting it is next in source.
-     *
-     * Note: This compares the token string to source and is thus somewhat less
-     * performant than token_at. But this is useful when you don't have a Span.
-     */
-    pub fn token_expect(&self, token: &str) -> FormatResult {
-        self.handle_whitespace_and_comments_if_needed()?;
-        self.source.eat(token)?;
-        self.next_is_whitespace_or_comments.set(true);
-        self.token_out(token)?;
+    pub fn space_token_space(&self, token: &str) -> FormatResult {
+        self.space()?;
+        self.token(token)?;
+        self.space()?;
+        Ok(())
+    }
+
+    pub fn space_token(&self, token: &str) -> FormatResult {
+        self.space()?;
+        self.token(token)?;
         Ok(())
     }
 
@@ -183,13 +180,13 @@ impl SourceFormatter {
         Ok(())
     }
 
-    pub fn require_width(&self, width: usize) -> Result<(), FormatError> {
-        self.out
-            .remaining_width()
-            .and_then(|remaining| match remaining {
-                Some(r) if r < width => Err(WidthLimitExceededError),
-                _ => Ok(()),
-            })?;
+    pub fn require_width(&self, width: usize) -> Result<(), WidthLimitExceededError> {
+        if let Some(remaining) = self.out.remaining_width() {
+            let remaining = remaining?;
+            if remaining < width {
+                return Err(WidthLimitExceededError);
+            }
+        }
         Ok(())
     }
 

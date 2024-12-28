@@ -10,11 +10,7 @@ impl<'a> AstFormatter {
 
     pub fn mutability(&self, mutability: ast::Mutability) -> FormatResult {
         match mutability {
-            ast::Mutability::Mut => {
-                self.out.token_expect("mut")?;
-                self.out.space()?;
-                Ok(())
-            }
+            ast::Mutability::Mut => self.out.token_space("mut"),
             ast::Mutability::Not => Ok(()),
         }
     }
@@ -27,11 +23,11 @@ impl<'a> AstFormatter {
         match *safety {
             ast::Safety::Unsafe(span) => {
                 let pos = span.lo();
-                self.out.token_at_space("unsafe", pos)
+                self.out.token_space("unsafe")
             }
             ast::Safety::Safe(span) => {
                 let pos = span.lo();
-                self.out.token_at_space("safe", pos)
+                self.out.token_space("safe")
             }
             ast::Safety::Default => Ok(()),
         }

@@ -19,9 +19,7 @@ impl AstFormatter {
         self.fallback(|| {
             self.with_single_line(|| {
                 chain.iter().try_for_each(|(op, expr)| -> FormatResult {
-                    self.out.space()?;
-                    self.out.token_expect(op.as_str())?;
-                    self.out.space()?;
+                    self.out.space_token_space(op.as_str())?;
                     self.with_no_multiline_overflow(|| self.expr(expr))?;
                     Ok(())
                 })?;
@@ -33,8 +31,7 @@ impl AstFormatter {
             self.indented(|| {
                 chain.iter().try_for_each(|(op, expr)| -> FormatResult {
                     self.out.newline_indent()?;
-                    self.out.token_expect(op.as_str())?;
-                    self.out.space()?;
+                    self.out.token_space(op.as_str())?;
                     self.expr(expr)?;
                     Ok(())
                 })?;

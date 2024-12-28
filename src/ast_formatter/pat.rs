@@ -15,22 +15,19 @@ impl<'a> AstFormatter {
 
     pub fn pat_tail(&self, pat: &ast::Pat, end: &Tail) -> FormatResult {
         match pat.kind {
-            ast::PatKind::Wild => self.out.token_expect("_"),
+            ast::PatKind::Wild => self.out.token("_"),
             ast::PatKind::Ident(ast::BindingMode(by_ref, mutbl), ident, ref pat) => {
                 self.mutability(mutbl)?;
                 match by_ref {
                     ast::ByRef::No => {}
                     ast::ByRef::Yes(ref_mutbl) => {
-                        self.out.token_expect("ref")?;
-                        self.out.space()?;
+                        self.out.token_space("ref")?;
                         self.mutability(ref_mutbl)?;
                     }
                 }
                 self.ident(ident)?;
                 if let Some(pat) = pat {
-                    self.out.space()?;
-                    self.out.token_expect("@")?;
-                    self.out.space()?;
+                    self.out.space_token_space("@")?;
                     self.pat(pat)?;
                 }
                 self.tail(end)
@@ -63,7 +60,7 @@ impl<'a> AstFormatter {
             ast::PatKind::Slice(ref elements) => {
                 list(Braces::SQUARE, elements, |pat| self.pat(pat)).format(self)
             }
-            ast::PatKind::Rest => self.out.token_expect(".."),
+            ast::PatKind::Rest => self.out.token(".."),
             ast::PatKind::Never => todo!(),
             ast::PatKind::Paren(_) => todo!(),
             ast::PatKind::MacCall(_) => todo!(),
@@ -99,8 +96,7 @@ impl<'a> AstFormatter {
             self.pat(&pat_field.pat)?;
         } else {
             self.ident(pat_field.ident)?;
-            self.out.token_expect(":")?;
-            self.out.space()?;
+            self.out.token_space(":")?;
             self.pat(&pat_field.pat)?;
         }
         Ok(())

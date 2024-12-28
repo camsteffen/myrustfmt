@@ -21,7 +21,7 @@ impl AstFormatter {
                 kw_span,
                 ref default,
             } => {
-                self.out.token_at_space("const", kw_span.lo())?;
+                self.out.token_space("const")?;
                 if let Some(_default) = default {
                     todo!()
                 }
@@ -30,9 +30,7 @@ impl AstFormatter {
             ast::GenericParamKind::Lifetime => {}
             ast::GenericParamKind::Type { ref default } => {
                 if let Some(default) = default {
-                    self.out.space()?;
-                    self.out.token_expect("=")?;
-                    self.out.space()?;
+                    self.out.space_token_space("=")?;
                     self.ty(default)?;
                 }
             }
@@ -45,21 +43,20 @@ impl AstFormatter {
             return Ok(());
         }
         self.out.newline_indent()?;
-        self.out.token_expect("where")?;
+        self.out.token("where")?;
         self.indented(|| {
             where_clause.predicates.iter().try_for_each(|pred| {
                 self.out.newline_indent()?;
                 match &pred.kind {
                     ast::WherePredicateKind::BoundPredicate(pred) => {
                         self.ty(&pred.bounded_ty)?;
-                        self.out.token_expect(":")?;
-                        self.out.space()?;
+                        self.out.token_space(":")?;
                         self.generic_bounds(&pred.bounds)?;
                     }
                     ast::WherePredicateKind::RegionPredicate(_) => todo!(),
                     ast::WherePredicateKind::EqPredicate(_) => todo!(),
                 }
-                self.out.token_expect(",")?;
+                self.out.token(",")?;
                 Ok(())
             })
         })?;

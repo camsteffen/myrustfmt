@@ -128,9 +128,9 @@ where
         af: &AstFormatter,
         contents: impl FnOnce(&Self, &AstFormatter, &Tail) -> FormatResult,
     ) -> FormatResult {
-        af.out.token_expect(self.braces.start)?;
+        af.out.token(self.braces.start)?;
         if self.list.is_empty() {
-            af.out.token_expect(self.braces.end)?;
+            af.out.token(self.braces.end)?;
             af.tail(self.tail)?;
             return Ok(());
         }
@@ -279,7 +279,7 @@ impl<'a> AstFormatter {
                 self.with_single_line(|| -> FormatResult {
                     self.out.token_maybe_missing(",")?;
                     self.out.space()?;
-                    self.out.token_expect("..")?;
+                    self.out.token("..")?;
                     if let ListRest::Base(expr) = rest {
                         self.expr(expr)?;
                     }
@@ -330,7 +330,7 @@ impl<'a> AstFormatter {
                 })?;
                 self.out.token_maybe_missing(",")?;
                 self.out.space()?;
-                self.out.token_expect("..")?;
+                self.out.token("..")?;
                 Ok(())
             })
         })?;
@@ -408,7 +408,7 @@ impl<'a> AstFormatter {
             }
             if !matches!(rest, ListRest::None) {
                 self.out.newline_indent()?;
-                self.out.token_expect("..")?;
+                self.out.token("..")?;
                 if let ListRest::Base(expr) = rest {
                     self.expr(expr)?;
                 }

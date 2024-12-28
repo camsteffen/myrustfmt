@@ -43,19 +43,16 @@ impl<'a> AstFormatter {
                 self.binary(left, right, op, use_tail())?
             }
             ast::ExprKind::Unary(op, ref target) => {
-                self.out.token_expect(op.as_str())?;
+                self.out.token(op.as_str())?;
                 self.expr_tail(target, use_tail())?;
             }
             ast::ExprKind::Lit(_) => self.out.copy_span(expr.span)?,
             ast::ExprKind::Cast(_, _) => todo!(),
             ast::ExprKind::Type(_, _) => todo!(),
             ast::ExprKind::Let(ref pat, ref init, ..) => {
-                self.out.token_expect("let")?;
-                self.out.space()?;
+                self.out.token_space("let")?;
                 self.pat(pat)?;
-                self.out.space()?;
-                self.out.token_expect("=")?;
-                self.out.space()?;
+                self.out.space_token_space("=")?;
                 self.expr_tail(init, use_tail())?;
             }
             ast::ExprKind::If(ref condition, ref block, ref else_) => {
@@ -72,20 +69,16 @@ impl<'a> AstFormatter {
                 ..
             } => {
                 self.label(label)?;
-                self.out.token_expect("for")?;
-                self.out.space()?;
+                self.out.token_space("for")?;
                 self.pat(pat)?;
-                self.out.space()?;
-                self.out.token_expect("in")?;
-                self.out.space()?;
+                self.out.space_token_space("in")?;
                 self.expr(iter)?;
                 self.out.space()?;
                 self.block(body)?;
             }
             ast::ExprKind::Loop(ref block, label, _) => {
                 self.label(label)?;
-                self.out.token_expect("loop")?;
-                self.out.space()?;
+                self.out.token_space("loop")?;
                 self.block(block)?;
             }
             ast::ExprKind::Match(ref scrutinee, ref arms, ast::MatchKind::Prefix) => {
@@ -102,15 +95,13 @@ impl<'a> AstFormatter {
             ast::ExprKind::TryBlock(_) => todo!(),
             ast::ExprKind::Assign(ref left, ref right, eq_span) => {
                 self.expr(left)?;
-                self.out.space()?;
-                self.out.token_at("=", eq_span.lo())?;
-                self.out.space()?;
+                self.out.space_token_space("=")?;
                 self.expr_tail(right, use_tail())?;
             }
             ast::ExprKind::AssignOp(_, _, _) => todo!(),
             ast::ExprKind::Index(ref target, ref index, _) => {
                 self.expr(target)?;
-                self.out.token_expect("[")?;
+                self.out.token("[")?;
                 let tail = use_tail();
                 self.expr_tail(index, &Tail::token("]").and(tail))?;
             }
@@ -124,7 +115,7 @@ impl<'a> AstFormatter {
                 self.expr_tail(target, use_tail())?;
             }
             ast::ExprKind::Break(label, ref inner) => {
-                self.out.token_expect("break")?;
+                self.out.token("break")?;
                 if label.is_some() || inner.is_some() {
                     self.out.space()?;
                 }
@@ -135,7 +126,7 @@ impl<'a> AstFormatter {
             }
             ast::ExprKind::Continue(_) => todo!(),
             ast::ExprKind::Ret(ref target) => {
-                self.out.token_expect("return")?;
+                self.out.token("return")?;
                 if let Some(target) = target {
                     self.out.space()?;
                     self.expr_tail(target, use_tail())?;
@@ -147,7 +138,7 @@ impl<'a> AstFormatter {
             ast::ExprKind::Struct(ref struct_) => self.struct_expr(struct_, use_tail())?,
             ast::ExprKind::Repeat(_, _) => todo!(),
             ast::ExprKind::Paren(ref inner) => {
-                self.out.token_at("(", expr.span.lo())?;
+                self.out.token("(")?;
                 let tail = use_tail();
                 self.expr_tail(inner, &Tail::token(")").and(tail))?;
             }
@@ -188,8 +179,8 @@ impl<'a> AstFormatter {
             self.expr(start)?;
         }
         match limits {
-            ast::RangeLimits::Closed => self.out.token_expect("..=")?,
-            ast::RangeLimits::HalfOpen => self.out.token_expect("..")?,
+            ast::RangeLimits::Closed => self.out.token("..=")?,
+            ast::RangeLimits::HalfOpen => self.out.token("..")?,
         }
         match end {
             None => self.tail(tail)?,
@@ -206,7 +197,7 @@ impl<'a> AstFormatter {
     ) -> FormatResult {
         match borrow_kind {
             ast::BorrowKind::Raw => todo!(),
-            ast::BorrowKind::Ref => self.out.token_at("&", expr.span.lo())?,
+            ast::BorrowKind::Ref => self.out.token("&")?,
         }
         self.mutability(mutability)?;
         Ok(())
@@ -240,9 +231,7 @@ impl<'a> AstFormatter {
             match else_ {
                 None => self.tail(tail)?,
                 Some(else_) => {
-                    self.out.space()?;
-                    self.out.token_expect("else")?;
-                    self.out.space()?;
+                    self.out.space_token_space("else")?;
                     self.expr_tail(else_, tail)?;
                 }
             }
@@ -276,16 +265,11 @@ impl<'a> AstFormatter {
                         || {
                             self.out.space()?;
                             self.expr(block_expr)?;
-                            self.out.space()?;
-                            self.out.token_expect("}")?;
-                            self.out.space()?;
-                            self.out.token_expect("else")?;
-                            self.out.space()?;
-                            self.out.token_expect("{")?;
-                            self.out.space()?;
+                            self.out.space_token_space("}")?;
+                            self.out.token_space("else")?;
+                            self.out.token_space("{")?;
                             self.expr(else_expr)?;
-                            self.out.space()?;
-                            self.out.token_expect("}")?;
+                            self.out.space_token("}")?;
                             self.tail(tail)?;
                             Ok(())
                         },
@@ -302,8 +286,7 @@ impl<'a> AstFormatter {
 
     pub fn token_expr_open_brace(&self, token: &str, expr: &ast::Expr) -> FormatResult<bool> {
         let first_line = self.out.line();
-        self.out.token_expect(token)?;
-        self.out.space()?;
+        self.out.token_space(token)?;
         self.expr(expr)?;
         let force_newline = self.out.line() != first_line
             && self.out.with_last_line(|line| {
@@ -315,28 +298,22 @@ impl<'a> AstFormatter {
             });
         let newline_open_block = || {
             self.out.newline_indent()?;
-            self.out.token_expect("{")?;
+            self.out.token("{")?;
             Ok(())
         };
         if force_newline {
             newline_open_block()?;
         } else {
-            self.fallback(|| {
-                self.with_single_line(|| {
-                    self.out.space()?;
-                    self.out.token_expect("{")?;
-                    Ok(())
-                })
-            })
-            .next(newline_open_block)
-            .result()?;
+            self.fallback(|| self.with_single_line(|| self.out.space_token("{")))
+                .next(newline_open_block)
+                .result()?;
         }
         Ok(self.out.line() == first_line)
     }
 
     pub fn mac_call(&self, mac_call: &ast::MacCall) -> FormatResult {
         self.path(&mac_call.path, true)?;
-        self.out.token_expect("!")?;
+        self.out.token("!")?;
         self.delim_args(&mac_call.args)
     }
 
@@ -358,8 +335,7 @@ impl<'a> AstFormatter {
         self.attrs(&field.attrs)?;
         self.ident(field.ident)?;
         if !field.is_shorthand {
-            self.out.token_expect(":")?;
-            self.out.space()?;
+            self.out.token_space(":")?;
             self.expr(&field.expr)?;
         }
         Ok(())
