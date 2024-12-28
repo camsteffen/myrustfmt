@@ -1,7 +1,8 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::config::ListConfig;
 use crate::ast_formatter::list::{Braces, list};
-use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::util::tail::Tail;
+use crate::ast_utils::is_call_or_prefixed;
 use crate::config::Config;
 use crate::constraints::INDENT_WIDTH;
 use crate::error::WidthLimitExceededError;
@@ -62,7 +63,7 @@ impl AstFormatter {
         tail: &Tail,
     ) -> FormatResult {
         let (last, until_last) = dot_chain.split_last().unwrap();
-        self.with_width_limit_from_start_first_line_opt(start_pos, width_limit, || {
+        self.with_width_limit_from_start_opt(start_pos, width_limit, || {
             self.with_single_line(|| {
                 for item in until_last {
                     self.dot_chain_item(item, false)?;
@@ -73,7 +74,7 @@ impl AstFormatter {
         let snapshot = self.out.snapshot();
         // no multiline overflow
         let result = self
-            .with_width_limit_from_start_first_line_opt(start_pos, width_limit, || {
+            .with_width_limit_from_start_opt(start_pos, width_limit, || {
                 self.with_single_line(|| self.dot_chain_item(last, false))
             })
             .and_then(|()| self.tail(tail));
@@ -140,7 +141,7 @@ impl AstFormatter {
                 self.with_no_multiline_overflow_optional(!allow_multiline_overflow, || {
                     self.path_segment(&method_call.seg, true)?;
                     let args_max_width_exempt = self.config().rustfmt_quirks
-                        && matches!(&*method_call.args, [arg] if !is_call(arg));
+                        && matches!(&*method_call.args, [arg] if !is_call_or_prefixed(arg));
                     let list_config = MethodCallParamsListConfig {
                         apply_max_contents_width: !args_max_width_exempt,
                     };
@@ -184,16 +185,5 @@ impl ListConfig for MethodCallParamsListConfig {
     fn single_line_max_contents_width(&self) -> Option<usize> {
         self.apply_max_contents_width
             .then_some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
-    }
-}
-
-fn is_call(expr: &ast::Expr) -> bool {
-    match expr.kind {
-        ast::ExprKind::Call(..) | ast::ExprKind::MacCall(..) => true,
-        ast::ExprKind::AddrOf(_, _, ref expr)
-        | ast::ExprKind::Try(ref expr)
-        | ast::ExprKind::Unary(_, ref expr)
-        | ast::ExprKind::Cast(ref expr, _) => is_call(expr),
-        _ => false,
     }
 }

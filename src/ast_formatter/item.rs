@@ -6,7 +6,7 @@ use crate::ast_formatter::list::config::{
     ListConfig, ListWrapToFitConfig, ParamListConfig, struct_field_list_config,
 };
 use crate::ast_formatter::list::{Braces, list};
-use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::util::tail::Tail;
 use crate::config::Config;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;

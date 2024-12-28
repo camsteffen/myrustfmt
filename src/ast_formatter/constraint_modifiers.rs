@@ -200,6 +200,18 @@ impl AstFormatter {
         self.with_width_limit(remaining, f)
     }
 
+    pub fn with_width_limit_from_start_opt<T>(
+        &self,
+        line_start_pos: usize,
+        width_limit: Option<usize>,
+        f: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
+        let Some(width_limit) = width_limit else {
+            return f();
+        };
+        self.with_width_limit_from_start(line_start_pos, width_limit, f)
+    }
+
     pub fn with_width_limit_from_start_first_line<T>(
         &self,
         line_start_pos: usize,

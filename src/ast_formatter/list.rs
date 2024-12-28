@@ -3,7 +3,7 @@ mod overflow;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ListWrapToFitConfig};
-use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use overflow::{ListOverflow, ListOverflowNo, ListOverflowYes};
 use rustc_ast::ast;
@@ -134,7 +134,7 @@ where
             af.tail(self.tail)?;
             return Ok(());
         }
-        contents(self, af, &self.tail.prefix_token(self.braces.end))
+        contents(self, af, &Tail::token(self.braces.end).and(self.tail))
     }
 
     fn contents_default(&self, af: &AstFormatter, tail: &Tail) -> FormatResult {

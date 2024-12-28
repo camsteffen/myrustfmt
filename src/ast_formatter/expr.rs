@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{Braces, ListRest, list};
-use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
@@ -112,7 +112,7 @@ impl<'a> AstFormatter {
                 self.expr(target)?;
                 self.out.token_expect("[")?;
                 let tail = use_tail();
-                self.expr_tail(index, &tail.prefix_token("]"))?;
+                self.expr_tail(index, &Tail::token("]").and(tail))?;
             }
             ast::ExprKind::Range(ref start, ref end, limits) => {
                 self.range(start.as_deref(), end.as_deref(), limits, use_tail())?
@@ -149,11 +149,11 @@ impl<'a> AstFormatter {
             ast::ExprKind::Paren(ref inner) => {
                 self.out.token_at("(", expr.span.lo())?;
                 let tail = use_tail();
-                self.expr_tail(inner, &tail.prefix_token(")"))?;
+                self.expr_tail(inner, &Tail::token(")").and(tail))?;
             }
             ast::ExprKind::Try(ref target) => {
                 let tail = use_tail();
-                self.expr_tail(target, &tail.prefix_token("?"))?;
+                self.expr_tail(target, &Tail::token("?").and(tail))?;
             }
             ast::ExprKind::Yield(_) => todo!(),
             ast::ExprKind::Yeet(_) => todo!(),
@@ -309,9 +309,9 @@ impl<'a> AstFormatter {
             && self.out.with_last_line(|line| {
                 let after_indent = &line[self.out.constraints().indent.get()..];
                 after_indent.starts_with(' ')
-                    || !after_indent
+                    || after_indent
                         .chars()
-                        .all(|c| matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
+                        .any(|c| !matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
             });
         let newline_open_block = || {
             self.out.newline_indent()?;

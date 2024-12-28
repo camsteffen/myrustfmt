@@ -20,8 +20,8 @@ mod local;
 mod r#match;
 mod pat;
 mod path;
-mod tail;
 mod ty;
+mod util;
 mod wrapping;
 
 pub struct AstFormatter {

@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{Braces, list};
-use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 
 use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ParamListConfig};
@@ -22,7 +22,14 @@ impl<'a> AstFormatter {
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         let (decl_tail, opened_block) = if generics.where_clause.is_empty() && body.is_some() {
-            (Tail::OPEN_BLOCK, true)
+            (
+                &Tail::new(|af| {
+                    af.out.space()?;
+                    af.out.token_expect("{")?;
+                    Ok(())
+                }),
+                true,
+            )
         } else {
             (Tail::NONE, false)
         };
