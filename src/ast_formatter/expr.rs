@@ -1,15 +1,16 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{Braces, ListRest, list};
+use crate::ast_formatter::list::{list, Braces};
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 use crate::ast_formatter::list::config::{
-    ArrayListConfig, CallParamListConfig, ParamListConfig, struct_field_list_config,
+    struct_field_list_config, ArrayListConfig, CallParamListConfig, ParamListConfig,
 };
 use crate::ast_utils::expr_only_block;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
+use crate::ast_formatter::list::ListRest;
 
 impl<'a> AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {

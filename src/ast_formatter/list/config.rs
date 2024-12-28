@@ -10,12 +10,12 @@ pub trait ListConfig {
         false
     }
 
-    fn single_line_reduce_max_width(&self, _config: &Config) -> usize {
-        0
-    }
-
     fn single_line_max_contents_width(&self) -> Option<usize> {
         None
+    }
+
+    fn single_line_reduce_max_width(&self, _config: &Config) -> usize {
+        0
     }
 
     fn wrap_to_fit() -> ListWrapToFitConfig {

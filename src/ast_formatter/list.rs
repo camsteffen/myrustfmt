@@ -1,31 +1,17 @@
 pub mod config;
 mod overflow;
+mod rest;
+mod braces;
+
+pub use braces::Braces;
+pub use rest::ListRest;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ListWrapToFitConfig};
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use overflow::{ListOverflow, ListOverflowNo, ListOverflowYes};
-use rustc_ast::ast;
 
-pub struct Braces {
-    start: &'static str,
-    end: &'static str,
-    pad: bool,
-}
-
-impl Braces {
-    pub const ANGLE: &'static Braces = &Braces::new("<", ">", false);
-    pub const CURLY: &'static Braces = &Braces::new("{", "}", true);
-    pub const CURLY_NO_PAD: &'static Braces = &Braces::new("{", "}", false);
-    pub const PARENS: &'static Braces = &Braces::new("(", ")", false);
-    pub const PIPE: &'static Braces = &Braces::new("|", "|", false);
-    pub const SQUARE: &'static Braces = &Braces::new("[", "]", false);
-
-    const fn new(start: &'static str, end: &'static str, pad: bool) -> Braces {
-        Braces { start, end, pad }
-    }
-}
 
 pub fn list<'a, 'list, Item, FormatItem>(
     braces: &'static Braces,
@@ -197,32 +183,6 @@ where
 
     fn contents_separate_lines(&self, af: &AstFormatter, tail: &Tail) -> FormatResult {
         af.list_contents_separate_lines(self.list, &self.format_item, self.rest, tail)
-    }
-}
-
-#[derive(Clone, Copy)]
-pub enum ListRest<'a> {
-    None,
-    Rest,
-    Base(&'a ast::Expr),
-}
-
-impl From<ast::PatFieldsRest> for ListRest<'static> {
-    fn from(rest: ast::PatFieldsRest) -> Self {
-        match rest {
-            ast::PatFieldsRest::None => ListRest::None,
-            ast::PatFieldsRest::Rest => ListRest::Rest,
-        }
-    }
-}
-
-impl<'a> From<&'a ast::StructRest> for ListRest<'a> {
-    fn from(rest: &'a ast::StructRest) -> Self {
-        match rest {
-            ast::StructRest::None => ListRest::None,
-            ast::StructRest::Rest(_) => ListRest::Rest,
-            ast::StructRest::Base(expr) => ListRest::Base(expr),
-        }
     }
 }
 
