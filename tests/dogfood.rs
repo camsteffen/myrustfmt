@@ -1,9 +1,9 @@
 #![feature(rustc_private)]
 
-use std::ffi::OsStr;
 use myrustfmt::format_file;
-use std::{fs, io};
+use std::ffi::OsStr;
 use std::path::Path;
+use std::{fs, io};
 
 #[test]
 fn dogfood_test() -> io::Result<()> {
@@ -22,7 +22,6 @@ fn dogfood_test_dir(dir: &Path) -> io::Result<()> {
             dogfood_test_dir(&entry.path())?;
         } else if entry.path().extension() == Some(OsStr::new("rs")) {
             dogfood_test_file(&entry.path());
-            
         }
     }
     Ok(())

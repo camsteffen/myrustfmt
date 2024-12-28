@@ -2,11 +2,11 @@ use rustc_ast::ast;
 use rustc_span::symbol::Ident;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::config::{
     ListConfig, ListWrapToFitConfig, ParamListConfig, struct_field_list_config,
 };
 use crate::ast_formatter::list::{Braces, list};
+use crate::ast_formatter::tail::Tail;
 use crate::config::Config;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -45,7 +45,7 @@ impl<'a> AstFormatter {
             }
             ast::ItemKind::Use(use_tree) => {
                 self.out.token_at_space("use", item.span.lo())?;
-                self.use_tree(use_tree, Tail::SEMICOLON)?;
+                self.use_tree(use_tree, &Tail::token(";"))?;
             }
             ast::ItemKind::Static(_) => todo!(),
             ast::ItemKind::Const(const_item) => self.const_item(const_item, item.ident)?,
@@ -305,7 +305,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn use_tree(&self, use_tree: &ast::UseTree, tail: Tail<'_>) -> FormatResult {
+    fn use_tree(&self, use_tree: &ast::UseTree, tail: &Tail) -> FormatResult {
         self.path(&use_tree.prefix, false)?;
         match use_tree.kind {
             ast::UseTreeKind::Simple(rename) => {

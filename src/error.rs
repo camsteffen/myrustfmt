@@ -16,7 +16,7 @@ impl<T> FormatResultExt for FormatResult<T> {
                 FormatError::Constraint(_) => false,
             },
         }
-    } 
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -82,7 +82,7 @@ impl FormatError {
                             if pos > self.pos { "ahead" } else { "behind" }
                         )?;
                         next_token(f)?;
-                    },
+                    }
                     FormatError::Parse(ParseError::ExpectedToken(ref token)) => {
                         write!(f, "expected token: `{}`", token)?;
                         next_token(f)?;
@@ -92,7 +92,13 @@ impl FormatError {
             }
         }
         let (line, col) = line_col(source, pos);
-        FormatErrorDisplay { error: self, source, pos, line, col }
+        FormatErrorDisplay {
+            error: self,
+            source,
+            pos,
+            line,
+            col,
+        }
     }
 }
 

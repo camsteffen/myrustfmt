@@ -1,8 +1,8 @@
-use std::backtrace::Backtrace;
-use std::rc::Rc;
 use crate::ast_formatter::AstFormatter;
 use crate::constraints::{Constraints, MaxWidthForLine};
 use crate::error::{FormatResult, WidthLimitExceededError};
+use std::backtrace::Backtrace;
+use std::rc::Rc;
 use tracing::info;
 
 impl AstFormatter {
@@ -38,7 +38,11 @@ impl AstFormatter {
         result
     }
 
-    pub fn with_no_multiline_overflow_optional(&self, apply: bool, f: impl FnOnce() -> FormatResult) -> FormatResult {
+    pub fn with_no_multiline_overflow_optional(
+        &self,
+        apply: bool,
+        f: impl FnOnce() -> FormatResult,
+    ) -> FormatResult {
         if !apply {
             return f();
         }
@@ -51,7 +55,10 @@ impl AstFormatter {
 
     pub fn with_replace_single_line<T>(&self, value: bool, f: impl FnOnce() -> T) -> T {
         let single_line_prev = self.constraints().single_line.replace(value);
-        let bp = self.constraints().single_line_backtrace.replace(Some(Rc::new(Backtrace::capture())));
+        let bp = self
+            .constraints()
+            .single_line_backtrace
+            .replace(Some(Rc::new(Backtrace::capture())));
         let result = f();
         self.constraints().single_line.set(single_line_prev);
         self.constraints().single_line_backtrace.replace(bp);

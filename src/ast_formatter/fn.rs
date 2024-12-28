@@ -1,11 +1,11 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::{Braces, list};
+use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 
 use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ParamListConfig};
-use rustc_ast::ast;
 use rustc_ast::BindingMode;
+use rustc_ast::ast;
 use rustc_span::symbol::kw;
 
 impl<'a> AstFormatter {
@@ -47,12 +47,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    pub fn closure(
-        &self,
-        closure: &ast::Closure,
-        is_overflow: bool,
-        end: Tail<'_>,
-    ) -> FormatResult {
+    pub fn closure(&self, closure: &ast::Closure, is_overflow: bool, end: &Tail) -> FormatResult {
         let ast::Closure {
             ref binder,
             capture_clause,
@@ -88,7 +83,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn closure_body(&self, body: &ast::Expr, tail: Tail<'_>) -> FormatResult {
+    fn closure_body(&self, body: &ast::Expr, tail: &Tail) -> FormatResult {
         fn is_block_like(expr: &ast::Expr) -> bool {
             match expr.kind {
                 ast::ExprKind::Match(..)
@@ -111,7 +106,9 @@ impl<'a> AstFormatter {
                 self.expr_tail(body, tail)
             } else {
                 self.fallback(|| {
-                    self.with_no_multiline_overflow(|| self.with_single_line(|| self.expr_tail(body, tail)))
+                    self.with_no_multiline_overflow(|| {
+                        self.with_single_line(|| self.expr_tail(body, tail))
+                    })
                 })
                 .next(|| {
                     self.add_block(|| self.expr(body))?;
@@ -170,7 +167,7 @@ impl<'a> AstFormatter {
         fn_decl: &ast::FnDecl,
         braces: &'static Braces,
         input_list_config: &C,
-        tail: Tail<'_>,
+        tail: &Tail,
     ) -> FormatResult {
         // args and return type all on one line
         self.fallback(|| {

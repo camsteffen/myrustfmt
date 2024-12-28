@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::Tail;
+use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;

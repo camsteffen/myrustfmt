@@ -1,5 +1,5 @@
-use std::backtrace::Backtrace;
 use crate::error::{FormatResult, WidthLimitExceededError};
+use std::backtrace::Backtrace;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -49,7 +49,8 @@ impl Constraints {
         self.max_width_for_line.set(max_width_first_line.get());
         self.newline_budget.set(newline_budget.get());
         self.single_line.set(single_line.get());
-        self.single_line_backtrace.replace(single_line_backtrace.borrow().clone());
+        self.single_line_backtrace
+            .replace(single_line_backtrace.borrow().clone());
     }
 
     pub fn increment_indent(&self) {

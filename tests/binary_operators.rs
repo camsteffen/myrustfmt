@@ -37,7 +37,8 @@ fn binary_operators_no_rustfmt_quirks() {
         format_str_config(
             source,
             Config::default().max_width(48).rustfmt_quirks(false)
-        ).unwrap(),
+        )
+        .unwrap(),
         "
 fn main() {
     111111111111111111
@@ -60,10 +61,7 @@ fn no_overflow() {
             let something = a == b && call_meeeeeeeeeeeeeeeeee(|line| { let x; });
         }"#;
     assert_eq!(
-        format_str_config(
-            source,
-            Config::default()
-        ).unwrap(),
+        format_str_config(source, Config::default()).unwrap(),
         r#"
 fn test() {
     let something = a == b

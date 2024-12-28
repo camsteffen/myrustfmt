@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::{Braces, ListRest, list};
+use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
@@ -16,7 +16,7 @@ impl<'a> AstFormatter {
         self.expr_tail(expr, Tail::NONE)
     }
 
-    pub fn expr_tail(&self, expr: &ast::Expr, tail: Tail<'_>) -> FormatResult {
+    pub fn expr_tail(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
         let mut tail_used = false;
         let mut use_tail = || {
             tail_used = true;
@@ -112,14 +112,7 @@ impl<'a> AstFormatter {
                 self.expr(target)?;
                 self.out.token_expect("[")?;
                 let tail = use_tail();
-                self.expr_tail(
-                    index,
-                    Tail::new(&|| {
-                        self.out.token_expect("]")?;
-                        self.tail(tail)?;
-                        Ok(())
-                    }),
-                )?;
+                self.expr_tail(index, &tail.prefix_token("]"))?;
             }
             ast::ExprKind::Range(ref start, ref end, limits) => {
                 self.range(start.as_deref(), end.as_deref(), limits, use_tail())?
@@ -156,25 +149,11 @@ impl<'a> AstFormatter {
             ast::ExprKind::Paren(ref inner) => {
                 self.out.token_at("(", expr.span.lo())?;
                 let tail = use_tail();
-                self.expr_tail(
-                    inner,
-                    Tail::new(&|| {
-                        self.out.token_expect(")")?;
-                        self.tail(tail)?;
-                        Ok(())
-                    }),
-                )?;
+                self.expr_tail(inner, &tail.prefix_token(")"))?;
             }
             ast::ExprKind::Try(ref target) => {
                 let tail = use_tail();
-                self.expr_tail(
-                    target,
-                    Tail::new(&|| {
-                        self.out.token_expect("?")?;
-                        self.tail(tail)?;
-                        Ok(())
-                    }),
-                )?;
+                self.expr_tail(target, &tail.prefix_token("?"))?;
             }
             ast::ExprKind::Yield(_) => todo!(),
             ast::ExprKind::Yeet(_) => todo!(),
@@ -203,7 +182,7 @@ impl<'a> AstFormatter {
         start: Option<&ast::Expr>,
         end: Option<&ast::Expr>,
         limits: ast::RangeLimits,
-        tail: Tail<'_>,
+        tail: &Tail,
     ) -> FormatResult {
         if let Some(start) = start {
             self.expr(start)?;
@@ -233,7 +212,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], end: Tail<'_>) -> FormatResult {
+    fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], end: &Tail) -> FormatResult {
         self.expr(func)?;
         list(Braces::PARENS, args, |arg| self.expr(arg))
             .config(&CallParamListConfig)
@@ -251,7 +230,7 @@ impl<'a> AstFormatter {
         condition: &ast::Expr,
         block: &ast::Block,
         else_: Option<&ast::Expr>,
-        tail: Tail,
+        tail: &Tail,
     ) -> FormatResult {
         let start_pos = self.out.last_line_len();
         let is_single_line_cond = self.token_expr_open_brace("if", condition)?;
@@ -361,7 +340,7 @@ impl<'a> AstFormatter {
         self.delim_args(&mac_call.args)
     }
 
-    fn struct_expr(&self, struct_: &ast::StructExpr, tail: Tail<'_>) -> FormatResult {
+    fn struct_expr(&self, struct_: &ast::StructExpr, tail: &Tail) -> FormatResult {
         self.qpath(&struct_.qself, &struct_.path, true)?;
         self.out.space()?;
         list(Braces::CURLY, &struct_.fields, |f| self.expr_field(f))

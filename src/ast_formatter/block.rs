@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::Tail;
+use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use rustc_ast::ast;
 
@@ -45,10 +45,10 @@ impl<'a> AstFormatter {
 
     fn stmt(&self, stmt: &ast::Stmt) -> FormatResult {
         match &stmt.kind {
-            ast::StmtKind::Let(local) => self.local(local, Tail::SEMICOLON),
+            ast::StmtKind::Let(local) => self.local(local, &Tail::token(";")),
             ast::StmtKind::Item(item) => self.item(item),
             ast::StmtKind::Expr(expr) => self.expr(expr),
-            ast::StmtKind::Semi(expr) => self.expr_tail(expr, Tail::SEMICOLON),
+            ast::StmtKind::Semi(expr) => self.expr_tail(expr, &Tail::token(";")),
             ast::StmtKind::Empty => self.out.token_expect(";"),
             ast::StmtKind::MacCall(mac_call_stmt) => {
                 self.attrs(&mac_call_stmt.attrs)?;
@@ -57,7 +57,7 @@ impl<'a> AstFormatter {
                         self.mac_call(&mac_call_stmt.mac)?;
                         self.out.token_end_at(";", stmt.span.hi())?;
                         Ok(())
-                    },
+                    }
                     ast::MacStmtStyle::Braces | ast::MacStmtStyle::NoBraces => {
                         self.mac_call(&mac_call_stmt.mac)
                     }

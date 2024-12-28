@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{list, Braces};
+use crate::ast_formatter::list::{Braces, list};
 use crate::error::FormatResult;
 
 use rustc_ast::ast;
@@ -30,7 +30,9 @@ impl AstFormatter {
             ast::GenericParamKind::Lifetime => {}
             ast::GenericParamKind::Type { ref default } => {
                 if let Some(default) = default {
+                    self.out.space()?;
                     self.out.token_expect("=")?;
+                    self.out.space()?;
                     self.ty(default)?;
                 }
             }

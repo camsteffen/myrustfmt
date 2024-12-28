@@ -11,7 +11,7 @@ macro_rules! config {
                 }
             }
         }
-        
+
         impl Config {
             $(pub fn $name(self, $name: $ty) -> Config {
                 Config { $name, ..self }

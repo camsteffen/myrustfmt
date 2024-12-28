@@ -4,11 +4,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 
 impl AstFormatter {
-    pub fn match_(
-        &self,
-        scrutinee: &ast::Expr,
-        arms: &[ast::Arm],
-    ) -> FormatResult {
+    pub fn match_(&self, scrutinee: &ast::Expr, arms: &[ast::Arm]) -> FormatResult {
         self.token_expr_open_brace("match", scrutinee)?;
         self.block_generic_after_open_brace(arms, |arm| self.arm(arm))?;
         Ok(())

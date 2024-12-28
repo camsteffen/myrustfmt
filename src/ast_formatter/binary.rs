@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::Tail;
+use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 
 use rustc_ast::ast;
@@ -12,7 +12,7 @@ impl AstFormatter {
         left: &ast::Expr,
         right: &ast::Expr,
         op: Spanned<ast::BinOpKind>,
-        tail: Tail<'_>,
+        tail: &Tail,
     ) -> FormatResult {
         let (first, chain) = self.collect_binary_chain(left, right, op);
         self.expr(first)?;

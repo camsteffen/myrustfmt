@@ -152,7 +152,7 @@ impl ConstraintWriter {
             })
             .transpose()
     }
-    
+
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T {
         self.with_buffer(|b| f(&b[self.last_line_start.get()..]))
     }

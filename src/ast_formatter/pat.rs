@@ -2,9 +2,9 @@ use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::config::{ParamListConfig, struct_field_list_config};
 use crate::ast_formatter::list::{Braces, ListRest, list};
+use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
@@ -13,7 +13,7 @@ impl<'a> AstFormatter {
         self.pat_tail(pat, Tail::NONE)
     }
 
-    pub fn pat_tail(&self, pat: &ast::Pat, end: Tail<'_>) -> FormatResult {
+    pub fn pat_tail(&self, pat: &ast::Pat, end: &Tail) -> FormatResult {
         match pat.kind {
             ast::PatKind::Wild => self.out.token_expect("_"),
             ast::PatKind::Ident(ast::BindingMode(by_ref, mutbl), ident, ref pat) => {
@@ -77,7 +77,7 @@ impl<'a> AstFormatter {
         path: &ast::Path,
         fields: &[ast::PatField],
         rest: ast::PatFieldsRest,
-        end: Tail<'_>,
+        end: &Tail,
     ) -> FormatResult {
         self.qpath(qself, path, false)?;
         self.out.space()?;

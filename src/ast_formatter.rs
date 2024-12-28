@@ -1,28 +1,28 @@
-use crate::source_formatter::SourceFormatter;
-use std::cell::Cell;
 use crate::config::Config;
 use crate::error::FormatResult;
+use crate::source_formatter::SourceFormatter;
+use std::cell::Cell;
 
 mod attr;
+mod binary;
 mod block;
 mod common;
+mod constraint_modifiers;
 mod dot_chain;
 mod expr;
 mod fallback;
 mod r#fn;
 mod generics;
+mod infix_chain;
 mod item;
-mod last_line;
 pub mod list;
 mod local;
+mod r#match;
 mod pat;
 mod path;
+mod tail;
 mod ty;
-mod constraint_modifiers;
 mod wrapping;
-mod infix_chain;
-mod binary;
-mod r#match;
 
 pub struct AstFormatter {
     config: Config,
@@ -51,11 +51,11 @@ impl<'a> AstFormatter {
         }
         Ok(())
     }
-    
+
     fn config(&self) -> &Config {
         &self.config
     }
-    
+
     pub fn pos(&self) -> usize {
         self.out.pos()
     }

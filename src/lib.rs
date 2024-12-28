@@ -19,6 +19,7 @@ extern crate thin_vec;
 extern crate rustc_driver;
 
 pub mod ast_formatter;
+mod ast_utils;
 pub mod config;
 pub mod constraint_writer;
 mod constraints;
@@ -26,7 +27,6 @@ mod error;
 mod rustfmt_config_defaults;
 pub mod source_formatter;
 mod source_reader;
-mod ast_utils;
 
 use rustc_data_structures::sync::Lrc;
 use rustc_errors::emitter::{HumanEmitter, stderr_destination};
@@ -34,8 +34,7 @@ use rustc_errors::{ColorConfig, DiagCtxt};
 use rustc_session::parse::ParseSess;
 use rustc_span::edition::Edition;
 use rustc_span::{
-    FileName,
-    ErrorGuaranteed,
+    ErrorGuaranteed, FileName,
     source_map::{FilePathMapping, SourceMap},
 };
 use std::fs;
@@ -86,9 +85,7 @@ fn parse_ast_then<T>(
             string,
         )
         .unwrap();
-        let crate_ = parser.parse_crate_mod().map_err(|err| {
-            err.emit()
-        })?;
+        let crate_ = parser.parse_crate_mod().map_err(|err| err.emit())?;
         if let Some(error) = psess.dcx().has_errors() {
             return Err(error);
         }

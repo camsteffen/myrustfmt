@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::config::ListConfig;
 use crate::ast_formatter::list::{Braces, list};
+use crate::ast_formatter::tail::Tail;
 use crate::config::Config;
 use crate::constraints::INDENT_WIDTH;
 use crate::error::WidthLimitExceededError;
@@ -11,7 +11,7 @@ use rustc_ast::ast;
 use tracing::info;
 
 impl AstFormatter {
-    pub fn dot_chain(&self, expr: &ast::Expr, tail: Tail<'_>) -> FormatResult {
+    pub fn dot_chain(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
         info!(
             "single line: {:?}, max_width: {:?}",
             self.out.constraints().single_line.get(),
@@ -59,7 +59,7 @@ impl AstFormatter {
         dot_chain: &[&ast::Expr],
         start_pos: usize,
         width_limit: Option<usize>,
-        tail: Tail<'_>,
+        tail: &Tail,
     ) -> FormatResult {
         let (last, until_last) = dot_chain.split_last().unwrap();
         self.with_width_limit_from_start_first_line_opt(start_pos, width_limit, || {
@@ -117,7 +117,7 @@ impl AstFormatter {
     fn dot_chain_separate_lines_indented(
         &self,
         dot_chain: &[&ast::Expr],
-        tail: Tail<'_>,
+        tail: &Tail,
     ) -> FormatResult {
         info!("separate lines now");
         self.indented(|| {

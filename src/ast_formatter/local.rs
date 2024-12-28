@@ -1,10 +1,10 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::Tail;
+use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use rustc_ast::ast;
 
 impl<'a> AstFormatter {
-    pub fn local(&self, local: &ast::Local, tail: Tail<'_>) -> FormatResult {
+    pub fn local(&self, local: &ast::Local, tail: &Tail) -> FormatResult {
         let ast::Local {
             pat, kind, span, ..
         } = local;
@@ -29,7 +29,7 @@ impl<'a> AstFormatter {
         }
     }
 
-    fn local_init(&self, expr: &ast::Expr, end: Tail<'_>) -> FormatResult {
+    fn local_init(&self, expr: &ast::Expr, end: &Tail) -> FormatResult {
         self.out.space()?;
         self.out.token_expect("=")?;
         // todo do all these cases apply with else clause?

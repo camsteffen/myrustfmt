@@ -1,4 +1,3 @@
-
 use rustc_ast::ast;
 
 pub fn expr_only_block(block: &ast::Block) -> Option<&ast::Expr> {

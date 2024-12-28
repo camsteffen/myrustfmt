@@ -2,8 +2,8 @@ pub mod config;
 mod overflow;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::last_line::Tail;
 use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ListWrapToFitConfig};
+use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use overflow::{ListOverflow, ListOverflowNo, ListOverflowYes};
 use rustc_ast::ast;
@@ -40,7 +40,7 @@ where
         list,
         rest: ListRest::None,
         format_item,
-        tail: Tail::NONE,
+        tail: &Tail::NONE,
         config: &DefaultListConfig,
         overflow: ListOverflowNo::default(),
     }
@@ -51,7 +51,7 @@ pub struct ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, Overflow>
     list: &'ast [Item],
     format_item: FormatItem,
     rest: ListRest<'ast>,
-    tail: Tail<'tail>,
+    tail: &'tail Tail,
     config: &'config Config,
     overflow: Overflow,
 }
@@ -98,7 +98,7 @@ where
 
     pub fn tail<'tail_new>(
         self,
-        tail: Tail<'tail_new>,
+        tail: &'tail_new Tail,
     ) -> ListBuilder<'ast, 'tail_new, 'config, Item, FormatItem, Config, Overflow> {
         ListBuilder {
             braces: self.braces,
@@ -126,7 +126,7 @@ where
     fn do_format(
         &self,
         af: &AstFormatter,
-        contents: impl FnOnce(&Self, &AstFormatter, Tail) -> FormatResult,
+        contents: impl FnOnce(&Self, &AstFormatter, &Tail) -> FormatResult,
     ) -> FormatResult {
         af.out.token_expect(self.braces.start)?;
         if self.list.is_empty() {
@@ -134,18 +134,10 @@ where
             af.tail(self.tail)?;
             return Ok(());
         }
-        contents(
-            self,
-            af,
-            Tail::new(&|| {
-                af.out.token_expect(self.braces.end)?;
-                af.tail(self.tail)?;
-                return Ok(());
-            }),
-        )
+        contents(self, af, &self.tail.prefix_token(self.braces.end))
     }
 
-    fn contents_default(&self, af: &AstFormatter, tail: Tail<'_>) -> FormatResult {
+    fn contents_default(&self, af: &AstFormatter, tail: &Tail) -> FormatResult {
         let mut fallback = af.fallback(|| self.contents_single_line(af, tail));
         if self.config.single_line_block() {
             fallback = fallback.next(|| self.contents_single_line_block(af, tail))
@@ -165,7 +157,7 @@ where
             .result()
     }
 
-    fn contents_single_line(&self, af: &AstFormatter, tail: Tail<'_>) -> FormatResult {
+    fn contents_single_line(&self, af: &AstFormatter, tail: &Tail) -> FormatResult {
         af.with_reduce_width_limit(
             self.config.single_line_reduce_max_width(af.config()),
             || {
@@ -184,7 +176,7 @@ where
         )
     }
 
-    fn contents_single_line_block(&self, af: &AstFormatter, tail: Tail<'_>) -> FormatResult {
+    fn contents_single_line_block(&self, af: &AstFormatter, tail: &Tail) -> FormatResult {
         af.list_contents_single_line_block(
             self.list,
             self.rest,
@@ -197,13 +189,13 @@ where
     fn contents_wrap_to_fit(
         &self,
         af: &AstFormatter,
-        tail: Tail<'_>,
+        tail: &Tail,
         max_element_width: Option<usize>,
     ) -> FormatResult {
         af.list_contents_wrap_to_fit(self.list, tail, &self.format_item, max_element_width)
     }
 
-    fn contents_separate_lines(&self, af: &AstFormatter, tail: Tail<'_>) -> FormatResult {
+    fn contents_separate_lines(&self, af: &AstFormatter, tail: &Tail) -> FormatResult {
         af.list_contents_separate_lines(self.list, &self.format_item, self.rest, tail)
     }
 }
@@ -241,7 +233,7 @@ impl<'a> AstFormatter {
         list: &[Item],
         format_item: impl Fn(&Item) -> FormatResult,
         rest: ListRest<'_>,
-        tail: Tail,
+        tail: &Tail,
         _overflow: Overflow,
         pad: bool,
         max_width: Option<usize>,
@@ -314,7 +306,7 @@ impl<'a> AstFormatter {
         &self,
         list: &[Item],
         rest: ListRest<'_>,
-        tail: Tail,
+        tail: &Tail,
         format_item: impl Fn(&Item) -> FormatResult,
         max_width: Option<usize>,
     ) -> FormatResult {
@@ -356,7 +348,7 @@ impl<'a> AstFormatter {
     fn list_contents_wrap_to_fit<T>(
         &self,
         list: &[T],
-        tail: Tail,
+        tail: &Tail,
         format_item: impl Fn(&T) -> FormatResult,
         max_element_width: Option<usize>,
     ) -> FormatResult {
@@ -406,7 +398,7 @@ impl<'a> AstFormatter {
         list: &[T],
         format_item: impl Fn(&T) -> FormatResult,
         rest: ListRest<'_>,
-        tail: Tail<'_>,
+        tail: &Tail,
     ) -> FormatResult {
         self.indented(|| {
             for item in list {

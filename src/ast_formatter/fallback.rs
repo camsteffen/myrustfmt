@@ -16,7 +16,7 @@ impl AstFormatter {
 }
 
 #[must_use]
-pub struct Fallback<'a, T=()> {
+pub struct Fallback<'a, T = ()> {
     out: &'a SourceFormatter,
     snapshot: SourceFormatterSnapshot,
     result: FormatResult<T>,
