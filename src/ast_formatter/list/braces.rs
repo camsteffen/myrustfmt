@@ -1,4 +1,3 @@
-
 pub struct Braces {
     pub start: &'static str,
     pub end: &'static str,

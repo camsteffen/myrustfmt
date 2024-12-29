@@ -1,5 +1,4 @@
 use std::fmt::{Display, Formatter};
-use thiserror::Error;
 
 pub type FormatResult<T = ()> = Result<T, FormatError>;
 
@@ -32,21 +31,18 @@ pub enum ConstraintError {
 }
 
 #[derive(Clone, Copy, Debug)]
-// #[error("newline character is not allowed")]
 pub struct NewlineNotAllowedError;
 
 #[derive(Clone, Copy, Debug)]
-// #[error("width limit exceeded")]
 pub struct WidthLimitExceededError;
 
 pub type ParseResult<T = ()> = Result<T, ParseError>;
 
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Debug)]
 pub enum ParseError {
-    #[error("expected `{0}`")]
     ExpectedPosition(usize),
-    #[error("expected `{0}`")]
     ExpectedToken(String),
+    UnsupportedSyntax,
 }
 
 impl FormatError {
@@ -86,6 +82,9 @@ impl FormatError {
                     FormatError::Parse(ParseError::ExpectedToken(ref token)) => {
                         write!(f, "expected token: `{}`", token)?;
                         next_token(f)?;
+                    }
+                    FormatError::Parse(ParseError::UnsupportedSyntax) => {
+                        write!(f, "unsupported syntax")?;
                     }
                 }
                 Ok(())

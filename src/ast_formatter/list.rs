@@ -114,7 +114,7 @@ where
         contents: impl FnOnce(&Self, &AstFormatter, &Tail) -> FormatResult,
     ) -> FormatResult {
         af.out.token(self.braces.start)?;
-        if self.list.is_empty() {
+        if self.list.is_empty() && matches!(self.rest, ListRest::None) {
             af.out.token(self.braces.end)?;
             af.tail(self.tail)?;
             return Ok(());
@@ -143,8 +143,8 @@ where
     }
 
     fn contents_single_line(&self, af: &AstFormatter, tail: &Tail) -> FormatResult {
-        af.with_reduce_width_limit(
-            self.config.single_line_reduce_max_width(af.config()),
+        af.with_reduce_max_width(
+            self.config.single_line_reduce_max_width_quirk(af.config()),
             || {
                 af.list_contents_single_line(
                     self.list,
@@ -202,9 +202,10 @@ impl<'a> AstFormatter {
             self.out.space()?;
         }
 
-        let (last, until_last) = list.split_last().unwrap();
-
-        let format = || {
+        let until_rest = || -> FormatResult {
+            let Some((last, until_last)) = list.split_last() else {
+                return Ok(());
+            };
             let start = self.out.last_line_len();
             self.with_single_line(|| -> FormatResult {
                 for item in until_last {
@@ -229,12 +230,21 @@ impl<'a> AstFormatter {
             } else {
                 self.with_single_line(|| format_item(last))?;
             }
+            Ok(())
+        };
+
+        let format = || {
+            until_rest()?;
             if matches!(rest, ListRest::None) {
-                self.out.skip_token_if_present(",")?;
+                if !list.is_empty() {
+                    self.out.skip_token_if_present(",")?;
+                }
             } else {
                 self.with_single_line(|| -> FormatResult {
-                    self.out.token_maybe_missing(",")?;
-                    self.out.space()?;
+                    if !list.is_empty() {
+                        self.out.token_maybe_missing(",")?;
+                        self.out.space()?;
+                    }
                     self.out.token("..")?;
                     if let ListRest::Base(expr) = rest {
                         self.expr(expr)?;

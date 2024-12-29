@@ -21,3 +21,10 @@ pub fn is_call_or_prefixed(expr: &ast::Expr) -> bool {
         _ => false,
     }
 }
+
+pub fn is_plain_block(expr: &ast::Expr) -> bool {
+    match &expr.kind {
+        ast::ExprKind::Block(block, None) => matches!(block.rules, ast::BlockCheckMode::Default),
+        _ => false,
+    }
+}

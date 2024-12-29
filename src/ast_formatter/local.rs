@@ -16,8 +16,22 @@ impl<'a> AstFormatter {
             ast::LocalKind::InitElse(init, else_) => {
                 self.pat(pat)?;
                 self.local_init(init, Tail::NONE)?;
-                self.out.space_token_space("else")?;
-                self.block(else_)?;
+                self.fallback(|| {
+                    self.out.space_token_space("else")?;
+                    self.out.token("{")?;
+                    if self.config().rustfmt_quirks {
+                        self.out.require_width(1)?;
+                    }
+                    Ok(())
+                })
+                .next(|| {
+                    self.out.newline_indent()?;
+                    self.out.token_space("else")?;
+                    self.out.token("{")?;
+                    Ok(())
+                })
+                .result()?;
+                self.block_after_open_brace(else_)?;
                 self.tail(tail)?;
                 Ok(())
             }
@@ -47,7 +61,6 @@ impl<'a> AstFormatter {
         })
         // normal
         .next(|| {
-            // self.fallback(|| {
             self.out.space()?;
             self.expr(expr)?;
             self.tail(end)?;

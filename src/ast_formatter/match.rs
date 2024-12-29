@@ -1,6 +1,7 @@
 use rustc_ast::ast;
 
 use crate::ast_formatter::AstFormatter;
+use crate::ast_utils::is_plain_block;
 use crate::error::FormatResult;
 
 impl AstFormatter {
@@ -68,18 +69,10 @@ impl AstFormatter {
                 guard_separate_line()?;
             }
         } else if let Some(body) = arm.body.as_deref() {
-            self.out.space_token("=>")?;
-            self.out.space()?;
+            self.out.space_token_space("=>")?;
             self.expr(body)?;
             comma(body)?;
         }
         Ok(())
-    }
-}
-
-fn is_plain_block(expr: &ast::Expr) -> bool {
-    match &expr.kind {
-        ast::ExprKind::Block(block, None) => matches!(block.rules, ast::BlockCheckMode::Default),
-        _ => false,
     }
 }

@@ -46,7 +46,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    pub fn closure(&self, closure: &ast::Closure, is_overflow: bool, end: &Tail) -> FormatResult {
+    pub fn closure(&self, closure: &ast::Closure, end: &Tail) -> FormatResult {
         let ast::Closure {
             ref binder,
             capture_clause,
@@ -74,11 +74,7 @@ impl<'a> AstFormatter {
         self.fn_decl(fn_decl, Braces::PIPE, &DefaultListConfig, Tail::NONE)?;
         self.out.space()?;
 
-        if is_overflow {
-            self.with_do_overflow(|| self.closure_body(body, end))?;
-        } else {
-            self.closure_body(body, end)?;
-        }
+        self.closure_body(body, end)?;
         Ok(())
     }
 

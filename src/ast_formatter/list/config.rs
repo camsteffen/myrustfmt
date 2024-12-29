@@ -14,13 +14,15 @@ pub trait ListConfig {
         None
     }
 
-    fn single_line_reduce_max_width(&self, _config: &Config) -> usize {
+    fn single_line_reduce_max_width_quirk(&self, _config: &Config) -> usize {
         0
     }
 
     fn wrap_to_fit() -> ListWrapToFitConfig {
         ListWrapToFitConfig::No
     }
+    
+    // fn item_must_have_own_line
 }
 
 pub struct DefaultListConfig;

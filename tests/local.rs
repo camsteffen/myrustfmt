@@ -1,6 +1,6 @@
 #![feature(rustc_private)]
 
-use myrustfmt::format_str;
+use myrustfmt::{format_str, format_str_defaults};
 use tracing_test::traced_test;
 
 #[traced_test]
@@ -24,8 +24,7 @@ fn main() {
 #[traced_test]
 #[test]
 fn local_init_wrap_indent() {
-    let source =
-        "fn test() {let asdfasdfasdfasf=aaa;}";
+    let source = "fn test() {let asdfasdfasdfasf=aaa;}";
     assert_eq!(
         format_str(source, 25).unwrap(),
         "
@@ -35,5 +34,23 @@ fn test() {
 }
 "
         .trim_start()
+    );
+}
+
+#[traced_test]
+#[test]
+fn let_else_wrap_else() {
+    let source = "fn test() { let xxxxxxxxxxxxx = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa else { return x; }; }";
+    assert_eq!(
+        format_str_defaults(source).unwrap(),
+        "
+fn test() {
+    let xxxxxxxxxxxxx = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    else {
+        return x;
+    };
+}
+"
+            .trim_start()
     );
 }

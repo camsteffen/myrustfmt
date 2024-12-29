@@ -160,9 +160,7 @@ impl Overflow for ast::Expr {
         match expr.kind {
             // block-like
             ast::ExprKind::Block(..) | ast::ExprKind::Gen(..) => H::overflows(|| af.expr(expr)),
-            ast::ExprKind::Closure(ref closure) => {
-                H::overflows(|| af.closure(closure, true, Tail::NONE))
-            }
+            ast::ExprKind::Closure(ref closure) => H::overflows(|| af.closure(closure, Tail::NONE)),
             // control flow
             // | ast::ExprKind::ForLoop { .. }
             // | ast::ExprKind::If(..)
@@ -174,10 +172,8 @@ impl Overflow for ast::Expr {
             | ast::ExprKind::Call(..)
             | ast::ExprKind::MacCall(..)
             | ast::ExprKind::Struct(..)
-            | ast::ExprKind::Tup(..) => handler.conditional_overflows(
-                |is_only_list_item| is_only_list_item,
-                || af.with_do_overflow(|| af.expr(expr)),
-            ),
+            | ast::ExprKind::Tup(..) => handler
+                .conditional_overflows(|is_only_list_item| is_only_list_item, || af.expr(expr)),
             // | ast::ExprKind::MethodCall(..) if is_only_list_item => H::overflows(|| af.dot_chain(expr, Tail::NONE, true)),
             // prefix
             ast::ExprKind::AddrOf(borrow_kind, mutability, ref target) => handler

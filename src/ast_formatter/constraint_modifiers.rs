@@ -3,7 +3,6 @@ use crate::constraints::{Constraints, MaxWidthForLine};
 use crate::error::{FormatResult, WidthLimitExceededError};
 use std::backtrace::Backtrace;
 use std::rc::Rc;
-use tracing::info;
 
 impl AstFormatter {
     fn constraints(&self) -> &Constraints {
@@ -58,19 +57,6 @@ impl AstFormatter {
         self.with_single_line(f)
     }
 
-    pub fn with_do_overflow(&self, f: impl Fn() -> FormatResult) -> FormatResult {
-        if self.config().rustfmt_quirks {
-            self.fallback(&f)
-                .next(|| {
-                    info!("{:?}", self.constraints());
-                    self.with_reduce_max_width_for_line(2, f)
-                })
-                .result()
-        } else {
-            f()
-        }
-    }
-
     pub fn with_height_limit(
         &self,
         height: usize,
@@ -101,18 +87,21 @@ impl AstFormatter {
         Ok((self.out.len() - len, self.out.line() - line))
     }
 
-    pub fn with_reduce_width_limit(
+    pub fn with_reduce_max_width(
         &self,
         amount: usize,
         f: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
+        if amount == 0 {
+            return f();
+        }
         let Some(current) = self.constraints().max_width.get() else {
             return f();
         };
-        let Some(new_limit) = current.checked_sub(amount) else {
+        let Some(max_width) = current.checked_sub(amount) else {
             return Err(WidthLimitExceededError.into());
         };
-        self.with_width_limit(new_limit, f)
+        self.with_set_max_width(max_width, f)
     }
 
     pub fn with_reduce_max_width_for_line(
@@ -130,6 +119,13 @@ impl AstFormatter {
             return Err(WidthLimitExceededError.into());
         };
         self.with_set_max_width_for_line(new_max_width, f)
+    }
+
+    fn with_set_max_width<T>(&self, max_width: usize, f: impl FnOnce() -> T) -> T {
+        let max_width_prev = self.constraints().max_width.replace(Some(max_width));
+        let result = f();
+        self.constraints().max_width.set(max_width_prev);
+        result
     }
 
     fn with_set_max_width_for_line<T>(&self, max_width: usize, f: impl FnOnce() -> T) -> T {

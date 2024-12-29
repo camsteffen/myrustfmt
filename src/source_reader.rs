@@ -1,7 +1,7 @@
 use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
 
-use crate::error::{ParseError, ParseResult};
+use crate::error::{FormatError, ParseError, ParseResult};
 
 pub struct SourceReader {
     pub source: String,
@@ -28,11 +28,26 @@ impl SourceReader {
     }
 
     pub fn eat(&self, token: &str) -> Result<(), ParseError> {
+        if !self.try_eat(token) {
+            let err = ParseError::ExpectedToken(token.to_string());
+            if cfg!(debug_assertions) {
+                panic!(
+                    "{}",
+                    FormatError::from(err).display(&self.source, self.pos.get().to_usize())
+                );
+            }
+            return Err(err);
+        }
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn try_eat(&self, token: &str) -> bool {
         if !self.remaining().starts_with(token) {
-            return Err(ParseError::ExpectedToken(token.to_string()));
+            return false;
         }
         self.advance(token.len());
-        Ok(())
+        true
     }
 
     pub fn eat_next_token(&self) -> &str {

@@ -1,16 +1,16 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{list, Braces};
+use crate::ast_formatter::list::{Braces, list};
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
+use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::config::{
-    struct_field_list_config, ArrayListConfig, CallParamListConfig, ParamListConfig,
+    ArrayListConfig, CallParamListConfig, ParamListConfig, struct_field_list_config,
 };
 use crate::ast_utils::expr_only_block;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
-use crate::ast_formatter::list::ListRest;
 
 impl<'a> AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
@@ -48,7 +48,23 @@ impl<'a> AstFormatter {
                 self.expr_tail(target, use_tail())?;
             }
             ast::ExprKind::Lit(_) => self.out.copy_span(expr.span)?,
-            ast::ExprKind::Cast(_, _) => todo!(),
+            ast::ExprKind::Cast(ref target, ref ty) => {
+                self.expr(target)?;
+                self.fallback(|| {
+                    self.out.space_token_space("as")?;
+                    self.ty(ty)?;
+                    Ok(())
+                })
+                .next(|| {
+                    self.indented(|| {
+                        self.out.newline_indent()?;
+                        self.out.token_space("as")?;
+                        self.ty(ty)?;
+                        Ok(())
+                    })
+                })
+                .result()?;
+            }
             ast::ExprKind::Type(_, _) => todo!(),
             ast::ExprKind::Let(ref pat, ref init, ..) => {
                 self.out.token_space("let")?;
@@ -86,7 +102,7 @@ impl<'a> AstFormatter {
                 self.match_(scrutinee, arms)?
             }
             ast::ExprKind::Match(_, _, ast::MatchKind::Postfix) => todo!(),
-            ast::ExprKind::Closure(ref closure) => self.closure(closure, false, use_tail())?,
+            ast::ExprKind::Closure(ref closure) => self.closure(closure, use_tail())?,
             ast::ExprKind::Block(ref block, label) => {
                 self.label(label)?;
                 self.block(block)?;
@@ -99,7 +115,13 @@ impl<'a> AstFormatter {
                 self.out.space_token_space("=")?;
                 self.expr_tail(right, use_tail())?;
             }
-            ast::ExprKind::AssignOp(_, _, _) => todo!(),
+            ast::ExprKind::AssignOp(op, ref left, ref right) => {
+                self.expr(left)?;
+                self.out.space()?;
+                self.out.copy_span(op.span)?;
+                self.out.space()?;
+                self.expr(right)?;
+            }
             ast::ExprKind::Index(ref target, ref index, _) => {
                 self.expr(target)?;
                 self.out.token("[")?;
@@ -213,6 +235,9 @@ impl<'a> AstFormatter {
     }
 
     fn delim_args(&self, delim_args: &ast::DelimArgs) -> FormatResult {
+        if matches!(delim_args.delim, rustc_ast::token::Delimiter::Brace) {
+            self.out.space()?;
+        }
         self.out.copy_span(delim_args.dspan.entire())
     }
 

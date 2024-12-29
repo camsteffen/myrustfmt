@@ -15,16 +15,21 @@ pub struct SourceFormatterSnapshot {
 pub struct SourceFormatter {
     source: SourceReader,
     out: ConstraintWriter,
+    // todo move to SourceReader
     next_is_whitespace_or_comments: Cell<bool>,
 }
 
 impl SourceFormatter {
-    pub fn new(source: String, constraints: Constraints) -> SourceFormatter {
+    pub fn new(source: impl Into<String>, constraints: Constraints) -> SourceFormatter {
         SourceFormatter {
-            source: SourceReader::new(source),
+            source: SourceReader::new(source.into()),
             out: ConstraintWriter::new(constraints),
             next_is_whitespace_or_comments: Cell::new(true),
         }
+    }
+
+    pub fn new_defaults(source: impl Into<String>) -> SourceFormatter {
+        Self::new(source, Constraints::default())
     }
 
     pub fn finish(self) -> String {
@@ -96,7 +101,7 @@ impl SourceFormatter {
         let snapshot;
         if self.next_is_whitespace_or_comments.get() {
             snapshot = Some(self.snapshot());
-            self.handle_whitespace_and_comments()?;
+            self.handle_whitespace_and_comments_for_token()?;
         } else {
             snapshot = None;
         }
@@ -114,8 +119,14 @@ impl SourceFormatter {
     pub fn copy_next_token(&self) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed()?;
         let token = self.source.eat_next_token();
-        self.token_out(token)?;
+        self.out.token(&token)?;
         self.next_is_whitespace_or_comments.set(true);
+        Ok(())
+    }
+
+    pub fn eof(&self) -> FormatResult {
+        self.source
+            .expect_pos(BytePos::from_usize(self.source.source.len()))?;
         Ok(())
     }
 
@@ -123,25 +134,26 @@ impl SourceFormatter {
      * Write a token, asserting it is next in source.
      *
      * N.B. a token should not contain whitespace
-     * N.B. a token is indivisible (e.g. "::<" is two tokens since you can write "::   <")
+     * N.B. a token is indivisible (e.g. "::<" is two tokens since you can write "::  <")
      */
     pub fn token(&self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed()?;
         self.source.eat(token)?;
         self.next_is_whitespace_or_comments.set(true);
-        self.token_out(token)?;
+        self.out.token(&token)?;
         Ok(())
     }
 
     /** Writes a space and accounts for spaces and comments in source */
     pub fn space(&self) -> FormatResult {
-        if !self.handle_whitespace_and_comments()? {
+        if self.next_is_whitespace_or_comments.get() {
+            self.handle_whitespace_and_comments_for_space()?;
+        } else {
             self.out.token(" ")?;
         }
         Ok(())
     }
 
-    /** Convenience for calling `token_at` followed by `space` */
     pub fn token_space(&self, token: &str) -> FormatResult {
         self.token(token)?;
         self.space()?;
@@ -194,27 +206,74 @@ impl SourceFormatter {
         self.out.with_last_line(f)
     }
 
-    fn handle_whitespace_and_comments(&self) -> FormatResult<bool> {
-        let mut whitespace_len = 0usize;
-        let mut comments_happened = false;
+    fn handle_whitespace_and_comments_for_token(&self) -> FormatResult {
+        let mut skipped_newline = false;
+        let mut skipped_space = false;
+        let mut twas_comments = false;
         for token in rustc_lexer::tokenize(self.source.remaining()) {
             match token.kind {
                 TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
+                    if skipped_newline {
+                        self.out.newline()?;
+                        self.out.indent()?;
+                    }
+                    if skipped_space {
+                        skipped_space = false;
+                        self.out.token(" ")?;
+                    }
                     self.constraints()
-                        .with_no_width_limit(|| self.copy(whitespace_len + token.len as usize))?;
-                    whitespace_len = 0;
-                    comments_happened = true;
+                        .with_no_width_limit(|| self.copy(token.len as usize))?;
+                    twas_comments = true;
                 }
                 TokenKind::Whitespace => {
-                    whitespace_len += token.len as usize;
+                    let token_str = &self.source.remaining()[..token.len as usize];
+                    if token_str.contains('\n') {
+                        // todo detect start of blocks too
+                        if self.out.len() > 0 {
+                            skipped_newline = true;
+                        }
+                    } else {
+                        skipped_space = true;
+                    }
+                    self.source.advance(token.len as usize);
                 }
                 _ => break,
             }
         }
-        // skip trailing whitespace
-        self.source.advance(whitespace_len);
+        if twas_comments {
+            if skipped_newline {
+                self.out.newline()?;
+                self.out.indent()?;
+            }
+            if skipped_space {
+                self.out.token(" ")?;
+            }
+        }
         self.next_is_whitespace_or_comments.set(false);
-        Ok(comments_happened)
+        Ok(())
+    }
+
+    fn handle_whitespace_and_comments_for_space(&self) -> FormatResult {
+        let mut anything_happened = false;
+        for token in rustc_lexer::tokenize(self.source.remaining()) {
+            match token.kind {
+                TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
+                    self.constraints()
+                        .with_no_width_limit(|| self.copy(token.len as usize))?;
+                }
+                TokenKind::Whitespace => {
+                    self.out.token(" ")?;
+                    self.source.advance(token.len as usize);
+                }
+                _ => break,
+            }
+            anything_happened = true;
+        }
+        if !anything_happened {
+            self.out.token(" ")?;
+        }
+        self.next_is_whitespace_or_comments.set(false);
+        Ok(())
     }
 
     fn handle_whitespace_and_comments_for_newline(&self) -> FormatResult {
@@ -248,7 +307,7 @@ impl SourceFormatter {
 
     fn handle_whitespace_and_comments_if_needed(&self) -> FormatResult {
         if self.next_is_whitespace_or_comments.get() {
-            self.handle_whitespace_and_comments()?;
+            self.handle_whitespace_and_comments_for_token()?;
         }
         Ok(())
     }
@@ -267,6 +326,7 @@ impl SourceFormatter {
         let segment = &self.source.remaining()[..len];
         self.out.write_possibly_multiline(segment)?;
         self.source.advance(len);
+        self.next_is_whitespace_or_comments.set(true);
         Ok(())
     }
 
@@ -281,15 +341,9 @@ impl SourceFormatter {
         self.copy(pos.to_usize() - self.source.pos.get().to_usize())
     }
 
-    /** Write a token */
-    fn token_out(&self, token: &str) -> FormatResult {
-        self.out.token(&token)?;
-        Ok(())
-    }
-
     /** Write a token assuming it is next in source */
     fn token_unchecked(&self, token: &str) -> FormatResult {
-        self.token_out(token)?;
+        self.out.token(&token)?;
         self.source.advance(token.len());
         self.next_is_whitespace_or_comments.set(true);
         Ok(())
@@ -297,6 +351,109 @@ impl SourceFormatter {
 
     /** Write a token assuming it is missing from source */
     pub fn token_missing(&self, token: &str) -> FormatResult {
-        self.token_out(token)
+        self.out.token(&token)?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn first_token_skips_initial_whitespace() {
+        let sf = SourceFormatter::new_defaults(" aa");
+        sf.token("aa").unwrap();
+        sf.eof().unwrap();
+        assert_eq!(sf.finish(), "aa");
+    }
+
+    #[test]
+    fn space_without_comment() {
+        let sf = SourceFormatter::new_defaults("aa bb");
+        sf.token("aa").unwrap();
+        sf.space().unwrap();
+        sf.token("bb").unwrap();
+        sf.eof().unwrap();
+        assert_eq!(sf.finish(), "aa bb");
+    }
+
+    #[test]
+    fn space_missing_from_source() {
+        let sf = SourceFormatter::new_defaults("aa,bb");
+        sf.token("aa").unwrap();
+        sf.token(",").unwrap();
+        sf.space().unwrap();
+        sf.token("bb").unwrap();
+        sf.eof().unwrap();
+        assert_eq!(sf.finish(), "aa, bb");
+    }
+
+    #[test]
+    fn space_with_comment_no_space() {
+        let sf = SourceFormatter::new_defaults("aa/*comment*/bb");
+        sf.token("aa").unwrap();
+        sf.space().unwrap();
+        sf.token("bb").unwrap();
+        sf.eof().unwrap();
+        assert_eq!(sf.finish(), "aa/*comment*/bb");
+    }
+
+    #[test]
+    fn space_with_comment_leading_space() {
+        let sf = SourceFormatter::new_defaults("aa /*comment*/bb");
+        sf.token("aa").unwrap();
+        sf.space().unwrap();
+        sf.token("bb").unwrap();
+        sf.eof().unwrap();
+        assert_eq!(sf.finish(), "aa /*comment*/bb");
+    }
+
+    #[test]
+    fn space_with_comment_trailing_space() {
+        let sf = SourceFormatter::new_defaults("aa/*comment*/ bb");
+        sf.token("aa").unwrap();
+        sf.space().unwrap();
+        sf.token("bb").unwrap();
+        sf.eof().unwrap();
+        assert_eq!(sf.finish(), "aa/*comment*/ bb");
+    }
+
+    #[test]
+    fn space_with_comment_space_on_both_sides() {
+        let sf = SourceFormatter::new_defaults("aa /*comment*/ bb");
+        sf.token("aa").unwrap();
+        sf.space().unwrap();
+        sf.token("bb").unwrap();
+        sf.eof().unwrap();
+        assert_eq!(sf.finish(), "aa /*comment*/ bb");
+    }
+
+    #[test]
+    fn space_with_comment_extra_spaces_trimmed() {
+        let sf = SourceFormatter::new_defaults("aa   /*comment*/   bb");
+        sf.token("aa").unwrap();
+        sf.space().unwrap();
+        sf.token("bb").unwrap();
+        sf.eof().unwrap();
+        assert_eq!(sf.finish(), "aa /*comment*/ bb");
+    }
+
+    #[test]
+    fn space_around_comments_preserved_even_with_no_space_out() {
+        let sf = SourceFormatter::new_defaults("( /*comment*/ aa");
+        sf.token("(").unwrap();
+        sf.token("aa").unwrap();
+        sf.eof().unwrap();
+        assert_eq!(sf.finish(), "( /*comment*/ aa");
+    }
+
+    #[test]
+    fn newlines_removed_between_tokens() {
+        let sf = SourceFormatter::new_defaults("(\naa");
+        sf.token("(").unwrap();
+        sf.token("aa").unwrap();
+        sf.eof().unwrap();
+        assert_eq!(sf.finish(), "(aa");
     }
 }

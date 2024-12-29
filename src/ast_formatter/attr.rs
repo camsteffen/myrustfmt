@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::error::FormatResult;
+use crate::error::{FormatResult, ParseError};
 
 use crate::ast_formatter::list::config::ParamListConfig;
 use crate::ast_formatter::list::{Braces, list};
@@ -57,6 +57,6 @@ impl AstFormatter {
     }
 
     fn meta_item_lit(&self, _lit: &ast::MetaItemLit) -> FormatResult {
-        todo!()
+        Err(ParseError::UnsupportedSyntax.into())
     }
 }

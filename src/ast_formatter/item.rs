@@ -41,7 +41,7 @@ impl<'a> AstFormatter {
             }
             ast::ItemKind::Use(use_tree) => {
                 self.out.token_space("use")?;
-                self.use_tree(use_tree, &Tail::token(";"))?;
+                self.use_tree_tail(use_tree, &Tail::token(";"))?;
             }
             ast::ItemKind::Static(_) => todo!(),
             ast::ItemKind::Const(const_item) => self.const_item(const_item, item.ident)?,
@@ -62,7 +62,16 @@ impl<'a> AstFormatter {
             }
             ast::ItemKind::ForeignMod(_) => todo!(),
             ast::ItemKind::GlobalAsm(_) => todo!(),
-            ast::ItemKind::TyAlias(_) => todo!(),
+            ast::ItemKind::TyAlias(ty_alias) => {
+                self.out.token_space("type")?;
+                self.ident(item.ident)?;
+                self.generic_params(&ty_alias.generics.params)?;
+                if let Some(ty) = &ty_alias.ty {
+                    self.out.space_token_space("=")?;
+                    self.ty(ty)?;
+                }
+                self.out.token(";")?;
+            }
             ast::ItemKind::Enum(def, generics) => self.enum_(&def.variants, generics, item)?,
             ast::ItemKind::Struct(variants, generics) => {
                 self.struct_item(variants, generics, item)?
@@ -71,8 +80,9 @@ impl<'a> AstFormatter {
             ast::ItemKind::Trait(trait_) => self.trait_(trait_, item)?,
             ast::ItemKind::TraitAlias(_, _) => todo!(),
             ast::ItemKind::Impl(impl_) => self.impl_(impl_)?,
-            ast::ItemKind::MacCall(_) => todo!(),
-            ast::ItemKind::MacroDef(_) => todo!(),
+            ast::ItemKind::MacCall(mac_call) => self.mac_call(mac_call)?,
+            // todo
+            ast::ItemKind::MacroDef(_) => self.out.copy_span(item.span)?,
             ast::ItemKind::Delegation(_) => todo!(),
             ast::ItemKind::DelegationMac(_) => todo!(),
         }
@@ -286,7 +296,11 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn use_tree(&self, use_tree: &ast::UseTree, tail: &Tail) -> FormatResult {
+    fn use_tree(&self, use_tree: &ast::UseTree) -> FormatResult {
+        self.use_tree_tail(use_tree, Tail::NONE)
+    }
+
+    fn use_tree_tail(&self, use_tree: &ast::UseTree, tail: &Tail) -> FormatResult {
         self.path(&use_tree.prefix, false)?;
         match use_tree.kind {
             ast::UseTreeKind::Simple(rename) => {
@@ -298,18 +312,40 @@ impl<'a> AstFormatter {
             }
             ast::UseTreeKind::Nested { ref items, span: _ } => {
                 self.out.token("::")?;
-                let has_nested = items
-                    .iter()
-                    .any(|(item, _)| matches!(item.kind, ast::UseTreeKind::Nested { .. }));
-                let list = list(Braces::CURLY_NO_PAD, items, |(use_tree, _)| {
-                    self.use_tree(use_tree, Tail::NONE)
-                })
-                .config(&UseTreeListConfig)
-                .tail(tail);
-                if has_nested {
-                    list.format_separate_lines(self)?
+                enum GroupItem<'a> {
+                    NonNested(Vec<&'a ast::UseTree>),
+                    Nested(&'a ast::UseTree),
+                }
+                let mut non_nested = Vec::new();
+                let mut nested = Vec::new();
+                for (item, _) in items {
+                    if matches!(item.kind, ast::UseTreeKind::Nested { .. }) {
+                        nested.push(item);
+                    } else {
+                        non_nested.push(item);
+                    }
+                }
+                if nested.is_empty() {
+                    list(Braces::CURLY_NO_PAD, items, |(use_tree, _)| {
+                        self.use_tree(use_tree)
+                    })
+                    .config(&UseTreeListConfig)
+                    .tail(tail)
+                    .format(self)?;
                 } else {
-                    list.format(self)?
+                    let group_items = Vec::from_iter(
+                        std::iter::once(GroupItem::NonNested(non_nested))
+                            .chain(nested.into_iter().map(GroupItem::Nested)),
+                    );
+                    list(Braces::CURLY_NO_PAD, &group_items, |item| match item {
+                        GroupItem::Nested(use_tree) => self.use_tree(use_tree),
+                        GroupItem::NonNested(use_trees) => {
+                            self.wrap_to_fit_items(use_trees, |u| self.use_tree(u))
+                        }
+                    })
+                    .config(&UseTreeListConfig)
+                    .tail(tail)
+                    .format_separate_lines(self)?;
                 }
             }
             ast::UseTreeKind::Glob => todo!(),
@@ -321,8 +357,8 @@ impl<'a> AstFormatter {
 struct UseTreeListConfig;
 
 impl ListConfig for UseTreeListConfig {
-    fn single_line_reduce_max_width(&self, config: &Config) -> usize {
-        if config.rustfmt_quirks { 2 } else { 0 }
+    fn single_line_reduce_max_width_quirk(&self, config: &Config) -> usize {
+        config.rustfmt_quirks.then_some(2).unwrap_or(0)
     }
 
     fn wrap_to_fit() -> ListWrapToFitConfig {
