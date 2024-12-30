@@ -3,7 +3,7 @@ use crate::ast_formatter::list::{Braces, list};
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 
-use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ParamListConfig};
+use crate::ast_formatter::list::list_config::{DefaultListConfig, ListConfig, ParamListConfig};
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
 use rustc_span::symbol::kw;
@@ -20,22 +20,50 @@ impl<'a> AstFormatter {
         self.out.token_space("fn")?;
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
-        let (decl_tail, opened_block) = if generics.where_clause.is_empty() && body.is_some() {
-            (&Tail::new(|af| af.out.space_token("{")), true)
-        } else {
-            (Tail::NONE, false)
+        let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
+        // todo avoid function?
+        let param_list = || {
+            list(Braces::PARENS, &sig.decl.inputs, |param| self.param(param)).config(
+                &ParamListConfig {
+                    single_line_max_contents_width: None,
+                },
+            )
         };
-        self.fn_decl(
-            &sig.decl,
-            Braces::PARENS,
-            &ParamListConfig {
-                single_line_max_contents_width: None,
-            },
-            decl_tail,
-        )?;
+        self.fallback(|| {
+            param_list().format_single_line(self)?;
+            self.with_single_line(|| {
+                self.fn_ret_ty(&sig.decl.output)?;
+                if is_block_after_decl {
+                    self.out.space_token("{")?;
+                }
+                Ok(())
+            })?;
+            Ok(())
+        })
+        .next(|| {
+            param_list().format_separate_lines(self)?;
+            self.fn_ret_ty(&sig.decl.output)?;
+            if is_block_after_decl {
+                self.fallback(|| {
+                    self.out.space_token("{")?;
+                    if self.config().rustfmt_quirks {
+                        self.out.require_width(4)?;
+                    }
+                    Ok(())
+                })
+                .next(|| {
+                    self.out.newline_indent()?;
+                    self.out.token("{")?;
+                    Ok(())
+                })
+                .result()?;
+            }
+            Ok(())
+        })
+        .result()?;
         self.where_clause(&generics.where_clause)?;
         if let Some(body) = body {
-            if opened_block {
+            if is_block_after_decl {
                 self.block_after_open_brace(body)?;
             } else {
                 self.block(body)?;
@@ -71,9 +99,8 @@ impl<'a> AstFormatter {
         if let Some(coroutine_kind) = coroutine_kind {
             self.coroutine_kind(coroutine_kind)?;
         }
-        self.fn_decl(fn_decl, Braces::PIPE, &DefaultListConfig, Tail::NONE)?;
+        self.fn_decl(fn_decl, Braces::PIPE, &DefaultListConfig, false)?;
         self.out.space()?;
-
         self.closure_body(body, end)?;
         Ok(())
     }
@@ -116,12 +143,7 @@ impl<'a> AstFormatter {
         // self.extern_(&bare_fn_ty.ext)?;
         // self.generic_params(&bare_fn_ty.generic_params)?;
         self.out.token("fn")?;
-        self.fn_decl(
-            &bare_fn_ty.decl,
-            Braces::PARENS,
-            &DefaultListConfig,
-            Tail::NONE,
-        )?;
+        self.fn_decl(&bare_fn_ty.decl, Braces::PARENS, &DefaultListConfig, false)?;
         Ok(())
     }
 
@@ -158,27 +180,29 @@ impl<'a> AstFormatter {
         fn_decl: &ast::FnDecl,
         braces: &'static Braces,
         input_list_config: &C,
-        tail: &Tail,
+        single_line: bool,
     ) -> FormatResult {
         // args and return type all on one line
-        self.fallback(|| {
+        let do_single_line = || {
             list(braces, &fn_decl.inputs, |param| self.param(param))
                 .config(input_list_config)
                 .format_single_line(self)?;
             self.with_single_line(|| self.fn_ret_ty(&fn_decl.output))?;
-            self.tail(tail)?;
             Ok(())
-        })
-        // args on separate lines
-        .next(|| {
-            list(braces, &fn_decl.inputs, |param| self.param(param))
-                .config(input_list_config)
-                .format_separate_lines(self)?;
-            self.fn_ret_ty(&fn_decl.output)?;
-            self.tail(tail)?;
-            Ok(())
-        })
-        .result()
+        };
+        if single_line {
+            return do_single_line();
+        }
+        self.fallback(do_single_line)
+            // args on separate lines
+            .next(|| {
+                list(braces, &fn_decl.inputs, |param| self.param(param))
+                    .config(input_list_config)
+                    .format_separate_lines(self)?;
+                self.fn_ret_ty(&fn_decl.output)?;
+                Ok(())
+            })
+            .result()
     }
 
     fn param(&self, param: &ast::Param) -> FormatResult {

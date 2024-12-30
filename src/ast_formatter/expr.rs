@@ -5,7 +5,7 @@ use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 use crate::ast_formatter::list::ListRest;
-use crate::ast_formatter::list::config::{
+use crate::ast_formatter::list::list_config::{
     ArrayListConfig, CallParamListConfig, ParamListConfig, struct_field_list_config,
 };
 use crate::ast_utils::expr_only_block;
@@ -31,7 +31,7 @@ impl<'a> AstFormatter {
                 .format(self)?,
             ast::ExprKind::ConstBlock(_) => todo!(),
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, use_tail())?,
-            ast::ExprKind::Field(..) | ast::ExprKind::MethodCall(_) => {
+            ast::ExprKind::Field(..) | ast::ExprKind::MethodCall(_) | ast::ExprKind::Try(_) => {
                 self.dot_chain(expr, use_tail())?
             }
             ast::ExprKind::Tup(ref items) => list(Braces::PARENS, items, |item| self.expr(item))
@@ -164,10 +164,6 @@ impl<'a> AstFormatter {
                 self.out.token("(")?;
                 let tail = use_tail();
                 self.expr_tail(inner, &Tail::token(")").and(tail))?;
-            }
-            ast::ExprKind::Try(ref target) => {
-                let tail = use_tail();
-                self.expr_tail(target, &Tail::token("?").and(tail))?;
             }
             ast::ExprKind::Yield(_) => todo!(),
             ast::ExprKind::Yeet(_) => todo!(),

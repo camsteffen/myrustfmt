@@ -2,10 +2,10 @@ use rustc_ast::ast;
 use rustc_span::symbol::Ident;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::config::{
+use crate::ast_formatter::list::list_config::{
     ListConfig, ListWrapToFitConfig, ParamListConfig, struct_field_list_config,
 };
-use crate::ast_formatter::list::{Braces, list};
+use crate::ast_formatter::list::{Braces, ListItemConfig, list};
 use crate::ast_formatter::util::tail::Tail;
 use crate::config::Config;
 use crate::error::FormatResult;
@@ -312,41 +312,14 @@ impl<'a> AstFormatter {
             }
             ast::UseTreeKind::Nested { ref items, span: _ } => {
                 self.out.token("::")?;
-                enum GroupItem<'a> {
-                    NonNested(Vec<&'a ast::UseTree>),
-                    Nested(&'a ast::UseTree),
-                }
-                let mut non_nested = Vec::new();
-                let mut nested = Vec::new();
-                for (item, _) in items {
-                    if matches!(item.kind, ast::UseTreeKind::Nested { .. }) {
-                        nested.push(item);
-                    } else {
-                        non_nested.push(item);
-                    }
-                }
-                if nested.is_empty() {
-                    list(Braces::CURLY_NO_PAD, items, |(use_tree, _)| {
-                        self.use_tree(use_tree)
-                    })
-                    .config(&UseTreeListConfig)
-                    .tail(tail)
-                    .format(self)?;
-                } else {
-                    let group_items = Vec::from_iter(
-                        std::iter::once(GroupItem::NonNested(non_nested))
-                            .chain(nested.into_iter().map(GroupItem::Nested)),
-                    );
-                    list(Braces::CURLY_NO_PAD, &group_items, |item| match item {
-                        GroupItem::Nested(use_tree) => self.use_tree(use_tree),
-                        GroupItem::NonNested(use_trees) => {
-                            self.wrap_to_fit_items(use_trees, |u| self.use_tree(u))
-                        }
-                    })
-                    .config(&UseTreeListConfig)
-                    .tail(tail)
-                    .format_separate_lines(self)?;
-                }
+
+                list(Braces::CURLY_NO_PAD, items, |(use_tree, _)| {
+                    self.use_tree(use_tree)
+                })
+                .config(&UseTreeListConfig)
+                .item_config(UseTreeListItemConfig)
+                .tail(tail)
+                .format(self)?;
             }
             ast::UseTreeKind::Glob => todo!(),
         }
@@ -365,5 +338,17 @@ impl ListConfig for UseTreeListConfig {
         ListWrapToFitConfig::Yes {
             max_element_width: None,
         }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct UseTreeListItemConfig;
+impl ListItemConfig for UseTreeListItemConfig {
+    type Item = (ast::UseTree, ast::NodeId);
+
+    const ITEMS_POSSIBLY_MUST_HAVE_OWN_LINE: bool = true;
+
+    fn item_must_have_own_line((item, _): &Self::Item) -> bool {
+        matches!(item.kind, ast::UseTreeKind::Nested { .. })
     }
 }

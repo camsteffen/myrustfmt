@@ -21,8 +21,6 @@ pub trait ListConfig {
     fn wrap_to_fit() -> ListWrapToFitConfig {
         ListWrapToFitConfig::No
     }
-    
-    // fn item_must_have_own_line
 }
 
 pub struct DefaultListConfig;

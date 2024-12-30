@@ -1,22 +1,34 @@
 mod braces;
-pub mod config;
+pub mod list_config;
+mod list_item_config;
 mod overflow;
 mod rest;
 
 pub use braces::Braces;
+pub use list_item_config::ListItemConfig;
 pub use rest::ListRest;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::config::{DefaultListConfig, ListConfig, ListWrapToFitConfig};
+use crate::ast_formatter::list::list_config::{DefaultListConfig, ListConfig, ListWrapToFitConfig};
+use crate::ast_formatter::list::list_item_config::DefaultListItemConfig;
 use crate::ast_formatter::util::tail::Tail;
-use crate::error::FormatResult;
+use crate::error::{ConstraintError, FormatResult};
 use overflow::{ListOverflow, ListOverflowNo, ListOverflowYes};
 
 pub fn list<'a, 'list, Item, FormatItem>(
     braces: &'static Braces,
     list: &'list [Item],
     format_item: FormatItem,
-) -> ListBuilder<'list, 'static, 'static, Item, FormatItem, DefaultListConfig, ListOverflowNo<Item>>
+) -> ListBuilder<
+    'list,
+    'static,
+    'static,
+    Item,
+    FormatItem,
+    DefaultListConfig,
+    DefaultListItemConfig<Item>,
+    ListOverflowNo<Item>,
+>
 where
     FormatItem: Fn(&Item) -> FormatResult,
 {
@@ -27,45 +39,51 @@ where
         format_item,
         tail: &Tail::NONE,
         config: &DefaultListConfig,
+        item_config: DefaultListItemConfig::default(),
         overflow: ListOverflowNo::default(),
     }
 }
 
-pub struct ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, Overflow> {
+pub struct ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfig, Overflow> {
     braces: &'static Braces,
     list: &'ast [Item],
     format_item: FormatItem,
     rest: ListRest<'ast>,
     tail: &'tail Tail,
     config: &'config Config,
+    item_config: ItemConfig,
     overflow: Overflow,
 }
 
-impl<'a, 'ast, 'tail, 'config, Item, FormatItem, Config, Overflow>
-    ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, Overflow>
+impl<'a, 'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfig, Overflow>
+    ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfig, Overflow>
 where
     Config: ListConfig,
+    ItemConfig: ListItemConfig<Item = Item>,
     FormatItem: Fn(&Item) -> FormatResult,
     Overflow: ListOverflow<Item = Item>,
 {
     pub fn config<'config_new, ConfigNew: ListConfig>(
         self,
         config: &'config_new ConfigNew,
-    ) -> ListBuilder<'ast, 'tail, 'config_new, Item, FormatItem, ConfigNew, Overflow> {
+    ) -> ListBuilder<'ast, 'tail, 'config_new, Item, FormatItem, ConfigNew, ItemConfig, Overflow>
+    {
         ListBuilder {
             braces: self.braces,
             list: self.list,
             format_item: self.format_item,
             rest: self.rest,
             tail: self.tail,
-            config,
+            config: config,
+            item_config: self.item_config,
             overflow: self.overflow,
         }
     }
 
-    pub fn overflow(
+    pub fn item_config<ItemConfigNew: ListItemConfig<Item = Item>>(
         self,
-    ) -> ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, ListOverflowYes<Item>> {
+        item_config: ItemConfigNew,
+    ) -> ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfigNew, Overflow> {
         ListBuilder {
             braces: self.braces,
             list: self.list,
@@ -73,6 +91,31 @@ where
             rest: self.rest,
             tail: self.tail,
             config: self.config,
+            item_config,
+            overflow: self.overflow,
+        }
+    }
+
+    pub fn overflow(
+        self,
+    ) -> ListBuilder<
+        'ast,
+        'tail,
+        'config,
+        Item,
+        FormatItem,
+        Config,
+        ItemConfig,
+        ListOverflowYes<Item>,
+    > {
+        ListBuilder {
+            braces: self.braces,
+            list: self.list,
+            format_item: self.format_item,
+            rest: self.rest,
+            tail: self.tail,
+            config: self.config,
+            item_config: self.item_config,
             overflow: ListOverflowYes::default(),
         }
     }
@@ -84,7 +127,7 @@ where
     pub fn tail<'tail_new>(
         self,
         tail: &'tail_new Tail,
-    ) -> ListBuilder<'ast, 'tail_new, 'config, Item, FormatItem, Config, Overflow> {
+    ) -> ListBuilder<'ast, 'tail_new, 'config, Item, FormatItem, Config, ItemConfig, Overflow> {
         ListBuilder {
             braces: self.braces,
             list: self.list,
@@ -92,6 +135,7 @@ where
             rest: self.rest,
             tail,
             config: self.config,
+            item_config: self.item_config,
             overflow: self.overflow,
         }
     }
@@ -123,8 +167,20 @@ where
     }
 
     fn contents_default(&self, af: &AstFormatter, tail: &Tail) -> FormatResult {
-        let mut fallback = af.fallback(|| self.contents_single_line(af, tail));
+        let mut fallback = af.fallback(|| {
+            if ItemConfig::ITEMS_POSSIBLY_MUST_HAVE_OWN_LINE
+                && self.list.iter().any(ItemConfig::item_must_have_own_line)
+            {
+                return Err(ConstraintError::Logical.into());
+            }
+            self.contents_single_line(af, tail)
+        });
         if self.config.single_line_block() {
+            assert_eq!(
+                ItemConfig::ITEMS_POSSIBLY_MUST_HAVE_OWN_LINE,
+                false,
+                "not implemented"
+            );
             fallback = fallback.next(|| self.contents_single_line_block(af, tail))
         }
         match Config::wrap_to_fit() {
@@ -177,7 +233,13 @@ where
         tail: &Tail,
         max_element_width: Option<usize>,
     ) -> FormatResult {
-        af.list_contents_wrap_to_fit(self.list, tail, &self.format_item, max_element_width)
+        af.list_contents_wrap_to_fit(
+            self.list,
+            tail,
+            &self.format_item,
+            self.item_config,
+            max_element_width,
+        )
     }
 
     fn contents_separate_lines(&self, af: &AstFormatter, tail: &Tail) -> FormatResult {
@@ -311,13 +373,17 @@ impl<'a> AstFormatter {
         item,
     ]
     */
-    fn list_contents_wrap_to_fit<T>(
+    fn list_contents_wrap_to_fit<T, ItemConfig>(
         &self,
         list: &[T],
         tail: &Tail,
         format_item: impl Fn(&T) -> FormatResult,
+        _item_config: ItemConfig,
         max_element_width: Option<usize>,
-    ) -> FormatResult {
+    ) -> FormatResult
+    where
+        ItemConfig: ListItemConfig<Item = T>,
+    {
         let format_item = |item| match max_element_width {
             Some(max_width) => self.with_width_limit_single_line(max_width, || format_item(item)),
             None => format_item(item),
@@ -327,23 +393,34 @@ impl<'a> AstFormatter {
             let (first, rest) = list.split_first().unwrap();
             format_item(first)?;
             self.out.token_maybe_missing(",")?;
+            let mut prev_must_have_own_line = false;
             for item in rest {
                 let item_comma = || -> FormatResult {
                     format_item(item)?;
                     self.out.token_maybe_missing(",")?;
                     Ok(())
                 };
-                self.fallback(|| {
+                let item_same_line = || {
                     self.out.space()?;
                     item_comma()?;
                     Ok(())
-                })
-                .next(|| {
+                };
+                let item_next_line = || {
                     self.out.newline_indent()?;
                     item_comma()?;
                     Ok(())
-                })
-                .result()?;
+                };
+                if prev_must_have_own_line {
+                    item_next_line()?;
+                    prev_must_have_own_line = false;
+                } else if ItemConfig::item_must_have_own_line(item) {
+                    item_next_line()?;
+                    prev_must_have_own_line = true;
+                } else {
+                    self.fallback(item_same_line)
+                        .next(item_next_line)
+                        .result()?;
+                }
             }
             Ok(())
         })?;

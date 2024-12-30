@@ -26,6 +26,7 @@ pub enum FormatError {
 
 #[derive(Clone, Copy, Debug)]
 pub enum ConstraintError {
+    Logical,
     NewlineNotAllowed,
     WidthLimitExceeded,
 }
@@ -64,6 +65,9 @@ impl FormatError {
                     write!(f, ". Next token is `{token_str}`")
                 };
                 match *self.error {
+                    FormatError::Constraint(ConstraintError::Logical) => {
+                        write!(f, "unhandled logical constraint error")?
+                    }
                     FormatError::Constraint(ConstraintError::WidthLimitExceeded) => {
                         write!(f, "width limit exceeded")?
                     }
