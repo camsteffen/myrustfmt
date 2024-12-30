@@ -140,15 +140,15 @@ where
         }
     }
 
-    pub fn format(self, af: &AstFormatter) -> FormatResult {
+    pub fn format(&self, af: &AstFormatter) -> FormatResult {
         self.do_format(af, Self::contents_default)
     }
 
-    pub fn format_single_line(self, af: &AstFormatter) -> FormatResult {
+    pub fn format_single_line(&self, af: &AstFormatter) -> FormatResult {
         self.do_format(af, Self::contents_single_line)
     }
 
-    pub fn format_separate_lines(self, af: &AstFormatter) -> FormatResult {
+    pub fn format_separate_lines(&self, af: &AstFormatter) -> FormatResult {
         self.do_format(af, Self::contents_separate_lines)
     }
 

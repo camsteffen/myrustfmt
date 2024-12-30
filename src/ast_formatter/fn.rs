@@ -21,17 +21,14 @@ impl<'a> AstFormatter {
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
-        // todo avoid function?
-        let param_list = || {
-            list(Braces::PARENS, &sig.decl.inputs, |param| self.param(param)).config(
-                &ParamListConfig {
-                    single_line_max_contents_width: None,
-                },
-            )
-        };
+        let param_list = list(Braces::PARENS, &sig.decl.inputs, |param| self.param(param)).config(
+            &ParamListConfig {
+                single_line_max_contents_width: None,
+            },
+        );
         self.fallback(|| {
-            param_list().format_single_line(self)?;
-            self.with_single_line(|| {
+            param_list.format_single_line(self)?;
+            self.with_single_line(|| -> FormatResult {
                 self.fn_ret_ty(&sig.decl.output)?;
                 if is_block_after_decl {
                     self.out.space_token("{")?;
@@ -41,7 +38,7 @@ impl<'a> AstFormatter {
             Ok(())
         })
         .next(|| {
-            param_list().format_separate_lines(self)?;
+            param_list.format_separate_lines(self)?;
             self.fn_ret_ty(&sig.decl.output)?;
             if is_block_after_decl {
                 self.fallback(|| {
