@@ -12,9 +12,14 @@ impl<'a> AstFormatter {
                 self.out.token("[")?;
                 self.ty(elem)?;
                 self.out.token("]")?;
-                Ok(())
             }
-            ast::TyKind::Array(_ty, _length) => todo!(),
+            ast::TyKind::Array(ty, length) => {
+                self.out.token("[")?;
+                self.ty(ty)?;
+                self.out.token_space(";")?;
+                self.anon_const(length)?;
+                self.out.token("]")?;
+            }
             ast::TyKind::Ptr(_mut_ty) => todo!(),
             ast::TyKind::Ref(lifetime, mut_ty) => {
                 self.out.token("&")?;
@@ -23,17 +28,16 @@ impl<'a> AstFormatter {
                     self.out.space()?;
                 }
                 self.mut_ty(mut_ty)?;
-                Ok(())
             }
             ast::TyKind::PinnedRef(_lifetime, _mut_ty) => todo!(),
-            ast::TyKind::BareFn(bare_fn_ty) => self.bare_fn_ty(bare_fn_ty),
+            ast::TyKind::BareFn(bare_fn_ty) => self.bare_fn_ty(bare_fn_ty)?,
             ast::TyKind::Never => todo!(),
             ast::TyKind::Tup(elements) => list(Braces::PARENS, elements, |ty| self.ty(ty))
                 .config(&ParamListConfig {
                     single_line_max_contents_width: None,
                 })
-                .format(self),
-            ast::TyKind::Path(qself, path) => self.qpath(qself, path, false),
+                .format(self)?,
+            ast::TyKind::Path(qself, path) => self.qpath(qself, path, false)?,
             ast::TyKind::TraitObject(bounds, syntax) => {
                 match syntax {
                     ast::TraitObjectSyntax::Dyn => {
@@ -43,28 +47,26 @@ impl<'a> AstFormatter {
                     ast::TraitObjectSyntax::None => todo!(),
                 }
                 self.generic_bounds(bounds)?;
-                Ok(())
             }
             ast::TyKind::ImplTrait(_, bounds) => {
                 self.out.token_space("impl")?;
                 self.generic_bounds(bounds)?;
-                Ok(())
             }
             ast::TyKind::Paren(ty) => {
                 self.out.token("(")?;
                 self.ty(ty)?;
                 self.out.token(")")?;
-                Ok(())
             }
-            ast::TyKind::Typeof(_anon_const) => todo!(),
+            ast::TyKind::Typeof(anon_const) => self.anon_const(anon_const)?,
             ast::TyKind::Infer => todo!(),
-            ast::TyKind::ImplicitSelf => self.out.token("self"),
+            ast::TyKind::ImplicitSelf => self.out.token("self")?,
             ast::TyKind::MacCall(_mac_call) => todo!(),
             ast::TyKind::CVarArgs => todo!(),
             ast::TyKind::Pat(_ty, _pat) => todo!(),
             ast::TyKind::Dummy => todo!(),
             ast::TyKind::Err(_) => todo!(),
         }
+        Ok(())
     }
 
     pub fn lifetime(&self, lifetime: &ast::Lifetime) -> FormatResult {
@@ -91,17 +93,17 @@ impl<'a> AstFormatter {
 
     fn generic_bound(&self, bound: &ast::GenericBound) -> FormatResult {
         match bound {
-            ast::GenericBound::Trait(poly_trait_ref) => self.poly_trait_ref(poly_trait_ref),
             ast::GenericBound::Outlives(lifetime) => self.lifetime(lifetime),
+            ast::GenericBound::Trait(poly_trait_ref) => self.poly_trait_ref(poly_trait_ref),
             ast::GenericBound::Use(_capture_args, _span) => todo!(),
         }
     }
 
     pub fn generic_arg(&self, arg: &ast::GenericArg) -> FormatResult {
         match &arg {
+            ast::GenericArg::Const(anon_const) => self.anon_const(anon_const),
             ast::GenericArg::Lifetime(lifetime) => self.lifetime(lifetime),
             ast::GenericArg::Type(ty) => self.ty(ty),
-            ast::GenericArg::Const(_anon_const) => todo!(),
         }
     }
 

@@ -31,9 +31,10 @@ impl<'a> AstFormatter {
                 .format(self)?,
             ast::ExprKind::ConstBlock(_) => todo!(),
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, use_tail())?,
-            ast::ExprKind::Field(..) | ast::ExprKind::MethodCall(_) | ast::ExprKind::Try(_) => {
-                self.dot_chain(expr, use_tail())?
-            }
+            ast::ExprKind::Await(..)
+            | ast::ExprKind::Field(..)
+            | ast::ExprKind::MethodCall(_)
+            | ast::ExprKind::Try(_) => self.dot_chain(expr, use_tail())?,
             ast::ExprKind::Tup(ref items) => list(Braces::PARENS, items, |item| self.expr(item))
                 .config(&ParamListConfig {
                     single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
@@ -108,7 +109,6 @@ impl<'a> AstFormatter {
                 self.block(block)?;
             }
             ast::ExprKind::Gen(_, _, _, _) => todo!(),
-            ast::ExprKind::Await(_, _) => todo!(),
             ast::ExprKind::TryBlock(_) => todo!(),
             ast::ExprKind::Assign(ref left, ref right, _) => {
                 self.expr(left)?;
@@ -177,6 +177,10 @@ impl<'a> AstFormatter {
             self.tail(tail)?;
         }
         Ok(())
+    }
+
+    pub fn anon_const(&self, anon_const: &ast::AnonConst) -> FormatResult {
+        self.expr(&anon_const.value)
     }
 
     fn label(&self, label: Option<ast::Label>) -> FormatResult {

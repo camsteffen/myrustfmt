@@ -13,57 +13,51 @@ use tracing::info;
 
 struct DotChainItem<'a> {
     expr: &'a ast::Expr,
+    /// Number of trailing `?` operators
     try_ops: u32,
 }
 
 impl AstFormatter {
     pub fn dot_chain(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
-        info!(
-            "single line: {:?}, max_width: {:?}",
-            self.out.constraints().single_line.get(),
-            self.out.constraints().max_width.get()
-        );
-        // info!("{}", self.out.constraints().single_line_backtrace.borrow().as_ref().unwrap());
-        let mut dot_chain = Vec::new();
-        build_dot_chain(&mut dot_chain, expr, 0);
-        let (root, mut dot_chain) = dot_chain.split_first().unwrap();
-        if dot_chain.is_empty() {
-            self.expr(root.expr)?;
-            self.trys(root.try_ops)?;
-            self.tail(tail)?;
-            return Ok(());
-        }
-        let width_limit = if self.config().rustfmt_quirks && dot_chain.len() == 1 {
-            None
-        } else {
-            if self.config().rustfmt_quirks && dot_chain.last().unwrap().try_ops > 0 {
-                // todo test
-                Some(RUSTFMT_CONFIG_DEFAULTS.chain_width - 1)
-            } else {
-                Some(RUSTFMT_CONFIG_DEFAULTS.chain_width)
-            }
-        };
+        let items = build_dot_chain(expr);
+        let (root, dot_chain) = items.split_first().unwrap();
         let first_line = self.out.line();
         let start_pos = self.out.last_line_len();
         self.expr(root.expr)?;
         self.trys(root.try_ops)?;
+        if dot_chain.is_empty() {
+            self.tail(tail)?;
+            return Ok(());
+        }
         let indent_margin = self.out.constraints().indent.get() + INDENT_WIDTH;
+        let mut dot_chain_remaining = dot_chain;
         while self.out.line() == first_line && self.out.last_line_len() <= indent_margin {
-            info!("in the margin");
             let next;
-            (next, dot_chain) = dot_chain.split_first().unwrap();
+            (next, dot_chain_remaining) = dot_chain_remaining.split_first().unwrap();
             self.dot_chain_item(next)?;
-            if dot_chain.is_empty() {
+            if dot_chain_remaining.is_empty() {
                 return self.tail(tail);
             }
         }
         if self.out.line() == first_line {
-            self.fallback(|| self.dot_chain_single_line(dot_chain, start_pos, width_limit, tail))
-                .next(|| self.dot_chain_separate_lines_indented(dot_chain, tail))
-                .result()
+            let width_limit = if self.config().rustfmt_quirks && dot_chain.len() == 1 {
+                None
+            } else {
+                if self.config().rustfmt_quirks && dot_chain.last().unwrap().try_ops > 0 {
+                    // todo test
+                    Some(RUSTFMT_CONFIG_DEFAULTS.chain_width - 1)
+                } else {
+                    Some(RUSTFMT_CONFIG_DEFAULTS.chain_width)
+                }
+            };
+            self.fallback(|| {
+                self.dot_chain_single_line(dot_chain_remaining, start_pos, width_limit, tail)
+            })
+            .next(|| self.dot_chain_separate_lines_indented(dot_chain_remaining, tail))
+            .result()
         } else {
             // each item on a separate line, no indent
-            for item in dot_chain {
+            for item in dot_chain_remaining {
                 self.out.newline_indent()?;
                 self.dot_chain_item(item)?;
             }
@@ -150,14 +144,12 @@ impl AstFormatter {
     }
 
     fn dot_chain_item(&self, item: &DotChainItem<'_>) -> FormatResult {
+        self.out.token(".")?;
         match item.expr.kind {
-            ast::ExprKind::Field(_, ident) => {
-                self.out.token(".")?;
-                self.ident(ident)?;
-            }
+            ast::ExprKind::Await(..) => self.out.token("await")?,
+            ast::ExprKind::Field(_, ident) => self.ident(ident)?,
             // todo share code with ExprKind::Call?
             ast::ExprKind::MethodCall(ref method_call) => {
-                self.out.token(".")?;
                 self.path_segment(&method_call.seg, true)?;
                 let args_max_width_exempt = self.config().rustfmt_quirks
                     && matches!(&*method_call.args, [arg] if !is_call_or_prefixed(arg));
@@ -180,15 +172,21 @@ impl AstFormatter {
     }
 }
 
-fn build_dot_chain<'a>(chain: &mut Vec<DotChainItem<'a>>, expr: &'a ast::Expr, try_ops: u32) {
+fn build_dot_chain(expr: &ast::Expr) -> Vec<DotChainItem<'_>> {
+    let mut items = Vec::new();
+    do_build_dot_chain(&mut items, expr, 0);
+    items
+}
+
+fn do_build_dot_chain<'a>(chain: &mut Vec<DotChainItem<'a>>, expr: &'a ast::Expr, try_ops: u32) {
     let mut dot = |inner| {
-        build_dot_chain(chain, inner, 0);
+        do_build_dot_chain(chain, inner, 0);
         chain.push(DotChainItem { expr, try_ops });
     };
     match &expr.kind {
-        ast::ExprKind::Field(target, _ident) => dot(target),
+        ast::ExprKind::Await(target, _) | ast::ExprKind::Field(target, _) => dot(target),
         ast::ExprKind::MethodCall(method_call) => dot(&method_call.receiver),
-        ast::ExprKind::Try(inner) => build_dot_chain(chain, inner, try_ops + 1),
+        ast::ExprKind::Try(inner) => do_build_dot_chain(chain, inner, try_ops + 1),
         _ => chain.push(DotChainItem { expr, try_ops }),
     };
 }

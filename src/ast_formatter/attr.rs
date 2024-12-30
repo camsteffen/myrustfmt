@@ -1,12 +1,31 @@
 use crate::ast_formatter::AstFormatter;
-use crate::error::{FormatResult, ParseError};
-
 use crate::ast_formatter::list::list_config::ParamListConfig;
 use crate::ast_formatter::list::{Braces, list};
+use crate::ast_utils::is_rustfmt_skip;
+use crate::error::{FormatResult, ParseError};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
+use rustc_span::Span;
 
 impl AstFormatter {
+    pub fn with_attrs(
+        &self,
+        attrs: &[ast::Attribute],
+        f: impl Fn() -> FormatResult,
+        span: Span,
+    ) -> FormatResult {
+        self.attrs(attrs)?;
+        if attrs.iter().any(is_rustfmt_skip) {
+            self.out
+                .constraints()
+                .with_no_max_width(|| self.out.copy_span(span))?;
+        } else {
+            f()?;
+        }
+        Ok(())
+    }
+
+    // todo private, use with_attrs
     pub fn attrs(&self, attrs: &[ast::Attribute]) -> FormatResult {
         for attr in attrs {
             self.attr(attr)?;

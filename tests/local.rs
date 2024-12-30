@@ -40,7 +40,8 @@ fn test() {
 #[traced_test]
 #[test]
 fn let_else_wrap_else() {
-    let source = "fn test() { let xxxxxxxxxxxxx = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa else { return x; }; }";
+    let source = "fn test() { let xxxxxxxxxxxxx =\
+     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa else { return x; }; }";
     assert_eq!(
         format_str_defaults(source).unwrap(),
         "
@@ -51,6 +52,6 @@ fn test() {
     };
 }
 "
-            .trim_start()
+        .trim_start()
     );
 }

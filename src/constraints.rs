@@ -84,7 +84,7 @@ impl Constraints {
         Ok(())
     }
 
-    pub fn with_no_width_limit(&self, f: impl FnOnce() -> FormatResult) -> FormatResult {
+    pub fn with_no_max_width(&self, f: impl FnOnce() -> FormatResult) -> FormatResult {
         let max_width_prev = self.max_width.replace(None);
         let result = f();
         self.max_width.set(max_width_prev);

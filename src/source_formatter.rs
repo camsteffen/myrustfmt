@@ -222,7 +222,7 @@ impl SourceFormatter {
                         self.out.token(" ")?;
                     }
                     self.constraints()
-                        .with_no_width_limit(|| self.copy(token.len as usize))?;
+                        .with_no_max_width(|| self.copy(token.len as usize))?;
                     twas_comments = true;
                 }
                 TokenKind::Whitespace => {
@@ -259,7 +259,7 @@ impl SourceFormatter {
             match token.kind {
                 TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
                     self.constraints()
-                        .with_no_width_limit(|| self.copy(token.len as usize))?;
+                        .with_no_max_width(|| self.copy(token.len as usize))?;
                 }
                 TokenKind::Whitespace => {
                     self.out.token(" ")?;
@@ -283,7 +283,7 @@ impl SourceFormatter {
             match token.kind {
                 TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
                     self.constraints()
-                        .with_no_width_limit(|| self.copy(token.len as usize))?;
+                        .with_no_max_width(|| self.copy(token.len as usize))?;
                 }
                 TokenKind::Whitespace => {
                     let newline_count = token_str.bytes().filter(|&b| b == b'\n').count();

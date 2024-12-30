@@ -1,4 +1,6 @@
+use rustc_span::Symbol;
 use rustc_ast::ast;
+use rustc_span::sym;
 
 pub fn expr_only_block(block: &ast::Block) -> Option<&ast::Expr> {
     if let [stmt] = &block.stmts[..] {
@@ -9,6 +11,11 @@ pub fn expr_only_block(block: &ast::Block) -> Option<&ast::Expr> {
         }
     }
     None
+}
+
+pub fn is_rustfmt_skip(attr: &ast::Attribute) -> bool {
+    static PATH: [Symbol; 2] = [sym::rustfmt, sym::skip];
+    attr.path_matches(&PATH)
 }
 
 pub fn is_call_or_prefixed(expr: &ast::Expr) -> bool {

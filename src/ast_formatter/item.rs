@@ -43,7 +43,17 @@ impl<'a> AstFormatter {
                 self.out.token_space("use")?;
                 self.use_tree_tail(use_tree, &Tail::token(";"))?;
             }
-            ast::ItemKind::Static(_) => todo!(),
+            ast::ItemKind::Static(static_item) => {
+                self.out.token_space("static")?;
+                self.ident(item.ident)?;
+                self.out.token_space(":")?;
+                self.ty(&static_item.ty)?;
+                if let Some(expr) = &static_item.expr {
+                    self.out.space_token_space("=")?;
+                    self.expr(expr)?;
+                }
+                self.out.token(";")?;
+            }
             ast::ItemKind::Const(const_item) => self.const_item(const_item, item.ident)?,
             ast::ItemKind::Fn(fn_) => self.fn_(fn_, item)?,
             ast::ItemKind::Mod(safety, mod_kind) => {
@@ -312,7 +322,6 @@ impl<'a> AstFormatter {
             }
             ast::UseTreeKind::Nested { ref items, span: _ } => {
                 self.out.token("::")?;
-
                 list(Braces::CURLY_NO_PAD, items, |(use_tree, _)| {
                     self.use_tree(use_tree)
                 })
@@ -321,7 +330,11 @@ impl<'a> AstFormatter {
                 .tail(tail)
                 .format(self)?;
             }
-            ast::UseTreeKind::Glob => todo!(),
+            ast::UseTreeKind::Glob => {
+                self.out.token("::")?;
+                self.out.token("*")?;
+                self.tail(tail)?;
+            }
         }
         Ok(())
     }

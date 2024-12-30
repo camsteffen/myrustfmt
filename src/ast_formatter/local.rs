@@ -5,37 +5,43 @@ use rustc_ast::ast;
 
 impl<'a> AstFormatter {
     pub fn local(&self, local: &ast::Local, tail: &Tail) -> FormatResult {
-        let ast::Local { pat, kind, .. } = local;
-        self.out.token_space("let")?;
-        match kind {
-            ast::LocalKind::Decl => self.pat_tail(pat, tail),
-            ast::LocalKind::Init(init) => {
-                self.pat(pat)?;
-                self.local_init(init, tail)
-            }
-            ast::LocalKind::InitElse(init, else_) => {
-                self.pat(pat)?;
-                self.local_init(init, Tail::NONE)?;
-                self.fallback(|| {
-                    self.out.space_token_space("else")?;
-                    self.out.token("{")?;
-                    if self.config().rustfmt_quirks {
-                        self.out.require_width(1)?;
+        self.with_attrs(
+            &local.attrs,
+            || {
+                let ast::Local { pat, kind, .. } = local;
+                self.out.token_space("let")?;
+                match kind {
+                    ast::LocalKind::Decl => self.pat_tail(pat, tail),
+                    ast::LocalKind::Init(init) => {
+                        self.pat(pat)?;
+                        self.local_init(init, tail)
                     }
-                    Ok(())
-                })
-                .next(|| {
-                    self.out.newline_indent()?;
-                    self.out.token_space("else")?;
-                    self.out.token("{")?;
-                    Ok(())
-                })
-                .result()?;
-                self.block_after_open_brace(else_)?;
-                self.tail(tail)?;
-                Ok(())
-            }
-        }
+                    ast::LocalKind::InitElse(init, else_) => {
+                        self.pat(pat)?;
+                        self.local_init(init, Tail::NONE)?;
+                        self.fallback(|| {
+                            self.out.space_token_space("else")?;
+                            self.out.token("{")?;
+                            if self.config().rustfmt_quirks {
+                                self.out.require_width(1)?;
+                            }
+                            Ok(())
+                        })
+                        .next(|| {
+                            self.out.newline_indent()?;
+                            self.out.token_space("else")?;
+                            self.out.token("{")?;
+                            Ok(())
+                        })
+                        .result()?;
+                        self.block_after_open_brace(else_)?;
+                        self.tail(tail)?;
+                        Ok(())
+                    }
+                }
+            },
+            local.span,
+        )
     }
 
     fn local_init(&self, expr: &ast::Expr, end: &Tail) -> FormatResult {

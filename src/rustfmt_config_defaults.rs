@@ -10,7 +10,7 @@ pub struct RustfmtConfig {
 }
 
 pub const RUSTFMT_CONFIG_DEFAULTS: RustfmtConfig = RustfmtConfig {
-    array_width: 10,
+    array_width: 60,
     attr_fn_like_width: 70,
     chain_width: 60,
     fn_call_width: 60,
