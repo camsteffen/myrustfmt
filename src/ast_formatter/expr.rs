@@ -357,13 +357,14 @@ impl<'a> AstFormatter {
     }
 
     fn expr_field(&self, field: &ast::ExprField) -> FormatResult {
-        self.attrs(&field.attrs)?;
-        self.ident(field.ident)?;
-        if !field.is_shorthand {
-            self.out.token_space(":")?;
-            self.expr(&field.expr)?;
-        }
-        Ok(())
+        self.with_attrs(&field.attrs, field.span, || {
+            self.ident(field.ident)?;
+            if !field.is_shorthand {
+                self.out.token_space(":")?;
+                self.expr(&field.expr)?;
+            }
+            Ok(())
+        })
     }
 
     pub fn while_(&self, condition: &ast::Expr, block: &ast::Block) -> FormatResult {

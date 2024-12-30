@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::path::Path;
 
 pub type FormatResult<T = ()> = Result<T, FormatError>;
 
@@ -47,17 +48,27 @@ pub enum ParseError {
 }
 
 impl FormatError {
-    pub fn display(&self, source: &str, pos: usize) -> impl Display {
-        struct FormatErrorDisplay<'err, 'source> {
+    pub fn display(&self, source: &str, pos: usize, path: Option<&Path>) -> impl Display {
+        struct FormatErrorDisplay<'err, 'path, 'source> {
             error: &'err FormatError,
+            path: Option<&'path Path>,
             source: &'source str,
             pos: usize,
             line: usize,
             col: usize,
         }
-        impl Display for FormatErrorDisplay<'_, '_> {
+        impl Display for FormatErrorDisplay<'_, '_, '_> {
             fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-                write!(f, "Error formatting at {}:{}, ", self.line, self.col)?;
+                match self.path {
+                    None => write!(f, "Error formatting at {}:{}, ", self.line, self.col)?,
+                    Some(path) => write!(
+                        f,
+                        "Error formatting {}:{}:{}, ",
+                        path.display(),
+                        self.line,
+                        self.col
+                    )?,
+                }
                 let next_token = |f: &mut Formatter<'_>| {
                     let remaining = &self.source[self.pos..];
                     let token = rustc_lexer::tokenize(remaining).next().unwrap();
@@ -98,6 +109,7 @@ impl FormatError {
         FormatErrorDisplay {
             error: self,
             source,
+            path,
             pos,
             line,
             col,

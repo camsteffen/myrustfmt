@@ -36,12 +36,13 @@ impl<'a> AstFormatter {
     }
 
     pub fn crate_(&self, crate_: &rustc_ast::ast::Crate) -> FormatResult {
-        self.attrs(&crate_.attrs)?;
-        for item in &crate_.items {
-            self.item(item)?;
-            self.out.newline_indent()?;
-        }
-        Ok(())
+        self.with_attrs(&crate_.attrs, crate_.spans.inner_span, || {
+            for item in &crate_.items {
+                self.item(item)?;
+                self.out.newline_indent()?;
+            }
+            Ok(())
+        })
     }
 
     fn config(&self) -> &Config {

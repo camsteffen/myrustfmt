@@ -12,7 +12,10 @@ impl AstFormatter {
     }
 
     fn arm(&self, arm: &ast::Arm) -> FormatResult {
-        self.attrs(&arm.attrs)?;
+        self.with_attrs(&arm.attrs, arm.span, || self.arm_after_attrs(arm))
+    }
+    
+    fn arm_after_attrs(&self, arm: &ast::Arm) -> FormatResult {
         let first_line = self.out.line();
         self.pat(&arm.pat)?;
         let comma = |body| {

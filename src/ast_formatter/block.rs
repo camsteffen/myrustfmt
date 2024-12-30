@@ -51,17 +51,18 @@ impl<'a> AstFormatter {
             ast::StmtKind::Semi(expr) => self.expr_tail(expr, &Tail::token(";")),
             ast::StmtKind::Empty => self.out.token(";"),
             ast::StmtKind::MacCall(mac_call_stmt) => {
-                self.attrs(&mac_call_stmt.attrs)?;
-                match mac_call_stmt.style {
-                    ast::MacStmtStyle::Semicolon => {
-                        self.mac_call(&mac_call_stmt.mac)?;
-                        self.out.token(";")?;
-                        Ok(())
+                self.with_attrs(&mac_call_stmt.attrs, stmt.span, || {
+                    match mac_call_stmt.style {
+                        ast::MacStmtStyle::Semicolon => {
+                            self.mac_call(&mac_call_stmt.mac)?;
+                            self.out.token(";")?;
+                            Ok(())
+                        }
+                        ast::MacStmtStyle::Braces | ast::MacStmtStyle::NoBraces => {
+                            self.mac_call(&mac_call_stmt.mac)
+                        }
                     }
-                    ast::MacStmtStyle::Braces | ast::MacStmtStyle::NoBraces => {
-                        self.mac_call(&mac_call_stmt.mac)
-                    }
-                }
+                })
             }
         }
     }

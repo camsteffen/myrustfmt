@@ -1,18 +1,20 @@
 use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
-
+use std::path::PathBuf;
 use crate::error::{FormatError, ParseError, ParseResult};
 
 pub struct SourceReader {
     pub source: String,
     pub pos: Cell<BytePos>,
+    pub path: Option<PathBuf>,
 }
 
 impl SourceReader {
-    pub fn new(source: String) -> SourceReader {
+    pub fn new(source: String, path: Option<PathBuf>) -> SourceReader {
         SourceReader {
             source,
             pos: Cell::new(BytePos(0)),
+            path,
         }
     }
 
@@ -33,7 +35,11 @@ impl SourceReader {
             if cfg!(debug_assertions) {
                 panic!(
                     "{}",
-                    FormatError::from(err).display(&self.source, self.pos.get().to_usize())
+                    FormatError::from(err).display(
+                        &self.source,
+                        self.pos.get().to_usize(),
+                        self.path.as_deref()
+                    )
                 );
             }
             return Err(err);

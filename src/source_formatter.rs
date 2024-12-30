@@ -5,6 +5,7 @@ use crate::source_reader::SourceReader;
 use rustc_lexer::TokenKind;
 use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
+use std::path::PathBuf;
 
 pub struct SourceFormatterSnapshot {
     writer_snapshot: ConstraintWriterSnapshot,
@@ -20,16 +21,16 @@ pub struct SourceFormatter {
 }
 
 impl SourceFormatter {
-    pub fn new(source: impl Into<String>, constraints: Constraints) -> SourceFormatter {
+    pub fn new(source: impl Into<String>, constraints: Constraints, path: Option<PathBuf>) -> SourceFormatter {
         SourceFormatter {
-            source: SourceReader::new(source.into()),
+            source: SourceReader::new(source.into(), path),
             out: ConstraintWriter::new(constraints),
             next_is_whitespace_or_comments: Cell::new(true),
         }
     }
 
     pub fn new_defaults(source: impl Into<String>) -> SourceFormatter {
-        Self::new(source, Constraints::default())
+        Self::new(source, Constraints::default(), None)
     }
 
     pub fn finish(self) -> String {

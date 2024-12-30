@@ -45,7 +45,9 @@ impl<'a> AstFormatter {
                     .tail(end)
                     .format(self)?
             }
-            ast::PatKind::Or(ref pats) => self.infix_chain("|", pats, |pat| self.pat(pat), false)?,
+            ast::PatKind::Or(ref pats) => {
+                self.infix_chain("|", pats, |pat| self.pat(pat), false)?
+            }
             ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false)?,
             ast::PatKind::Tuple(ref fields) => list(Braces::PARENS, fields, |pat| self.pat(pat))
                 .config(&ParamListConfig {
@@ -97,14 +99,15 @@ impl<'a> AstFormatter {
     }
 
     fn pat_field(&self, pat_field: &ast::PatField) -> FormatResult {
-        self.attrs(&pat_field.attrs)?;
-        if pat_field.is_shorthand {
-            self.pat(&pat_field.pat)?;
-        } else {
-            self.ident(pat_field.ident)?;
-            self.out.token_space(":")?;
-            self.pat(&pat_field.pat)?;
-        }
-        Ok(())
+        self.with_attrs(&pat_field.attrs, pat_field.span, || {
+            if pat_field.is_shorthand {
+                self.pat(&pat_field.pat)?;
+            } else {
+                self.ident(pat_field.ident)?;
+                self.out.token_space(":")?;
+                self.pat(&pat_field.pat)?;
+            }
+            Ok(())
+        })
     }
 }

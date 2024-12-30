@@ -1,32 +1,46 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::list_config::ParamListConfig;
 use crate::ast_formatter::list::{Braces, list};
+use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::is_rustfmt_skip;
-use crate::error::{FormatResult, ParseError};
+use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use rustc_span::Span;
 
 impl AstFormatter {
+    // todo test usages
     pub fn with_attrs(
         &self,
         attrs: &[ast::Attribute],
-        f: impl Fn() -> FormatResult,
         span: Span,
+        f: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
+        self.with_attrs_tail(attrs, span, Tail::NONE, f)
+    }
+
+    pub fn with_attrs_tail(
+        &self,
+        attrs: &[ast::Attribute],
+        span: Span,
+        tail: &Tail,
+        f: impl FnOnce() -> FormatResult,
+    ) -> FormatResult {
+        // todo skip attributes as well?
         self.attrs(attrs)?;
         if attrs.iter().any(is_rustfmt_skip) {
-            self.out
-                .constraints()
-                .with_no_max_width(|| self.out.copy_span(span))?;
+            self.out.constraints().with_no_max_width(|| {
+                self.out.copy_span(span)?;
+                self.tail(tail)?;
+                Ok(())
+            })?;
         } else {
             f()?;
         }
         Ok(())
     }
 
-    // todo private, use with_attrs
-    pub fn attrs(&self, attrs: &[ast::Attribute]) -> FormatResult {
+    fn attrs(&self, attrs: &[ast::Attribute]) -> FormatResult {
         for attr in attrs {
             self.attr(attr)?;
         }
@@ -61,7 +75,7 @@ impl AstFormatter {
         self.safety(&meta.unsafety)?;
         self.path(&meta.path, false)?;
         match &meta.kind {
-            ast::MetaItemKind::Word => Ok(()),
+            ast::MetaItemKind::Word => {}
             ast::MetaItemKind::List(items) => list(Braces::PARENS, items, |item| match item {
                 ast::MetaItemInner::MetaItem(item) => self.meta_item(item),
                 ast::MetaItemInner::Lit(lit) => self.meta_item_lit(lit),
@@ -70,12 +84,16 @@ impl AstFormatter {
                 single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
             })
             .overflow()
-            .format(self),
-            ast::MetaItemKind::NameValue(lit) => self.meta_item_lit(lit),
+            .format(self)?,
+            ast::MetaItemKind::NameValue(lit) => {
+                self.out.space_token_space("=")?;
+                self.meta_item_lit(lit)?;
+            }
         }
+        Ok(())
     }
 
-    fn meta_item_lit(&self, _lit: &ast::MetaItemLit) -> FormatResult {
-        Err(ParseError::UnsupportedSyntax.into())
+    fn meta_item_lit(&self, lit: &ast::MetaItemLit) -> FormatResult {
+        self.out.copy_span(lit.span)
     }
 }

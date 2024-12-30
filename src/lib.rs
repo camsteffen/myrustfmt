@@ -38,35 +38,45 @@ use rustc_span::{
     source_map::{FilePathMapping, SourceMap},
 };
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::ast_formatter::AstFormatter;
 use crate::config::Config;
 use crate::constraints::Constraints;
 use source_formatter::SourceFormatter;
 
-pub fn format_file(path: impl AsRef<Path>) -> Result<String, ErrorGuaranteed> {
+pub fn format_file(path: impl AsRef<Path>, config: Config) -> Result<String, ErrorGuaranteed> {
+    let path = path.as_ref();
     let string = fs::read_to_string(path).unwrap();
-    format_str_config(&string, Config::default())
+    format_str_config(&string, config, Some(path))
+}
+
+pub fn format_file_defaults(path: impl AsRef<Path>) -> Result<String, ErrorGuaranteed> {
+    format_file(path, Config::default())
 }
 
 pub fn format_str_defaults(source: &str) -> Result<String, ErrorGuaranteed> {
-    format_str_config(source, Config::default())
+    format_str_config(source, Config::default(), None)
 }
 
 pub fn format_str(source: &str, max_width: usize) -> Result<String, ErrorGuaranteed> {
-    format_str_config(source, Config::default().max_width(max_width))
+    format_str_config(source, Config::default().max_width(max_width), None)
 }
 
-pub fn format_str_config(source: &str, config: Config) -> Result<String, ErrorGuaranteed> {
+pub fn format_str_config(
+    source: &str,
+    config: Config,
+    path: Option<&Path>,
+) -> Result<String, ErrorGuaranteed> {
     parse_ast_then(String::from(source), |crate_| {
         let constraints = Constraints::new(config.max_width);
-        let source_formatter = SourceFormatter::new(String::from(source), constraints);
+        let source_formatter =
+            SourceFormatter::new(String::from(source), constraints, path.map(PathBuf::from));
         let ast_formatter = AstFormatter::new(config, source_formatter);
         match ast_formatter.crate_(&crate_) {
             Ok(()) => {}
             // todo don't panic
-            Err(e) => panic!("{}", e.display(source, ast_formatter.pos())),
+            Err(e) => panic!("{}", e.display(source, ast_formatter.pos(), path)),
         }
         ast_formatter.finish()
     })

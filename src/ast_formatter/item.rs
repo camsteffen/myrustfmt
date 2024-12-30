@@ -21,10 +21,11 @@ impl<'a> AstFormatter {
         item: &ast::Item<K>,
         kind: impl FnOnce(&K) -> FormatResult,
     ) -> FormatResult {
-        self.attrs(&item.attrs)?;
-        self.vis(&item.vis)?;
-        kind(&item.kind)?;
-        Ok(())
+        self.with_attrs(&item.attrs, item.span, || {
+            self.vis(&item.vis)?;
+            kind(&item.kind)?;
+            Ok(())
+        })
     }
 
     pub fn item_kind(&self, kind: &ast::ItemKind, item: &ast::Item) -> FormatResult {
@@ -146,14 +147,15 @@ impl<'a> AstFormatter {
     }
 
     fn variant(&self, variant: &ast::Variant) -> FormatResult {
-        self.attrs(&variant.attrs)?;
-        self.vis(&variant.vis)?;
-        self.ident(variant.ident)?;
-        self.variant_data(&variant.data, true)?;
-        if let Some(_discriminant) = &variant.disr_expr {
-            todo!()
-        }
-        Ok(())
+        self.with_attrs(&variant.attrs, variant.span, || {
+            self.vis(&variant.vis)?;
+            self.ident(variant.ident)?;
+            self.variant_data(&variant.data, true)?;
+            if let Some(_discriminant) = &variant.disr_expr {
+                todo!()
+            }
+            Ok(())
+        })
     }
 
     fn impl_(&self, impl_: &ast::Impl) -> FormatResult {
@@ -296,14 +298,15 @@ impl<'a> AstFormatter {
     }
 
     fn field_def(&self, field: &ast::FieldDef) -> FormatResult {
-        self.attrs(&field.attrs)?;
-        self.vis(&field.vis)?;
-        if let Some(ident) = field.ident {
-            self.ident(ident)?;
-            self.out.token_space(":")?;
-        }
-        self.ty(&field.ty)?;
-        Ok(())
+        self.with_attrs(&field.attrs, field.span, || {
+            self.vis(&field.vis)?;
+            if let Some(ident) = field.ident {
+                self.ident(ident)?;
+                self.out.token_space(":")?;
+            }
+            self.ty(&field.ty)?;
+            Ok(())
+        })
     }
 
     fn use_tree(&self, use_tree: &ast::UseTree) -> FormatResult {

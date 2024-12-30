@@ -203,7 +203,10 @@ impl<'a> AstFormatter {
     }
 
     fn param(&self, param: &ast::Param) -> FormatResult {
-        self.attrs(&param.attrs)?;
+        self.with_attrs(&param.attrs, param.span, || self.param_after_attrs(param))
+    }
+
+    fn param_after_attrs(&self, param: &ast::Param) -> FormatResult {
         if let ast::PatKind::Ident(BindingMode(_, mutbl), ident, _) = param.pat.kind {
             match ident.name {
                 kw::Empty => return self.ty(&param.ty),
