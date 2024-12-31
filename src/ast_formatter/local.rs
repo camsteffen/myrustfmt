@@ -25,9 +25,6 @@ impl<'a> AstFormatter {
                 self.fallback(|| {
                     self.out.space_token_space("else")?;
                     self.out.token("{")?;
-                    if self.config().rustfmt_quirks {
-                        self.out.require_width(1)?;
-                    }
                     Ok(())
                 })
                 .next(|| {

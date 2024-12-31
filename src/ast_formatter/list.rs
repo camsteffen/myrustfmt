@@ -175,14 +175,6 @@ where
             }
             self.contents_single_line(af, tail)
         });
-        if self.config.single_line_block() {
-            assert_eq!(
-                ItemConfig::ITEMS_POSSIBLY_MUST_HAVE_OWN_LINE,
-                false,
-                "not implemented"
-            );
-            fallback = fallback.next(|| self.contents_single_line_block(af, tail))
-        }
         match Config::wrap_to_fit() {
             ListWrapToFitConfig::Yes { max_element_width } => {
                 assert!(
@@ -199,31 +191,16 @@ where
     }
 
     fn contents_single_line(&self, af: &AstFormatter, tail: &Tail) -> FormatResult {
-        af.with_reduce_max_width(
-            self.config.single_line_reduce_max_width_quirk(af.config()),
-            || {
-                af.list_contents_single_line(
-                    self.list,
-                    &self.format_item,
-                    self.rest,
-                    tail,
-                    self.overflow,
-                    self.braces.pad,
-                    self.config.single_line_max_contents_width(),
-                    self.config
-                        .overflow_max_first_line_contents_width(af.config()),
-                )
-            },
-        )
-    }
-
-    fn contents_single_line_block(&self, af: &AstFormatter, tail: &Tail) -> FormatResult {
-        af.list_contents_single_line_block(
+        af.list_contents_single_line(
             self.list,
+            &self.format_item,
             self.rest,
             tail,
-            &self.format_item,
+            self.overflow,
+            self.braces.pad,
             self.config.single_line_max_contents_width(),
+            self.config
+                .overflow_max_first_line_contents_width(af.config()),
         )
     }
 
@@ -321,48 +298,6 @@ impl<'a> AstFormatter {
         if pad {
             self.out.space()?;
         }
-        self.tail(tail)?;
-        Ok(())
-    }
-
-    /*
-    [
-        item, item
-    ]
-     */
-    fn list_contents_single_line_block<Item>(
-        &self,
-        list: &[Item],
-        rest: ListRest<'_>,
-        tail: &Tail,
-        format_item: impl Fn(&Item) -> FormatResult,
-        max_width: Option<usize>,
-    ) -> FormatResult {
-        // single line block only exists for a specific case of rustfmt compatibility
-        assert!(
-            matches!(rest, ListRest::Rest),
-            "single line block list can only be used with ListRest::Rest"
-        );
-        let (last, until_last) = list.split_last().unwrap();
-        self.indented(|| {
-            self.out.newline_indent()?;
-            self.with_single_line(|| {
-                self.with_width_limit_opt(max_width, || {
-                    for item in until_last {
-                        format_item(item)?;
-                        self.out.token_maybe_missing(",")?;
-                        self.out.space()?;
-                    }
-                    format_item(last)?;
-                    Ok(())
-                })?;
-                self.out.token_maybe_missing(",")?;
-                self.out.space()?;
-                self.out.token("..")?;
-                Ok(())
-            })
-        })?;
-        self.out.newline_indent()?;
         self.tail(tail)?;
         Ok(())
     }

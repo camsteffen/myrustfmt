@@ -13,21 +13,20 @@ macro_rules! config {
         }
 
         impl Config {
-            $(pub fn $name(self, $name: $ty) -> Config {
-                Config { $name, ..self }
-            })*
-            
-            pub fn set(&mut self, name: &str, value: &str) {
+            pub fn set_str(&mut self, name: &str, value: &str) {
                 match name {
                     $(stringify!($name) => self.$name = value.parse().unwrap(),)*
                     _ => panic!("Invalid config name: {name}"),
                 }
             }
+
+            $(pub fn $name(self, $name: $ty) -> Config {
+                Config { $name, ..self }
+            })*
         }
     };
 }
 
 config! {
     max_width: usize = 100,
-    rustfmt_quirks: bool = true,
 }

@@ -2,7 +2,6 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::list_config::ListConfig;
 use crate::ast_formatter::list::{Braces, list};
 use crate::ast_formatter::util::tail::Tail;
-use crate::ast_utils::is_call_or_prefixed;
 use crate::config::Config;
 use crate::constraints::INDENT_WIDTH;
 use crate::error::WidthLimitExceededError;
@@ -40,21 +39,9 @@ impl AstFormatter {
             }
         }
         if self.out.line() == first_line {
-            let width_limit = if self.config().rustfmt_quirks && dot_chain.len() == 1 {
-                None
-            } else {
-                if self.config().rustfmt_quirks && dot_chain.last().unwrap().try_ops > 0 {
-                    // todo test
-                    Some(RUSTFMT_CONFIG_DEFAULTS.chain_width - 1)
-                } else {
-                    Some(RUSTFMT_CONFIG_DEFAULTS.chain_width)
-                }
-            };
-            self.fallback(|| {
-                self.dot_chain_single_line(dot_chain_remaining, start_pos, width_limit, tail)
-            })
-            .next(|| self.dot_chain_separate_lines_indented(dot_chain_remaining, tail))
-            .result()
+            self.fallback(|| self.dot_chain_single_line(dot_chain_remaining, start_pos, tail))
+                .next(|| self.dot_chain_separate_lines_indented(dot_chain_remaining, tail))
+                .result()
         } else {
             // each item on a separate line, no indent
             for item in dot_chain_remaining {
@@ -70,11 +57,11 @@ impl AstFormatter {
         &self,
         dot_chain: &[DotChainItem<'_>],
         start_pos: usize,
-        width_limit: Option<usize>,
         tail: &Tail,
     ) -> FormatResult {
+        let width_limit = RUSTFMT_CONFIG_DEFAULTS.chain_width;
         let (last, until_last) = dot_chain.split_last().unwrap();
-        self.with_width_limit_from_start_opt(start_pos, width_limit, || {
+        self.with_width_limit_from_start(start_pos, width_limit, || {
             self.with_single_line(|| {
                 for item in until_last {
                     self.dot_chain_item(item)?;
@@ -85,7 +72,7 @@ impl AstFormatter {
         let snapshot = self.out.snapshot();
         // no multiline overflow
         let result = self
-            .with_width_limit_from_start_opt(start_pos, width_limit, || {
+            .with_width_limit_from_start(start_pos, width_limit, || {
                 self.with_single_line(|| self.dot_chain_item(last))
             })
             .and_then(|()| self.tail(tail));
@@ -117,7 +104,7 @@ impl AstFormatter {
             return Err(WidthLimitExceededError.into());
         }
         self.out.restore(&snapshot);
-        self.with_width_limit_from_start_first_line_opt(start_pos, width_limit, || {
+        self.with_width_limit_from_start_first_line(start_pos, width_limit, || {
             // try with overflow
             info!("trying overflow");
             self.dot_chain_item(last)
@@ -151,13 +138,8 @@ impl AstFormatter {
             // todo share code with ExprKind::Call?
             ast::ExprKind::MethodCall(ref method_call) => {
                 self.path_segment(&method_call.seg, true)?;
-                let args_max_width_exempt = self.config().rustfmt_quirks
-                    && matches!(&*method_call.args, [arg] if !is_call_or_prefixed(arg));
-                let list_config = MethodCallParamsListConfig {
-                    apply_max_contents_width: !args_max_width_exempt,
-                };
                 list(Braces::PARENS, &method_call.args, |arg| self.expr(arg))
-                    .config(&list_config)
+                    .config(&MethodCallParamsListConfig)
                     .overflow()
                     .format(self)?;
             }
@@ -191,21 +173,14 @@ fn do_build_dot_chain<'a>(chain: &mut Vec<DotChainItem<'a>>, expr: &'a ast::Expr
     };
 }
 
-pub struct MethodCallParamsListConfig {
-    apply_max_contents_width: bool,
-}
+pub struct MethodCallParamsListConfig;
 
 impl ListConfig for MethodCallParamsListConfig {
-    fn overflow_max_first_line_contents_width(&self, config: &Config) -> Option<usize> {
-        if config.rustfmt_quirks {
-            Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width - 2)
-        } else {
-            Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
-        }
+    fn overflow_max_first_line_contents_width(&self, _config: &Config) -> Option<usize> {
+        Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
     }
 
     fn single_line_max_contents_width(&self) -> Option<usize> {
-        self.apply_max_contents_width
-            .then_some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
+        Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
     }
 }

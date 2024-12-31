@@ -37,7 +37,7 @@ fn long_struct_pat_multiple_lines() {
             "fn test() { let Struct { a, b, c: cccccccccc } = foo; }",
             80
         )
-            .unwrap(),
+        .unwrap(),
         "
 fn test() {
     let Struct {
@@ -47,6 +47,6 @@ fn test() {
     } = foo;
 }
 "
-            .trim_start()
+        .trim_start()
     );
 }

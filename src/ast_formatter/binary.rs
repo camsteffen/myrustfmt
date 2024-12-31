@@ -55,17 +55,11 @@ impl AstFormatter {
         let precedence = AssocOp::from_ast_binop(top_op.node).precedence();
         let mut current = left;
 
-        let op_matches = |op: ast::BinOp| {
-            if self.config().rustfmt_quirks {
-                op.node == top_op.node
-            } else {
-                AssocOp::from_ast_binop(op.node).precedence() == precedence
-            }
-        };
-
         loop {
             match current.kind {
-                ast::ExprKind::Binary(op, ref left, ref right) if op_matches(op) => {
+                ast::ExprKind::Binary(op, ref left, ref right)
+                    if AssocOp::from_ast_binop(op.node).precedence() == precedence =>
+                {
                     operators.push(op.node);
                     current = left;
                     stack.push(right);

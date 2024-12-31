@@ -86,11 +86,8 @@ impl<'a> AstFormatter {
     ) -> FormatResult {
         self.qpath(qself, path, false)?;
         self.out.space()?;
-        let single_line_block =
-            self.config().rustfmt_quirks && matches!(rest, ast::PatFieldsRest::Rest);
         list(Braces::CURLY, fields, |f| self.pat_field(f))
             .config(&struct_field_list_config(
-                single_line_block,
                 RUSTFMT_CONFIG_DEFAULTS.struct_lit_width,
             ))
             .rest(ListRest::from(rest))

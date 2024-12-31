@@ -7,7 +7,6 @@ use crate::ast_formatter::list::list_config::{
 };
 use crate::ast_formatter::list::{Braces, ListItemConfig, list};
 use crate::ast_formatter::util::tail::Tail;
-use crate::config::Config;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
@@ -166,7 +165,7 @@ impl<'a> AstFormatter {
             Some(of_trait) => self.trait_ref(of_trait),
             None => self.ty(&impl_.self_ty),
         };
-        let indented = if self.out.line() == first_line || self.config().rustfmt_quirks {
+        let indented = if self.out.line() == first_line {
             self.fallback(|| {
                 self.with_single_line(|| {
                     self.out.space()?;
@@ -276,8 +275,7 @@ impl<'a> AstFormatter {
         match variants {
             ast::VariantData::Struct { fields, .. } => {
                 self.out.space()?;
-                let config =
-                    struct_field_list_config(false, RUSTFMT_CONFIG_DEFAULTS.struct_variant_width);
+                let config = struct_field_list_config(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width);
                 let list = list(Braces::CURLY, fields, |f| self.field_def(f)).config(&config);
                 if is_enum {
                     list.format(self)?;
@@ -346,10 +344,6 @@ impl<'a> AstFormatter {
 struct UseTreeListConfig;
 
 impl ListConfig for UseTreeListConfig {
-    fn single_line_reduce_max_width_quirk(&self, config: &Config) -> usize {
-        config.rustfmt_quirks.then_some(2).unwrap_or(0)
-    }
-
     fn wrap_to_fit() -> ListWrapToFitConfig {
         ListWrapToFitConfig::Yes {
             max_element_width: None,

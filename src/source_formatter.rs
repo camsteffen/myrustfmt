@@ -1,11 +1,13 @@
 use crate::constraint_writer::{ConstraintWriter, ConstraintWriterSnapshot};
 use crate::constraints::Constraints;
 use crate::error::{FormatResult, WidthLimitExceededError};
+use crate::source_formatter::whitespace::{WhitespaceMode, handle_whitespace};
 use crate::source_reader::SourceReader;
-use rustc_lexer::TokenKind;
 use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
 use std::path::PathBuf;
+
+mod whitespace;
 
 pub struct SourceFormatterSnapshot {
     writer_snapshot: ConstraintWriterSnapshot,
@@ -21,7 +23,11 @@ pub struct SourceFormatter {
 }
 
 impl SourceFormatter {
-    pub fn new(source: impl Into<String>, constraints: Constraints, path: Option<PathBuf>) -> SourceFormatter {
+    pub fn new(
+        source: impl Into<String>,
+        constraints: Constraints,
+        path: Option<PathBuf>,
+    ) -> SourceFormatter {
         SourceFormatter {
             source: SourceReader::new(source.into(), path),
             out: ConstraintWriter::new(constraints),
@@ -84,7 +90,7 @@ impl SourceFormatter {
 
     /** Writes a newline character and indent characters according to the current indent level */
     pub fn newline_indent(&self) -> FormatResult {
-        self.handle_whitespace_and_comments_for_newline()
+        self.handle_whitespace_and_comments(WhitespaceMode::Newline)
     }
 
     pub fn char_ending_at(&self, pos: BytePos) -> u8 {
@@ -102,7 +108,7 @@ impl SourceFormatter {
         let snapshot;
         if self.next_is_whitespace_or_comments.get() {
             snapshot = Some(self.snapshot());
-            self.handle_whitespace_and_comments_for_token()?;
+            self.handle_whitespace_and_comments(WhitespaceMode::Token)?;
         } else {
             snapshot = None;
         }
@@ -148,7 +154,7 @@ impl SourceFormatter {
     /** Writes a space and accounts for spaces and comments in source */
     pub fn space(&self) -> FormatResult {
         if self.next_is_whitespace_or_comments.get() {
-            self.handle_whitespace_and_comments_for_space()?;
+            self.handle_whitespace_and_comments(WhitespaceMode::Space)?;
         } else {
             self.out.token(" ")?;
         }
@@ -207,108 +213,13 @@ impl SourceFormatter {
         self.out.with_last_line(f)
     }
 
-    fn handle_whitespace_and_comments_for_token(&self) -> FormatResult {
-        let mut skipped_newline = false;
-        let mut skipped_space = false;
-        let mut twas_comments = false;
-        for token in rustc_lexer::tokenize(self.source.remaining()) {
-            match token.kind {
-                TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
-                    if skipped_newline {
-                        self.out.newline()?;
-                        self.out.indent()?;
-                    }
-                    if skipped_space {
-                        skipped_space = false;
-                        self.out.token(" ")?;
-                    }
-                    self.constraints()
-                        .with_no_max_width(|| self.copy(token.len as usize))?;
-                    twas_comments = true;
-                }
-                TokenKind::Whitespace => {
-                    let token_str = &self.source.remaining()[..token.len as usize];
-                    if token_str.contains('\n') {
-                        // todo detect start of blocks too
-                        if self.out.len() > 0 {
-                            skipped_newline = true;
-                        }
-                    } else {
-                        skipped_space = true;
-                    }
-                    self.source.advance(token.len as usize);
-                }
-                _ => break,
-            }
-        }
-        if twas_comments {
-            if skipped_newline {
-                self.out.newline()?;
-                self.out.indent()?;
-            }
-            if skipped_space {
-                self.out.token(" ")?;
-            }
-        }
-        self.next_is_whitespace_or_comments.set(false);
-        Ok(())
-    }
-
-    fn handle_whitespace_and_comments_for_space(&self) -> FormatResult {
-        let mut anything_happened = false;
-        for token in rustc_lexer::tokenize(self.source.remaining()) {
-            match token.kind {
-                TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
-                    self.constraints()
-                        .with_no_max_width(|| self.copy(token.len as usize))?;
-                }
-                TokenKind::Whitespace => {
-                    self.out.token(" ")?;
-                    self.source.advance(token.len as usize);
-                }
-                _ => break,
-            }
-            anything_happened = true;
-        }
-        if !anything_happened {
-            self.out.token(" ")?;
-        }
-        self.next_is_whitespace_or_comments.set(false);
-        Ok(())
-    }
-
-    fn handle_whitespace_and_comments_for_newline(&self) -> FormatResult {
-        let mut newlines_happened = false;
-        for token in rustc_lexer::tokenize(self.source.remaining()) {
-            let token_str = &self.source.remaining()[..token.len as usize];
-            match token.kind {
-                TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
-                    self.constraints()
-                        .with_no_max_width(|| self.copy(token.len as usize))?;
-                }
-                TokenKind::Whitespace => {
-                    let newline_count = token_str.bytes().filter(|&b| b == b'\n').count();
-                    self.newline()?;
-                    if newline_count >= 2 {
-                        self.newline()?;
-                    }
-                    self.indent()?;
-                    self.source.advance(token.len as usize);
-                    newlines_happened = true;
-                }
-                _ => break,
-            }
-        }
-        if !newlines_happened {
-            self.newline()?;
-            self.indent()?;
-        }
-        Ok(())
+    fn handle_whitespace_and_comments(&self, mode: WhitespaceMode) -> FormatResult {
+        handle_whitespace(mode, self)
     }
 
     fn handle_whitespace_and_comments_if_needed(&self) -> FormatResult {
         if self.next_is_whitespace_or_comments.get() {
-            self.handle_whitespace_and_comments_for_token()?;
+            self.handle_whitespace_and_comments(WhitespaceMode::Token)?;
         }
         Ok(())
     }
@@ -363,10 +274,31 @@ mod tests {
 
     #[test]
     fn first_token_skips_initial_whitespace() {
-        let sf = SourceFormatter::new_defaults(" aa");
+        let sf = SourceFormatter::new_defaults(" \naa");
         sf.token("aa").unwrap();
         sf.eof().unwrap();
         assert_eq!(sf.finish(), "aa");
+    }
+
+    #[test]
+    fn replace_space_with_newline() {
+        let sf = SourceFormatter::new_defaults("aa aa");
+        sf.token("aa").unwrap();
+        sf.newline_indent().unwrap();
+        sf.token("aa").unwrap();
+        sf.eof().unwrap();
+        assert_eq!(sf.finish(), "aa\naa");
+    }
+
+    #[test]
+    fn no_indent_for_blank_line() {
+        let sf = SourceFormatter::new_defaults("aa\n    \naa");
+        sf.constraints().increment_indent();
+        sf.token("aa").unwrap();
+        sf.newline_indent().unwrap();
+        sf.token("aa").unwrap();
+        sf.eof().unwrap();
+        assert_eq!(sf.finish(), "aa\n\n    aa");
     }
 
     #[test]

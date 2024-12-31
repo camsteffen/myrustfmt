@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
-use crate::ast_formatter::list::list_config::ParamListConfig;
 use crate::ast_formatter::list::list;
+use crate::ast_formatter::list::list_config::ParamListConfig;
 use crate::error::FormatResult;
 use rustc_ast::ast;
 

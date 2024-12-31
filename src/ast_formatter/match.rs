@@ -14,7 +14,7 @@ impl AstFormatter {
     fn arm(&self, arm: &ast::Arm) -> FormatResult {
         self.with_attrs(&arm.attrs, arm.span, || self.arm_after_attrs(arm))
     }
-    
+
     fn arm_after_attrs(&self, arm: &ast::Arm) -> FormatResult {
         let first_line = self.out.line();
         self.pat(&arm.pat)?;
@@ -55,9 +55,6 @@ impl AstFormatter {
                 })?;
                 if let Some(body) = arm.body.as_deref() {
                     self.out.space_token("=>")?;
-                    if self.config.rustfmt_quirks {
-                        self.out.require_width(" {".len())?;
-                    }
                     self.out.newline_indent()?;
                     self.expr_force_block(body)?;
                     comma(body)?;

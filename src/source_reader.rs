@@ -1,7 +1,7 @@
+use crate::error::{FormatError, ParseError, ParseResult};
 use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
 use std::path::PathBuf;
-use crate::error::{FormatError, ParseError, ParseResult};
 
 pub struct SourceReader {
     pub source: String,

@@ -6,16 +6,8 @@ pub trait ListConfig {
         None
     }
 
-    fn single_line_block(&self) -> bool {
-        false
-    }
-
     fn single_line_max_contents_width(&self) -> Option<usize> {
         None
-    }
-
-    fn single_line_reduce_max_width_quirk(&self, _config: &Config) -> usize {
-        0
     }
 
     fn wrap_to_fit() -> ListWrapToFitConfig {
@@ -47,12 +39,9 @@ impl ListConfig for ArrayListConfig {
 pub struct CallParamListConfig;
 
 impl ListConfig for CallParamListConfig {
-    fn overflow_max_first_line_contents_width(&self, config: &Config) -> Option<usize> {
-        if config.rustfmt_quirks {
-            Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width - 2)
-        } else {
-            Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
-        }
+    // todo redundant?
+    fn overflow_max_first_line_contents_width(&self, _config: &Config) -> Option<usize> {
+        Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
     }
 
     fn single_line_max_contents_width(&self) -> Option<usize> {
@@ -69,25 +58,16 @@ impl ListConfig for ParamListConfig {
     }
 }
 
-pub fn struct_field_list_config(
-    single_line_block: bool,
-    single_line_max_contents_width: usize,
-) -> impl ListConfig {
+pub fn struct_field_list_config(single_line_max_contents_width: usize) -> impl ListConfig {
     pub struct StructFieldListConfig {
-        single_line_block: bool,
         single_line_max_contents_width: usize,
     }
     impl ListConfig for StructFieldListConfig {
-        fn single_line_block(&self) -> bool {
-            self.single_line_block
-        }
-
         fn single_line_max_contents_width(&self) -> Option<usize> {
             Some(self.single_line_max_contents_width)
         }
     }
     StructFieldListConfig {
-        single_line_block,
         single_line_max_contents_width,
     }
 }

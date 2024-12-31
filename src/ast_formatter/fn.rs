@@ -41,19 +41,13 @@ impl<'a> AstFormatter {
             param_list.format_separate_lines(self)?;
             self.fn_ret_ty(&sig.decl.output)?;
             if is_block_after_decl {
-                self.fallback(|| {
-                    self.out.space_token("{")?;
-                    if self.config().rustfmt_quirks {
-                        self.out.require_width(4)?;
-                    }
-                    Ok(())
-                })
-                .next(|| {
-                    self.out.newline_indent()?;
-                    self.out.token("{")?;
-                    Ok(())
-                })
-                .result()?;
+                self.fallback(|| self.out.space_token("{"))
+                    .next(|| {
+                        self.out.newline_indent()?;
+                        self.out.token("{")?;
+                        Ok(())
+                    })
+                    .result()?;
             }
             Ok(())
         })
@@ -105,12 +99,9 @@ impl<'a> AstFormatter {
     fn closure_body(&self, body: &ast::Expr, tail: &Tail) -> FormatResult {
         fn is_block_like(expr: &ast::Expr) -> bool {
             match expr.kind {
-                ast::ExprKind::Match(..)
-                | ast::ExprKind::Gen(..)
+                ast::ExprKind::Gen(..)
                 | ast::ExprKind::Block(..)
-                | ast::ExprKind::TryBlock(..)
-                | ast::ExprKind::Loop(..)
-                | ast::ExprKind::Struct(..) => true,
+                | ast::ExprKind::TryBlock(..) => true,
 
                 ast::ExprKind::AddrOf(_, _, ref expr)
                 | ast::ExprKind::Try(ref expr)

@@ -1,8 +1,8 @@
+use crate::config::Config;
 use crate::error::{FormatResult, WidthLimitExceededError};
 use std::backtrace::Backtrace;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use crate::config::Config;
 
 pub const INDENT_WIDTH: usize = 4;
 
@@ -22,7 +22,6 @@ pub struct Constraints {
     pub max_width_for_line: Cell<Option<MaxWidthForLine>>,
     pub indent: Cell<usize>,
     pub newline_budget: Cell<Option<usize>>,
-
 }
 
 impl Default for Constraints {

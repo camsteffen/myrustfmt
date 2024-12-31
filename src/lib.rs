@@ -48,7 +48,7 @@ use source_formatter::SourceFormatter;
 pub fn format_file(path: impl AsRef<Path>, config: Config) -> Result<String, ErrorGuaranteed> {
     let path = path.as_ref();
     let string = fs::read_to_string(path).unwrap();
-    format_str_config(&string, config, Some(path))
+    format(&string, config, Some(path))
 }
 
 pub fn format_file_defaults(path: impl AsRef<Path>) -> Result<String, ErrorGuaranteed> {
@@ -56,14 +56,18 @@ pub fn format_file_defaults(path: impl AsRef<Path>) -> Result<String, ErrorGuara
 }
 
 pub fn format_str_defaults(source: &str) -> Result<String, ErrorGuaranteed> {
-    format_str_config(source, Config::default(), None)
+    format_str_config(source, Config::default())
 }
 
 pub fn format_str(source: &str, max_width: usize) -> Result<String, ErrorGuaranteed> {
-    format_str_config(source, Config::default().max_width(max_width), None)
+    format_str_config(source, Config::default().max_width(max_width))
 }
 
-pub fn format_str_config(
+pub fn format_str_config(source: &str, config: Config) -> Result<String, ErrorGuaranteed> {
+    format(source, config, None)
+}
+
+pub fn format(
     source: &str,
     config: Config,
     path: Option<&Path>,

@@ -347,7 +347,6 @@ impl<'a> AstFormatter {
         self.out.space()?;
         list(Braces::CURLY, &struct_.fields, |f| self.expr_field(f))
             .config(&struct_field_list_config(
-                false,
                 RUSTFMT_CONFIG_DEFAULTS.struct_lit_width,
             ))
             .rest(ListRest::from(&struct_.rest))

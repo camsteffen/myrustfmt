@@ -6,7 +6,7 @@ pub trait ListItemConfig: Copy {
     const ITEMS_POSSIBLY_MUST_HAVE_OWN_LINE: bool = false;
 
     fn item_must_have_own_line(_item: &Self::Item) -> bool {
-        panic!("ITEMS_POSSIBLY_MUST_HAVE_OWN_LINE is false");
+        false
     }
 }
 

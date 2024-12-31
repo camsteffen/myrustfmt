@@ -31,6 +31,6 @@ use aaaaaaaaaaaaaaaaaa::{
     ccccccccc::{dddddddd, eeeeeeeeee},
 };
 "#
-            .trim_start()
-    ); 
+        .trim_start()
+    );
 }

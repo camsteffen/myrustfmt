@@ -1,5 +1,5 @@
-use rustc_span::Symbol;
 use rustc_ast::ast;
+use rustc_span::Symbol;
 use rustc_span::sym;
 
 pub fn expr_only_block(block: &ast::Block) -> Option<&ast::Expr> {
@@ -16,17 +16,6 @@ pub fn expr_only_block(block: &ast::Block) -> Option<&ast::Expr> {
 pub fn is_rustfmt_skip(attr: &ast::Attribute) -> bool {
     static PATH: [Symbol; 2] = [sym::rustfmt, sym::skip];
     attr.path_matches(&PATH)
-}
-
-pub fn is_call_or_prefixed(expr: &ast::Expr) -> bool {
-    match expr.kind {
-        ast::ExprKind::Call(..) | ast::ExprKind::MacCall(..) => true,
-        ast::ExprKind::AddrOf(_, _, ref expr)
-        | ast::ExprKind::Try(ref expr)
-        | ast::ExprKind::Unary(_, ref expr)
-        | ast::ExprKind::Cast(ref expr, _) => is_call_or_prefixed(expr),
-        _ => false,
-    }
 }
 
 pub fn is_plain_block(expr: &ast::Expr) -> bool {

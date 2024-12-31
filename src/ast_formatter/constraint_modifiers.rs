@@ -87,23 +87,6 @@ impl AstFormatter {
         Ok((self.out.len() - len, self.out.line() - line))
     }
 
-    pub fn with_reduce_max_width(
-        &self,
-        amount: usize,
-        f: impl FnOnce() -> FormatResult,
-    ) -> FormatResult {
-        if amount == 0 {
-            return f();
-        }
-        let Some(current) = self.constraints().max_width.get() else {
-            return f();
-        };
-        let Some(max_width) = current.checked_sub(amount) else {
-            return Err(WidthLimitExceededError.into());
-        };
-        self.with_set_max_width(max_width, f)
-    }
-
     pub fn with_reduce_max_width_for_line(
         &self,
         amount: usize,
@@ -119,13 +102,6 @@ impl AstFormatter {
             return Err(WidthLimitExceededError.into());
         };
         self.with_set_max_width_for_line(new_max_width, f)
-    }
-
-    fn with_set_max_width<T>(&self, max_width: usize, f: impl FnOnce() -> T) -> T {
-        let max_width_prev = self.constraints().max_width.replace(Some(max_width));
-        let result = f();
-        self.constraints().max_width.set(max_width_prev);
-        result
     }
 
     fn with_set_max_width_for_line<T>(&self, max_width: usize, f: impl FnOnce() -> T) -> T {
