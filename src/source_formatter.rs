@@ -5,7 +5,6 @@ use crate::source_formatter::whitespace::{WhitespaceMode, handle_whitespace};
 use crate::source_reader::SourceReader;
 use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
-use std::path::PathBuf;
 
 mod whitespace;
 
@@ -26,17 +25,16 @@ impl SourceFormatter {
     pub fn new(
         source: impl Into<String>,
         constraints: Constraints,
-        path: Option<PathBuf>,
     ) -> SourceFormatter {
         SourceFormatter {
-            source: SourceReader::new(source.into(), path),
+            source: SourceReader::new(source.into()),
             out: ConstraintWriter::new(constraints),
             next_is_whitespace_or_comments: Cell::new(true),
         }
     }
 
     pub fn new_defaults(source: impl Into<String>) -> SourceFormatter {
-        Self::new(source, Constraints::default(), None)
+        Self::new(source, Constraints::default())
     }
 
     pub fn finish(self) -> String {
@@ -80,7 +78,7 @@ impl SourceFormatter {
         self.out.len()
     }
 
-    pub fn line(&self) -> usize {
+    pub fn line(&self) -> u32 {
         self.out.line()
     }
 
@@ -152,6 +150,7 @@ impl SourceFormatter {
     }
 
     /** Writes a space and accounts for spaces and comments in source */
+    // todo do newlines and comments sneak in when it should be single line?
     pub fn space(&self) -> FormatResult {
         if self.next_is_whitespace_or_comments.get() {
             self.handle_whitespace_and_comments(WhitespaceMode::Space)?;
@@ -199,7 +198,7 @@ impl SourceFormatter {
         Ok(())
     }
 
-    pub fn require_width(&self, width: usize) -> Result<(), WidthLimitExceededError> {
+    pub fn require_width(&self, width: u32) -> Result<(), WidthLimitExceededError> {
         if let Some(remaining) = self.out.remaining_width() {
             let remaining = remaining?;
             if remaining < width {

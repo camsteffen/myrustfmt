@@ -1,0 +1,37 @@
+- before: |
+    let x = y;
+  after: |
+    let x =
+        y;
+- before: |
+    let x =
+        [yyyy];
+  after: |
+    let x = [
+        yyyy,
+    ];
+- before: |
+    let x = Struct {
+        y,
+    };
+  after: |
+    let x =
+        Struct {
+            y,
+        };
+#  let else
+- before: |
+    let xxxxxxxxxxxxx = aaaaaaaaaa else { return x };
+  after: |
+    let xxxxxxxxxxxxx = aaaaaaaaaa else {
+        return x;
+    };
+- before: |
+    let xxxxxxxxxxxxx = aaaaaaaaaa else {
+        return x;
+    };
+  after: |
+    let xxxxxxxxxxxxx = aaaaaaaaaa
+    else {
+        return x;
+    };

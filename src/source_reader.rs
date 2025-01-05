@@ -1,20 +1,18 @@
-use crate::error::{FormatError, ParseError, ParseResult};
+use crate::error::{ParseError, ParseErrorKind, ParseResult};
 use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
-use std::path::PathBuf;
 
 pub struct SourceReader {
+    // todo use parse session source file?
     pub source: String,
     pub pos: Cell<BytePos>,
-    pub path: Option<PathBuf>,
 }
 
 impl SourceReader {
-    pub fn new(source: String, path: Option<PathBuf>) -> SourceReader {
+    pub fn new(source: String) -> SourceReader {
         SourceReader {
             source,
             pos: Cell::new(BytePos(0)),
-            path,
         }
     }
 
@@ -24,25 +22,18 @@ impl SourceReader {
 
     pub fn expect_pos(&self, pos: BytePos) -> ParseResult {
         if pos != self.pos.get() {
-            return Err(ParseError::ExpectedPosition(pos.to_usize()));
+            return Err(ParseError::new(ParseErrorKind::ExpectedPosition(
+                pos.to_usize(),
+            )));
         }
         Ok(())
     }
 
     pub fn eat(&self, token: &str) -> Result<(), ParseError> {
         if !self.try_eat(token) {
-            let err = ParseError::ExpectedToken(token.to_string());
-            if cfg!(debug_assertions) {
-                panic!(
-                    "{}",
-                    FormatError::from(err).display(
-                        &self.source,
-                        self.pos.get().to_usize(),
-                        self.path.as_deref()
-                    )
-                );
-            }
-            return Err(err);
+            return Err(ParseError::new(ParseErrorKind::ExpectedToken(
+                token.to_string(),
+            )));
         }
         Ok(())
     }

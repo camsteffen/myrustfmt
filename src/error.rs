@@ -1,3 +1,4 @@
+use std::backtrace::Backtrace;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
 
@@ -19,7 +20,7 @@ impl<T> FormatResultExt for FormatResult<T> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum FormatError {
     Constraint(ConstraintError),
     Parse(ParseError),
@@ -40,8 +41,24 @@ pub struct WidthLimitExceededError;
 
 pub type ParseResult<T = ()> = Result<T, ParseError>;
 
+#[derive(Debug)]
+pub struct ParseError {
+    pub kind: ParseErrorKind,
+    pub backtrace: Backtrace,
+}
+
+impl ParseError {
+    #[cold]
+    pub fn new(kind: ParseErrorKind) -> Self {
+        ParseError {
+            kind,
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
-pub enum ParseError {
+pub enum ParseErrorKind {
     ExpectedPosition(usize),
     ExpectedToken(String),
     UnsupportedSyntax,
@@ -49,71 +66,56 @@ pub enum ParseError {
 
 impl FormatError {
     pub fn display(&self, source: &str, pos: usize, path: Option<&Path>) -> impl Display {
-        struct FormatErrorDisplay<'err, 'path, 'source> {
-            error: &'err FormatError,
-            path: Option<&'path Path>,
-            source: &'source str,
-            pos: usize,
-            line: usize,
-            col: usize,
-        }
-        impl Display for FormatErrorDisplay<'_, '_, '_> {
-            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-                match self.path {
-                    None => write!(f, "Error formatting at {}:{}, ", self.line, self.col)?,
-                    Some(path) => write!(
-                        f,
-                        "Error formatting {}:{}:{}, ",
-                        path.display(),
-                        self.line,
-                        self.col
-                    )?,
-                }
-                let next_token = |f: &mut Formatter<'_>| {
-                    let remaining = &self.source[self.pos..];
-                    let token = rustc_lexer::tokenize(remaining).next().unwrap();
-                    let token_str = &remaining[..token.len as usize];
-                    write!(f, ". Next token is `{token_str}`")
-                };
-                match *self.error {
-                    FormatError::Constraint(ConstraintError::Logical) => {
-                        write!(f, "unhandled logical constraint error")?
-                    }
-                    FormatError::Constraint(ConstraintError::WidthLimitExceeded) => {
-                        write!(f, "width limit exceeded")?
-                    }
-                    FormatError::Constraint(ConstraintError::NewlineNotAllowed) => {
-                        write!(f, "width limit exceeded")?
-                    }
-                    FormatError::Parse(ParseError::ExpectedPosition(pos)) => {
-                        write!(
-                            f,
-                            "expected position is {} bytes {}",
-                            pos.abs_diff(self.pos),
-                            if pos > self.pos { "ahead" } else { "behind" }
-                        )?;
-                        next_token(f)?;
-                    }
-                    FormatError::Parse(ParseError::ExpectedToken(ref token)) => {
-                        write!(f, "expected token: `{}`", token)?;
-                        next_token(f)?;
-                    }
-                    FormatError::Parse(ParseError::UnsupportedSyntax) => {
-                        write!(f, "unsupported syntax")?;
-                    }
-                }
-                Ok(())
+        display_from_fn(move |f| {
+            let (line, col) = line_col(source, pos);
+            match path {
+                None => write!(f, "Error formatting at {line}:{col}, ")?,
+                Some(path) => write!(
+                    f,
+                    "Error formatting {}:{line}:{col}, ",
+                    path.display(),
+                )?,
             }
-        }
-        let (line, col) = line_col(source, pos);
-        FormatErrorDisplay {
-            error: self,
-            source,
-            path,
-            pos,
-            line,
-            col,
-        }
+            let next_token = |f: &mut Formatter<'_>| {
+                let remaining = &source[pos..];
+                let token = rustc_lexer::tokenize(remaining).next().unwrap();
+                let token_str = &remaining[..token.len as usize];
+                write!(f, ". Next token is `{token_str}`")
+            };
+            match self {
+                FormatError::Constraint(ConstraintError::Logical) => {
+                    write!(f, "unhandled logical constraint error")?
+                }
+                FormatError::Constraint(ConstraintError::WidthLimitExceeded) => {
+                    write!(f, "width limit exceeded")?
+                }
+                FormatError::Constraint(ConstraintError::NewlineNotAllowed) => {
+                    write!(f, "width limit exceeded")?
+                }
+                FormatError::Parse(parse_error) => {
+                    match parse_error.kind {
+                        ParseErrorKind::ExpectedPosition(expected_pos) => {
+                            write!(
+                                f,
+                                "expected position is {} bytes {}",
+                                expected_pos.abs_diff(pos),
+                                if expected_pos > pos { "ahead" } else { "behind" }
+                            )?;
+                            next_token(f)?;
+                        }
+                        ParseErrorKind::ExpectedToken(ref token) => {
+                            write!(f, "expected token: `{}`", token)?;
+                            next_token(f)?;
+                        }
+                        ParseErrorKind::UnsupportedSyntax => {
+                            write!(f, "unsupported syntax")?;
+                        }
+                    }
+                    write!(f, "\n{}", parse_error.backtrace)?;
+                }
+            }
+            Ok(())
+        })
     }
 }
 
@@ -164,4 +166,17 @@ fn line_col(str: &str, pos: usize) -> (usize, usize) {
         }
     }
     (line, col)
+}
+
+fn display_from_fn(f: impl Fn(&mut Formatter<'_>) -> std::fmt::Result) -> impl Display {
+    struct Impl<F>(F);
+    impl<F> Display for Impl<F>
+    where
+        F: Fn(&mut Formatter<'_>) -> std::fmt::Result,
+    {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            self.0(f)
+        }
+    }
+    Impl(f)
 }

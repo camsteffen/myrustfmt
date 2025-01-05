@@ -1,22 +1,19 @@
 use crate::config::Config;
 use crate::error::{FormatResult, WidthLimitExceededError};
-use std::backtrace::Backtrace;
-use std::cell::{Cell, RefCell};
-use std::rc::Rc;
+use std::cell::Cell;
 
 pub const INDENT_WIDTH: usize = 4;
 
 #[derive(Clone, Copy, Debug)]
 pub struct MaxWidthForLine {
-    pub line: usize,
-    pub max_width: usize,
+    pub line: u32,
+    pub max_width: u32,
 }
 
 #[derive(Clone, Debug)]
 pub struct Constraints {
     pub single_line: Cell<bool>,
-    pub single_line_backtrace: RefCell<Option<Rc<Backtrace>>>,
-    pub max_width: Cell<Option<usize>>,
+    pub max_width: Cell<Option<u32>>,
     /// Used to set the max width for the current line, so it no longer applies after a newline
     /// character is printed
     pub max_width_for_line: Cell<Option<MaxWidthForLine>>,
@@ -31,14 +28,13 @@ impl Default for Constraints {
 }
 
 impl Constraints {
-    pub fn new(max_width: usize) -> Constraints {
+    pub fn new(max_width: u32) -> Constraints {
         Constraints {
             indent: Cell::new(0),
             max_width: Cell::new(Some(max_width)),
             max_width_for_line: Cell::new(None),
             newline_budget: Cell::new(None),
             single_line: Cell::new(false),
-            single_line_backtrace: RefCell::new(None),
         }
     }
 
@@ -49,15 +45,12 @@ impl Constraints {
             max_width_for_line: max_width_first_line,
             newline_budget,
             single_line,
-            single_line_backtrace,
         } = other;
         self.indent.set(indent.get());
         self.max_width.set(max_width.get());
         self.max_width_for_line.set(max_width_first_line.get());
         self.newline_budget.set(newline_budget.get());
         self.single_line.set(single_line.get());
-        self.single_line_backtrace
-            .replace(single_line_backtrace.borrow().clone());
     }
 
     pub fn increment_indent(&self) {
@@ -68,13 +61,13 @@ impl Constraints {
         self.indent.set(self.indent.get() - INDENT_WIDTH);
     }
 
-    pub fn add_max_width(&self, len: usize) {
+    pub fn add_max_width(&self, len: u32) {
         if let Some(max_width) = self.max_width.get() {
             self.max_width.set(Some(max_width + len));
         }
     }
 
-    pub fn sub_max_width(&self, len: usize) -> Result<(), WidthLimitExceededError> {
+    pub fn sub_max_width(&self, len: u32) -> Result<(), WidthLimitExceededError> {
         if let Some(max_width) = self.max_width.get() {
             self.max_width.set(Some(
                 max_width.checked_sub(len).ok_or(WidthLimitExceededError)?,

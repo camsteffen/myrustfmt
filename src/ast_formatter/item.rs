@@ -308,7 +308,7 @@ impl<'a> AstFormatter {
     }
 
     fn use_tree(&self, use_tree: &ast::UseTree) -> FormatResult {
-        self.use_tree_tail(use_tree, Tail::NONE)
+        self.use_tree_tail(use_tree, Tail::none())
     }
 
     fn use_tree_tail(&self, use_tree: &ast::UseTree, tail: &Tail) -> FormatResult {

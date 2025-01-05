@@ -176,11 +176,11 @@ fn do_build_dot_chain<'a>(chain: &mut Vec<DotChainItem<'a>>, expr: &'a ast::Expr
 pub struct MethodCallParamsListConfig;
 
 impl ListConfig for MethodCallParamsListConfig {
-    fn overflow_max_first_line_contents_width(&self, _config: &Config) -> Option<usize> {
+    fn overflow_max_first_line_contents_width(&self, _config: &Config) -> Option<u32> {
         Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
     }
 
-    fn single_line_max_contents_width(&self) -> Option<usize> {
+    fn single_line_max_contents_width(&self) -> Option<u32> {
         Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
     }
 }

@@ -7,6 +7,7 @@ edition = "2024"
 [dependencies]
 tracing = "0.1.35"
 thiserror = "2.0.8"
+serde = { version = "1.0.217", features = ["derive"] }
 #tracing-subscriber = "0.3.19"
 # https://youtrack.jetbrains.com/issue/RUST-946/Cant-find-libsyntax-from-rust-sources-in-external-librairies
 # rustc --print sysroot
@@ -21,6 +22,7 @@ thiserror = "2.0.8"
 
 [dev-dependencies]
 regex = "1.11.1"
+serde_yaml = "0.9.34+deprecated"
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 
 #[package.metadata.rust-analyzer]
@@ -28,6 +30,5 @@ tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 #rustc_private = true
 
 [features]
-# Defines a feature named `webp` that does not enable any other features.
 intellij-hack = []
 other-feature = []

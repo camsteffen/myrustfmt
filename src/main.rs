@@ -8,15 +8,12 @@ use std::{env, fs};
 fn main() -> ExitCode {
     let args = Vec::from_iter(env::args());
     if args.len() < 2 {
-        eprintln!("Provide a path");
+        eprintln!("Provide at least one path");
         return ExitCode::FAILURE;
     }
-    if args.len() > 2 {
-        eprintln!("Too many arguments");
-        return ExitCode::FAILURE;
+    for path in &args[1..] {
+        let formatted = format_file(path, Config::default()).unwrap();
+        fs::write(path, formatted).unwrap();
     }
-    let path = &args[1];
-    let formatted = format_file(path, Config::default()).unwrap();
-    fs::write(path, formatted).unwrap();
     ExitCode::SUCCESS
 }

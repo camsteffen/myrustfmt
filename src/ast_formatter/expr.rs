@@ -14,7 +14,7 @@ use rustc_ast::ptr::P;
 
 impl<'a> AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
-        self.expr_tail(expr, Tail::NONE)
+        self.expr_tail(expr, Tail::none())
     }
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
@@ -125,8 +125,7 @@ impl<'a> AstFormatter {
             ast::ExprKind::Index(ref target, ref index, _) => {
                 self.expr(target)?;
                 self.out.token("[")?;
-                let tail = use_tail();
-                self.expr_tail(index, &Tail::token("]").and(tail))?;
+                self.expr_tail(index, &Tail::token("]").and(use_tail()))?;
             }
             ast::ExprKind::Range(ref start, ref end, limits) => {
                 self.range(start.as_deref(), end.as_deref(), limits, use_tail())?
@@ -162,8 +161,7 @@ impl<'a> AstFormatter {
             ast::ExprKind::Repeat(_, _) => todo!(),
             ast::ExprKind::Paren(ref inner) => {
                 self.out.token("(")?;
-                let tail = use_tail();
-                self.expr_tail(inner, &Tail::token(")").and(tail))?;
+                self.expr_tail(inner, &Tail::token(")").and(use_tail()))?;
             }
             ast::ExprKind::Yield(_) => todo!(),
             ast::ExprKind::Yeet(_) => todo!(),
@@ -390,6 +388,7 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
+    // todo be more conservative about skipping?
     pub fn skip_single_expr_blocks(
         &self,
         expr: &ast::Expr,

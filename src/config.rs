@@ -28,5 +28,5 @@ macro_rules! config {
 }
 
 config! {
-    max_width: usize = 100,
+    max_width: u32 = 100,
 }

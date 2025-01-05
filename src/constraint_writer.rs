@@ -7,12 +7,12 @@ pub struct ConstraintWriter {
     constraints: Constraints,
     buffer: Cell<String>,
     last_line_start: Cell<usize>,
-    line: Cell<usize>,
+    line: Cell<u32>,
 }
 
 pub struct ConstraintWriterSnapshot {
     constraints: Constraints,
-    line: usize,
+    line: u32,
     len: usize,
     last_line_start: usize,
 }
@@ -39,7 +39,7 @@ impl ConstraintWriter {
         self.with_buffer(|b| b.len())
     }
 
-    pub fn line(&self) -> usize {
+    pub fn line(&self) -> u32 {
         self.line.get()
     }
 
@@ -129,7 +129,7 @@ impl ConstraintWriter {
         }
     }
 
-    pub fn max_width(&self) -> Option<usize> {
+    pub fn max_width(&self) -> Option<u32> {
         let max_width = self.constraints.max_width.get();
         let max_width_for_current_line = self
             .constraints
@@ -143,10 +143,10 @@ impl ConstraintWriter {
         }
     }
 
-    pub fn remaining_width(&self) -> Option<Result<usize, WidthLimitExceededError>> {
+    pub fn remaining_width(&self) -> Option<Result<u32, WidthLimitExceededError>> {
         self.max_width().map(|max_width| {
             max_width
-                .checked_sub(self.last_line_len())
+                .checked_sub(self.last_line_len() as u32)
                 .ok_or(WidthLimitExceededError)
         })
     }

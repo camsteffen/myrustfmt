@@ -160,7 +160,7 @@ impl Overflow for ast::Expr {
         match expr.kind {
             // block-like
             ast::ExprKind::Block(..) | ast::ExprKind::Gen(..) => H::overflows(|| af.expr(expr)),
-            ast::ExprKind::Closure(ref closure) => H::overflows(|| af.closure(closure, Tail::NONE)),
+            ast::ExprKind::Closure(ref closure) => H::overflows(|| af.closure(closure, Tail::none())),
             // control flow
             // | ast::ExprKind::ForLoop { .. }
             // | ast::ExprKind::If(..)

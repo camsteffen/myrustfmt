@@ -1,12 +1,13 @@
 pub struct RustfmtConfig {
-    pub array_width: usize,
-    pub attr_fn_like_width: usize,
-    pub chain_width: usize,
-    pub fn_call_width: usize,
-    pub short_array_element_width_threshold: usize,
-    pub single_line_if_else_max_width: usize,
-    pub struct_lit_width: usize,
-    pub struct_variant_width: usize,
+    pub array_width: u32,
+    pub attr_fn_like_width: u32,
+    pub chain_width: u32,
+    pub fn_call_width: u32,
+    pub short_array_element_width_threshold: u32,
+    pub single_line_if_else_max_width: u32,
+    pub single_line_let_else_max_width: u32,
+    pub struct_lit_width: u32,
+    pub struct_variant_width: u32,
 }
 
 pub const RUSTFMT_CONFIG_DEFAULTS: RustfmtConfig = RustfmtConfig {
@@ -16,6 +17,7 @@ pub const RUSTFMT_CONFIG_DEFAULTS: RustfmtConfig = RustfmtConfig {
     fn_call_width: 60,
     short_array_element_width_threshold: 10,
     single_line_if_else_max_width: 50,
+    single_line_let_else_max_width: 50,
     struct_lit_width: 18,
     struct_variant_width: 35,
 };

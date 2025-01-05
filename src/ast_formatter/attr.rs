@@ -16,7 +16,7 @@ impl AstFormatter {
         span: Span,
         f: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
-        self.with_attrs_tail(attrs, span, Tail::NONE, f)
+        self.with_attrs_tail(attrs, span, Tail::none(), f)
     }
 
     pub fn with_attrs_tail(

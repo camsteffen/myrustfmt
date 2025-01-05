@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 /// Used to add trailing tokens to a formatted node
 ///
-/// * DO accept a Tail argument to make a node narrower to make room for trailing tokens
+/// * DO accept a Tail argument to "coerce" a node to leave room for trailing tokens
 /// * DON'T accept a Tail argument if it is not used to trigger fallback formats
 /// * DON'T pass a Tail argument when the single-line constraint is invariably enabled
 #[derive(Clone)]
@@ -13,19 +13,21 @@ pub struct Tail(Option<TailImpl>);
 #[derive(Clone)]
 enum TailImpl {
     And(Rc<(TailImpl, TailImpl)>),
-    Fn(fn(&AstFormatter) -> FormatResult),
     Token(&'static str),
+    TokenMissing(&'static str),
 }
 
 impl Tail {
-    pub const NONE: &'static Tail = &Tail(None);
-
-    pub const fn new(f: fn(&AstFormatter) -> FormatResult) -> Self {
-        Tail(Some(TailImpl::Fn(f)))
+    pub const fn none() -> &'static Tail {
+        const { &Tail(None) }
     }
 
-    pub fn token(token: &'static str) -> Self {
+    pub const fn token(token: &'static str) -> Self {
         Tail(Some(TailImpl::Token(token)))
+    }
+
+    pub const fn token_missing(token: &'static str) -> Self {
+        Tail(Some(TailImpl::TokenMissing(token)))
     }
 
     pub fn and(&self, other: &Tail) -> Tail {
@@ -64,8 +66,8 @@ impl AstFormatter {
                 self.tail_inner(a)?;
                 self.tail_inner(b)?;
             }
-            TailImpl::Fn(f) => f(self)?,
             TailImpl::Token(token) => self.out.token(token)?,
+            TailImpl::TokenMissing(token) => self.out.token_missing(token)?,
         }
         Ok(())
     }

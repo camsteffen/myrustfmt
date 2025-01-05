@@ -1,6 +1,9 @@
 #![feature(rustc_private)]
 
-use myrustfmt::{format_str, format_str_defaults};
+mod test_lib;
+
+use crate::test_lib::{stmt_breakpoint_test, stmt_test};
+use myrustfmt::format_str;
 use tracing_test::traced_test;
 
 #[traced_test]
@@ -37,21 +40,51 @@ fn test() {
     );
 }
 
-#[traced_test]
 #[test]
-fn let_else_wrap_else() {
-    let source = "fn test() { let xxxxxxxxxxxxx =\
-     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa else { return x; }; }";
-    assert_eq!(
-        format_str_defaults(source).unwrap(),
-        "
-fn test() {
-    let xxxxxxxxxxxxx = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    else {
-        return x;
+fn local_breakpoints() {
+    stmt_breakpoint_test(
+        r#"
+let x = y;
+        "#,
+        r#"
+let x =
+    y;
+        "#,
+    );
+    stmt_breakpoint_test(
+        r#"
+let x =
+    [yyyy];
+        "#,
+        r#"
+let x = [
+    yyyy,
+];
+        "#,
+    );
+    stmt_breakpoint_test(
+        r#"
+let x = Struct {
+    y,
+};
+        "#,
+        r#"
+let x =
+    Struct {
+        y,
     };
-}
-"
-        .trim_start()
+        "#,
+    );
+    stmt_breakpoint_test_new(
+        r#"
+let x = Struct {
+    y,
+};
+=====
+let x =
+    Struct {
+        y,
+    };
+  "#,
     );
 }

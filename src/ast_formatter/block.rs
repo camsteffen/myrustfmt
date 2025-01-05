@@ -43,11 +43,18 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn stmt(&self, stmt: &ast::Stmt) -> FormatResult {
+    pub fn stmt(&self, stmt: &ast::Stmt) -> FormatResult {
         match &stmt.kind {
-            ast::StmtKind::Let(local) => self.local(local, &Tail::token(";")),
+            ast::StmtKind::Let(local) => self.local(local),
             ast::StmtKind::Item(item) => self.item(item),
-            ast::StmtKind::Expr(expr) => self.expr(expr),
+            ast::StmtKind::Expr(expr) => self.expr_tail(
+                expr,
+                if stmt_expr_add_semi(expr) {
+                    const { &Tail::token_missing(";") }
+                } else {
+                    Tail::none()
+                },
+            ),
             ast::StmtKind::Semi(expr) => self.expr_tail(expr, &Tail::token(";")),
             ast::StmtKind::Empty => self.out.token(";"),
             ast::StmtKind::MacCall(mac_call_stmt) => {
@@ -65,5 +72,12 @@ impl<'a> AstFormatter {
                 })
             }
         }
+    }
+}
+
+fn stmt_expr_add_semi(expr: &ast::Expr) -> bool {
+    match expr.kind {
+        ast::ExprKind::Break(..) | ast::ExprKind::Continue(_) | ast::ExprKind::Ret(_) => true,
+        _ => false,
     }
 }

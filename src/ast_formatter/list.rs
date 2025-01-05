@@ -37,7 +37,7 @@ where
         list,
         rest: ListRest::None,
         format_item,
-        tail: &Tail::NONE,
+        tail: &Tail::none(),
         config: &DefaultListConfig,
         item_config: DefaultListItemConfig::default(),
         overflow: ListOverflowNo::default(),
@@ -208,7 +208,7 @@ where
         &self,
         af: &AstFormatter,
         tail: &Tail,
-        max_element_width: Option<usize>,
+        max_element_width: Option<u32>,
     ) -> FormatResult {
         af.list_contents_wrap_to_fit(
             self.list,
@@ -234,8 +234,8 @@ impl<'a> AstFormatter {
         tail: &Tail,
         _overflow: Overflow,
         pad: bool,
-        max_width: Option<usize>,
-        max_width_overflow: Option<usize>,
+        max_width: Option<u32>,
+        max_width_overflow: Option<u32>,
     ) -> FormatResult {
         if pad {
             self.out.space()?;
@@ -314,7 +314,7 @@ impl<'a> AstFormatter {
         tail: &Tail,
         format_item: impl Fn(&T) -> FormatResult,
         _item_config: ItemConfig,
-        max_element_width: Option<usize>,
+        max_element_width: Option<u32>,
     ) -> FormatResult
     where
         ItemConfig: ListItemConfig<Item = T>,

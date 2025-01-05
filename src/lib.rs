@@ -59,7 +59,7 @@ pub fn format_str_defaults(source: &str) -> Result<String, ErrorGuaranteed> {
     format_str_config(source, Config::default())
 }
 
-pub fn format_str(source: &str, max_width: usize) -> Result<String, ErrorGuaranteed> {
+pub fn format_str(source: &str, max_width: u32) -> Result<String, ErrorGuaranteed> {
     format_str_config(source, Config::default().max_width(max_width))
 }
 
@@ -72,12 +72,13 @@ pub fn format(
     config: Config,
     path: Option<&Path>,
 ) -> Result<String, ErrorGuaranteed> {
-    parse_ast_then(String::from(source), |crate_| {
+    parse_crate(String::from(source), path, |crate_| {
         let constraints = Constraints::new(config.max_width);
         let source_formatter =
-            SourceFormatter::new(String::from(source), constraints, path.map(PathBuf::from));
+            SourceFormatter::new(String::from(source), constraints);
         let ast_formatter = AstFormatter::new(config, source_formatter);
-        match ast_formatter.crate_(&crate_) {
+        let result = ast_formatter.crate_(&crate_);
+        match result {
             Ok(()) => {}
             // todo don't panic
             Err(e) => panic!("{}", e.display(source, ast_formatter.pos(), path)),
@@ -86,17 +87,23 @@ pub fn format(
     })
 }
 
-fn parse_ast_then<T>(
+fn parse_crate<T>(
     string: String,
+    path: Option<&Path>,
     f: impl FnOnce(rustc_ast::ast::Crate) -> T,
 ) -> Result<T, ErrorGuaranteed> {
     let source_map = Lrc::new(SourceMap::new(FilePathMapping::empty()));
     let dcx = dcx(source_map.clone());
+    // todo should this be shared for a crate?
     rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
         let psess = ParseSess::with_dcx(dcx, source_map);
         let mut parser = rustc_parse::new_parser_from_source_str(
             &psess,
-            FileName::anon_source_code(&string),
+            match path {
+                None => FileName::anon_source_code(&string),
+                // todo is this actually beneficial?
+                Some(path) => FileName::from(PathBuf::from(path)),
+            },
             string,
         )
         .unwrap();
