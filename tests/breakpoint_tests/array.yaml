@@ -1,0 +1,32 @@
+- name: array at max width of 60 chars
+  type: idempotent
+  formatted: |
+    [aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaaaa]
+- name: array would one above max width, elements are all <= 10 chars
+  type: idempotent
+  formatted: |
+    [
+        aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, a, aaaaaaaaaa,
+    ]
+- name: array would be one above max width, one element is 11 chars
+  type: idempotent
+  formatted: |
+    [
+        aaaa,
+        aaaa,
+        aaaa,
+        aaaa,
+        aaaa,
+        aaaa,
+        aaaa,
+        aaa,
+        a,
+        aaaaaaaaaaa,
+    ]
+- name: wrap to fit with multiple lines of contents
+  type: idempotent
+  formatted: |
+      [
+          aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa,
+          aaaaaaaaaa, aaaaaaaaaa,
+      ]

@@ -42,7 +42,7 @@ fn format_stmt_max_width(stmt: &str, max_width: Option<u32>) -> String {
     formatted_stmt
 }
 
-fn format_stmt_max_width_expected(stmt: &str, max_width: Option<u32>, expected: &str) {
+pub fn format_stmt_max_width_expected(stmt: &str, max_width: Option<u32>, expected: &str) {
     let formatted = format_stmt_max_width(stmt, max_width);
     if formatted != expected {
         panic!("Unformatted: {:?}\n  Formatted: {:?}\n   Expected: {:?}", stmt, formatted, expected);

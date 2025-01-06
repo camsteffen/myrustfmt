@@ -1,16 +1,22 @@
-- before: |
+- name: initializer breaks onto next line
+  type: breakpoint
+  before: |
     let x = y;
   after: |
     let x =
         y;
-- before: |
+- name: initializer goes from next-line-single-line to overflow
+  type: breakpoint
+  before: |
     let x =
         [yyyy];
   after: |
     let x = [
         yyyy,
     ];
-- before: |
+- name: initializer goes from overflow to break onto next line
+  type: breakpoint
+  before: |
     let x = Struct {
         y,
     };
@@ -19,14 +25,19 @@
         Struct {
             y,
         };
-#  let else
-- before: |
+
+# let...else
+- name: else block breaks into multi-line
+  type: breakpoint
+  before: |
     let xxxxxxxxxxxxx = aaaaaaaaaa else { return x };
   after: |
     let xxxxxxxxxxxxx = aaaaaaaaaa else {
         return x;
     };
-- before: |
+- name: else keyword breaks onto next line
+  type: breakpoint
+  before: |
     let xxxxxxxxxxxxx = aaaaaaaaaa else {
         return x;
     };
