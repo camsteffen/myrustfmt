@@ -55,10 +55,10 @@ fn breakpoint_test_file(test_source_path: &Path) {
 }
 
 fn breakpoint_test(test: &Test) {
-    match test {
-        Test::Breakpoint(test) => stmt_breakpoint_test(&test.before, &test.after),
-        Test::Idempotent { name, formatted } => {
-            println!("Test: {name}");
+    println!("Test: {}", &test.name);
+    match &test.kind {
+        TestKind::Breakpoint(test) => stmt_breakpoint_test(&test.before, &test.after),
+        TestKind::Idempotent { formatted } => {
             let formatted = formatted.trim();
             format_stmt_max_width_expected(formatted, None, formatted)
         }
@@ -66,16 +66,22 @@ fn breakpoint_test(test: &Test) {
 }
 
 #[derive(Deserialize)]
+struct Test {
+    name: String,
+    #[serde(flatten)]
+    kind: TestKind,
+}
+
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "type")]
-enum Test {
+enum TestKind {
     Breakpoint(BreakpointTest),
-    Idempotent { name: String, formatted: String },
+    Idempotent { formatted: String },
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct BreakpointTest {
-    name: String,
     before: String,
     after: String,
 }
