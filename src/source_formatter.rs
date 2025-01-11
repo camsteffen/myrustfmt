@@ -86,9 +86,15 @@ impl SourceFormatter {
         self.source.pos.get().to_usize()
     }
 
+    pub fn newline(&self) -> FormatResult {
+        self.handle_whitespace_and_comments(WhitespaceMode::Newline)
+    }
+
     /** Writes a newline character and indent characters according to the current indent level */
     pub fn newline_indent(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Newline)
+        self.newline()?;
+        self.indent()?;
+        Ok(())
     }
 
     pub fn char_ending_at(&self, pos: BytePos) -> u8 {
@@ -223,12 +229,7 @@ impl SourceFormatter {
         Ok(())
     }
 
-    fn newline(&self) -> FormatResult {
-        self.out.newline()?;
-        Ok(())
-    }
-
-    fn indent(&self) -> FormatResult {
+    pub fn indent(&self) -> FormatResult {
         self.out.indent()?;
         Ok(())
     }

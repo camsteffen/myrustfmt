@@ -379,9 +379,10 @@ impl<'a> AstFormatter {
         self.indented(|| {
             self.out.newline_indent()?;
             inside()?;
+            self.out.newline()?;
             Ok(())
         })?;
-        self.out.newline_indent()?;
+        self.out.indent()?;
         self.out.token_missing("}")?;
         Ok(())
     }

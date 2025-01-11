@@ -18,7 +18,6 @@ pub struct Constraints {
     /// character is printed
     pub max_width_for_line: Cell<Option<MaxWidthForLine>>,
     pub indent: Cell<usize>,
-    pub newline_budget: Cell<Option<usize>>,
 }
 
 impl Default for Constraints {
@@ -33,7 +32,6 @@ impl Constraints {
             indent: Cell::new(0),
             max_width: Cell::new(Some(max_width)),
             max_width_for_line: Cell::new(None),
-            newline_budget: Cell::new(None),
             single_line: Cell::new(false),
         }
     }
@@ -43,13 +41,11 @@ impl Constraints {
             indent,
             max_width,
             max_width_for_line: max_width_first_line,
-            newline_budget,
             single_line,
         } = other;
         self.indent.set(indent.get());
         self.max_width.set(max_width.get());
         self.max_width_for_line.set(max_width_first_line.get());
-        self.newline_budget.set(newline_budget.get());
         self.single_line.set(single_line.get());
     }
 

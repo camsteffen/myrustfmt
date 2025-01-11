@@ -12,6 +12,7 @@
     field1, field2, ..
   } = x;
   ```
+  This formatter always puts all fields on separate lines if the struct does not fit on one line.
 * Chains may include index operators
 * Large expressions in an index operator are broken into a separate line
 

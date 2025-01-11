@@ -18,11 +18,13 @@ macro_rules! breakpoint_tests {
         }
         )*
     };
+    
 }
 
 breakpoint_tests! {
     array,
     binop,
+    comments,
     chain,
     index,
     local,
@@ -46,6 +48,9 @@ fn breakpoint_test(test: &Test) {
             let formatted = formatted.trim();
             format_stmt_max_width_expected(formatted, None, formatted)
         }
+        TestKind::BeforeAfter { before, after } => {
+            format_stmt_max_width_expected(before.trim(), None, after.trim())
+        }
     }
 }
 
@@ -59,6 +64,13 @@ struct Test {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "type")]
 enum TestKind {
+    /// A breakpoint test is for testing how formatting changes when the max width is constrained.
+    /// The "before" and "after" code snippets should contain the exact same code, but the "after"
+    /// string should use less width. The test is performed by formatting the "before" string with
+    /// a max width that is just one character smaller than the width required for the "before"
+    /// string. The result should equal the "after" string. Also, the "before" string is formatted
+    /// with exactly a large enough max width to test that it is not changed.
     Breakpoint { before: String, after: String },
     NoChange { formatted: String },
+    BeforeAfter { before: String, after: String },
 }

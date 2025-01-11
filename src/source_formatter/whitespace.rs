@@ -23,14 +23,14 @@ pub fn handle_whitespace(mode: WhitespaceMode, sf: &SourceFormatter) -> FormatRe
 struct WhitespaceContext<'a> {
     sf: &'a SourceFormatter,
     mode: WhitespaceMode,
-    skipped_whitespace: Option<usize>,
+    skipped_whitespace: Option</*newline count*/ usize>,
     is_after_line_comment_out: bool,
     is_required_whitespace_out: bool,
     twas_comments: bool,
 }
 
 impl WhitespaceContext<'_> {
-    fn flush_skipped_whitespace(&mut self) -> FormatResult {
+    fn flush_skipped_whitespace(&mut self, should_indent: bool) -> FormatResult {
         let Some(newlines) = self.skipped_whitespace.take() else {
             return Ok(());
         };
@@ -41,7 +41,9 @@ impl WhitespaceContext<'_> {
                 if matches!(self.mode, WhitespaceMode::Newline) && newlines > 1 {
                     self.sf.out.newline()?;
                 }
-                self.sf.out.indent()?;
+                if should_indent {
+                    self.sf.out.indent()?;
+                }
             }
             self.is_required_whitespace_out = true;
         } else {
@@ -57,7 +59,7 @@ impl WhitespaceContext<'_> {
         for token in rustc_lexer::tokenize(self.sf.source.remaining()) {
             match token.kind {
                 TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
-                    self.flush_skipped_whitespace()?;
+                    self.flush_skipped_whitespace(true)?;
                     self.sf
                         .constraints()
                         .with_no_max_width(|| self.sf.copy(token.len as usize))?;
@@ -78,14 +80,16 @@ impl WhitespaceContext<'_> {
                 _ => break,
             }
         }
-        if !(matches!(self.mode, WhitespaceMode::Token) && !self.twas_comments) {
-            self.flush_skipped_whitespace()?
+        if matches!(self.mode, WhitespaceMode::Token) && !self.twas_comments {
+            // ignore skipped (extra) whitespace
+        } else {
+            let should_indent = !matches!(self.mode, WhitespaceMode::Newline);
+            self.flush_skipped_whitespace(should_indent)?
         }
         if !self.is_required_whitespace_out {
             match self.mode {
                 WhitespaceMode::Newline => {
-                    self.sf.newline()?;
-                    self.sf.indent()?;
+                    self.sf.out.newline()?;
                 }
                 WhitespaceMode::Space => self.sf.out.token(" ")?,
                 WhitespaceMode::Token => {}

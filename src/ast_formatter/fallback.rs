@@ -33,13 +33,10 @@ impl<T> Fallback<'_, T> {
     }
 
     /// Returns true if the result is either Ok or a non-recoverable error
-    pub fn is_done(&self) -> bool {
-        match &self.result {
-            Ok(_) => true,
-            Err(e) => match e {
-                FormatError::Parse(_) => true,
-                FormatError::Constraint(_) => false,
-            },
+    fn is_done(&self) -> bool {
+        match self.result {
+            Ok(_) | Err(FormatError::Parse(_)) => true,
+            Err(FormatError::Constraint(_)) => false,
         }
     }
 

@@ -32,7 +32,15 @@ fn format_stmt_max_width(stmt: &str, max_width: Option<u32>) -> String {
         .strip_suffix(suffix)
         .unwrap()
         .lines()
-        .map(|line| line.strip_prefix(indent).unwrap())
+        .map(|mut line| {
+            for _ in 0..4 {
+                match line.strip_prefix(' ') {
+                    None => break,
+                    Some(l) => line = l,
+                }
+            }
+            line
+        })
         .fold(String::new(), |mut acc, line| {
             acc.push_str(line);
             acc.push('\n');

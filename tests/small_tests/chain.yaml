@@ -1,18 +1,36 @@
-- name: index operation in chain
+- name: index operations in multiline chain
   type: no_change
   formatted: |
     aaaaaaa
         .aaaaaaaa[bbbbbbbb]
         .aaaaaaa
-        .aaaaaa[
+        .aaaaaaa[
             bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
         ]
         .aaaaaaa
         .aaaaaaa
         .aaaaaaa
-        .aaaaaaa
-        .aaaaaaa
-        .aaaaaaa
+- name: field after multiline method call
+  type: no_change
+  formatted: |
+    asdfasdf
+        .ab
+        .method_call(|| {
+            let x;
+        })
+        .hi
+- name: simple index after multiline method call
+  type: no_change
+  formatted: |
+    asdfasdf.ab.method_call(|| {
+        let x;
+    })[0]
+- name: try after multiline method call
+  type: no_change
+  formatted: |
+    asdfasdf.ab.method_call(|| {
+        let x;
+    })?
 - name: multiline index after multiline method call
   type: no_change
   formatted: |

@@ -35,9 +35,10 @@ impl<'a> AstFormatter {
                     self.out.newline_indent()?;
                     format_item(item)?;
                 }
+                self.out.newline()?;
                 Ok(())
             })?;
-            self.out.newline_indent()?;
+            self.out.indent()?;
         }
         self.out.token("}")?;
         Ok(())

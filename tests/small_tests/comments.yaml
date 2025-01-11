@@ -1,0 +1,20 @@
+- name: trim all but one blank line leading and trailing line comments in block
+  type: before_after
+  before: |
+    {
+        // leading
+
+
+        let x;
+
+
+        // trailing
+    }
+  after: |
+    {
+        // leading
+
+        let x;
+
+        // trailing
+    }

@@ -29,44 +29,9 @@ impl AstFormatter {
     }
 
     pub fn with_single_line<T>(&self, f: impl FnOnce() -> T) -> T {
-        self.with_replace_single_line(true, f)
-    }
-
-    pub fn with_replace_single_line<T>(&self, value: bool, f: impl FnOnce() -> T) -> T {
-        let single_line_prev = self.constraints().single_line.replace(value);
+        let single_line_prev = self.constraints().single_line.replace(true);
         let result = f();
         self.constraints().single_line.set(single_line_prev);
-        result
-    }
-
-    pub fn with_single_line_optional(
-        &self,
-        apply: bool,
-        f: impl FnOnce() -> FormatResult,
-    ) -> FormatResult {
-        if !apply {
-            return f();
-        }
-        self.with_single_line(f)
-    }
-
-    pub fn with_height_limit(
-        &self,
-        height: usize,
-        f: impl FnOnce() -> FormatResult,
-    ) -> FormatResult {
-        let newlines = height - 1;
-        if self
-            .constraints()
-            .newline_budget
-            .get()
-            .is_some_and(|h| h <= newlines)
-        {
-            return f();
-        }
-        let height_budget_prev = self.constraints().newline_budget.replace(Some(newlines));
-        let result = f();
-        self.constraints().newline_budget.set(height_budget_prev);
         result
     }
 

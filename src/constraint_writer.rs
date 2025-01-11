@@ -78,7 +78,6 @@ impl ConstraintWriter {
         self.with_buffer(|b| b.truncate(len));
     }
 
-    // #[instrument(skip(self))]
     pub fn token(&self, token: &str) -> Result<(), WidthLimitExceededError> {
         self.with_buffer(|b| b.push_str(token));
         self.check_width_constraints()
@@ -97,14 +96,7 @@ impl ConstraintWriter {
     }
 
     pub fn newline(&self) -> Result<(), NewlineNotAllowedError> {
-        if let Some(newline_budget) = self.constraints.newline_budget.get() {
-            let Some(n) = newline_budget.checked_sub(1) else {
-                return Err(NewlineNotAllowedError);
-            };
-            self.constraints.newline_budget.set(Some(n));
-        }
         if self.constraints.single_line.get() {
-            info!("too wide: \"{}\"", self.last_line_to_string());
             return Err(NewlineNotAllowedError);
         }
         self.with_buffer(|b| b.push('\n'));
@@ -123,7 +115,6 @@ impl ConstraintWriter {
         match self.remaining_width() {
             None | Some(Ok(_)) => Ok(()),
             Some(Err(WidthLimitExceededError { .. })) => {
-                info!("too wide: \"{}\"", self.last_line_to_string());
                 Err(WidthLimitExceededError)
             }
         }
@@ -153,10 +144,6 @@ impl ConstraintWriter {
 
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T {
         self.with_buffer(|b| f(&b[self.last_line_start.get()..]))
-    }
-
-    fn last_line_to_string(&self) -> String {
-        self.with_buffer(|b| String::from(b[self.last_line_start.get()..].trim_start()))
     }
 
     pub fn last_line_len(&self) -> usize {
