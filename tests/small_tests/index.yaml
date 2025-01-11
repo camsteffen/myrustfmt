@@ -1,0 +1,8 @@
+- name: index breakpoint
+  type: breakpoint
+  before: |
+    aaaaa[bbbbb]
+  after: |
+    aaaaa[
+        bbbbb
+    ]

@@ -1,0 +1,26 @@
+- name: index operation in chain
+  type: no_change
+  formatted: |
+    aaaaaaa
+        .aaaaaaaa[bbbbbbbb]
+        .aaaaaaa
+        .aaaaaa[
+            bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        ]
+        .aaaaaaa
+        .aaaaaaa
+        .aaaaaaa
+        .aaaaaaa
+        .aaaaaaa
+        .aaaaaaa
+- name: multiline index after multiline method call
+  type: no_change
+  formatted: |
+    asdfasdf
+        .ab
+        .method_call(|| {
+            let x;
+        })[
+            asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf
+                + asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf
+        ]

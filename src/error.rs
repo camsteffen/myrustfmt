@@ -4,22 +4,6 @@ use std::path::Path;
 
 pub type FormatResult<T = ()> = Result<T, FormatError>;
 
-pub trait FormatResultExt {
-    fn is_ok_or_parse_error(&self) -> bool;
-}
-
-impl<T> FormatResultExt for FormatResult<T> {
-    fn is_ok_or_parse_error(&self) -> bool {
-        match self {
-            Ok(_) => true,
-            Err(e) => match e {
-                FormatError::Parse(_) => true,
-                FormatError::Constraint(_) => false,
-            },
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum FormatError {
     Constraint(ConstraintError),
@@ -70,11 +54,7 @@ impl FormatError {
             let (line, col) = line_col(source, pos);
             match path {
                 None => write!(f, "Error formatting at {line}:{col}, ")?,
-                Some(path) => write!(
-                    f,
-                    "Error formatting {}:{line}:{col}, ",
-                    path.display(),
-                )?,
+                Some(path) => write!(f, "Error formatting {}:{line}:{col}, ", path.display(),)?,
             }
             let next_token = |f: &mut Formatter<'_>| {
                 let remaining = &source[pos..];
@@ -99,7 +79,11 @@ impl FormatError {
                                 f,
                                 "expected position is {} bytes {}",
                                 expected_pos.abs_diff(pos),
-                                if expected_pos > pos { "ahead" } else { "behind" }
+                                if expected_pos > pos {
+                                    "ahead"
+                                } else {
+                                    "behind"
+                                }
                             )?;
                             next_token(f)?;
                         }

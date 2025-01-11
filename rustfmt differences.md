@@ -12,6 +12,8 @@
     field1, field2, ..
   } = x;
   ```
+* Chains may include index operators
+* Large expressions in an index operator are broken into a separate line
 
 
 rustfmt Bugs:

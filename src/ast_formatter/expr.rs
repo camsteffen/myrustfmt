@@ -33,8 +33,9 @@ impl<'a> AstFormatter {
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, use_tail())?,
             ast::ExprKind::Await(..)
             | ast::ExprKind::Field(..)
+            | ast::ExprKind::Index(..)
             | ast::ExprKind::MethodCall(_)
-            | ast::ExprKind::Try(_) => self.dot_chain(expr, use_tail())?,
+            | ast::ExprKind::Try(_) => self.postfix_chain(expr, use_tail())?,
             ast::ExprKind::Tup(ref items) => list(Braces::PARENS, items, |item| self.expr(item))
                 .config(&ParamListConfig {
                     single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
@@ -99,10 +100,12 @@ impl<'a> AstFormatter {
                 self.out.token_space("loop")?;
                 self.block(block)?;
             }
-            ast::ExprKind::Match(ref scrutinee, ref arms, ast::MatchKind::Prefix) => {
-                self.match_(scrutinee, arms)?
+            ast::ExprKind::Match(ref scrutinee, ref arms, match_kind) => {
+                match match_kind {
+                    ast::MatchKind::Postfix => todo!(),
+                    ast::MatchKind::Prefix => self.match_(scrutinee, arms)?,
+                }
             }
-            ast::ExprKind::Match(_, _, ast::MatchKind::Postfix) => todo!(),
             ast::ExprKind::Closure(ref closure) => self.closure(closure, use_tail())?,
             ast::ExprKind::Block(ref block, label) => {
                 self.label(label)?;
@@ -121,11 +124,6 @@ impl<'a> AstFormatter {
                 self.out.copy_span(op.span)?;
                 self.out.space()?;
                 self.expr(right)?;
-            }
-            ast::ExprKind::Index(ref target, ref index, _) => {
-                self.expr(target)?;
-                self.out.token("[")?;
-                self.expr_tail(index, &Tail::token("]").and(use_tail()))?;
             }
             ast::ExprKind::Range(ref start, ref end, limits) => {
                 self.range(start.as_deref(), end.as_deref(), limits, use_tail())?

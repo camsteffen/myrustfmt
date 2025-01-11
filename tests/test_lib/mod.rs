@@ -45,6 +45,14 @@ fn format_stmt_max_width(stmt: &str, max_width: Option<u32>) -> String {
 pub fn format_stmt_max_width_expected(stmt: &str, max_width: Option<u32>, expected: &str) {
     let formatted = format_stmt_max_width(stmt, max_width);
     if formatted != expected {
-        panic!("Unformatted: {:?}\n  Formatted: {:?}\n   Expected: {:?}", stmt, formatted, expected);
+        for line in diff::lines(expected, &formatted) {
+            match line {
+                diff::Result::Left(s) => println!("- {s}"),
+                diff::Result::Right(s) => println!("+ {s}"),
+                diff::Result::Both(s, _) => println!("  {s}"),
+            }
+        }
+        panic!("Formatted code does not match expected");
+        // panic!("Unformatted: {:?}\n  Formatted: {:?}\n   Expected: {:?}", stmt, formatted, expected);
     }
 }

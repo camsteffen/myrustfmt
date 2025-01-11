@@ -23,6 +23,8 @@ macro_rules! breakpoint_tests {
 breakpoint_tests! {
     array,
     binop,
+    chain,
+    index,
     local,
 }
 
