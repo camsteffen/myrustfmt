@@ -1,15 +1,15 @@
 - name: array at max width of 60 chars
-  type: idempotent
+  type: no_change
   formatted: |
     [aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaaaa]
 - name: array would one above max width, elements are all <= 10 chars
-  type: idempotent
+  type: no_change
   formatted: |
     [
         aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, a, aaaaaaaaaa,
     ]
 - name: array would be one above max width, one element is 11 chars
-  type: idempotent
+  type: no_change
   formatted: |
     [
         aaaa,
@@ -24,7 +24,7 @@
         aaaaaaaaaaa,
     ]
 - name: wrap to fit with multiple lines of contents
-  type: idempotent
+  type: no_change
   formatted: |
       [
           aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa,
