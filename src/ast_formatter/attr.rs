@@ -27,6 +27,7 @@ impl AstFormatter {
         f: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
         // todo skip attributes as well?
+        // todo make my own attribute? or comment?
         self.attrs(attrs)?;
         if attrs.iter().any(is_rustfmt_skip) {
             self.out.constraints().with_no_max_width(|| {

@@ -1,4 +1,23 @@
-- name: arm body is is chain with all overflowing method calls
+- name: arm body is chain on multiple lines with final multiline method call
+  type: no_change
+  formatted: |
+    match x {
+        x => {
+            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                .aaaaaaaaaaaaaa({
+                    let x;
+                })
+        }
+    }
+- name: arm body is chain on single line except final multiline method call
+  type: no_change
+  formatted: |
+    match x {
+        x => a.b.aaaaaaa({
+            let x;
+        }),
+    }
+- name: arm body is chain with all overflowing method calls
   type: no_change
   formatted: |
     match x {

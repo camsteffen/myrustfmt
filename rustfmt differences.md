@@ -30,4 +30,4 @@ rustfmt Bugs:
 * When an import has curly braces, max_width is reduced by 2
 * When placing a `{` after `let...else`, max_width is reduced by 1
 * When placing a `{` after `if .. =>` where the if-guard has its own line, max_width is reduced by 2
-* Removes block from match arm body when it is a long chain ending in a multi-line method call
+* Removes block from match arm body when it is a multi-line chain ending in a multi-line method call
