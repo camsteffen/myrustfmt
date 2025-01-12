@@ -22,10 +22,7 @@ pub struct SourceFormatter {
 }
 
 impl SourceFormatter {
-    pub fn new(
-        source: impl Into<String>,
-        constraints: Constraints,
-    ) -> SourceFormatter {
+    pub fn new(source: impl Into<String>, constraints: Constraints) -> SourceFormatter {
         SourceFormatter {
             source: SourceReader::new(source.into()),
             out: ConstraintWriter::new(constraints),

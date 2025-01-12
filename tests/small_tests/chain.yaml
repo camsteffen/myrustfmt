@@ -10,6 +10,14 @@
         .aaaaaaa
         .aaaaaaa
         .aaaaaaa
+- name: multiline root with chained items
+  type: no_change
+  formatted: |
+    asdfasdf({
+        let x;
+    })
+    .aaaa
+    .aaaa
 - name: field after multiline method call
   type: no_change
   formatted: |

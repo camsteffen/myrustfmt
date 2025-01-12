@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::list_config::ListConfig;
+use crate::ast_formatter::list::list_config::{CallParamListConfig, ListConfig};
 use crate::ast_formatter::list::{Braces, list};
 use crate::ast_formatter::util::tail::Tail;
 use crate::config::Config;
@@ -15,7 +15,6 @@ use tracing::info;
 enum PostfixChainItem<'a> {
     Await,
     Field(Ident),
-    // todo don't overflow index when single line chain
     Index(&'a ast::Expr),
     MethodCall(&'a ast::MethodCall),
     Try,
@@ -156,14 +155,10 @@ impl AstFormatter {
                 self.out.token(".")?;
                 self.ident(ident)?
             }
-            // todo share code with ExprKind::Call?
             PostfixChainItem::MethodCall(method_call) => {
                 self.out.token(".")?;
-                self.path_segment(&method_call.seg, true)?;
-                list(Braces::PARENS, &method_call.args, |arg| self.expr(arg))
-                    .config(&MethodCallParamsListConfig)
-                    .overflow()
-                    .format(self)?;
+                self.path_segment(&method_call.seg, true, &Tail::token("("))?;
+                self.call_args_after_open_paren(&method_call.args, Tail::none())?;
             }
             PostfixChainItem::Index(index) => {
                 self.out.token("[")?;
@@ -246,16 +241,4 @@ fn split_overflowable<'a, 'b>(
 
 fn is_unbreakable(item: &PostfixChainItem<'_>) -> bool {
     matches!(item, PostfixChainItem::Index(_) | PostfixChainItem::Try)
-}
-
-pub struct MethodCallParamsListConfig;
-
-impl ListConfig for MethodCallParamsListConfig {
-    fn overflow_max_first_line_contents_width(&self, _config: &Config) -> Option<u32> {
-        Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
-    }
-
-    fn single_line_max_contents_width(&self) -> Option<u32> {
-        Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
-    }
 }

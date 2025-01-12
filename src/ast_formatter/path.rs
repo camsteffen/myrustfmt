@@ -2,6 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 
 use crate::ast_formatter::list::{Braces, list};
+use crate::ast_formatter::util::tail::Tail;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
@@ -38,34 +39,42 @@ impl AstFormatter {
 
     pub fn path_segments(&self, segments: &[ast::PathSegment], is_expr: bool) -> FormatResult {
         let (first, rest) = segments.split_first().unwrap();
-        self.path_segment(first, is_expr)?;
+        self.path_segment(first, is_expr, Tail::none())?;
         for segment in rest {
             self.out.token("::")?;
-            self.path_segment(segment, is_expr)?;
+            self.path_segment(segment, is_expr, Tail::none())?;
         }
         Ok(())
     }
 
-    pub fn path_segment(&self, segment: &ast::PathSegment, is_expr: bool) -> FormatResult {
+    pub fn path_segment(
+        &self,
+        segment: &ast::PathSegment,
+        is_expr: bool,
+        tail: &Tail,
+    ) -> FormatResult {
         self.ident(segment.ident)?;
         if let Some(generic_args) = segment.args.as_deref() {
             if is_expr {
                 self.out.token("::")?;
             }
-            self.generic_args(generic_args)?;
-        };
+            self.generic_args(generic_args, tail)?;
+        } else {
+            self.tail(tail)?;
+        }
         Ok(())
     }
 
-    fn generic_args(&self, generic_args: &ast::GenericArgs) -> FormatResult {
+    fn generic_args(&self, generic_args: &ast::GenericArgs, tail: &Tail) -> FormatResult {
         match generic_args {
             ast::GenericArgs::AngleBracketed(args) => list(Braces::ANGLE, &args.args, |arg| {
                 self.angle_bracketed_arg(arg)
             })
+            .tail(tail)
             .format(self),
             // (A, B) -> C
             ast::GenericArgs::Parenthesized(parenthesized_args) => {
-                self.parenthesized_args(parenthesized_args)
+                self.parenthesized_args(parenthesized_args, tail)
             }
             ast::GenericArgs::ParenthesizedElided(_span) => todo!(),
         }
@@ -83,7 +92,7 @@ impl AstFormatter {
     fn assoc_item_constraint(&self, constraint: &ast::AssocItemConstraint) -> FormatResult {
         self.ident(constraint.ident)?;
         if let Some(generic_args) = &constraint.gen_args {
-            self.generic_args(generic_args)?;
+            self.generic_args(generic_args, Tail::none())?;
         }
         match &constraint.kind {
             ast::AssocItemConstraintKind::Bound { bounds } => self.generic_bounds(bounds),

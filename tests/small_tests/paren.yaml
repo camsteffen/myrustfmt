@@ -1,0 +1,9 @@
+- name: paren breakpoint
+  type: breakpoint
+  before: |
+    (aaaaaaa + bbbbb)
+  after: |
+    (
+        aaaaaaa
+            + bbbbb
+    )

@@ -99,9 +99,9 @@ impl<'a> AstFormatter {
     fn closure_body(&self, body: &ast::Expr, tail: &Tail) -> FormatResult {
         fn is_block_like(expr: &ast::Expr) -> bool {
             match expr.kind {
-                ast::ExprKind::Gen(..)
-                | ast::ExprKind::Block(..)
-                | ast::ExprKind::TryBlock(..) => true,
+                ast::ExprKind::Gen(..) | ast::ExprKind::Block(..) | ast::ExprKind::TryBlock(..) => {
+                    true
+                }
 
                 ast::ExprKind::AddrOf(_, _, ref expr)
                 | ast::ExprKind::Try(ref expr)
@@ -135,13 +135,24 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    pub fn parenthesized_args(&self, parenthesized_args: &ast::ParenthesizedArgs) -> FormatResult {
+    pub fn parenthesized_args(
+        &self,
+        parenthesized_args: &ast::ParenthesizedArgs,
+        tail: &Tail,
+    ) -> FormatResult {
+        let (list_tail, final_tail) = match parenthesized_args.output {
+            ast::FnRetTy::Default(_) => (tail, Tail::none()),
+            ast::FnRetTy::Ty(_) => (Tail::none(), tail),
+        };
         list(Braces::PARENS, &parenthesized_args.inputs, |ty| self.ty(ty))
             .config(&ParamListConfig {
                 single_line_max_contents_width: None,
             })
+            .tail(list_tail)
             .format(self)?;
         self.fn_ret_ty(&parenthesized_args.output)?;
+        // todo pass tail to ret ty?
+        self.tail(final_tail)?;
         Ok(())
     }
 
@@ -233,7 +244,13 @@ impl<'a> AstFormatter {
         match output {
             ast::FnRetTy::Default(_) => {}
             ast::FnRetTy::Ty(ty) => {
-                self.out.space_token_space("->")?;
+                self.fallback(|| self.out.space_token_space("->"))
+                    .next(|| {
+                        self.out.newline_indent()?;
+                        self.out.token_space("->")?;
+                        Ok(())
+                    })
+                    .result()?;
                 self.ty(ty)?;
             }
         }

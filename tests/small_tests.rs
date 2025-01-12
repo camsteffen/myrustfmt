@@ -7,7 +7,6 @@ use serde::Deserialize;
 use std::fs;
 use std::io::BufReader;
 use std::path::Path;
-use std::sync::LazyLock;
 
 macro_rules! breakpoint_tests {
     ($($name:ident,)*) => {
@@ -24,10 +23,13 @@ macro_rules! breakpoint_tests {
 breakpoint_tests! {
     array,
     binop,
+    call,
     comments,
     chain,
     index,
     local,
+    match_,
+    paren,
 }
 
 fn breakpoint_test_file(test_source_path: &Path) {

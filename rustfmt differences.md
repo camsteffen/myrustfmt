@@ -15,6 +15,12 @@
   This formatter always puts all fields on separate lines if the struct does not fit on one line.
 * Chains may include index operators
 * Large expressions in an index operator are broken into a separate line
+* Large expressions in parentheses are broken into a separate line
+
+TODO
+* Don't allow multiline chains without indent as a match arm or list item
+  * Force parentheses around chains that do not indent, unless it's a statement
+    * What about unused_parens lint?
 
 
 rustfmt Bugs:
@@ -24,3 +30,4 @@ rustfmt Bugs:
 * When an import has curly braces, max_width is reduced by 2
 * When placing a `{` after `let...else`, max_width is reduced by 1
 * When placing a `{` after `if .. =>` where the if-guard has its own line, max_width is reduced by 2
+* Removes block from match arm body when it is a long chain ending in a multi-line method call

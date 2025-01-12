@@ -30,7 +30,10 @@ impl<'a> AstFormatter {
                 .tail(use_tail())
                 .format(self)?,
             ast::ExprKind::ConstBlock(_) => todo!(),
-            ast::ExprKind::Call(ref func, ref args) => self.call(func, args, use_tail())?,
+            ast::ExprKind::Call(ref func, ref args) => {
+                self.expr_tail(func, &Tail::token("("))?;
+                self.call_args_after_open_paren(args, use_tail())?
+            }
             ast::ExprKind::Await(..)
             | ast::ExprKind::Field(..)
             | ast::ExprKind::Index(..)
@@ -100,12 +103,10 @@ impl<'a> AstFormatter {
                 self.out.token_space("loop")?;
                 self.block(block)?;
             }
-            ast::ExprKind::Match(ref scrutinee, ref arms, match_kind) => {
-                match match_kind {
-                    ast::MatchKind::Postfix => todo!(),
-                    ast::MatchKind::Prefix => self.match_(scrutinee, arms)?,
-                }
-            }
+            ast::ExprKind::Match(ref scrutinee, ref arms, match_kind) => match match_kind {
+                ast::MatchKind::Postfix => todo!(),
+                ast::MatchKind::Prefix => self.match_(scrutinee, arms)?,
+            },
             ast::ExprKind::Closure(ref closure) => self.closure(closure, use_tail())?,
             ast::ExprKind::Block(ref block, label) => {
                 self.label(label)?;
@@ -158,8 +159,28 @@ impl<'a> AstFormatter {
             ast::ExprKind::Struct(ref struct_) => self.struct_expr(struct_, use_tail())?,
             ast::ExprKind::Repeat(_, _) => todo!(),
             ast::ExprKind::Paren(ref inner) => {
+                let tail = use_tail();
                 self.out.token("(")?;
-                self.expr_tail(inner, &Tail::token(")").and(use_tail()))?;
+                self.fallback(|| {
+                    self.with_single_line(|| {
+                        self.expr(inner)?;
+                        self.out.token(")")?;
+                        self.tail(tail)?;
+                        Ok(())
+                    })
+                })
+                .next(|| {
+                    self.indented(|| {
+                        self.out.newline_indent()?;
+                        self.expr(inner)?;
+                        Ok(())
+                    })?;
+                    self.out.newline_indent()?;
+                    self.out.token(")")?;
+                    self.tail(tail)?;
+                    Ok(())
+                })
+                .result()?;
             }
             ast::ExprKind::Yield(_) => todo!(),
             ast::ExprKind::Yeet(_) => todo!(),
@@ -221,12 +242,12 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], end: &Tail) -> FormatResult {
-        self.expr(func)?;
+    pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
         list(Braces::PARENS, args, |arg| self.expr(arg))
             .config(&CallParamListConfig)
+            .omit_open_brace()
             .overflow()
-            .tail(end)
+            .tail(tail)
             .format(self)
     }
 

@@ -1,0 +1,19 @@
+- name: call function (not args) breakpoint
+  type: breakpoint
+  before: |
+    (aaaaaaa + bbbbb)(
+        aaaaaaaaaa,
+        aaaaaaaaaa,
+        aaaaaaaaaa,
+        aaaaaaaaaa,
+    )
+  after: |
+    (
+        aaaaaaa
+            + bbbbb
+    )(
+        aaaaaaaaaa,
+        aaaaaaaaaa,
+        aaaaaaaaaa,
+        aaaaaaaaaa,
+    )

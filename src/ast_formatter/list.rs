@@ -38,6 +38,7 @@ where
         rest: ListRest::None,
         format_item,
         tail: &Tail::none(),
+        omit_open_brace: false,
         config: &DefaultListConfig,
         item_config: DefaultListItemConfig::default(),
         overflow: ListOverflowNo::default(),
@@ -50,6 +51,7 @@ pub struct ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfi
     format_item: FormatItem,
     rest: ListRest<'ast>,
     tail: &'tail Tail,
+    omit_open_brace: bool,
     config: &'config Config,
     item_config: ItemConfig,
     overflow: Overflow,
@@ -74,9 +76,17 @@ where
             format_item: self.format_item,
             rest: self.rest,
             tail: self.tail,
-            config: config,
+            omit_open_brace: self.omit_open_brace,
+            config,
             item_config: self.item_config,
             overflow: self.overflow,
+        }
+    }
+    
+    pub fn omit_open_brace(self) -> Self {
+        ListBuilder {
+            omit_open_brace: true,
+            ..self
         }
     }
 
@@ -90,6 +100,7 @@ where
             format_item: self.format_item,
             rest: self.rest,
             tail: self.tail,
+            omit_open_brace: self.omit_open_brace,
             config: self.config,
             item_config,
             overflow: self.overflow,
@@ -114,6 +125,7 @@ where
             format_item: self.format_item,
             rest: self.rest,
             tail: self.tail,
+            omit_open_brace: self.omit_open_brace,
             config: self.config,
             item_config: self.item_config,
             overflow: ListOverflowYes::default(),
@@ -134,6 +146,7 @@ where
             format_item: self.format_item,
             rest: self.rest,
             tail,
+            omit_open_brace: self.omit_open_brace,
             config: self.config,
             item_config: self.item_config,
             overflow: self.overflow,
@@ -157,7 +170,9 @@ where
         af: &AstFormatter,
         contents: impl FnOnce(&Self, &AstFormatter, &Tail) -> FormatResult,
     ) -> FormatResult {
-        af.out.token(self.braces.start)?;
+        if !self.omit_open_brace {
+            af.out.token(self.braces.start)?;
+        }
         if self.list.is_empty() && matches!(self.rest, ListRest::None) {
             af.out.token(self.braces.end)?;
             af.tail(self.tail)?;

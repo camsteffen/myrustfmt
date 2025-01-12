@@ -1,0 +1,13 @@
+- name: arm body is is chain with all overflowing method calls
+  type: no_change
+  formatted: |
+    match x {
+        x => {
+            aaaaaaa({
+                let x;
+            })
+            .aaaaaaa({
+                let x;
+            })
+        }
+    }
