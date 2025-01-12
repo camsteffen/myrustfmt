@@ -113,9 +113,7 @@ impl ConstraintWriter {
     pub fn check_width_constraints(&self) -> Result<(), WidthLimitExceededError> {
         match self.remaining_width() {
             None | Some(Ok(_)) => Ok(()),
-            Some(Err(WidthLimitExceededError { .. })) => {
-                Err(WidthLimitExceededError)
-            }
+            Some(Err(WidthLimitExceededError { .. })) => Err(WidthLimitExceededError),
         }
     }
 

@@ -74,8 +74,7 @@ pub fn format(
 ) -> Result<String, ErrorGuaranteed> {
     parse_crate(String::from(source), path, |crate_| {
         let constraints = Constraints::new(config.max_width);
-        let source_formatter =
-            SourceFormatter::new(String::from(source), constraints);
+        let source_formatter = SourceFormatter::new(String::from(source), constraints);
         let ast_formatter = AstFormatter::new(config, source_formatter);
         let result = ast_formatter.crate_(&crate_);
         match result {

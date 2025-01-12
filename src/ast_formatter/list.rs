@@ -82,7 +82,7 @@ where
             overflow: self.overflow,
         }
     }
-    
+
     pub fn omit_open_brace(self) -> Self {
         ListBuilder {
             omit_open_brace: true,

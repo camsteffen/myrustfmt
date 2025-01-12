@@ -7,7 +7,6 @@ mod binary;
 mod block;
 mod common;
 mod constraint_modifiers;
-mod postfix_chain;
 mod expr;
 mod fallback;
 mod r#fn;
@@ -18,6 +17,7 @@ mod local;
 mod r#match;
 mod pat;
 mod path;
+mod postfix_chain;
 mod ty;
 mod util;
 

@@ -24,7 +24,6 @@ fn test() {
     );
 }
 
-
 #[test]
 fn call_with_just_a_closure_can_exceed_fn_call_width() {
     let source = r#"
