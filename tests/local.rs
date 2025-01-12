@@ -2,7 +2,6 @@
 
 mod test_lib;
 
-use crate::test_lib::{stmt_breakpoint_test, stmt_test};
 use myrustfmt::format_str;
 use tracing_test::traced_test;
 

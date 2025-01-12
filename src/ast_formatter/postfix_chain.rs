@@ -1,11 +1,8 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::list_config::{CallParamListConfig, ListConfig};
-use crate::ast_formatter::list::{Braces, list};
 use crate::ast_formatter::util::tail::Tail;
-use crate::config::Config;
 use crate::constraints::INDENT_WIDTH;
 use crate::error::FormatResult;
-use crate::error::{ConstraintError, FormatError, WidthLimitExceededError};
+use crate::error::{FormatError, WidthLimitExceededError};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use rustc_span::symbol::Ident;

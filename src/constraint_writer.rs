@@ -1,7 +1,6 @@
 use crate::constraints::Constraints;
 use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededError};
 use std::cell::Cell;
-use tracing::info;
 
 pub struct ConstraintWriter {
     constraints: Constraints,
