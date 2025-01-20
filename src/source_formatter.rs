@@ -1,7 +1,7 @@
 use crate::constraint_writer::{ConstraintWriter, ConstraintWriterSnapshot};
 use crate::constraints::Constraints;
 use crate::error::{FormatResult, WidthLimitExceededError};
-use crate::source_formatter::whitespace::{WhitespaceMode, handle_whitespace};
+use crate::source_formatter::whitespace::{WhitespaceMode, handle_whitespace, NewlineKind};
 use crate::source_reader::SourceReader;
 use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
@@ -84,21 +84,21 @@ impl SourceFormatter {
     }
 
     pub fn newline(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Newline)
+        self.handle_whitespace_and_comments(WhitespaceMode::Newline(NewlineKind::Between))
     }
 
     pub fn newline_split(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::NewlineSplit)
+        self.handle_whitespace_and_comments(WhitespaceMode::Newline(NewlineKind::Split))
     }
 
     pub fn newline_leading_indent(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::NewlineLeading)?;
+        self.handle_whitespace_and_comments(WhitespaceMode::Newline(NewlineKind::Leading))?;
         self.indent()?;
         Ok(())
     }
     
     pub fn newline_trailing(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::NewlineTrailing)
+        self.handle_whitespace_and_comments(WhitespaceMode::Newline(NewlineKind::Trailing))
     }
 
     /** Writes a newline character and indent characters according to the current indent level */
