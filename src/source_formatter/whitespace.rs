@@ -6,13 +6,12 @@ use rustc_lexer::TokenKind;
 pub enum NewlineKind {
     /// Newline between items where a blank line is allowed.
     Between,
-    /// Newline that splits a syntactical construct that would typically be on one line.
-    /// Blank lines are trimmed away.
-    Split,
-    /// Newline at the beginning of a block. A blank line is allowed only below comments.
+    /// Newline at the beginning of a braced section. A blank line is allowed only below comments.
     Leading,
-    /// Newline at the end of a block. A blank line is allowed only above comments.
+    /// Newline at the end of a braced section. A blank line is allowed only above comments.
     Trailing,
+    /// Newline in a less typical place where extra blank lines should be trimmed away.
+    Split,
 }
 
 impl NewlineKind {
@@ -26,6 +25,7 @@ impl NewlineKind {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum WhitespaceMode {
     Newline(NewlineKind),
     Space,
@@ -98,31 +98,44 @@ impl WhitespaceContext<'_> {
             return Ok(());
         };
         enum ToFlush {
-            None,
             Newline { double: bool },
             Space,
         }
-        let to_flush = match self.mode {
-            WhitespaceMode::Newline(kind) => {
-                if newlines > 0 {
-                    let double = newlines > 1
-                        && kind.allow_blank_line(is_before_comments, self.is_after_comments);
-                    ToFlush::Newline { double }
-                } else if is_before_comments {
-                    ToFlush::Space
-                } else {
-                    ToFlush::None
-                }
+        let is_by_comments = is_before_comments || self.is_after_comments;
+        let to_flush = match (newlines, self.mode) {
+            (2.., WhitespaceMode::Newline(kind))
+                if kind.allow_blank_line(is_before_comments, self.is_after_comments) =>
+            {
+                ToFlush::Newline { double: true }
             }
-            WhitespaceMode::Void if !is_before_comments && !self.is_after_comments => ToFlush::None,
-            WhitespaceMode::Space | WhitespaceMode::Void => {
-                if is_before_comments && newlines > 0 {
-                    ToFlush::Newline { double: false }
-                } else {
-                    ToFlush::Space
-                }
-            }
+            (1.., WhitespaceMode::Newline(_)) => ToFlush::Newline { double: false },
+            (1.., _) if is_by_comments => ToFlush::Newline { double: false },
+            _ if is_by_comments => ToFlush::Space,
+            (_, WhitespaceMode::Space) => ToFlush::Space,
+            _ => return Ok(())
         };
+        // let to_flush = match self.mode {
+        //     WhitespaceMode::Newline(kind) => {
+        //         if newlines > 0 {
+        //             let double = newlines > 1
+        //                 && kind.allow_blank_line(is_before_comments, self.is_after_comments);
+        //             ToFlush::Newline { double }
+        //         } else if is_before_comments {
+        //             ToFlush::Space
+        //         } else {
+        //             ToFlush::None
+        //         }
+        //     }
+        //     WhitespaceMode::Space | WhitespaceMode::Void => {
+        //         if (is_before_comments || self.is_after_comments) && newlines > 0 {
+        //             ToFlush::Newline { double: false }
+        //         } else if matches!(self.mode, WhitespaceMode::Void) {
+        //             ToFlush::None
+        //         } else {
+        //             ToFlush::Space
+        //         }
+        //     }
+        // };
         match to_flush {
             ToFlush::Newline { double } => {
                 // todo handle this upstream
@@ -138,7 +151,6 @@ impl WhitespaceContext<'_> {
                 }
                 self.is_required_whitespace_out = true;
             }
-            ToFlush::None => {}
             ToFlush::Space => {
                 self.sf.out.token(" ")?;
                 if matches!(self.mode, WhitespaceMode::Space) {
