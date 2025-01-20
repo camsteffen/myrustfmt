@@ -43,12 +43,4 @@ impl<T> Fallback<'_, T> {
     pub fn result(self) -> FormatResult<T> {
         self.result
     }
-
-    pub fn peek_result(&self) -> &FormatResult<T> {
-        &self.result
-    }
-
-    pub fn snapshot(&self) -> &SourceFormatterSnapshot {
-        &self.snapshot
-    }
 }

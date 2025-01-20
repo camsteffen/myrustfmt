@@ -1,3 +1,19 @@
+- name: line comment after block opening and closing brace
+  type: before_after
+  before: |
+    {    // open
+        let x;
+    }    // close
+  after: |
+    { // open
+        let x;
+    } // close
+- name: line comment after block opening brace without space
+  type: no_change
+  formatted: |
+    {// open
+        let x;
+    }// close
 - name: trim all but one blank line leading and trailing line comments in block
   type: before_after
   before: |
@@ -80,3 +96,9 @@
   after: |
     let/*comment
           second line*/ x;
+- name: block comment padded with spaces where there would be no space
+  type: before_after
+  before: |
+    (  /* comment */  x );
+  after: |
+    ( /* comment */ x);
