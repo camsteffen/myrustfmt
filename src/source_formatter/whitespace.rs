@@ -2,9 +2,17 @@ use crate::error::FormatResult;
 use crate::source_formatter::SourceFormatter;
 use rustc_lexer::TokenKind;
 
+/// Answers the question: What whitespace to we expect to print, ignoring comments?
+#[derive(Clone, Copy)]
+pub enum WhitespaceMode {
+    Newline(NewlineKind),
+    Space,
+    Void,
+}
+
 #[derive(Clone, Copy)]
 pub enum NewlineKind {
-    /// Newline between items where a blank line is allowed.
+    /// Newline between items where a blank line is allowed. (e.g. between statements)
     Between,
     /// Newline at the beginning of a braced section. A blank line is allowed only below comments.
     Leading,
@@ -15,28 +23,21 @@ pub enum NewlineKind {
 }
 
 impl NewlineKind {
-    pub fn allow_blank_line(self, is_before_comments: bool, is_after_comments: bool) -> bool {
+    pub fn allow_blank_line(self, is_comments_before: bool, is_comments_after: bool) -> bool {
         match self {
             NewlineKind::Between => true,
-            NewlineKind::Leading => is_after_comments,
-            NewlineKind::Trailing => is_before_comments,
-            NewlineKind::Split => is_after_comments && is_before_comments,
+            NewlineKind::Leading => is_comments_before,
+            NewlineKind::Trailing => is_comments_after,
+            NewlineKind::Split => is_comments_before && is_comments_after,
         }
     }
-}
-
-#[derive(Clone, Copy)]
-pub enum WhitespaceMode {
-    Newline(NewlineKind),
-    Space,
-    Void,
 }
 
 pub fn handle_whitespace(mode: WhitespaceMode, sf: &SourceFormatter) -> FormatResult {
     WhitespaceContext {
         sf,
-        is_after_comments: false,
-        skipped_whitespace: None,
+        is_comments_before: false,
+        whitespace_buffer: None,
         mode,
         is_required_whitespace_out: false,
         is_after_line_comment_out: false,
@@ -47,10 +48,11 @@ pub fn handle_whitespace(mode: WhitespaceMode, sf: &SourceFormatter) -> FormatRe
 struct WhitespaceContext<'a> {
     sf: &'a SourceFormatter,
     mode: WhitespaceMode,
-    skipped_whitespace: Option</*newline count*/ usize>,
+    /// Some if any amount of whitespace is seen and not yet printed
+    whitespace_buffer: Option</*newline count*/ usize>,
     is_after_line_comment_out: bool,
     is_required_whitespace_out: bool,
-    is_after_comments: bool,
+    is_comments_before: bool,
 }
 
 impl WhitespaceContext<'_> {
@@ -58,11 +60,11 @@ impl WhitespaceContext<'_> {
         for token in rustc_lexer::tokenize(self.sf.source.remaining()) {
             match token.kind {
                 TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
-                    self.flush_skipped_whitespace(true)?;
+                    self.flush_whitespace(true)?;
                     self.sf
                         .constraints()
                         .with_no_max_width(|| self.sf.copy(token.len as usize))?;
-                    self.is_after_comments = true;
+                    self.is_comments_before = true;
                     self.is_after_line_comment_out =
                         matches!(token.kind, TokenKind::LineComment { .. });
                     if matches!(self.mode, WhitespaceMode::Space) {
@@ -73,14 +75,14 @@ impl WhitespaceContext<'_> {
                 TokenKind::Whitespace => {
                     let token_str = &self.sf.source.remaining()[..token.len as usize];
                     let newlines = token_str.bytes().filter(|&b| b == b'\n').count();
-                    self.skipped_whitespace = Some(newlines);
+                    self.whitespace_buffer = Some(newlines);
                     self.sf.source.advance(token.len as usize);
                 }
                 _ => break,
             }
         }
 
-        self.flush_skipped_whitespace(false)?;
+        self.flush_whitespace(false)?;
 
         if !self.is_required_whitespace_out {
             match self.mode {
@@ -93,51 +95,29 @@ impl WhitespaceContext<'_> {
         Ok(())
     }
 
-    fn flush_skipped_whitespace(&mut self, is_before_comments: bool) -> FormatResult {
-        let Some(newlines) = self.skipped_whitespace.take() else {
+    fn flush_whitespace(&mut self, is_comments_after: bool) -> FormatResult {
+        let Some(newlines) = self.whitespace_buffer.take() else {
             return Ok(());
         };
-        enum ToFlush {
+        let is_by_comments = self.is_comments_before || is_comments_after;
+        enum Out {
             Newline { double: bool },
             Space,
         }
-        let is_by_comments = is_before_comments || self.is_after_comments;
-        let to_flush = match (newlines, self.mode) {
+        let out = match (newlines, self.mode) {
             (2.., WhitespaceMode::Newline(kind))
-                if kind.allow_blank_line(is_before_comments, self.is_after_comments) =>
+                if kind.allow_blank_line(self.is_comments_before, is_comments_after) =>
             {
-                ToFlush::Newline { double: true }
+                Out::Newline { double: true }
             }
-            (1.., WhitespaceMode::Newline(_)) => ToFlush::Newline { double: false },
-            (1.., _) if is_by_comments => ToFlush::Newline { double: false },
-            _ if is_by_comments => ToFlush::Space,
-            (_, WhitespaceMode::Space) => ToFlush::Space,
+            (1.., WhitespaceMode::Newline(_)) => Out::Newline { double: false },
+            (1.., _) if is_by_comments => Out::Newline { double: false },
+            _ if is_by_comments => Out::Space,
+            (_, WhitespaceMode::Space) => Out::Space,
             _ => return Ok(())
         };
-        // let to_flush = match self.mode {
-        //     WhitespaceMode::Newline(kind) => {
-        //         if newlines > 0 {
-        //             let double = newlines > 1
-        //                 && kind.allow_blank_line(is_before_comments, self.is_after_comments);
-        //             ToFlush::Newline { double }
-        //         } else if is_before_comments {
-        //             ToFlush::Space
-        //         } else {
-        //             ToFlush::None
-        //         }
-        //     }
-        //     WhitespaceMode::Space | WhitespaceMode::Void => {
-        //         if (is_before_comments || self.is_after_comments) && newlines > 0 {
-        //             ToFlush::Newline { double: false }
-        //         } else if matches!(self.mode, WhitespaceMode::Void) {
-        //             ToFlush::None
-        //         } else {
-        //             ToFlush::Space
-        //         }
-        //     }
-        // };
-        match to_flush {
-            ToFlush::Newline { double } => {
+        match out {
+            Out::Newline { double } => {
                 // todo handle this upstream
                 let should_omit_newlines = self.sf.out.len() == 0;
                 if !should_omit_newlines {
@@ -145,13 +125,13 @@ impl WhitespaceContext<'_> {
                     if double {
                         self.sf.out.newline()?;
                     }
-                    if is_before_comments {
+                    if is_comments_after {
                         self.sf.out.indent()?;
                     }
                 }
                 self.is_required_whitespace_out = true;
             }
-            ToFlush::Space => {
+            Out::Space => {
                 self.sf.out.token(" ")?;
                 if matches!(self.mode, WhitespaceMode::Space) {
                     self.is_required_whitespace_out = true;
