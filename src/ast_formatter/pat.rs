@@ -9,7 +9,7 @@ use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
-impl<'a> AstFormatter {
+impl AstFormatter {
     pub fn pat(&self, pat: &ast::Pat) -> FormatResult {
         self.pat_tail(pat, Tail::none())
     }

@@ -1,5 +1,5 @@
 * When a closure body begins with `match`, `loop` or a multi-line struct literal,
-  the body is wrapped with a block.
+  it is wrapped with a block.
 * A chain of binary operators of equal precedence are treated as a single chain.
 * A dot chain of two elements (e.g. expr.field) is not exempt from chain_width.
 * A method call with one argument that is a function call is not exempt from fn_call_width.
@@ -13,15 +13,14 @@
   } = x;
   ```
   This formatter always puts all fields on separate lines if the struct does not fit on one line.
-* Chains may include index operators
 * Large expressions in an index operator are broken into a separate line
 * Large expressions in parentheses are broken into a separate line
 
-TODO
-* Don't allow multiline chains without indent as a match arm or list item
-  * Force parentheses around chains that do not indent, unless it's a statement
-    * What about unused_parens lint?
-
+Chains
+* Chains may include index operators
+* Multi-line chains as a match arm body are always wrapped with a block. Rustfmt makes an exception when the chain
+  ends in a multi-line method call (this is probably a bug).
+* Multi-line chains with no indent as a list item (e.g. array element) are wrapped with a block
 
 rustfmt Bugs:
 * fn_call_width is reduced by 2 when the last argument overflows into multiple lines
@@ -30,4 +29,3 @@ rustfmt Bugs:
 * When an import has curly braces, max_width is reduced by 2
 * When placing a `{` after `let...else`, max_width is reduced by 1
 * When placing a `{` after `if .. =>` where the if-guard has its own line, max_width is reduced by 2
-* Removes block from match arm body when it is a multi-line chain ending in a multi-line method call

@@ -7,8 +7,9 @@ use crate::ast_formatter::list::list_config::{DefaultListConfig, ListConfig, Par
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
 use rustc_span::symbol::kw;
+use crate::ast_utils::{expr_kind, };
 
-impl<'a> AstFormatter {
+impl AstFormatter {
     pub fn fn_<K>(&self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
         let ast::Fn {
             generics,
@@ -97,24 +98,14 @@ impl<'a> AstFormatter {
     }
 
     fn closure_body(&self, body: &ast::Expr, tail: &Tail) -> FormatResult {
-        fn is_block_like(expr: &ast::Expr) -> bool {
-            match expr.kind {
-                ast::ExprKind::Gen(..) | ast::ExprKind::Block(..) | ast::ExprKind::TryBlock(..) => {
-                    true
-                }
-
-                ast::ExprKind::AddrOf(_, _, ref expr)
-                | ast::ExprKind::Try(ref expr)
-                | ast::ExprKind::Unary(_, ref expr)
-                | ast::ExprKind::Cast(ref expr, _) => is_block_like(expr),
-
-                _ => false,
-            }
-        }
         self.skip_single_expr_blocks(body, |body| {
-            if is_block_like(body) {
+            // todo consider allowing `match`, `loop`, `for`, `while` if the header fits on one line
+            //   should we preserve the block in such cases?
+            if matches!(body.kind, expr_kind::block_like!()) {
+                // don't add a block
                 self.expr_tail(body, tail)
             } else {
+                // add a block unless it fits on a single line
                 self.fallback(|| self.with_single_line(|| self.expr_tail(body, tail)))
                     .next(|| {
                         self.add_block(|| self.expr(body))?;
@@ -127,6 +118,7 @@ impl<'a> AstFormatter {
     }
 
     pub fn bare_fn_ty(&self, bare_fn_ty: &ast::BareFnTy) -> FormatResult {
+        // todo
         // self.safety(&bare_fn_ty.safety)?;
         // self.extern_(&bare_fn_ty.ext)?;
         // self.generic_params(&bare_fn_ty.generic_params)?;

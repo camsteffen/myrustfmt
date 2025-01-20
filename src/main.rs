@@ -7,8 +7,6 @@ use std::{env, fs};
 
 fn main() -> ExitCode {
     let args = Vec::from_iter(env::args());
-    dbg!(&args);
-    return ExitCode::FAILURE;
     if args.len() < 2 {
         eprintln!("Provide at least one path");
         return ExitCode::FAILURE;

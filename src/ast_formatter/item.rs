@@ -10,7 +10,7 @@ use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
-impl<'a> AstFormatter {
+impl AstFormatter {
     pub fn item(&self, item: &ast::Item) -> FormatResult {
         self.item_generic(item, |kind| self.item_kind(kind, item))
     }

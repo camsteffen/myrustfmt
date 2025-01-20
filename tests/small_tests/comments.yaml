@@ -2,6 +2,7 @@
   type: before_after
   before: |
     {
+
         // leading
 
 
@@ -9,6 +10,7 @@
 
 
         // trailing
+
     }
   after: |
     {
@@ -18,3 +20,63 @@
 
         // trailing
     }
+- name: comment in an empty array
+  type: before_after
+  before: |
+    [
+
+    // hi
+
+    ]
+  after: |
+    [
+        // hi
+    ]
+- name: leading and trailing comments in an array
+  type: before_after
+  before: |
+    [
+
+    // leading
+
+        element,
+
+    // trailing
+
+    ]
+  after: |
+    [
+        // leading
+
+        element,
+
+        // trailing
+    ]
+- name: prefix a token with a single-line block
+  type: before_after
+  before: |
+    let  /*comment*/x;
+  after: |
+    let /*comment*/x;
+- name: suffix a token with a single-line block comment
+  type: before_after
+  before: |
+    let/*comment*/  x;
+  after: |
+    let/*comment*/ x;
+- name: prefix a token with a multi-line block
+  type: before_after
+  before: |
+    let  /*comment
+          second line*/x;
+  after: |
+    let /*comment
+          second line*/x;
+- name: suffix a token with a multi-line block
+  type: before_after
+  before: |
+    let/*comment
+          second line*/  x;
+  after: |
+    let/*comment
+          second line*/ x;

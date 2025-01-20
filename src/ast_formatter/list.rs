@@ -15,6 +15,7 @@ use crate::ast_formatter::util::tail::Tail;
 use crate::error::{ConstraintError, FormatResult};
 use overflow::{ListOverflow, ListOverflowNo, ListOverflowYes};
 
+/// Main entrypoint for formatting a list
 pub fn list<'a, 'list, Item, FormatItem>(
     braces: &'static Braces,
     list: &'list [Item],
@@ -45,6 +46,9 @@ where
     }
 }
 
+// Yikes, lots of generics here. This allows the compiler to optimize away unneeded features.
+// The monomorphization shouldn't be too much since there is a finite number of list cases, and the
+// builder delegates to less generic functions for the actual formatting implementation.
 pub struct ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfig, Overflow> {
     braces: &'static Braces,
     list: &'ast [Item],
@@ -168,27 +172,27 @@ where
     fn do_format(
         &self,
         af: &AstFormatter,
-        contents: impl FnOnce(&Self, &AstFormatter, &Tail) -> FormatResult,
+        contents: impl FnOnce(&Self, &AstFormatter) -> FormatResult,
     ) -> FormatResult {
         if !self.omit_open_brace {
             af.out.token(self.braces.start)?;
         }
         if self.list.is_empty() && matches!(self.rest, ListRest::None) {
-            af.out.token(self.braces.end)?;
+            af.embraced_empty_after_opening(self.braces.end)?;
             af.tail(self.tail)?;
             return Ok(());
         }
-        contents(self, af, &Tail::token(self.braces.end).and(self.tail))
+        contents(self, af)
     }
 
-    fn contents_default(&self, af: &AstFormatter, tail: &Tail) -> FormatResult {
+    fn contents_default(&self, af: &AstFormatter) -> FormatResult {
         let mut fallback = af.fallback(|| {
             if ItemConfig::ITEMS_POSSIBLY_MUST_HAVE_OWN_LINE
                 && self.list.iter().any(ItemConfig::item_must_have_own_line)
             {
                 return Err(ConstraintError::Logical.into());
             }
-            self.contents_single_line(af, tail)
+            self.contents_single_line(af)
         });
         match Config::wrap_to_fit() {
             ListWrapToFitConfig::Yes { max_element_width } => {
@@ -196,21 +200,20 @@ where
                     matches!(self.rest, ListRest::None),
                     "rest cannot be used with wrap-to-fit"
                 );
-                fallback = fallback.next(|| self.contents_wrap_to_fit(af, tail, max_element_width));
+                fallback = fallback.next(|| self.contents_wrap_to_fit(af, max_element_width));
             }
             ListWrapToFitConfig::No => {}
         }
-        fallback
-            .next(|| self.contents_separate_lines(af, tail))
-            .result()
+        fallback.next(|| self.contents_separate_lines(af)).result()
     }
 
-    fn contents_single_line(&self, af: &AstFormatter, tail: &Tail) -> FormatResult {
+    fn contents_single_line(&self, af: &AstFormatter) -> FormatResult {
         af.list_contents_single_line(
             self.list,
             &self.format_item,
             self.rest,
-            tail,
+            self.braces.end,
+            self.tail,
             self.overflow,
             self.braces.pad,
             self.config.single_line_max_contents_width(),
@@ -222,30 +225,61 @@ where
     fn contents_wrap_to_fit(
         &self,
         af: &AstFormatter,
-        tail: &Tail,
         max_element_width: Option<u32>,
     ) -> FormatResult {
         af.list_contents_wrap_to_fit(
             self.list,
-            tail,
+            self.braces.end,
+            self.tail,
             &self.format_item,
             self.item_config,
             max_element_width,
         )
     }
 
-    fn contents_separate_lines(&self, af: &AstFormatter, tail: &Tail) -> FormatResult {
-        af.list_contents_separate_lines(self.list, &self.format_item, self.rest, tail)
+    fn contents_separate_lines(&self, af: &AstFormatter) -> FormatResult {
+        af.list_contents_separate_lines(
+            self.list,
+            &self.format_item,
+            self.rest,
+            self.braces.end,
+            self.tail,
+        )
     }
 }
 
-impl<'a> AstFormatter {
+/// convenience for `-> impl ListBuilderTrait`, otherwise ListBuilder is preferred
+pub trait ListBuilderTrait {
+    fn format(&self, af: &AstFormatter) -> FormatResult;
+
+    fn format_single_line(&self, af: &AstFormatter) -> FormatResult;
+}
+
+impl<'a, 'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfig, Overflow> ListBuilderTrait
+    for ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfig, Overflow>
+where
+    Config: ListConfig,
+    ItemConfig: ListItemConfig<Item = Item>,
+    FormatItem: Fn(&Item) -> FormatResult,
+    Overflow: ListOverflow<Item = Item>,
+{
+    fn format(&self, af: &AstFormatter) -> FormatResult {
+        self.format(af)
+    }
+
+    fn format_single_line(&self, af: &AstFormatter) -> FormatResult {
+        self.format_single_line(af)
+    }
+}
+
+impl AstFormatter {
     /* [item, item, item] */
     fn list_contents_single_line<Item, Overflow: ListOverflow<Item = Item>>(
         &self,
         list: &[Item],
         format_item: impl Fn(&Item) -> FormatResult,
         rest: ListRest<'_>,
+        close_brace: &str,
         tail: &Tail,
         _overflow: Overflow,
         pad: bool,
@@ -308,11 +342,11 @@ impl<'a> AstFormatter {
             }
             FormatResult::Ok(())
         };
-        // let format = || self.with_single_line(format);
         self.with_width_limit_first_line_opt(max_width, format)?;
         if pad {
             self.out.space()?;
         }
+        self.out.token(close_brace)?;
         self.tail(tail)?;
         Ok(())
     }
@@ -326,6 +360,7 @@ impl<'a> AstFormatter {
     fn list_contents_wrap_to_fit<T, ItemConfig>(
         &self,
         list: &[T],
+        close_brace: &str,
         tail: &Tail,
         format_item: impl Fn(&T) -> FormatResult,
         _item_config: ItemConfig,
@@ -338,8 +373,7 @@ impl<'a> AstFormatter {
             Some(max_width) => self.with_width_limit_single_line(max_width, || format_item(item)),
             None => format_item(item),
         };
-        self.indented(|| {
-            self.out.newline_indent()?;
+        self.embraced_after_opening(close_brace, || {
             let (first, rest) = list.split_first().unwrap();
             format_item(first)?;
             self.out.token_maybe_missing(",")?;
@@ -374,7 +408,6 @@ impl<'a> AstFormatter {
             }
             Ok(())
         })?;
-        self.out.newline_indent()?;
         self.tail(tail)?;
         Ok(())
     }
@@ -391,24 +424,37 @@ impl<'a> AstFormatter {
         list: &[T],
         format_item: impl Fn(&T) -> FormatResult,
         rest: ListRest<'_>,
+        close_brace: &str,
         tail: &Tail,
     ) -> FormatResult {
-        self.indented(|| {
-            for item in list {
-                self.out.newline_indent()?;
-                format_item(item)?;
-                self.out.token_maybe_missing(",")?;
-            }
-            if !matches!(rest, ListRest::None) {
-                self.out.newline_indent()?;
-                self.out.token("..")?;
-                if let ListRest::Base(expr) = rest {
-                    self.expr(expr)?;
+        let item_comma = |item| -> FormatResult {
+            format_item(item)?;
+            self.out.token_maybe_missing(",")?;
+            Ok(())
+        };
+        self.embraced_after_opening(close_brace, || {
+            match rest {
+                ListRest::None => {
+                    let (last, until_last) = list.split_last().unwrap();
+                    for item in until_last {
+                        item_comma(item)?;
+                        self.out.newline_indent()?;
+                    }
+                    item_comma(last)?;
+                }
+                _ => {
+                    for item in list {
+                        item_comma(item)?;
+                        self.out.newline_indent()?;
+                    }
+                    self.out.token("..")?;
+                    if let ListRest::Base(expr) = rest {
+                        self.expr(expr)?;
+                    }
                 }
             }
             Ok(())
         })?;
-        self.out.newline_indent()?;
         self.tail(tail)?;
         Ok(())
     }

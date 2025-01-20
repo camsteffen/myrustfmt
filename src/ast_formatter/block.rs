@@ -3,7 +3,7 @@ use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use rustc_ast::ast;
 
-impl<'a> AstFormatter {
+impl AstFormatter {
     pub fn block(&self, block: &ast::Block) -> FormatResult {
         self.out.token("{")?;
         self.block_after_open_brace(block)?;
@@ -29,19 +29,17 @@ impl<'a> AstFormatter {
         items: &[T],
         format_item: impl Fn(&T) -> FormatResult,
     ) -> FormatResult {
-        if !items.is_empty() {
-            self.indented(|| {
-                for item in items {
+        match items {
+            [] => self.embraced_empty_after_opening("}"),
+            [first, rest @ ..] => self.embraced_after_opening("}", || {
+                format_item(first)?;
+                for item in rest {
                     self.out.newline_indent()?;
                     format_item(item)?;
                 }
-                self.out.newline()?;
                 Ok(())
-            })?;
-            self.out.indent()?;
+            }),
         }
-        self.out.token("}")?;
-        Ok(())
     }
 
     pub fn stmt(&self, stmt: &ast::Stmt) -> FormatResult {

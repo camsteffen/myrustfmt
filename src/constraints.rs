@@ -1,8 +1,6 @@
 use crate::config::Config;
-use crate::error::{FormatResult, WidthLimitExceededError};
+use crate::error::FormatResult;
 use std::cell::Cell;
-
-pub const INDENT_WIDTH: usize = 4;
 
 #[derive(Clone, Copy, Debug)]
 pub struct MaxWidthForLine {
@@ -18,6 +16,26 @@ pub struct Constraints {
     /// character is printed
     pub max_width_for_line: Cell<Option<MaxWidthForLine>>,
     pub indent: Cell<usize>,
+    /// When true, we say the margin doesn't like to be touched by the expression in question.
+    /// If an expression is touching the margin too much, we wrap it with a block to push it away.
+    /// More specifically, the expression should only touch the margin in its first and last lines.
+    ///
+    /// In the example below, the chain expression is not indented, and so is "touching the margin"
+    /// for every item in the chain. This makes it harder to scan the arm patterns of the match.
+    /// Therefore, match arm bodies are formatted with `touchy_margin` enabled. In the example
+    /// below, this would cause the chain to be wrapped with a block.
+    ///
+    /// ```
+    /// match x {
+    ///     Some(pattern) => a({
+    ///         todo!()
+    ///     })
+    ///     .multi_line
+    ///     .chain,
+    ///     _ => {}
+    /// }
+    /// ```
+    pub touchy_margin: Cell<bool>,
 }
 
 impl Default for Constraints {
@@ -33,6 +51,7 @@ impl Constraints {
             max_width: Cell::new(Some(max_width)),
             max_width_for_line: Cell::new(None),
             single_line: Cell::new(false),
+            touchy_margin: Cell::new(false),
         }
     }
 
@@ -42,34 +61,13 @@ impl Constraints {
             max_width,
             max_width_for_line: max_width_first_line,
             single_line,
+            touchy_margin,
         } = other;
         self.indent.set(indent.get());
         self.max_width.set(max_width.get());
         self.max_width_for_line.set(max_width_first_line.get());
         self.single_line.set(single_line.get());
-    }
-
-    pub fn increment_indent(&self) {
-        self.indent.set(self.indent.get() + INDENT_WIDTH);
-    }
-
-    pub fn decrement_indent(&self) {
-        self.indent.set(self.indent.get() - INDENT_WIDTH);
-    }
-
-    pub fn add_max_width(&self, len: u32) {
-        if let Some(max_width) = self.max_width.get() {
-            self.max_width.set(Some(max_width + len));
-        }
-    }
-
-    pub fn sub_max_width(&self, len: u32) -> Result<(), WidthLimitExceededError> {
-        if let Some(max_width) = self.max_width.get() {
-            self.max_width.set(Some(
-                max_width.checked_sub(len).ok_or(WidthLimitExceededError)?,
-            ));
-        }
-        Ok(())
+        self.touchy_margin.set(touchy_margin.get());
     }
 
     pub fn with_no_max_width(&self, f: impl FnOnce() -> FormatResult) -> FormatResult {

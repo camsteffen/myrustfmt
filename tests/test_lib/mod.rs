@@ -1,11 +1,6 @@
 use myrustfmt::config::Config;
 use myrustfmt::format_str_config;
 
-pub fn stmt_test(stmt: &str) {
-    let stmt = stmt.trim();
-    assert_eq!(format_stmt(stmt), stmt);
-}
-
 pub fn stmt_breakpoint_test(before: &str, after: &str) {
     let before = before.trim();
     let after = after.trim();
@@ -14,13 +9,10 @@ pub fn stmt_breakpoint_test(before: &str, after: &str) {
     format_stmt_max_width_expected(before, Some(initial_used_width - 1), after);
 }
 
-fn format_stmt(stmt: &str) -> String {
-    format_stmt_max_width(stmt, None)
-}
-
-fn format_stmt_max_width(stmt: &str, max_width: Option<u32>) -> String {
-    let (prefix, indent, suffix) = ("fn test() {\n", "    ", "\n}\n");
-    let crate_source = format!("{prefix}{indent}{stmt}{suffix}");
+fn format_stmt(stmt: &str, max_width: Option<u32>) -> String {
+    let (prefix, indent, suffix) = ("fn test() {\n", "    ", "}\n");
+    let stmt = String::from_iter(stmt.lines().map(|s| format!("{indent}{s}\n")));
+    let crate_source = format!("{prefix}{stmt}{suffix}");
     let mut config = Config::default();
     if let Some(max_width) = max_width {
         config = config.max_width(max_width + indent.len() as u32)
@@ -51,7 +43,7 @@ fn format_stmt_max_width(stmt: &str, max_width: Option<u32>) -> String {
 }
 
 pub fn format_stmt_max_width_expected(stmt: &str, max_width: Option<u32>, expected: &str) {
-    let formatted = format_stmt_max_width(stmt, max_width);
+    let formatted = format_stmt(stmt, max_width);
     if formatted != expected {
         for line in diff::lines(expected, &formatted) {
             match line {

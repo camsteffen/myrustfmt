@@ -30,6 +30,7 @@ breakpoint_tests! {
     local,
     match_,
     paren,
+    touchy_margins,
 }
 
 fn breakpoint_test_file(test_source_path: &Path) {
@@ -51,7 +52,11 @@ fn breakpoint_test(test: &Test) {
             format_stmt_max_width_expected(formatted, None, formatted)
         }
         TestKind::BeforeAfter { before, after } => {
-            format_stmt_max_width_expected(before.trim(), None, after.trim())
+            let before = before.trim();
+            let after = after.trim();
+            format_stmt_max_width_expected(before, None, after);
+            // idempotency test
+            format_stmt_max_width_expected(after, None, after);
         }
     }
 }

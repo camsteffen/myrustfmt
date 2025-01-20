@@ -5,7 +5,7 @@ use crate::ast_formatter::list::list_config::ParamListConfig;
 use crate::error::FormatResult;
 use rustc_ast::ast;
 
-impl<'a> AstFormatter {
+impl AstFormatter {
     pub fn ty(&self, ty: &ast::Ty) -> FormatResult {
         match &ty.kind {
             ast::TyKind::Slice(elem) => {
@@ -58,7 +58,7 @@ impl<'a> AstFormatter {
                 self.out.token(")")?;
             }
             ast::TyKind::Typeof(anon_const) => self.anon_const(anon_const)?,
-            ast::TyKind::Infer => todo!(),
+            ast::TyKind::Infer => self.out.token("_")?,
             ast::TyKind::ImplicitSelf => self.out.token("self")?,
             ast::TyKind::MacCall(_mac_call) => todo!(),
             ast::TyKind::CVarArgs => todo!(),

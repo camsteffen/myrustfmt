@@ -4,8 +4,13 @@ use rustc_lexer::TokenKind;
 
 pub enum WhitespaceMode {
     Newline,
+    NewlineSplit,
+    /// Used at the beginning of a block and enforces that a block may not begin with a blank line
+    NewlineLeading,
+    /// Opposite of NewlineLeading - enforces that a block may not end with a blank line
+    NewlineTrailing,
     Space,
-    Token,
+    Void,
 }
 
 pub fn handle_whitespace(mode: WhitespaceMode, sf: &SourceFormatter) -> FormatResult {
@@ -30,16 +35,37 @@ struct WhitespaceContext<'a> {
 }
 
 impl WhitespaceContext<'_> {
-    fn flush_skipped_whitespace(&mut self, should_indent: bool) -> FormatResult {
+    fn flush_skipped_whitespace(&mut self, is_end: bool, should_indent: bool) -> FormatResult {
         let Some(newlines) = self.skipped_whitespace.take() else {
             return Ok(());
         };
-        if self.is_after_line_comment_out || matches!(self.mode, WhitespaceMode::Newline) {
-            // todo detect start of blocks too
-            if self.sf.out.len() > 0 {
+        let is_newlines = if self.is_after_line_comment_out {
+            true
+        } else {
+            match self.mode {
+                WhitespaceMode::Space | WhitespaceMode::Void => false,
+                WhitespaceMode::Newline
+                | WhitespaceMode::NewlineLeading
+                | WhitespaceMode::NewlineTrailing
+                | WhitespaceMode::NewlineSplit => true,
+            }
+        };
+        if is_newlines {
+            // todo handle this upstream
+            let should_omit_newlines = self.sf.out.len() == 0;
+            if !should_omit_newlines {
                 self.sf.out.newline()?;
-                if matches!(self.mode, WhitespaceMode::Newline) && newlines > 1 {
-                    self.sf.out.newline()?;
+                if newlines > 1 {
+                    let allow_blank_line = match self.mode {
+                        WhitespaceMode::Newline => true,
+                        WhitespaceMode::NewlineLeading => self.twas_comments,
+                        WhitespaceMode::NewlineTrailing => !is_end,
+                        WhitespaceMode::NewlineSplit => self.twas_comments && !is_end,
+                        WhitespaceMode::Space | WhitespaceMode::Void => false,
+                    };
+                    if allow_blank_line {
+                        self.sf.out.newline()?;
+                    }
                 }
                 if should_indent {
                     self.sf.out.indent()?;
@@ -47,9 +73,11 @@ impl WhitespaceContext<'_> {
             }
             self.is_required_whitespace_out = true;
         } else {
-            self.sf.out.token(" ")?;
-            if matches!(self.mode, WhitespaceMode::Space) {
-                self.is_required_whitespace_out = true;
+            if !matches!(self.mode, WhitespaceMode::Void) {
+                self.sf.out.token(" ")?;
+                if matches!(self.mode, WhitespaceMode::Space) {
+                    self.is_required_whitespace_out = true;
+                }
             }
         }
         Ok(())
@@ -59,7 +87,7 @@ impl WhitespaceContext<'_> {
         for token in rustc_lexer::tokenize(self.sf.source.remaining()) {
             match token.kind {
                 TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
-                    self.flush_skipped_whitespace(true)?;
+                    self.flush_skipped_whitespace(false, true)?;
                     self.sf
                         .constraints()
                         .with_no_max_width(|| self.sf.copy(token.len as usize))?;
@@ -67,7 +95,7 @@ impl WhitespaceContext<'_> {
                     self.is_after_line_comment_out =
                         matches!(token.kind, TokenKind::LineComment { .. });
                     if matches!(self.mode, WhitespaceMode::Space) {
-                        // comments can count for a space
+                        // comments count for a space in this universe
                         self.is_required_whitespace_out = true;
                     }
                 }
@@ -80,19 +108,27 @@ impl WhitespaceContext<'_> {
                 _ => break,
             }
         }
-        if matches!(self.mode, WhitespaceMode::Token) && !self.twas_comments {
-            // ignore skipped (extra) whitespace
-        } else {
-            let should_indent = !matches!(self.mode, WhitespaceMode::Newline);
-            self.flush_skipped_whitespace(should_indent)?
-        }
+
+        // todo TDD
+        let should_indent = match self.mode {
+            WhitespaceMode::Space | WhitespaceMode::Void => true,
+            WhitespaceMode::Newline
+            | WhitespaceMode::NewlineLeading
+            | WhitespaceMode::NewlineTrailing
+            | WhitespaceMode::NewlineSplit => false,
+        };
+        self.flush_skipped_whitespace(true, should_indent)?;
+
         if !self.is_required_whitespace_out {
             match self.mode {
-                WhitespaceMode::Newline => {
+                WhitespaceMode::Newline
+                | WhitespaceMode::NewlineLeading
+                | WhitespaceMode::NewlineTrailing
+                | WhitespaceMode::NewlineSplit => {
                     self.sf.out.newline()?;
                 }
                 WhitespaceMode::Space => self.sf.out.token(" ")?,
-                WhitespaceMode::Token => {}
+                WhitespaceMode::Void => {}
             }
         }
         self.sf.next_is_whitespace_or_comments.set(false);

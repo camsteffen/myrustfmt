@@ -23,7 +23,7 @@ serde = { version = "1.0.217", features = ["derive"] }
 [dev-dependencies]
 diff = "0.1.13"
 regex = "1.11.1"
-serde_yaml = "0.9.34+deprecated"
+serde_yaml = "0.9.33"
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 
 #[package.metadata.rust-analyzer]

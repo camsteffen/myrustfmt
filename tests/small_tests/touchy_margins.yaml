@@ -1,0 +1,24 @@
+- name: call
+  type: before_after
+  before: |
+    match x {
+        _ => (
+            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                .aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                .aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        )({
+            let x;
+        }),
+    }
+  after: |
+    match x {
+        _ => {
+            (
+                aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                    .aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                    .aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            )({
+                let x;
+            })
+        }
+    }

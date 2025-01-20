@@ -30,3 +30,38 @@
           aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa,
           aaaaaaaaaa, aaaaaaaaaa,
       ]
+- name: single-item list has a chain with multiline root
+  type: before_after
+  before: |
+    [asdfasdf({
+        let x;
+    })
+    .aaaa
+    .aaaa]
+  after: |
+    [
+        asdfasdf({
+            let x;
+        })
+        .aaaa
+        .aaaa,
+    ]
+- name: multiple-item list has a chain with multiline root
+  type: before_after
+  before: |
+    [asdfasdf({
+        let x;
+    })
+    .aaaa
+    .aaaa, item]
+  after: |
+    [
+        {
+            asdfasdf({
+                let x;
+            })
+            .aaaa
+            .aaaa
+        },
+        item,
+    ]

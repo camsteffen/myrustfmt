@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{Braces, list};
+use crate::ast_formatter::list::{Braces, ListBuilderTrait, list};
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -8,11 +8,12 @@ use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::list_config::{
     ArrayListConfig, CallParamListConfig, ParamListConfig, struct_field_list_config,
 };
-use crate::ast_utils::expr_only_block;
+use crate::ast_utils::{expr_kind, expr_only_block};
+use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
-impl<'a> AstFormatter {
+impl AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
         self.expr_tail(expr, Tail::none())
     }
@@ -24,27 +25,24 @@ impl<'a> AstFormatter {
             tail
         };
         match expr.kind {
-            ast::ExprKind::Array(ref items) => list(Braces::SQUARE, items, |e| self.expr(e))
-                .config(&ArrayListConfig)
-                .overflow()
-                .tail(use_tail())
-                .format(self)?,
-            ast::ExprKind::ConstBlock(_) => todo!(),
-            ast::ExprKind::Call(ref func, ref args) => {
-                self.expr_tail(func, &Tail::token("("))?;
-                self.call_args_after_open_paren(args, use_tail())?
+            ast::ExprKind::Array(ref items) => {
+                list(Braces::SQUARE, items, self.expr_list_item_fn(items))
+                    .config(&ArrayListConfig)
+                    .overflow()
+                    .tail(use_tail())
+                    .format(self)?
             }
-            ast::ExprKind::Await(..)
-            | ast::ExprKind::Field(..)
-            | ast::ExprKind::Index(..)
-            | ast::ExprKind::MethodCall(_)
-            | ast::ExprKind::Try(_) => self.postfix_chain(expr, use_tail())?,
-            ast::ExprKind::Tup(ref items) => list(Braces::PARENS, items, |item| self.expr(item))
-                .config(&ParamListConfig {
-                    single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
-                })
-                .tail(use_tail())
-                .format(self)?,
+            ast::ExprKind::ConstBlock(_) => todo!(),
+            ast::ExprKind::Call(ref func, ref args) => self.call(func, args, use_tail())?,
+            expr_kind::postfix!() => self.postfix_chain(expr, use_tail())?,
+            ast::ExprKind::Tup(ref items) => {
+                list(Braces::PARENS, items, self.expr_list_item_fn(items))
+                    .config(&ParamListConfig {
+                        single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
+                    })
+                    .tail(use_tail())
+                    .format(self)?
+            }
             ast::ExprKind::Binary(op, ref left, ref right) => {
                 self.binary(left, right, op, use_tail())?
             }
@@ -170,13 +168,7 @@ impl<'a> AstFormatter {
                     })
                 })
                 .next(|| {
-                    self.indented(|| {
-                        self.out.newline_indent()?;
-                        self.expr(inner)?;
-                        Ok(())
-                    })?;
-                    self.out.newline_indent()?;
-                    self.out.token(")")?;
+                    self.embraced_after_opening(")", || self.expr(inner))?;
                     self.tail(tail)?;
                     Ok(())
                 })
@@ -194,6 +186,35 @@ impl<'a> AstFormatter {
             self.tail(tail)?;
         }
         Ok(())
+    }
+
+    pub fn expr_list_item_fn(
+        &self,
+        list: &[P<ast::Expr>],
+    ) -> impl Fn(&P<ast::Expr>) -> FormatResult {
+        // todo is this too special?
+        let format_item = match list.len() {
+            2.. => Self::expr_touchy_margins,
+            _ => Self::expr,
+        };
+        move |e| format_item(self, e)
+    }
+
+    pub fn expr_touchy_margins(&self, expr: &ast::Expr) -> FormatResult {
+        self.skip_single_expr_blocks(expr, |expr| {
+            if self.out.constraints().single_line.get() {
+                self.expr(expr)
+            } else {
+                self.fallback(|| {
+                    self.out
+                        .constraints()
+                        .touchy_margin
+                        .with_replaced(true, || self.expr(expr))
+                })
+                .next(|| self.add_block(|| self.expr(expr)))
+                .result()
+            }
+        })
     }
 
     pub fn anon_const(&self, anon_const: &ast::AnonConst) -> FormatResult {
@@ -215,6 +236,7 @@ impl<'a> AstFormatter {
         limits: ast::RangeLimits,
         tail: &Tail,
     ) -> FormatResult {
+        let first_line = self.out.line();
         if let Some(start) = start {
             self.expr(start)?;
         }
@@ -224,7 +246,12 @@ impl<'a> AstFormatter {
         }
         match end {
             None => self.tail(tail)?,
-            Some(end) => self.expr_tail(end, tail)?,
+            Some(end) => {
+                let is_single_line = self.out.constraints().touchy_margin.get()
+                    && start.is_some()
+                    && self.out.line() != first_line;
+                self.with_single_line_opt(is_single_line, || self.expr_tail(end, tail))?
+            }
         }
         Ok(())
     }
@@ -242,13 +269,35 @@ impl<'a> AstFormatter {
         Ok(())
     }
 
-    pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
-        list(Braces::PARENS, args, |arg| self.expr(arg))
+    pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
+        let first_line = self.out.line();
+        self.expr_tail(func, &Tail::token("("))?;
+        let args = self.call_args_after_open_paren(args, tail);
+        if self.out.constraints().touchy_margin.get() && self.out.line() != first_line {
+            // single line and no overflow
+            // this avoids code like
+            // (
+            //    multiline_function_expr
+            // )(
+            //    multi_line_args,
+            // )
+            self.with_single_line(|| args.format_single_line(self))?;
+        } else {
+            args.format(self)?;
+        }
+        Ok(())
+    }
+
+    pub fn call_args_after_open_paren(
+        &self,
+        args: &[P<ast::Expr>],
+        tail: &Tail,
+    ) -> impl ListBuilderTrait {
+        list(Braces::PARENS, args, self.expr_list_item_fn(args))
             .config(&CallParamListConfig)
             .omit_open_brace()
             .overflow()
             .tail(tail)
-            .format(self)
     }
 
     fn delim_args(&self, delim_args: &ast::DelimArgs) -> FormatResult {
@@ -362,6 +411,7 @@ impl<'a> AstFormatter {
     fn struct_expr(&self, struct_: &ast::StructExpr, tail: &Tail) -> FormatResult {
         self.qpath(&struct_.qself, &struct_.path, true)?;
         self.out.space()?;
+        // todo touchy margins?
         list(Braces::CURLY, &struct_.fields, |f| self.expr_field(f))
             .config(&struct_field_list_config(
                 RUSTFMT_CONFIG_DEFAULTS.struct_lit_width,
@@ -391,29 +441,19 @@ impl<'a> AstFormatter {
 
     // utils
 
-    pub fn expr_force_block(&self, expr: &ast::Expr) -> FormatResult {
-        self.skip_single_expr_blocks(expr, |expr| self.add_block(|| self.expr(expr)))
-    }
-
     pub fn add_block(&self, inside: impl FnOnce() -> FormatResult) -> FormatResult {
         self.out.token_missing("{")?;
-        self.indented(|| {
-            self.out.newline_indent()?;
-            inside()?;
-            self.out.newline()?;
-            Ok(())
-        })?;
-        self.out.indent()?;
+        self.embraced_inside(inside)?;
         self.out.token_missing("}")?;
         Ok(())
     }
 
     // todo be more conservative about skipping?
-    pub fn skip_single_expr_blocks(
+    pub fn skip_single_expr_blocks<'a, T>(
         &self,
-        expr: &ast::Expr,
-        format: impl FnOnce(&ast::Expr) -> FormatResult,
-    ) -> FormatResult {
+        expr: &'a ast::Expr,
+        format: impl FnOnce(&'a ast::Expr) -> FormatResult<T>,
+    ) -> FormatResult<T> {
         let mut inner_expr = None;
         if let ast::ExprKind::Block(block, None) = &expr.kind {
             if matches!(block.rules, ast::BlockCheckMode::Default) {
@@ -422,13 +462,14 @@ impl<'a> AstFormatter {
                 }
             }
         }
+        let out;
         if let Some(inner) = inner_expr {
             self.out.skip_token("{")?;
-            self.skip_single_expr_blocks(inner, format)?;
+            out = self.skip_single_expr_blocks(inner, format)?;
             self.out.skip_token("}")?;
         } else {
-            format(expr)?
+            out = format(expr)?;
         }
-        Ok(())
+        Ok(out)
     }
 }

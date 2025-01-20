@@ -1,7 +1,9 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
+use crate::ast_formatter::list::ListBuilderTrait;
 use crate::ast_formatter::util::tail::Tail;
-use crate::constraints::INDENT_WIDTH;
-use crate::error::FormatResult;
+use crate::ast_utils::expr_kind;
+use crate::error::{ConstraintError, FormatResult};
 use crate::error::{FormatError, WidthLimitExceededError};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
@@ -37,6 +39,9 @@ impl AstFormatter {
             }
         }
         if self.out.line() != first_line {
+            if self.out.constraints().touchy_margin.get() {
+                return Err(ConstraintError::Logical.into());
+            }
             // each item on a separate line, no indent
             return self.postfix_chain_separate_lines(chain_remaining, tail);
         }
@@ -155,23 +160,15 @@ impl AstFormatter {
             PostfixChainItem::MethodCall(method_call) => {
                 self.out.token(".")?;
                 self.path_segment(&method_call.seg, true, &Tail::token("("))?;
-                self.call_args_after_open_paren(&method_call.args, Tail::none())?;
+                self.call_args_after_open_paren(&method_call.args, Tail::none())
+                    .format(self)?;
             }
             PostfixChainItem::Index(index) => {
                 self.out.token("[")?;
                 self.fallback(|| {
                     self.with_single_line(|| self.expr_tail(index, &Tail::token("]")))
                 })
-                .next(|| {
-                    self.indented(|| {
-                        self.out.newline_indent()?;
-                        self.expr(index)?;
-                        Ok(())
-                    })?;
-                    self.out.newline_indent()?;
-                    self.out.token("]")?;
-                    Ok(())
-                })
+                .next(|| self.embraced_after_opening("]", || self.expr(index)))
                 .result()?;
             }
             PostfixChainItem::Try => {
@@ -212,13 +209,18 @@ fn build_postfix_chain(mut expr: &ast::Expr) -> (&ast::Expr, Vec<PostfixChainIte
                 items.push(PostfixChainItem::Try);
                 expr = target;
             }
-            _ => break,
+            _ => {
+                debug_assert_eq!(matches!(expr.kind, expr_kind::postfix!()), false);
+                break;
+            }
         };
     }
     items.reverse();
     (expr, items)
 }
 
+/// Splits of the trailing method call, with optional unbreakable items after that,
+/// or returns None if the chain doesn't end with a method call.
 fn split_overflowable<'a, 'b>(
     chain: &'b [PostfixChainItem<'a>],
 ) -> Option<(&'b [PostfixChainItem<'a>], &'b [PostfixChainItem<'a>])> {

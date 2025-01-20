@@ -26,7 +26,7 @@ pub struct AstFormatter {
     out: SourceFormatter,
 }
 
-impl<'a> AstFormatter {
+impl AstFormatter {
     pub fn new(config: Config, out: SourceFormatter) -> Self {
         AstFormatter { config, out }
     }
@@ -36,6 +36,7 @@ impl<'a> AstFormatter {
     }
 
     pub fn crate_(&self, crate_: &rustc_ast::ast::Crate) -> FormatResult {
+        
         self.with_attrs(&crate_.attrs, crate_.spans.inner_span, || {
             for item in &crate_.items {
                 self.item(item)?;

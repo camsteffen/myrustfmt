@@ -87,6 +87,20 @@ impl SourceFormatter {
         self.handle_whitespace_and_comments(WhitespaceMode::Newline)
     }
 
+    pub fn newline_split(&self) -> FormatResult {
+        self.handle_whitespace_and_comments(WhitespaceMode::NewlineSplit)
+    }
+
+    pub fn newline_leading_indent(&self) -> FormatResult {
+        self.handle_whitespace_and_comments(WhitespaceMode::NewlineLeading)?;
+        self.indent()?;
+        Ok(())
+    }
+    
+    pub fn newline_trailing(&self) -> FormatResult {
+        self.handle_whitespace_and_comments(WhitespaceMode::NewlineTrailing)
+    }
+
     /** Writes a newline character and indent characters according to the current indent level */
     pub fn newline_indent(&self) -> FormatResult {
         self.newline()?;
@@ -109,7 +123,7 @@ impl SourceFormatter {
         let snapshot;
         if self.next_is_whitespace_or_comments.get() {
             snapshot = Some(self.snapshot());
-            self.handle_whitespace_and_comments(WhitespaceMode::Token)?;
+            self.handle_whitespace_and_comments(WhitespaceMode::Void)?;
         } else {
             snapshot = None;
         }
@@ -221,7 +235,7 @@ impl SourceFormatter {
 
     fn handle_whitespace_and_comments_if_needed(&self) -> FormatResult {
         if self.next_is_whitespace_or_comments.get() {
-            self.handle_whitespace_and_comments(WhitespaceMode::Token)?;
+            self.handle_whitespace_and_comments(WhitespaceMode::Void)?;
         }
         Ok(())
     }
@@ -290,7 +304,7 @@ mod tests {
     #[test]
     fn no_indent_for_blank_line() {
         let sf = SourceFormatter::new_defaults("aa\n    \naa");
-        sf.constraints().increment_indent();
+        sf.constraints().indent.set(4);
         sf.token("aa").unwrap();
         sf.newline_indent().unwrap();
         sf.token("aa").unwrap();

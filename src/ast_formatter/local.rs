@@ -5,7 +5,7 @@ use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 
-impl<'a> AstFormatter {
+impl AstFormatter {
     pub fn local(&self, local: &ast::Local) -> FormatResult {
         self.with_attrs(&local.attrs, local.span, || self.local_after_attrs(local))
     }

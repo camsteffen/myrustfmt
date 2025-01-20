@@ -27,6 +27,7 @@ mod error;
 mod rustfmt_config_defaults;
 pub mod source_formatter;
 mod source_reader;
+mod util;
 
 use rustc_data_structures::sync::Lrc;
 use rustc_errors::emitter::{HumanEmitter, stderr_destination};
@@ -108,6 +109,7 @@ fn parse_crate<T>(
         .unwrap();
         let crate_ = parser.parse_crate_mod().map_err(|err| err.emit())?;
         if let Some(error) = psess.dcx().has_errors() {
+            // todo this may not be emitted?
             return Err(error);
         }
         Ok(f(crate_))

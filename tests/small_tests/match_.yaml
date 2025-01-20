@@ -1,13 +1,35 @@
+- name: remove needless block
+  type: before_after
+  before: |
+    match x {
+        X => {
+            x
+        }
+    }
+  after: |
+    match x {
+        X => x,
+    }
+- name: arm body breakpoint (do not add block)
+  type: breakpoint
+  before: |
+    match x {
+        _ => [asdfasdf],
+    }
+  after: |
+    match x {
+        _ => [
+            asdfasdf,
+        ],
+    }
 - name: arm body is chain on multiple lines with final multiline method call
   type: no_change
   formatted: |
     match x {
-        x => {
-            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-                .aaaaaaaaaaaaaa({
-                    let x;
-                })
-        }
+        x => aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            .aaaaaaaaaaaaaa({
+                let x;
+            }),
     }
 - name: arm body is chain on single line except final multiline method call
   type: no_change
@@ -17,16 +39,45 @@
             let x;
         }),
     }
-- name: arm body is chain with all overflowing method calls
-  type: no_change
-  formatted: |
+#- name: arm body is chain with all overflowing method calls
+#  type: before_after
+#  before: |
+#    match x {
+#        x => aaaaaaa({
+#            let x;
+#        })
+#        .aaaaaaa({
+#            let x;
+#        }),
+#    }
+#  after: |
+#    match x {
+#        x => {
+#            aaaaaaa({
+#                let x;
+#            })
+#            .aaaaaaa({
+#                let x;
+#            })
+#        }
+#    }
+- name: arm body is multi-line range
+  type: before_after
+  before: |
+    match x {
+        x => [{
+            let x;
+        }]..[{
+            let x;
+        }]
+    }
+  after: |
     match x {
         x => {
-            aaaaaaa({
+            [{
                 let x;
-            })
-            .aaaaaaa({
+            }]..[{
                 let x;
-            })
+            }]
         }
     }
