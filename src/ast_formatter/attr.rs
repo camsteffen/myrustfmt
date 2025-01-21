@@ -1,7 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::list_config::ParamListConfig;
 use crate::ast_formatter::list::{Braces, list};
-use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::is_rustfmt_skip;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;

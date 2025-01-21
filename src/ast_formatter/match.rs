@@ -23,8 +23,7 @@ impl AstFormatter {
         if let Some(guard) = arm.guard.as_deref() {
             if self.out.line() == first_line {
                 self.fallback(|| self.arm_guard_same_line(arm, guard))
-                    .next(|| self.arm_guard_separate_line(arm, guard))
-                    .result()?;
+                    .otherwise(|| self.arm_guard_separate_line(arm, guard))?;
             } else {
                 self.arm_guard_separate_line(arm, guard)?;
             }
@@ -92,8 +91,7 @@ impl AstFormatter {
                         .with_replaced(true, || self.expr_tail(body, &tail))?;
                     Ok(())
                 })
-                .next(with_add_block)
-                .result()
+                .otherwise(with_add_block)
             }
         })
     }

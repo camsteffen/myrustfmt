@@ -4,10 +4,10 @@ use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 
 use crate::ast_formatter::list::list_config::{DefaultListConfig, ListConfig, ParamListConfig};
+use crate::ast_utils::expr_kind;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
 use rustc_span::symbol::kw;
-use crate::ast_utils::{expr_kind, };
 
 impl AstFormatter {
     pub fn fn_<K>(&self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
@@ -38,21 +38,18 @@ impl AstFormatter {
             })?;
             Ok(())
         })
-        .next(|| {
+        .otherwise(|| {
             param_list.format_separate_lines(self)?;
             self.fn_ret_ty(&sig.decl.output)?;
             if is_block_after_decl {
-                self.fallback(|| self.out.space_token("{"))
-                    .next(|| {
-                        self.out.newline_indent()?;
-                        self.out.token("{")?;
-                        Ok(())
-                    })
-                    .result()?;
+                self.fallback(|| self.out.space_token("{")).otherwise(|| {
+                    self.out.newline_indent()?;
+                    self.out.token("{")?;
+                    Ok(())
+                })?;
             }
             Ok(())
-        })
-        .result()?;
+        })?;
         self.where_clause(&generics.where_clause)?;
         if let Some(body) = body {
             if is_block_after_decl {
@@ -107,12 +104,11 @@ impl AstFormatter {
             } else {
                 // add a block unless it fits on a single line
                 self.fallback(|| self.with_single_line(|| self.expr_tail(body, tail)))
-                    .next(|| {
+                    .otherwise(|| {
                         self.add_block(|| self.expr(body))?;
                         self.tail(tail)?;
                         Ok(())
                     })
-                    .result()
             }
         })
     }
@@ -186,14 +182,13 @@ impl AstFormatter {
         }
         self.fallback(do_single_line)
             // args on separate lines
-            .next(|| {
+            .otherwise(|| {
                 list(braces, &fn_decl.inputs, |param| self.param(param))
                     .config(input_list_config)
                     .format_separate_lines(self)?;
                 self.fn_ret_ty(&fn_decl.output)?;
                 Ok(())
             })
-            .result()
     }
 
     fn param(&self, param: &ast::Param) -> FormatResult {
@@ -237,12 +232,11 @@ impl AstFormatter {
             ast::FnRetTy::Default(_) => {}
             ast::FnRetTy::Ty(ty) => {
                 self.fallback(|| self.out.space_token_space("->"))
-                    .next(|| {
+                    .otherwise(|| {
                         self.out.newline_indent()?;
                         self.out.token_space("->")?;
                         Ok(())
-                    })
-                    .result()?;
+                    })?;
                 self.ty(ty)?;
             }
         }

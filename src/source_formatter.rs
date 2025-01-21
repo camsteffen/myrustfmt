@@ -1,7 +1,7 @@
 use crate::constraint_writer::{ConstraintWriter, ConstraintWriterSnapshot};
 use crate::constraints::Constraints;
 use crate::error::{FormatResult, WidthLimitExceededError};
-use crate::source_formatter::whitespace::{WhitespaceMode, handle_whitespace, NewlineKind};
+use crate::source_formatter::whitespace::{NewlineKind, WhitespaceMode, handle_whitespace};
 use crate::source_reader::SourceReader;
 use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
@@ -96,7 +96,7 @@ impl SourceFormatter {
         self.indent()?;
         Ok(())
     }
-    
+
     pub fn newline_trailing(&self) -> FormatResult {
         self.handle_whitespace_and_comments(WhitespaceMode::Newline(NewlineKind::Trailing))
     }

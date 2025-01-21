@@ -49,19 +49,17 @@ impl AstFormatter {
                                     },
                                 )
                             })
-                            .next(else_block)
-                            .result()?,
+                            .otherwise(else_block)?,
                     }
                     Ok(())
                 })
-                .next(|| {
+                .otherwise(|| {
                     self.out.newline_indent()?;
                     self.out.token_space("else")?;
                     self.out.token("{")?;
                     else_block()?;
                     Ok(())
-                })
-                .result()?;
+                })?;
                 Ok(())
             }
         }
@@ -96,7 +94,7 @@ impl AstFormatter {
             Ok(())
         })
         // wrap and indent
-        .next(|| {
+        .otherwise(|| {
             self.indented(|| {
                 self.out.newline_indent()?;
                 self.expr(expr)?;
@@ -104,6 +102,5 @@ impl AstFormatter {
                 Ok(())
             })
         })
-        .result()
     }
 }

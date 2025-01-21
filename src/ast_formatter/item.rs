@@ -173,14 +173,13 @@ impl AstFormatter {
                     Ok(false)
                 })
             })
-            .next(|| {
+            .otherwise(|| {
                 self.indented(|| {
                     self.out.newline_indent()?;
                     first_part()?;
                     Ok(true)
                 })
-            })
-            .result()?
+            })?
         } else {
             self.out.space()?;
             first_part()?;
@@ -197,14 +196,13 @@ impl AstFormatter {
                 for_ty()?;
                 Ok(())
             })
-            .next(|| {
+            .otherwise(|| {
                 self.indented_optional(!indented, || {
                     self.out.newline_indent()?;
                     for_ty()?;
                     Ok(())
                 })
-            })
-            .result()?;
+            })?;
         }
         self.where_clause(&impl_.generics.where_clause)?;
         if impl_.generics.where_clause.is_empty() {

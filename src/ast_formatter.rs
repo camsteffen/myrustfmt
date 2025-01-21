@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::error::FormatResult;
 use crate::source_formatter::SourceFormatter;
+use std::cell::Cell;
 
 mod attr;
 mod binary;
@@ -24,11 +25,14 @@ mod util;
 pub struct AstFormatter {
     config: Config,
     out: SourceFormatter,
+    /// True when there is a fallback routine planned for if the current routine produces code
+    /// that does not meet the given constraints.
+    has_fallback: Cell<bool>,
 }
 
 impl AstFormatter {
     pub fn new(config: Config, out: SourceFormatter) -> Self {
-        AstFormatter { config, out }
+        AstFormatter { config, out, has_fallback: Cell::new(false) }
     }
 
     pub fn finish(self) -> String {

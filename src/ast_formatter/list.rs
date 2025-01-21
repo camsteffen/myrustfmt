@@ -204,7 +204,7 @@ where
             }
             ListWrapToFitConfig::No => {}
         }
-        fallback.next(|| self.contents_separate_lines(af)).result()
+        fallback.otherwise(|| self.contents_separate_lines(af))
     }
 
     fn contents_single_line(&self, af: &AstFormatter) -> FormatResult {
@@ -307,14 +307,13 @@ impl AstFormatter {
                 && Overflow::can_overflow(self, last, list.len() == 1);
             if can_overflow {
                 self.fallback(|| self.with_single_line(|| format_item(last)))
-                    .next(|| {
+                    .otherwise(|| {
                         self.with_width_limit_from_start_first_line_opt(
                             start,
                             max_width_overflow,
                             || Overflow::format_overflow(self, last),
                         )
-                    })
-                    .result()?;
+                    })?;
             } else {
                 self.with_single_line(|| format_item(last))?;
             }
@@ -401,9 +400,7 @@ impl AstFormatter {
                     item_next_line()?;
                     prev_must_have_own_line = true;
                 } else {
-                    self.fallback(item_same_line)
-                        .next(item_next_line)
-                        .result()?;
+                    self.fallback(item_same_line).otherwise(item_next_line)?;
                 }
             }
             Ok(())

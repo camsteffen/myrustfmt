@@ -1,7 +1,7 @@
+use crate::util::line_col::line_col;
 use std::backtrace::Backtrace;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
-use crate::util::line_col::line_col;
 
 pub type FormatResult<T = ()> = Result<T, FormatError>;
 
@@ -29,7 +29,7 @@ pub type ParseResult<T = ()> = Result<T, ParseError>;
 #[derive(Debug)]
 pub struct ParseError {
     pub kind: ParseErrorKind,
-    pub backtrace: Backtrace,
+    pub backtrace: Box<Backtrace>,
 }
 
 impl ParseError {
@@ -37,7 +37,7 @@ impl ParseError {
     pub fn new(kind: ParseErrorKind) -> Self {
         ParseError {
             kind,
-            backtrace: Backtrace::capture(),
+            backtrace: Box::new(Backtrace::capture()),
         }
     }
 }

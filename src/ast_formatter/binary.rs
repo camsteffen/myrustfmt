@@ -27,7 +27,7 @@ impl AstFormatter {
                 Ok(())
             })
         })
-        .next(|| {
+        .otherwise(|| {
             self.indented(|| {
                 for (op, expr) in chain {
                     self.out.newline_indent()?;
@@ -38,7 +38,6 @@ impl AstFormatter {
                 Ok(())
             })
         })
-        .result()
     }
 
     fn collect_binary_chain<'a>(

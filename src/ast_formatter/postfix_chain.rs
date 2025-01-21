@@ -46,8 +46,9 @@ impl AstFormatter {
             return self.postfix_chain_separate_lines(chain_remaining, tail);
         }
         self.fallback(|| self.postfix_chain_single_line(chain_remaining, start_pos, tail))
-            .next(|| self.indented(|| self.postfix_chain_separate_lines(chain_remaining, tail)))
-            .result()
+            .otherwise(|| {
+                self.indented(|| self.postfix_chain_separate_lines(chain_remaining, tail))
+            })
     }
 
     fn postfix_chain_single_line(
@@ -168,8 +169,7 @@ impl AstFormatter {
                 self.fallback(|| {
                     self.with_single_line(|| self.expr_tail(index, &Tail::token("]")))
                 })
-                .next(|| self.embraced_after_opening("]", || self.expr(index)))
-                .result()?;
+                .otherwise(|| self.embraced_after_opening("]", || self.expr(index)))?;
             }
             PostfixChainItem::Try => {
                 self.out.token("?")?;

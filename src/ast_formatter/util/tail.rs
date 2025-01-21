@@ -31,7 +31,7 @@ impl Tail {
     pub const fn token_maybe_missing(token: &'static str) -> Self {
         Tail(Some(TailImpl::TokenMaybeMissing(token)))
     }
-    
+
     pub const fn token_missing(token: &'static str) -> Self {
         Tail(Some(TailImpl::TokenMissing(token)))
     }

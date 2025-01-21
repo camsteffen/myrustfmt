@@ -114,7 +114,7 @@ impl WhitespaceContext<'_> {
             (1.., _) if is_by_comments => Out::Newline { double: false },
             _ if is_by_comments => Out::Space,
             (_, WhitespaceMode::Space) => Out::Space,
-            _ => return Ok(())
+            _ => return Ok(()),
         };
         match out {
             Out::Newline { double } => {

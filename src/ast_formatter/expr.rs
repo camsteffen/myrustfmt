@@ -58,15 +58,14 @@ impl AstFormatter {
                     self.ty(ty)?;
                     Ok(())
                 })
-                .next(|| {
+                .otherwise(|| {
                     self.indented(|| {
                         self.out.newline_indent()?;
                         self.out.token_space("as")?;
                         self.ty(ty)?;
                         Ok(())
                     })
-                })
-                .result()?;
+                })?;
             }
             ast::ExprKind::Type(_, _) => todo!(),
             ast::ExprKind::Let(ref pat, ref init, ..) => {
@@ -167,12 +166,11 @@ impl AstFormatter {
                         Ok(())
                     })
                 })
-                .next(|| {
+                .otherwise(|| {
                     self.embraced_after_opening(")", || self.expr(inner))?;
                     self.tail(tail)?;
                     Ok(())
-                })
-                .result()?;
+                })?;
             }
             ast::ExprKind::Yield(_) => todo!(),
             ast::ExprKind::Yeet(_) => todo!(),
@@ -211,8 +209,7 @@ impl AstFormatter {
                         .touchy_margin
                         .with_replaced(true, || self.expr(expr))
                 })
-                .next(|| self.add_block(|| self.expr(expr)))
-                .result()
+                .otherwise(|| self.add_block(|| self.expr(expr)))
             }
         })
     }
@@ -367,8 +364,7 @@ impl AstFormatter {
                     )
                 })
             })
-            .next(multiline)
-            .result()?;
+            .otherwise(multiline)?;
         } else {
             multiline()?;
         }
@@ -396,8 +392,7 @@ impl AstFormatter {
             newline_open_block()?;
         } else {
             self.fallback(|| self.with_single_line(|| self.out.space_token("{")))
-                .next(newline_open_block)
-                .result()?;
+                .otherwise(newline_open_block)?;
         }
         Ok(self.out.line() == first_line)
     }
