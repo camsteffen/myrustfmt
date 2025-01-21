@@ -44,27 +44,39 @@ use std::path::{Path, PathBuf};
 use crate::ast_formatter::AstFormatter;
 use crate::config::Config;
 use crate::constraints::Constraints;
+use crate::error::{ConstraintError, FormatError};
+use crate::util::line_col::line_col;
 use source_formatter::SourceFormatter;
 
-pub fn format_file(path: impl AsRef<Path>, config: Config) -> Result<String, ErrorGuaranteed> {
-    let path = path.as_ref();
-    let string = fs::read_to_string(path).unwrap();
-    format(&string, config, Some(path))
+#[derive(Debug)]
+pub enum CrateFormatError {
+    ErrorEmitted,
+    WidthLimitExceeded { line: u32 },
 }
 
-pub fn format_file_defaults(path: impl AsRef<Path>) -> Result<String, ErrorGuaranteed> {
+pub fn format_file(
+    path: impl AsRef<Path>,
+    config: Config,
+) -> Result<(String, String), CrateFormatError> {
+    let path = path.as_ref();
+    let string = fs::read_to_string(path).unwrap();
+    let formatted = format(&string, config, Some(path))?;
+    Ok((string, formatted))
+}
+
+pub fn format_file_defaults(path: impl AsRef<Path>) -> Result<(String, String), CrateFormatError> {
     format_file(path, Config::default())
 }
 
-pub fn format_str_defaults(source: &str) -> Result<String, ErrorGuaranteed> {
+pub fn format_str_defaults(source: &str) -> Result<String, CrateFormatError> {
     format_str_config(source, Config::default())
 }
 
-pub fn format_str(source: &str, max_width: u32) -> Result<String, ErrorGuaranteed> {
+pub fn format_str(source: &str, max_width: u32) -> Result<String, CrateFormatError> {
     format_str_config(source, Config::default().max_width(max_width))
 }
 
-pub fn format_str_config(source: &str, config: Config) -> Result<String, ErrorGuaranteed> {
+pub fn format_str_config(source: &str, config: Config) -> Result<String, CrateFormatError> {
     format(source, config, None)
 }
 
@@ -72,19 +84,31 @@ pub fn format(
     source: &str,
     config: Config,
     path: Option<&Path>,
-) -> Result<String, ErrorGuaranteed> {
-    parse_crate(String::from(source), path, |crate_| {
+) -> Result<String, CrateFormatError> {
+    let result = parse_crate(String::from(source), path, |crate_| {
         let constraints = Constraints::new(config.max_width);
         let source_formatter = SourceFormatter::new(String::from(source), constraints);
         let ast_formatter = AstFormatter::new(config, source_formatter);
         let result = ast_formatter.crate_(&crate_);
         match result {
             Ok(()) => {}
-            // todo don't panic
-            Err(e) => panic!("{}", e.display(source, ast_formatter.pos(), path)),
+            Err(e) => match e {
+                FormatError::Constraint(ConstraintError::WidthLimitExceeded) => {
+                    let (line, _col) = line_col(source, ast_formatter.pos());
+                    return Err(CrateFormatError::WidthLimitExceeded { line });
+                }
+                _ => panic!(
+                    "This is a bug :(\n{}",
+                    e.display(source, ast_formatter.pos(), path)
+                ),
+            },
         }
-        ast_formatter.finish()
-    })
+        Ok(ast_formatter.finish())
+    });
+    match result {
+        Ok(result) => result,
+        Err(ErrorGuaranteed { .. }) => Err(CrateFormatError::ErrorEmitted),
+    }
 }
 
 fn parse_crate<T>(

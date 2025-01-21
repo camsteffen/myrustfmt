@@ -16,29 +16,16 @@ impl AstFormatter {
         span: Span,
         f: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
-        self.with_attrs_tail(attrs, span, Tail::none(), f)
-    }
-
-    pub fn with_attrs_tail(
-        &self,
-        attrs: &[ast::Attribute],
-        span: Span,
-        tail: &Tail,
-        f: impl FnOnce() -> FormatResult,
-    ) -> FormatResult {
         // todo skip attributes as well?
         // todo make my own attribute? or comment?
         self.attrs(attrs)?;
         if attrs.iter().any(is_rustfmt_skip) {
-            self.out.constraints().with_no_max_width(|| {
-                self.out.copy_span(span)?;
-                self.tail(tail)?;
-                Ok(())
-            })?;
+            self.out
+                .constraints()
+                .with_no_max_width(|| self.out.copy_span(span))
         } else {
-            f()?;
+            f()
         }
-        Ok(())
     }
 
     fn attrs(&self, attrs: &[ast::Attribute]) -> FormatResult {

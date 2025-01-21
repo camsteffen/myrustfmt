@@ -1,6 +1,7 @@
 use std::backtrace::Backtrace;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
+use crate::util::line_col::line_col;
 
 pub type FormatResult<T = ()> = Result<T, FormatError>;
 
@@ -70,6 +71,7 @@ impl FormatError {
                     write!(f, "width limit exceeded")?
                 }
                 FormatError::Constraint(ConstraintError::NewlineNotAllowed) => {
+                    // todo
                     write!(f, "width limit exceeded")?
                 }
                 FormatError::Parse(parse_error) => {
@@ -137,19 +139,6 @@ impl From<WidthLimitExceededError> for FormatError {
     fn from(e: WidthLimitExceededError) -> Self {
         FormatError::Constraint(ConstraintError::from(e))
     }
-}
-
-fn line_col(str: &str, pos: usize) -> (usize, usize) {
-    let mut line = 1;
-    let mut col = 1;
-    for c in str[..pos].chars() {
-        col += 1;
-        if c == '\n' {
-            line += 1;
-            col = 1;
-        }
-    }
-    (line, col)
 }
 
 fn display_from_fn(f: impl Fn(&mut Formatter<'_>) -> std::fmt::Result) -> impl Display {

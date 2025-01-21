@@ -3,6 +3,7 @@ use crate::error::{FormatError, FormatResult};
 use crate::source_formatter::{SourceFormatter, SourceFormatterSnapshot};
 
 impl AstFormatter {
+    // todo should fallback be specific to a constraint? unless_too_wide(..).otherwise(..)
     pub fn fallback<T>(&self, first: impl FnOnce() -> FormatResult<T>) -> Fallback<T> {
         let out = &self.out;
         let snapshot = out.snapshot();
