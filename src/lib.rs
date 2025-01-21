@@ -43,10 +43,8 @@ use std::path::{Path, PathBuf};
 
 use crate::ast_formatter::AstFormatter;
 use crate::config::Config;
-use crate::constraints::Constraints;
 use crate::error::{ConstraintError, FormatError};
 use crate::util::line_col::line_col;
-use source_formatter::SourceFormatter;
 
 #[derive(Debug)]
 pub enum CrateFormatError {
@@ -86,9 +84,8 @@ pub fn format(
     path: Option<&Path>,
 ) -> Result<String, CrateFormatError> {
     let result = parse_crate(String::from(source), path, |crate_| {
-        let constraints = Constraints::new(config.max_width);
-        let source_formatter = SourceFormatter::new(String::from(source), constraints);
-        let ast_formatter = AstFormatter::new(config, source_formatter);
+        // todo can we reference the string in the parser instead of cloning here?
+        let ast_formatter = AstFormatter::new(source, config);
         let result = ast_formatter.crate_(&crate_);
         match result {
             Ok(()) => {}

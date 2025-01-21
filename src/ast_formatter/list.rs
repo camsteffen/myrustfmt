@@ -393,12 +393,9 @@ impl AstFormatter {
                     item_comma()?;
                     Ok(())
                 };
-                if prev_must_have_own_line {
+                if prev_must_have_own_line || ItemConfig::item_must_have_own_line(item) {
                     item_next_line()?;
-                    prev_must_have_own_line = false;
-                } else if ItemConfig::item_must_have_own_line(item) {
-                    item_next_line()?;
-                    prev_must_have_own_line = true;
+                    prev_must_have_own_line = !prev_must_have_own_line;
                 } else {
                     self.fallback(item_same_line).otherwise(item_next_line)?;
                 }

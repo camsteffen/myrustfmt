@@ -2,19 +2,21 @@ use crate::config::Config;
 use crate::error::FormatResult;
 use std::cell::Cell;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MaxWidthForLine {
     pub line: u32,
     pub max_width: u32,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Constraints {
-    pub single_line: Cell<bool>,
     pub max_width: Cell<Option<u32>>,
     /// Used to set the max width for the current line, so it no longer applies after a newline
     /// character is printed
     pub max_width_for_line: Cell<Option<MaxWidthForLine>>,
+    /// If true, no newline characters allowed
+    pub single_line: Cell<bool>,
+    // todo is this a constraint?
     pub indent: Cell<usize>,
     /// When true, we say the margin doesn't like to be touched by the expression in question.
     /// If an expression is touching the margin too much, we wrap it with a block to push it away.

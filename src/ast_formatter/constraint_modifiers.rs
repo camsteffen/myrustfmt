@@ -29,6 +29,10 @@ impl AstFormatter {
     }
 
     pub fn with_single_line<T>(&self, f: impl FnOnce() -> T) -> T {
+        assert!(
+            self.has_fallback.get(),
+            "single line constraint applied with no fallback"
+        );
         self.constraints().single_line.with_replaced(true, f)
     }
 

@@ -13,23 +13,22 @@ impl AstFormatter {
         self.fallback(|| {
             self.with_single_line(|| {
                 format_item(first)?;
-                rest.iter().try_for_each(|item| -> FormatResult {
+                for item in rest {
                     self.out.space_token_space(token)?;
                     format_item(item)?;
-                    Ok(())
-                })?;
+                }
                 Ok(())
             })
         })
         .otherwise(|| {
             format_item(first)?;
             self.indented_optional(should_indent, || {
-                rest.iter().try_for_each(|item| {
+                for item in rest {
                     self.out.newline_indent()?;
                     self.out.token_space(token)?;
                     format_item(item)?;
-                    Ok(())
-                })
+                }
+                Ok(())
             })?;
             Ok(())
         })

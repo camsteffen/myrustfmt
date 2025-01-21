@@ -1,6 +1,8 @@
 use crate::config::Config;
+use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::source_formatter::SourceFormatter;
+use rustc_ast::ast;
 use std::cell::Cell;
 
 mod attr;
@@ -31,15 +33,21 @@ pub struct AstFormatter {
 }
 
 impl AstFormatter {
-    pub fn new(config: Config, out: SourceFormatter) -> Self {
-        AstFormatter { config, out, has_fallback: Cell::new(false) }
+    pub fn new(source: impl Into<String>, config: Config) -> Self {
+        let constraints = Constraints::new(config.max_width);
+        let out = SourceFormatter::new(source.into(), constraints);
+        AstFormatter {
+            config,
+            out,
+            has_fallback: Cell::new(false),
+        }
     }
 
     pub fn finish(self) -> String {
         self.out.finish()
     }
 
-    pub fn crate_(&self, crate_: &rustc_ast::ast::Crate) -> FormatResult {
+    pub fn crate_(&self, crate_: &ast::Crate) -> FormatResult {
         self.with_attrs(&crate_.attrs, crate_.spans.inner_span, || {
             for item in &crate_.items {
                 self.item(item)?;
