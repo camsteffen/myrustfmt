@@ -15,20 +15,20 @@ pub enum NewlineKind {
     /// Newline between items where a blank line is allowed. (e.g. between statements)
     Between,
     /// Newline at the beginning of a braced section. A blank line is allowed only below comments.
-    Leading,
+    Above,
     /// Newline at the end of a braced section. A blank line is allowed only above comments.
-    Trailing,
-    /// Newline in a less typical place where extra blank lines should be trimmed away.
-    Split,
+    Below,
+    /// Newline in a place where extra blank lines should be trimmed away.
+    Within,
 }
 
 impl NewlineKind {
     pub fn allow_blank_line(self, is_comments_before: bool, is_comments_after: bool) -> bool {
         match self {
             NewlineKind::Between => true,
-            NewlineKind::Leading => is_comments_before,
-            NewlineKind::Trailing => is_comments_after,
-            NewlineKind::Split => is_comments_before && is_comments_after,
+            NewlineKind::Above => is_comments_before,
+            NewlineKind::Below => is_comments_after,
+            NewlineKind::Within => is_comments_before && is_comments_after,
         }
     }
 }

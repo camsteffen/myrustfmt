@@ -6,7 +6,7 @@ impl AstFormatter {
     pub fn embraced_empty_after_opening(&self, closing_brace: &str) -> FormatResult {
         self.fallback(|| self.with_single_line(|| self.out.token(closing_brace)))
             .otherwise(|| {
-                self.indented(|| self.out.newline_split())?;
+                self.indented(|| self.out.newline_within())?;
                 self.out.token(closing_brace)?;
                 Ok(())
             })
@@ -25,9 +25,10 @@ impl AstFormatter {
     /// Writes contents between braces with indentation
     pub fn embraced_inside(&self, contents: impl FnOnce() -> FormatResult) -> FormatResult {
         self.indented(|| {
-            self.out.newline_leading_indent()?;
+            self.out.newline_above()?;
+            self.out.indent()?;
             contents()?;
-            self.out.newline_trailing()?;
+            self.out.newline_below()?;
             Ok(())
         })?;
         self.out.indent()?;

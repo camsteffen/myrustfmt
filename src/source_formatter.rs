@@ -83,27 +83,26 @@ impl SourceFormatter {
         self.source.pos.get().to_usize()
     }
 
-    pub fn newline(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Newline(NewlineKind::Between))
+    pub fn newline(&self, kind: NewlineKind) -> FormatResult {
+        self.handle_whitespace_and_comments(WhitespaceMode::Newline(kind))
     }
 
-    pub fn newline_split(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Newline(NewlineKind::Split))
+    pub fn newline_above(&self) -> FormatResult {
+        self.newline(NewlineKind::Above)
     }
 
-    pub fn newline_leading_indent(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Newline(NewlineKind::Leading))?;
-        self.indent()?;
-        Ok(())
+    pub fn newline_below(&self) -> FormatResult {
+        self.handle_whitespace_and_comments(WhitespaceMode::Newline(NewlineKind::Below))
     }
 
-    pub fn newline_trailing(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Newline(NewlineKind::Trailing))
+    pub fn newline_within(&self) -> FormatResult {
+        self.newline(NewlineKind::Within)
     }
 
     /** Writes a newline character and indent characters according to the current indent level */
+    // todo don't make Between the default, audit usages
     pub fn newline_indent(&self) -> FormatResult {
-        self.newline()?;
+        self.handle_whitespace_and_comments(WhitespaceMode::Newline(NewlineKind::Between))?;
         self.indent()?;
         Ok(())
     }
