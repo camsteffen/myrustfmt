@@ -6,9 +6,11 @@ impl AstFormatter {
     // todo should fallback be specific to a constraint? unless_too_wide(..).otherwise(..)
     /// Begins a fallback chain with an initial formatting attempt function
     pub fn fallback<T>(&self, first: impl FnOnce() -> FormatResult<T>) -> Fallback<T> {
+        let has_fallback_prev = self.constraints().has_fallback.replace(true);
+        let snapshot = Box::new(self.out.snapshot());
         let state = FallbackState::Incomplete {
-            has_fallback_prev: self.has_fallback.replace(true),
-            snapshot: Box::new(self.out.snapshot()),
+            has_fallback_prev,
+            snapshot,
         };
         let mut fallback = Fallback { af: self, state };
         let result = first();
@@ -54,8 +56,8 @@ impl<T> Fallback<'_, T> {
                 has_fallback_prev,
                 snapshot,
             } => {
-                self.af.has_fallback.set(has_fallback_prev);
                 self.af.out.restore(&snapshot);
+                self.af.constraints().has_fallback.set(has_fallback_prev);
                 fallback()
             }
         }
@@ -68,7 +70,7 @@ impl<T> Fallback<'_, T> {
                 has_fallback_prev, ..
             } => {
                 if is_result_terminal(&result) {
-                    self.af.has_fallback.set(has_fallback_prev);
+                    self.af.constraints().has_fallback.set(has_fallback_prev);
                     self.state = FallbackState::Complete(result);
                 }
             }

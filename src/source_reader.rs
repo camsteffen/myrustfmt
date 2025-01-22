@@ -69,8 +69,6 @@ impl SourceReader {
     }
 
     pub fn get_span(&self, span: Span) -> &str {
-        self.source
-            .get(span.lo().to_usize()..span.hi().to_usize())
-            .expect("source string should include the span")
+        &self.source[span.lo().to_usize()..span.hi().to_usize()]
     }
 }

@@ -4,6 +4,7 @@ use crate::ast_formatter::list::{Braces, list};
 use crate::ast_utils::is_rustfmt_skip;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
+use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_span::Span;
 
@@ -21,7 +22,8 @@ impl AstFormatter {
         if attrs.iter().any(is_rustfmt_skip) {
             self.out
                 .constraints()
-                .with_no_max_width(|| self.out.copy_span(span))
+                .max_width
+                .with_replaced(None, || self.out.copy_span(span))
         } else {
             f()
         }

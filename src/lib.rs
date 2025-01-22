@@ -15,7 +15,7 @@ extern crate thin_vec;
 
 // Necessary to pull in object code as the rest of the rustc crates are shipped only as rmeta
 // files.
-#[allow(unused_extern_crates)]
+// #[allow(unused_extern_crates)]
 extern crate rustc_driver;
 
 pub mod ast_formatter;
@@ -24,6 +24,7 @@ pub mod config;
 pub mod constraint_writer;
 mod constraints;
 mod error;
+mod error_emitter;
 mod rustfmt_config_defaults;
 pub mod source_formatter;
 mod source_reader;
@@ -41,40 +42,43 @@ use rustc_span::{
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::{AstFormatter, FormatCrateResult};
 use crate::config::Config;
-use crate::error::{ConstraintError, FormatError};
-use crate::util::line_col::line_col;
 
-#[derive(Debug)]
-pub enum CrateFormatError {
-    ErrorEmitted,
-    WidthLimitExceeded { line: u32 },
+pub struct FormatFileResult {
+    pub original: String,
+    pub formatted: FormatCrateResult,
 }
 
 pub fn format_file(
     path: impl AsRef<Path>,
     config: Config,
-) -> Result<(String, String), CrateFormatError> {
+) -> Result<FormatFileResult, ErrorGuaranteed> {
     let path = path.as_ref();
-    let string = fs::read_to_string(path).unwrap();
-    let formatted = format(&string, config, Some(path))?;
-    Ok((string, formatted))
+    let original = fs::read_to_string(path).unwrap();
+    let formatted = format(&original, config, Some(path))?;
+    Ok(FormatFileResult {
+        original,
+        formatted,
+    })
 }
 
-pub fn format_file_defaults(path: impl AsRef<Path>) -> Result<(String, String), CrateFormatError> {
+pub fn format_file_defaults(path: impl AsRef<Path>) -> Result<FormatFileResult, ErrorGuaranteed> {
     format_file(path, Config::default())
 }
 
-pub fn format_str_defaults(source: &str) -> Result<String, CrateFormatError> {
+pub fn format_str_defaults(source: &str) -> Result<FormatCrateResult, ErrorGuaranteed> {
     format_str_config(source, Config::default())
 }
 
-pub fn format_str(source: &str, max_width: u32) -> Result<String, CrateFormatError> {
+pub fn format_str(source: &str, max_width: u32) -> Result<FormatCrateResult, ErrorGuaranteed> {
     format_str_config(source, Config::default().max_width(max_width))
 }
 
-pub fn format_str_config(source: &str, config: Config) -> Result<String, CrateFormatError> {
+pub fn format_str_config(
+    source: &str,
+    config: Config,
+) -> Result<FormatCrateResult, ErrorGuaranteed> {
     format(source, config, None)
 }
 
@@ -82,30 +86,23 @@ pub fn format(
     source: &str,
     config: Config,
     path: Option<&Path>,
-) -> Result<String, CrateFormatError> {
-    let result = parse_crate(String::from(source), path, |crate_| {
+) -> Result<FormatCrateResult, ErrorGuaranteed> {
+    parse_crate(String::from(source), path, |crate_| {
         // todo can we reference the string in the parser instead of cloning here?
-        let ast_formatter = AstFormatter::new(source, config);
+        let ast_formatter = AstFormatter::new(source, path, config);
         let result = ast_formatter.crate_(&crate_);
         match result {
             Ok(()) => {}
-            Err(e) => match e {
-                FormatError::Constraint(ConstraintError::WidthLimitExceeded) => {
-                    let (line, _col) = line_col(source, ast_formatter.pos());
-                    return Err(CrateFormatError::WidthLimitExceeded { line });
-                }
-                _ => panic!(
+            Err(e) => {
+                // todo don't panic?
+                panic!(
                     "This is a bug :(\n{}",
                     e.display(source, ast_formatter.pos(), path)
-                ),
-            },
+                )
+            }
         }
-        Ok(ast_formatter.finish())
-    });
-    match result {
-        Ok(result) => result,
-        Err(ErrorGuaranteed { .. }) => Err(CrateFormatError::ErrorEmitted),
-    }
+        ast_formatter.finish()
+    })
 }
 
 fn parse_crate<T>(

@@ -1,9 +1,6 @@
 use rustc_ast::ast;
-use rustc_span::Symbol;
-use rustc_span::sym;
+use rustc_span::{Symbol, sym};
 
-// #[macro_use]
-// #[macro_export]
 pub mod expr_kind {
     #[macro_export]
     macro_rules! block_like {
@@ -103,17 +100,6 @@ pub fn arm_body_requires_block(expr: &ast::Expr) -> bool {
         expr_kind::unary_like!(ref target) => arm_body_requires_block(target),
         // _ => ArmBodyRequiresBlock::No,
     }
-}
-
-pub fn expr_only_block(block: &ast::Block) -> Option<&ast::Expr> {
-    if let [stmt] = &block.stmts[..] {
-        if let ast::StmtKind::Expr(expr) = &stmt.kind {
-            if expr.attrs.is_empty() {
-                return Some(expr);
-            }
-        }
-    }
-    None
 }
 
 pub fn is_rustfmt_skip(attr: &ast::Attribute) -> bool {

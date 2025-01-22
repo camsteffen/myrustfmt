@@ -17,7 +17,9 @@ fn format_stmt(stmt: &str, max_width: Option<u32>) -> String {
     if let Some(max_width) = max_width {
         config = config.max_width(max_width + indent.len() as u32)
     }
-    let formatted_crate = format_str_config(&crate_source, config).unwrap();
+    let formatted_crate = format_str_config(&crate_source, config)
+        .unwrap()
+        .expect_not_exceeded_max_width();
     let mut formatted_stmt = formatted_crate
         .strip_prefix(prefix)
         .unwrap()

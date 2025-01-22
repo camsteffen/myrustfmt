@@ -1,5 +1,6 @@
 use crate::error::FormatResult;
 use crate::source_formatter::SourceFormatter;
+use crate::util::cell_ext::CellExt;
 use rustc_lexer::TokenKind;
 
 /// Answers the question: What whitespace to we expect to print, ignoring comments?
@@ -65,7 +66,8 @@ impl WhitespaceContext<'_> {
                     self.flush_whitespace(true)?;
                     self.sf
                         .constraints()
-                        .with_no_max_width(|| self.sf.copy(token.len as usize))?;
+                        .max_width
+                        .with_replaced(None, || self.sf.copy(token.len as usize))?;
                     self.is_comments_before = true;
                     self.is_after_line_comment_out =
                         matches!(token.kind, TokenKind::LineComment { .. });

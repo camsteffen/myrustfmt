@@ -81,3 +81,12 @@
             }]
         }
     }
+- name: comment in first line of arm block that prevents block removal
+  type: no_change
+  formatted: |
+    match x {
+        _ => {
+            // comment
+            foo()
+        }
+    }

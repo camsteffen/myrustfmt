@@ -25,11 +25,11 @@ breakpoint_tests! {
     binop,
     call,
     comments,
-    chain,
     index,
     local,
     match_,
     paren,
+    postfix,
     touchy_margins,
 }
 

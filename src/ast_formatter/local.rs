@@ -1,6 +1,5 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::util::tail::Tail;
-use crate::ast_utils::expr_only_block;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
@@ -31,7 +30,7 @@ impl AstFormatter {
                 self.fallback(|| {
                     self.out.space_token_space("else")?;
                     self.out.token("{")?;
-                    match expr_only_block(else_) {
+                    match self.expr_only_block(else_) {
                         None => else_block()?,
                         Some(else_expr) => self
                             .fallback(|| {

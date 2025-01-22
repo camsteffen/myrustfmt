@@ -1,6 +1,8 @@
+use crate::ast_formatter::FormatCrateResult;
 use crate::constraint_writer::{ConstraintWriter, ConstraintWriterSnapshot};
 use crate::constraints::Constraints;
-use crate::error::{FormatResult, WidthLimitExceededError};
+use crate::error::FormatResult;
+use crate::error_emitter::ErrorEmitter;
 use crate::source_formatter::whitespace::{NewlineKind, WhitespaceMode, handle_whitespace};
 use crate::source_reader::SourceReader;
 use rustc_span::{BytePos, Pos, Span};
@@ -22,19 +24,23 @@ pub struct SourceFormatter {
 }
 
 impl SourceFormatter {
-    pub fn new(source: impl Into<String>, constraints: Constraints) -> SourceFormatter {
+    pub fn new(
+        source: impl Into<String>,
+        constraints: Constraints,
+        error_emitter: ErrorEmitter,
+    ) -> SourceFormatter {
         SourceFormatter {
             source: SourceReader::new(source.into()),
-            out: ConstraintWriter::new(constraints),
+            out: ConstraintWriter::new(constraints, error_emitter),
             next_is_whitespace_or_comments: Cell::new(true),
         }
     }
 
     pub fn new_defaults(source: impl Into<String>) -> SourceFormatter {
-        Self::new(source, Constraints::default())
+        Self::new(source, Constraints::default(), ErrorEmitter::new(None))
     }
 
-    pub fn finish(self) -> String {
+    pub fn finish(self) -> FormatCrateResult {
         self.out.finish()
     }
 
@@ -81,6 +87,10 @@ impl SourceFormatter {
 
     pub fn pos(&self) -> usize {
         self.source.pos.get().to_usize()
+    }
+
+    pub fn source(&self) -> &str {
+        &self.source.source
     }
 
     pub fn newline(&self, kind: NewlineKind) -> FormatResult {
@@ -221,16 +231,6 @@ impl SourceFormatter {
         self.source.expect_pos(span.lo())?;
         let token = self.source.get_span(span);
         self.token_unchecked(token)?;
-        Ok(())
-    }
-
-    pub fn require_width(&self, width: u32) -> Result<(), WidthLimitExceededError> {
-        if let Some(remaining) = self.out.remaining_width() {
-            let remaining = remaining?;
-            if remaining < width {
-                return Err(WidthLimitExceededError);
-            }
-        }
         Ok(())
     }
 

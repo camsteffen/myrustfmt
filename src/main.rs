@@ -1,8 +1,11 @@
 #![feature(rustc_private)]
 
+extern crate rustc_span;
+
 use getopts::Options;
 use myrustfmt::config::Config;
-use myrustfmt::{CrateFormatError, format_file};
+use myrustfmt::format_file;
+use rustc_span::ErrorGuaranteed;
 use std::io::Write;
 use std::process::{Command, ExitCode, Stdio};
 use std::{env, fs};
@@ -23,20 +26,23 @@ fn main() -> ExitCode {
     let paths = options_matches.free;
     for path in paths {
         let format_result = format_file(&path, Config::default());
-        let (contents, formatted) = match format_result {
+        let format_result = match format_result {
             Ok(formatted) => formatted,
-            Err(CrateFormatError::ErrorEmitted) => return ExitCode::FAILURE,
-            Err(CrateFormatError::WidthLimitExceeded { line }) => {
-                eprintln!("Width limit exceeded at {path}:{line}");
-                return ExitCode::FAILURE;
-            }
+            Err(ErrorGuaranteed { .. }) => return ExitCode::FAILURE,
         };
         if is_check {
-            if !check_file(&path, &contents, &formatted) {
+            if !check_file(
+                &path,
+                &format_result.original,
+                &format_result.formatted.formatted_crate,
+            ) {
                 return ExitCode::FAILURE;
             }
         } else {
-            fs::write(path, formatted).unwrap();
+            fs::write(path, format_result.formatted.formatted_crate).unwrap();
+        }
+        if format_result.formatted.exceeded_max_width {
+            return ExitCode::FAILURE;
         }
     }
     ExitCode::SUCCESS

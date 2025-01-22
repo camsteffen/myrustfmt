@@ -1,5 +1,4 @@
 use crate::config::Config;
-use crate::error::FormatResult;
 use std::cell::Cell;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -10,6 +9,9 @@ pub struct MaxWidthForLine {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Constraints {
+    /// True when there is a fallback routine planned for if the current routine produces code
+    /// that does not meet the given constraints.
+    pub has_fallback: Cell<bool>,
     pub max_width: Cell<Option<u32>>,
     /// Used to set the max width for the current line, so it no longer applies after a newline
     /// character is printed
@@ -37,6 +39,7 @@ pub struct Constraints {
     ///     _ => {}
     /// }
     /// ```
+    // todo rename to indent_middle
     pub touchy_margin: Cell<bool>,
 }
 
@@ -49,6 +52,7 @@ impl Default for Constraints {
 impl Constraints {
     pub fn new(max_width: u32) -> Constraints {
         Constraints {
+            has_fallback: Cell::new(false),
             indent: Cell::new(0),
             max_width: Cell::new(Some(max_width)),
             max_width_for_line: Cell::new(None),
@@ -59,23 +63,18 @@ impl Constraints {
 
     pub fn set(&self, other: &Constraints) {
         let Constraints {
+            has_fallback,
             indent,
             max_width,
-            max_width_for_line: max_width_first_line,
+            max_width_for_line,
             single_line,
             touchy_margin,
         } = other;
+        self.has_fallback.set(has_fallback.get());
         self.indent.set(indent.get());
         self.max_width.set(max_width.get());
-        self.max_width_for_line.set(max_width_first_line.get());
+        self.max_width_for_line.set(max_width_for_line.get());
         self.single_line.set(single_line.get());
         self.touchy_margin.set(touchy_margin.get());
-    }
-
-    pub fn with_no_max_width(&self, f: impl FnOnce() -> FormatResult) -> FormatResult {
-        let max_width_prev = self.max_width.replace(None);
-        let result = f();
-        self.max_width.set(max_width_prev);
-        result
     }
 }

@@ -6,7 +6,7 @@ use crate::util::cell_ext::CellExt;
 pub const INDENT_WIDTH: usize = 4;
 
 impl AstFormatter {
-    fn constraints(&self) -> &Constraints {
+    pub(super) fn constraints(&self) -> &Constraints {
         self.out.constraints()
     }
 
@@ -30,7 +30,7 @@ impl AstFormatter {
 
     pub fn with_single_line<T>(&self, f: impl FnOnce() -> T) -> T {
         assert!(
-            self.has_fallback.get(),
+            self.constraints().has_fallback.get(),
             "single line constraint applied with no fallback"
         );
         self.constraints().single_line.with_replaced(true, f)
@@ -136,12 +136,12 @@ impl AstFormatter {
             .get()
             .is_some_and(|m| m <= max_width)
         {
-            return f();
+            f()
+        } else {
+            self.constraints()
+                .max_width
+                .with_replaced(Some(max_width), f)
         }
-        let max_width_prev = self.constraints().max_width.replace(Some(max_width));
-        let result = f();
-        self.constraints().max_width.set(max_width_prev);
-        result
     }
 
     pub fn with_width_limit_opt(

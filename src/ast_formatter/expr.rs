@@ -8,7 +8,7 @@ use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::list_config::{
     ArrayListConfig, CallParamListConfig, ParamListConfig, struct_field_list_config,
 };
-use crate::ast_utils::{expr_kind, expr_only_block};
+use crate::ast_utils::expr_kind;
 use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
@@ -327,7 +327,7 @@ impl AstFormatter {
         };
 
         let single_line_parts = || {
-            let Some(block_expr) = expr_only_block(block) else {
+            let Some(block_expr) = self.expr_only_block(block) else {
                 return None;
             };
             let Some(else_) = else_ else {
@@ -336,7 +336,7 @@ impl AstFormatter {
             let ast::ExprKind::Block(block, _) = &else_.kind else {
                 return None;
             };
-            let Some(else_expr) = expr_only_block(block) else {
+            let Some(else_expr) = self.expr_only_block(block) else {
                 return None;
             };
             Some((block_expr, else_expr))
@@ -452,7 +452,7 @@ impl AstFormatter {
         let mut inner_expr = None;
         if let ast::ExprKind::Block(block, None) = &expr.kind {
             if matches!(block.rules, ast::BlockCheckMode::Default) {
-                if let Some(expr) = expr_only_block(block) {
+                if let Some(expr) = self.expr_only_block(block) {
                     inner_expr = Some(expr);
                 }
             }

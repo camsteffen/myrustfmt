@@ -1,11 +1,17 @@
+use crate::ast_formatter::FormatCrateResult;
 use crate::constraints::Constraints;
 use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededError};
+use crate::error_emitter::ErrorEmitter;
+use crate::util::option::merge_options;
 use std::cell::Cell;
 
 pub struct ConstraintWriter {
     constraints: Constraints,
     buffer: Cell<String>,
+    error_emitter: ErrorEmitter,
+    exceeded_max_width: Cell<bool>,
     last_line_start: Cell<usize>,
+    last_width_exceeded_line: Cell<Option<u32>>,
     line: Cell<u32>,
 }
 
@@ -14,20 +20,27 @@ pub struct ConstraintWriterSnapshot {
     line: u32,
     len: usize,
     last_line_start: usize,
+    last_width_exceeded_line: Option<u32>,
 }
 
 impl ConstraintWriter {
-    pub fn new(constraints: Constraints) -> ConstraintWriter {
+    pub fn new(constraints: Constraints, error_emitter: ErrorEmitter) -> ConstraintWriter {
         ConstraintWriter {
             constraints,
             buffer: Cell::new(String::new()),
+            error_emitter,
+            exceeded_max_width: Cell::new(false),
             last_line_start: Cell::new(0),
+            last_width_exceeded_line: Cell::new(None),
             line: Cell::new(0),
         }
     }
 
-    pub fn finish(self) -> String {
-        self.buffer.into_inner()
+    pub fn finish(self) -> FormatCrateResult {
+        FormatCrateResult {
+            formatted_crate: self.buffer.into_inner(),
+            exceeded_max_width: self.exceeded_max_width.get(),
+        }
     }
 
     pub fn constraints(&self) -> &Constraints {
@@ -53,7 +66,11 @@ impl ConstraintWriter {
         let Self {
             ref constraints,
             buffer: _,
+            error_emitter: _,
+            // exceeded_max_width should only be changed when there is no fallback
+            exceeded_max_width: _,
             ref last_line_start,
+            ref last_width_exceeded_line,
             ref line,
         } = *self;
         ConstraintWriterSnapshot {
@@ -61,6 +78,7 @@ impl ConstraintWriter {
             line: line.get(),
             len: self.len(),
             last_line_start: last_line_start.get(),
+            last_width_exceeded_line: last_width_exceeded_line.get(),
         }
     }
 
@@ -68,6 +86,7 @@ impl ConstraintWriter {
         let ConstraintWriterSnapshot {
             ref constraints,
             last_line_start,
+            last_width_exceeded_line,
             len,
             line,
         } = *snapshot;
@@ -75,6 +94,7 @@ impl ConstraintWriter {
         assert_eq!(&self.constraints, constraints);
         self.constraints.set(constraints);
         self.last_line_start.set(last_line_start);
+        self.last_width_exceeded_line.set(last_width_exceeded_line);
         self.line.set(line);
         self.with_buffer(|b| b.truncate(len));
     }
@@ -115,7 +135,19 @@ impl ConstraintWriter {
     pub fn check_width_constraints(&self) -> Result<(), WidthLimitExceededError> {
         match self.remaining_width() {
             None | Some(Ok(_)) => Ok(()),
-            Some(Err(WidthLimitExceededError { .. })) => Err(WidthLimitExceededError),
+            Some(Err(WidthLimitExceededError { .. })) => {
+                if self.constraints.has_fallback.get() {
+                    Err(WidthLimitExceededError)
+                } else {
+                    let line = self.line.get();
+                    if self.last_width_exceeded_line.get() != Some(line) {
+                        self.last_width_exceeded_line.set(Some(line));
+                        self.error_emitter.emit_width_exceeded(line);
+                        self.exceeded_max_width.set(true);
+                    }
+                    Ok(())
+                }
+            }
         }
     }
 
@@ -127,10 +159,7 @@ impl ConstraintWriter {
             .get()
             .filter(|m| m.line == self.line())
             .map(|m| m.max_width);
-        match (max_width, max_width_for_current_line) {
-            (Some(a), Some(b)) => Some(a.min(b)),
-            (a, b) => a.or(b),
-        }
+        merge_options(max_width, max_width_for_current_line, u32::min)
     }
 
     pub fn remaining_width(&self) -> Option<Result<u32, WidthLimitExceededError>> {
