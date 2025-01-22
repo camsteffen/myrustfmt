@@ -39,7 +39,8 @@ fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         } else {
-            fs::write(path, format_result.formatted.formatted_crate).unwrap();
+            fs::write(path, format_result.formatted.formatted_crate)
+                .unwrap();
         }
         if format_result.formatted.exceeded_max_width {
             return ExitCode::FAILURE;
