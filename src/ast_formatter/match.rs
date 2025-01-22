@@ -2,7 +2,7 @@ use rustc_ast::ast;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::util::tail::Tail;
-use crate::ast_utils::{arm_body_requires_block, is_plain_block};
+use crate::ast_utils::{arm_body_requires_block, plain_block};
 use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
 
@@ -80,7 +80,7 @@ impl AstFormatter {
             } else {
                 self.fallback(|| {
                     // todo should be block-like?
-                    let tail = if is_plain_block(body) {
+                    let tail = if plain_block(body).is_some() {
                         Tail::token_skip_if_present(",")
                     } else {
                         Tail::token_maybe_missing(",")

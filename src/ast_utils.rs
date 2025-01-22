@@ -107,9 +107,9 @@ pub fn is_rustfmt_skip(attr: &ast::Attribute) -> bool {
     attr.path_matches(&PATH)
 }
 
-pub fn is_plain_block(expr: &ast::Expr) -> bool {
+pub fn plain_block(expr: &ast::Expr) -> Option<&ast::Block> {
     match &expr.kind {
-        ast::ExprKind::Block(block, None) => matches!(block.rules, ast::BlockCheckMode::Default),
-        _ => false,
+        ast::ExprKind::Block(block, None) if matches!(block.rules, ast::BlockCheckMode::Default) => Some(block),
+        _ => None,
     }
 }

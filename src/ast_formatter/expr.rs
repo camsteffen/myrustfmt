@@ -8,7 +8,7 @@ use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::list_config::{
     ArrayListConfig, CallParamListConfig, ParamListConfig, struct_field_list_config,
 };
-use crate::ast_utils::expr_kind;
+use crate::ast_utils::{expr_kind, plain_block};
 use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
@@ -444,27 +444,18 @@ impl AstFormatter {
     }
 
     // todo be more conservative about skipping?
-    pub fn skip_single_expr_blocks<'a, T>(
+    pub fn skip_single_expr_blocks<T>(
         &self,
-        expr: &'a ast::Expr,
-        format: impl FnOnce(&'a ast::Expr) -> FormatResult<T>,
+        expr: &ast::Expr,
+        format: impl FnOnce(&ast::Expr) -> FormatResult<T>,
     ) -> FormatResult<T> {
-        let mut inner_expr = None;
-        if let ast::ExprKind::Block(block, None) = &expr.kind {
-            if matches!(block.rules, ast::BlockCheckMode::Default) {
-                if let Some(expr) = self.expr_only_block(block) {
-                    inner_expr = Some(expr);
-                }
-            }
-        }
-        let out;
-        if let Some(inner) = inner_expr {
-            self.out.skip_token("{")?;
-            out = self.skip_single_expr_blocks(inner, format)?;
-            self.out.skip_token("}")?;
-        } else {
-            out = format(expr)?;
-        }
+        let inner_expr = plain_block(expr).and_then(|b| self.expr_only_block(b));
+        let Some(inner_expr) = inner_expr else {
+            return format(expr);
+        };
+        self.out.skip_token("{")?;
+        let out = self.skip_single_expr_blocks(inner_expr, format)?;
+        self.out.skip_token("}")?;
         Ok(out)
     }
 }

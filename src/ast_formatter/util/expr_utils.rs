@@ -15,9 +15,9 @@ impl AstFormatter {
             return None;
         }
         let source = self.out.source();
-        if !(is_whitespace(&source[block.span.lo().to_usize() + 1..expr.span.lo().to_usize()])
-            && is_whitespace(&source[expr.span.hi().to_usize()..block.span.hi().to_usize() - 1]))
-        {
+        let before_expr = &source[block.span.lo().to_usize() + 1..expr.span.lo().to_usize()];
+        let after_expr = &source[expr.span.hi().to_usize()..block.span.hi().to_usize() - 1];
+        if !(is_whitespace(before_expr) && is_whitespace(after_expr)) {
             // there are comments before or after the expression
             return None;
         }
