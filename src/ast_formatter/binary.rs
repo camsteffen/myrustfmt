@@ -30,7 +30,7 @@ impl AstFormatter {
         .otherwise(|| {
             self.indented(|| {
                 for (op, expr) in chain {
-                    self.out.newline_indent()?;
+                    self.out.newline_within_indent()?;
                     self.out.token_space(op.as_str())?;
                     self.expr(expr)?;
                 }

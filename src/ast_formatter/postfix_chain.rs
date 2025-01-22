@@ -8,7 +8,6 @@ use crate::error::{FormatError, WidthLimitExceededError};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use rustc_span::symbol::Ident;
-use tracing::info;
 
 #[derive(Debug)]
 enum PostfixChainItem<'a> {
@@ -80,11 +79,8 @@ impl AstFormatter {
         // experimentally check if wrapping the last item makes it fit on one line
         // the width limit would not apply
         // todo wouldn't the first line width limit be removed anyways from the newline?
-        info!("trying wrap");
         let result = self.indented(|| {
-            self.out.newline_indent()?;
-            info!("initial wrapped length: {}", self.out.last_line_len());
-            info!("max width: {:?}", self.out.constraints().max_width.get());
+            self.out.newline_within_indent()?;
             self.with_single_line(|| {
                 self.postfix_chain_items(overflowable)?;
                 self.tail(tail)?;
@@ -92,7 +88,6 @@ impl AstFormatter {
             })?;
             Ok(())
         });
-        info!("wrap result: {result:?}");
         if result.is_ok() {
             // ...if so, go to the separate lines approach
             return Err(WidthLimitExceededError.into());
@@ -115,7 +110,7 @@ impl AstFormatter {
         tail: &Tail,
     ) -> FormatResult {
         while !chain.is_empty() {
-            self.out.newline_indent()?;
+            self.out.newline_within_indent()?;
             chain = self.chain_item_and_unbreakables(chain)?;
         }
         self.tail(tail)?;

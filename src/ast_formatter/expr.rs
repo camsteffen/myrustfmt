@@ -60,7 +60,7 @@ impl AstFormatter {
                 })
                 .otherwise(|| {
                     self.indented(|| {
-                        self.out.newline_indent()?;
+                        self.out.newline_within_indent()?;
                         self.out.token_space("as")?;
                         self.ty(ty)?;
                         Ok(())
@@ -384,7 +384,7 @@ impl AstFormatter {
                         .any(|c| !matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
             });
         let newline_open_block = || {
-            self.out.newline_indent()?;
+            self.out.newline_within_indent()?;
             self.out.token("{")?;
             Ok(())
         };

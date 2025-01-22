@@ -356,6 +356,7 @@ impl AstFormatter {
         item,
     ]
     */
+    // todo how does this behave with comments between items - forcing newlines?
     fn list_contents_wrap_to_fit<T, ItemConfig>(
         &self,
         list: &[T],
@@ -389,7 +390,7 @@ impl AstFormatter {
                     Ok(())
                 };
                 let item_next_line = || {
-                    self.out.newline_indent()?;
+                    self.out.newline_within_indent()?;
                     item_comma()?;
                     Ok(())
                 };
@@ -432,14 +433,15 @@ impl AstFormatter {
                     let (last, until_last) = list.split_last().unwrap();
                     for item in until_last {
                         item_comma(item)?;
-                        self.out.newline_indent()?;
+                        // todo should this be "between"?
+                        self.out.newline_within_indent()?;
                     }
                     item_comma(last)?;
                 }
                 _ => {
                     for item in list {
                         item_comma(item)?;
-                        self.out.newline_indent()?;
+                        self.out.newline_within_indent()?;
                     }
                     self.out.token("..")?;
                     if let ListRest::Base(expr) = rest {

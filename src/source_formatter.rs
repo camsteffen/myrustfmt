@@ -87,6 +87,20 @@ impl SourceFormatter {
         self.handle_whitespace_and_comments(WhitespaceMode::Newline(kind))
     }
 
+    pub fn newline_indent(&self, kind: NewlineKind) -> FormatResult {
+        self.handle_whitespace_and_comments(WhitespaceMode::Newline(kind))?;
+        self.indent()?;
+        Ok(())
+    }
+
+    pub fn newline_between(&self) -> FormatResult {
+        self.newline(NewlineKind::Between)
+    }
+
+    pub fn newline_between_indent(&self) -> FormatResult {
+        self.newline_indent(NewlineKind::Between)
+    }
+
     pub fn newline_above(&self) -> FormatResult {
         self.newline(NewlineKind::Above)
     }
@@ -99,12 +113,8 @@ impl SourceFormatter {
         self.newline(NewlineKind::Within)
     }
 
-    /** Writes a newline character and indent characters according to the current indent level */
-    // todo don't make Between the default, audit usages
-    pub fn newline_indent(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Newline(NewlineKind::Between))?;
-        self.indent()?;
-        Ok(())
+    pub fn newline_within_indent(&self) -> FormatResult {
+        self.newline_indent(NewlineKind::Within)
     }
 
     pub fn char_ending_at(&self, pos: BytePos) -> u8 {
@@ -294,7 +304,7 @@ mod tests {
     fn replace_space_with_newline() {
         let sf = SourceFormatter::new_defaults("aa aa");
         sf.token("aa").unwrap();
-        sf.newline_indent().unwrap();
+        sf.newline_within_indent().unwrap();
         sf.token("aa").unwrap();
         sf.eof().unwrap();
         assert_eq!(sf.finish(), "aa\naa");
@@ -305,7 +315,7 @@ mod tests {
         let sf = SourceFormatter::new_defaults("aa\n    \naa");
         sf.constraints().indent.set(4);
         sf.token("aa").unwrap();
-        sf.newline_indent().unwrap();
+        sf.newline_within_indent().unwrap();
         sf.token("aa").unwrap();
         sf.eof().unwrap();
         assert_eq!(sf.finish(), "aa\n\n    aa");

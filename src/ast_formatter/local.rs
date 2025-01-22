@@ -54,7 +54,7 @@ impl AstFormatter {
                     Ok(())
                 })
                 .otherwise(|| {
-                    self.out.newline_indent()?;
+                    self.out.newline_within_indent()?;
                     self.out.token_space("else")?;
                     self.out.token("{")?;
                     else_block()?;
@@ -80,7 +80,7 @@ impl AstFormatter {
         // wrap and indent then single line
         .next(|| {
             self.indented(|| {
-                self.out.newline_indent()?;
+                self.out.newline_within_indent()?;
                 self.with_single_line(|| self.expr(expr))?;
                 self.tail(end)?;
                 Ok(())
@@ -96,7 +96,7 @@ impl AstFormatter {
         // wrap and indent
         .otherwise(|| {
             self.indented(|| {
-                self.out.newline_indent()?;
+                self.out.newline_within_indent()?;
                 self.expr(expr)?;
                 self.tail(end)?;
                 Ok(())

@@ -10,6 +10,8 @@ pub enum WhitespaceMode {
     Void,
 }
 
+// todo force blank lines between items?
+/// A bespoke way of characterizing line breaks that determines where blank lines are allowed
 #[derive(Clone, Copy)]
 pub enum NewlineKind {
     /// Newline between items where a blank line is allowed. (e.g. between statements)

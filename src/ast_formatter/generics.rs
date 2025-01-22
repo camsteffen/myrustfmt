@@ -42,11 +42,11 @@ impl AstFormatter {
         if where_clause.is_empty() {
             return Ok(());
         }
-        self.out.newline_indent()?;
+        self.out.newline_within_indent()?;
         self.out.token("where")?;
         self.indented(|| {
-            where_clause.predicates.iter().try_for_each(|pred| {
-                self.out.newline_indent()?;
+            for pred in &where_clause.predicates {
+                self.out.newline_within_indent()?;
                 match &pred.kind {
                     ast::WherePredicateKind::BoundPredicate(pred) => {
                         self.ty(&pred.bounded_ty)?;
@@ -57,10 +57,10 @@ impl AstFormatter {
                     ast::WherePredicateKind::EqPredicate(_) => todo!(),
                 }
                 self.out.token(",")?;
-                Ok(())
-            })
+            }
+            Ok(())
         })?;
-        self.out.newline_indent()?;
+        self.out.newline_within_indent()?;
         Ok(())
     }
 }

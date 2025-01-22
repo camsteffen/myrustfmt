@@ -43,7 +43,7 @@ impl AstFormatter {
             self.fn_ret_ty(&sig.decl.output)?;
             if is_block_after_decl {
                 self.fallback(|| self.out.space_token("{")).otherwise(|| {
-                    self.out.newline_indent()?;
+                    self.out.newline_within_indent()?;
                     self.out.token("{")?;
                     Ok(())
                 })?;
@@ -233,7 +233,7 @@ impl AstFormatter {
             ast::FnRetTy::Ty(ty) => {
                 self.fallback(|| self.out.space_token_space("->"))
                     .otherwise(|| {
-                        self.out.newline_indent()?;
+                        self.out.newline_within_indent()?;
                         self.out.token_space("->")?;
                         Ok(())
                     })?;

@@ -51,7 +51,11 @@ impl AstFormatter {
                     self.out.token("[")?;
                     self.meta_item(&meta)?;
                     self.out.token("]")?;
-                    self.out.newline_indent()?;
+                    match attr.style {
+                        ast::AttrStyle::Inner => self.out.newline_between()?,
+                        ast::AttrStyle::Outer => self.out.newline_within()?,
+                    }
+                    self.out.indent()?;
                     Ok(())
                 }
             },

@@ -51,7 +51,7 @@ impl AstFormatter {
         self.with_attrs(&crate_.attrs, crate_.spans.inner_span, || {
             for item in &crate_.items {
                 self.item(item)?;
-                self.out.newline_indent()?;
+                self.out.newline_between_indent()?;
             }
             Ok(())
         })
