@@ -29,3 +29,7 @@ rustfmt Bugs:
 * When an import has curly braces, max_width is reduced by 2
 * When placing a `{` after `let...else`, max_width is reduced by 1
 * When placing a `{` after `if .. =>` where the if-guard has its own line, max_width is reduced by 2
+
+
+TODO
+* rustfmt seems to shift comments up to the end of the previous line in wrap-to-fit lists

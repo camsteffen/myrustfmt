@@ -98,7 +98,6 @@ pub fn arm_body_requires_block(expr: &ast::Expr) -> bool {
         | ast::ExprKind::Struct(..)
         | ast::ExprKind::Tup(..) => false,
         expr_kind::unary_like!(ref target) => arm_body_requires_block(target),
-        // _ => ArmBodyRequiresBlock::No,
     }
 }
 
@@ -109,7 +108,11 @@ pub fn is_rustfmt_skip(attr: &ast::Attribute) -> bool {
 
 pub fn plain_block(expr: &ast::Expr) -> Option<&ast::Block> {
     match &expr.kind {
-        ast::ExprKind::Block(block, None) if matches!(block.rules, ast::BlockCheckMode::Default) => Some(block),
+        ast::ExprKind::Block(block, None)
+            if matches!(block.rules, ast::BlockCheckMode::Default) =>
+        {
+            Some(block)
+        }
         _ => None,
     }
 }

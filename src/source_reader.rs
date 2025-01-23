@@ -3,7 +3,6 @@ use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
 
 pub struct SourceReader {
-    // todo use parse session source file?
     pub source: String,
     pub pos: Cell<BytePos>,
 }

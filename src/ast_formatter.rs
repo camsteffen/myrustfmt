@@ -31,33 +31,24 @@ pub struct AstFormatter {
 }
 
 pub struct FormatCrateResult {
-    pub formatted_crate: String,
+    pub source: String,
+    pub formatted: String,
     pub exceeded_max_width: bool,
 }
 
 impl FormatCrateResult {
-    pub fn expect_not_exceeded_max_width(self) -> String {
-        let FormatCrateResult {
-            formatted_crate,
-            exceeded_max_width,
-        } = self;
-        if exceeded_max_width {
+    pub fn expect_not_exceeded_max_width(&self) {
+        if self.exceeded_max_width {
             panic!("Exceeded max width");
         }
-        formatted_crate
     }
 }
 
 impl AstFormatter {
-    pub fn new(
-        source: impl Into<String>,
-        path: Option<impl Into<PathBuf>>,
-        config: Config,
-    ) -> Self {
+    pub fn new(source: String, path: Option<PathBuf>, config: Config) -> Self {
         let constraints = Constraints::new(config.max_width);
-        let path = path.map(|p| p.into());
         let error_emitter = ErrorEmitter::new(path);
-        let out = SourceFormatter::new(source.into(), constraints, error_emitter);
+        let out = SourceFormatter::new(source, constraints, error_emitter);
         AstFormatter { config, out }
     }
 
@@ -81,5 +72,9 @@ impl AstFormatter {
 
     pub fn pos(&self) -> usize {
         self.out.pos()
+    }
+
+    pub fn source(&self) -> &str {
+        self.out.source()
     }
 }

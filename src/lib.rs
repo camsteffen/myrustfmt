@@ -30,40 +30,40 @@ pub mod source_formatter;
 mod source_reader;
 mod util;
 
-use rustc_data_structures::sync::Lrc;
+use crate::ast_formatter::{AstFormatter, FormatCrateResult};
+use crate::config::Config;
 use rustc_errors::emitter::{HumanEmitter, stderr_destination};
-use rustc_errors::{ColorConfig, DiagCtxt};
+use rustc_errors::{ColorConfig, Diag, DiagCtxt};
+use rustc_parse::parser::Parser;
 use rustc_session::parse::ParseSess;
 use rustc_span::edition::Edition;
 use rustc_span::{
     ErrorGuaranteed, FileName,
     source_map::{FilePathMapping, SourceMap},
 };
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::sync::Arc;
 
-use crate::ast_formatter::{AstFormatter, FormatCrateResult};
-use crate::config::Config;
-
-pub struct FormatFileResult {
-    pub original: String,
-    pub formatted: FormatCrateResult,
+#[derive(Clone, Copy)]
+pub enum CrateSource<'a> {
+    File(&'a Path),
+    Source(&'a str),
 }
 
-pub fn format_file(
-    path: impl AsRef<Path>,
-    config: Config,
-) -> Result<FormatFileResult, ErrorGuaranteed> {
-    let path = path.as_ref();
-    let original = fs::read_to_string(path).unwrap();
-    let formatted = format(&original, config, Some(path))?;
-    Ok(FormatFileResult {
-        original,
-        formatted,
-    })
+impl<'a> CrateSource<'a> {
+    pub fn path(self) -> Option<&'a Path> {
+        match self {
+            CrateSource::File(path) => Some(path),
+            CrateSource::Source(_) => None,
+        }
+    }
 }
 
-pub fn format_file_defaults(path: impl AsRef<Path>) -> Result<FormatFileResult, ErrorGuaranteed> {
+pub fn format_file(path: &Path, config: Config) -> Result<FormatCrateResult, ErrorGuaranteed> {
+    format(CrateSource::File(path), config)
+}
+
+pub fn format_file_defaults(path: &Path) -> Result<FormatCrateResult, ErrorGuaranteed> {
     format_file(path, Config::default())
 }
 
@@ -79,62 +79,68 @@ pub fn format_str_config(
     source: &str,
     config: Config,
 ) -> Result<FormatCrateResult, ErrorGuaranteed> {
-    format(source, config, None)
+    format(CrateSource::Source(source), config)
 }
 
 pub fn format(
-    source: &str,
+    crate_source: CrateSource<'_>,
     config: Config,
-    path: Option<&Path>,
 ) -> Result<FormatCrateResult, ErrorGuaranteed> {
-    parse_crate(String::from(source), path, |crate_| {
-        // todo can we reference the string in the parser instead of cloning here?
-        let ast_formatter = AstFormatter::new(source, path, config);
-        let result = ast_formatter.crate_(&crate_);
-        match result {
+    // todo should this be shared across crates?
+    rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
+        let (crate_, source) = parse_crate(crate_source)?;
+        let ast_formatter =
+            AstFormatter::new(source, crate_source.path().map(Path::to_path_buf), config);
+        match ast_formatter.crate_(&crate_) {
             Ok(()) => {}
-            Err(e) => {
-                // todo don't panic?
-                panic!(
-                    "This is a bug :(\n{}",
-                    e.display(source, ast_formatter.pos(), path)
+            // todo don't panic?
+            Err(e) => panic!(
+                "This is a bug :(\n{}",
+                e.display(
+                    ast_formatter.source(),
+                    ast_formatter.pos(),
+                    crate_source.path()
                 )
-            }
+            ),
         }
-        ast_formatter.finish()
+        Ok(ast_formatter.finish())
     })
 }
 
-fn parse_crate<T>(
-    string: String,
-    path: Option<&Path>,
-    f: impl FnOnce(rustc_ast::ast::Crate) -> T,
-) -> Result<T, ErrorGuaranteed> {
-    let source_map = Lrc::new(SourceMap::new(FilePathMapping::empty()));
-    let dcx = dcx(source_map.clone());
-    // todo should this be shared for a crate?
-    rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
-        let psess = ParseSess::with_dcx(dcx, source_map);
-        let mut parser = rustc_parse::new_parser_from_source_str(
-            &psess,
-            match path {
-                None => FileName::anon_source_code(&string),
-                // todo is this actually beneficial?
-                Some(path) => FileName::from(PathBuf::from(path)),
-            },
-            string,
-        )
-        .unwrap();
-        let crate_ = parser.parse_crate_mod().map_err(|err| err.emit())?;
+fn parse_crate(
+    crate_source: CrateSource,
+) -> Result<(rustc_ast::ast::Crate, String), ErrorGuaranteed> {
+    let crate_;
+    let source;
+    {
+        // We don't share a ParseSess across crates because its SourceMap would hold every
+        // crate's contents in memory after it is parsed and formatted
+        let psess = build_parse_sess();
+        // todo is this unwrap okay?
+        let mut parser = rustc_parse::unwrap_or_emit_fatal(build_parser(&psess, crate_source));
+        crate_ = parser.parse_crate_mod().map_err(|err| err.emit())?;
         if let Some(error) = psess.dcx().has_errors() {
-            // todo this may not be emitted?
             return Err(error);
         }
-        Ok(f(crate_))
-    })
+        let [file] = &psess.source_map().files()[..] else {
+            panic!("the SourceMap should have exactly one file");
+        };
+        let source_ref = file.src.as_ref().expect("the SourceFile should have src");
+        source = Arc::clone(source_ref);
+        // after this block, `source` will be a single reference that we can unwrap
+    };
+    let source = Arc::into_inner(source)
+        .expect("there should be no references to source");
+    Ok((crate_, source))
 }
 
-fn dcx(source_map: Lrc<SourceMap>) -> DiagCtxt {
+fn build_parse_sess() -> ParseSess {
+    let source_map = Arc::new(SourceMap::new(FilePathMapping::empty()));
+    let dcx = build_diag_ctxt(source_map.clone());
+    ParseSess::with_dcx(dcx, source_map)
+}
+
+fn build_diag_ctxt(source_map: Arc<SourceMap>) -> DiagCtxt {
     let fallback_bundle = rustc_errors::fallback_fluent_bundle(
         rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
         false,
@@ -143,6 +149,20 @@ fn dcx(source_map: Lrc<SourceMap>) -> DiagCtxt {
         HumanEmitter::new(stderr_destination(ColorConfig::Auto), fallback_bundle)
             .sm(Some(source_map)),
     );
-
     DiagCtxt::new(emitter)
+}
+
+fn build_parser<'a>(
+    psess: &'a ParseSess,
+    source: CrateSource,
+) -> Result<Parser<'a>, Vec<Diag<'a>>> {
+    match source {
+        CrateSource::File(path) => rustc_parse::new_parser_from_file(psess, &path, None // todo provide span when the file is found from a mod
+),
+        CrateSource::Source(source) => rustc_parse::new_parser_from_source_str(
+            psess,
+            FileName::anon_source_code(&source),
+            source.to_owned(),
+        ),
+    }
 }

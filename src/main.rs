@@ -7,6 +7,7 @@ use myrustfmt::config::Config;
 use myrustfmt::format_file;
 use rustc_span::ErrorGuaranteed;
 use std::io::Write;
+use std::path::Path;
 use std::process::{Command, ExitCode, Stdio};
 use std::{env, fs};
 
@@ -23,26 +24,20 @@ fn main() -> ExitCode {
         eprintln!("WARNING: Ignoring --edition option");
     }
     let is_check = options_matches.opt_present("check");
-    let paths = options_matches.free;
-    for path in paths {
-        let format_result = format_file(&path, Config::default());
+    for path in &options_matches.free {
+        let format_result = format_file(Path::new(path), Config::default());
         let format_result = match format_result {
             Ok(formatted) => formatted,
             Err(ErrorGuaranteed { .. }) => return ExitCode::FAILURE,
         };
         if is_check {
-            if !check_file(
-                &path,
-                &format_result.original,
-                &format_result.formatted.formatted_crate,
-            ) {
+            if !check_file(&path, &format_result.source, &format_result.formatted) {
                 return ExitCode::FAILURE;
             }
         } else {
-            fs::write(path, format_result.formatted.formatted_crate)
-                .unwrap();
+            fs::write(path, format_result.formatted).unwrap();
         }
-        if format_result.formatted.exceeded_max_width {
+        if format_result.exceeded_max_width {
             return ExitCode::FAILURE;
         }
     }

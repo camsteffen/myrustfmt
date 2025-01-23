@@ -1,5 +1,7 @@
 use crate::ast_formatter::FormatCrateResult;
-use crate::constraint_writer::{ConstraintWriter, ConstraintWriterSnapshot};
+use crate::constraint_writer::{
+    ConstraintWriter, ConstraintWriterResult, ConstraintWriterSnapshot,
+};
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::ErrorEmitter;
@@ -25,23 +27,36 @@ pub struct SourceFormatter {
 
 impl SourceFormatter {
     pub fn new(
-        source: impl Into<String>,
+        source: String,
         constraints: Constraints,
         error_emitter: ErrorEmitter,
     ) -> SourceFormatter {
         SourceFormatter {
-            source: SourceReader::new(source.into()),
+            source: SourceReader::new(source),
             out: ConstraintWriter::new(constraints, error_emitter),
             next_is_whitespace_or_comments: Cell::new(true),
         }
     }
 
     pub fn new_defaults(source: impl Into<String>) -> SourceFormatter {
-        Self::new(source, Constraints::default(), ErrorEmitter::new(None))
+        Self::new(
+            source.into(),
+            Constraints::default(),
+            ErrorEmitter::new(None),
+        )
     }
 
     pub fn finish(self) -> FormatCrateResult {
-        self.out.finish()
+        // todo rename these structs
+        let ConstraintWriterResult {
+            formatted,
+            exceeded_max_width,
+        } = self.out.finish();
+        FormatCrateResult {
+            source: self.source.source,
+            formatted,
+            exceeded_max_width,
+        }
     }
 
     pub fn constraints(&self) -> &Constraints {

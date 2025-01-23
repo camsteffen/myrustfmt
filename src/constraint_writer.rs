@@ -1,4 +1,3 @@
-use crate::ast_formatter::FormatCrateResult;
 use crate::constraints::Constraints;
 use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededError};
 use crate::error_emitter::ErrorEmitter;
@@ -23,6 +22,11 @@ pub struct ConstraintWriterSnapshot {
     last_width_exceeded_line: Option<u32>,
 }
 
+pub struct ConstraintWriterResult {
+    pub formatted: String,
+    pub exceeded_max_width: bool,
+}
+
 impl ConstraintWriter {
     pub fn new(constraints: Constraints, error_emitter: ErrorEmitter) -> ConstraintWriter {
         ConstraintWriter {
@@ -36,9 +40,9 @@ impl ConstraintWriter {
         }
     }
 
-    pub fn finish(self) -> FormatCrateResult {
-        FormatCrateResult {
-            formatted_crate: self.buffer.into_inner(),
+    pub fn finish(self) -> ConstraintWriterResult {
+        ConstraintWriterResult {
+            formatted: self.buffer.into_inner(),
             exceeded_max_width: self.exceeded_max_width.get(),
         }
     }
