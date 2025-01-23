@@ -1,10 +1,10 @@
 use crate::config::Config;
 use crate::constraints::Constraints;
-use crate::error::FormatResult;
 use crate::error_emitter::ErrorEmitter;
 use crate::source_formatter::SourceFormatter;
 use rustc_ast::ast;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 mod attr;
 mod binary;
@@ -27,6 +27,7 @@ mod util;
 
 pub struct AstFormatter {
     config: Config,
+    error_emitter: Rc<ErrorEmitter>,
     out: SourceFormatter,
 }
 
@@ -47,34 +48,32 @@ impl FormatCrateResult {
 impl AstFormatter {
     pub fn new(source: String, path: Option<PathBuf>, config: Config) -> Self {
         let constraints = Constraints::new(config.max_width);
-        let error_emitter = ErrorEmitter::new(path);
-        let out = SourceFormatter::new(source, constraints, error_emitter);
-        AstFormatter { config, out }
+        let error_emitter = Rc::new(ErrorEmitter::new(path));
+        let out = SourceFormatter::new(source, constraints, Rc::clone(&error_emitter));
+        AstFormatter {
+            config,
+            error_emitter,
+            out,
+        }
     }
 
-    pub fn finish(self) -> FormatCrateResult {
-        self.out.finish()
-    }
-
-    pub fn crate_(&self, crate_: &ast::Crate) -> FormatResult {
-        self.with_attrs(&crate_.attrs, crate_.spans.inner_span, || {
+    pub fn crate_(self, crate_: &ast::Crate) -> FormatCrateResult {
+        let result = self.with_attrs(&crate_.attrs, crate_.spans.inner_span, || {
             for item in &crate_.items {
                 self.item(item)?;
                 self.out.newline_between_indent()?;
             }
             Ok(())
-        })
+        });
+        match result {
+            Ok(()) => self.out.finish(),
+            Err(e) => self
+                .error_emitter
+                .fatal_format_error(e, self.out.source(), self.out.pos()),
+        }
     }
 
     fn config(&self) -> &Config {
         &self.config
-    }
-
-    pub fn pos(&self) -> usize {
-        self.out.pos()
-    }
-
-    pub fn source(&self) -> &str {
-        self.out.source()
     }
 }

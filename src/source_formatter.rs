@@ -9,6 +9,7 @@ use crate::source_formatter::whitespace::{NewlineKind, WhitespaceMode, handle_wh
 use crate::source_reader::SourceReader;
 use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
+use std::rc::Rc;
 
 mod whitespace;
 
@@ -29,7 +30,7 @@ impl SourceFormatter {
     pub fn new(
         source: String,
         constraints: Constraints,
-        error_emitter: ErrorEmitter,
+        error_emitter: Rc<ErrorEmitter>,
     ) -> SourceFormatter {
         SourceFormatter {
             source: SourceReader::new(source),
@@ -42,7 +43,7 @@ impl SourceFormatter {
         Self::new(
             source.into(),
             Constraints::default(),
-            ErrorEmitter::new(None),
+            Rc::new(ErrorEmitter::new(None)),
         )
     }
 

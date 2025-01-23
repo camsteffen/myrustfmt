@@ -3,11 +3,12 @@ use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededEr
 use crate::error_emitter::ErrorEmitter;
 use crate::util::option::merge_options;
 use std::cell::Cell;
+use std::rc::Rc;
 
 pub struct ConstraintWriter {
     constraints: Constraints,
     buffer: Cell<String>,
-    error_emitter: ErrorEmitter,
+    error_emitter: Rc<ErrorEmitter>,
     exceeded_max_width: Cell<bool>,
     last_line_start: Cell<usize>,
     last_width_exceeded_line: Cell<Option<u32>>,
@@ -28,7 +29,7 @@ pub struct ConstraintWriterResult {
 }
 
 impl ConstraintWriter {
-    pub fn new(constraints: Constraints, error_emitter: ErrorEmitter) -> ConstraintWriter {
+    pub fn new(constraints: Constraints, error_emitter: Rc<ErrorEmitter>) -> ConstraintWriter {
         ConstraintWriter {
             constraints,
             buffer: Cell::new(String::new()),

@@ -1,3 +1,4 @@
+use crate::error::FormatError;
 use std::path::PathBuf;
 
 pub struct ErrorEmitter {
@@ -15,5 +16,14 @@ impl ErrorEmitter {
             Some(path) => format!("{}:{line}", path.display()),
         };
         eprintln!("Max width exceeded at {place}");
+    }
+
+    // todo rename
+    pub fn fatal_format_error(&self, e: FormatError, source: &str, pos: usize) -> ! {
+        // todo don't panic?
+        panic!(
+            "This is a bug :(\n{}",
+            e.display(source, pos, self.path.as_deref(),)
+        )
     }
 }
