@@ -10,6 +10,20 @@
     match x {
         X => x,
     }
+- name: remove comma after block
+  type: before_after
+  before: |
+    match x {
+        _ => {
+            let x;
+        },
+    }
+  after: |
+    match x {
+        _ => {
+            let x;
+        }
+    }
 - name: arm body breakpoint (do not add block)
   type: breakpoint
   before: |
@@ -39,28 +53,28 @@
             let x;
         }),
     }
-#- name: arm body is chain with all overflowing method calls
-#  type: before_after
-#  before: |
-#    match x {
-#        x => aaaaaaa({
-#            let x;
-#        })
-#        .aaaaaaa({
-#            let x;
-#        }),
-#    }
-#  after: |
-#    match x {
-#        x => {
-#            aaaaaaa({
-#                let x;
-#            })
-#            .aaaaaaa({
-#                let x;
-#            })
-#        }
-#    }
+- name: arm body is chain with all overflowing method calls
+  type: before_after
+  before: |
+    match x {
+        x => aaaaaaa({
+            let x;
+        })
+        .aaaaaaa({
+            let x;
+        }),
+    }
+  after: |
+    match x {
+        x => {
+            aaaaaaa({
+                let x;
+            })
+            .aaaaaaa({
+                let x;
+            })
+        }
+    }
 - name: arm body is multi-line range
   type: before_after
   before: |
@@ -89,4 +103,16 @@
             // comment
             foo()
         }
+    }
+- name: comma after arm block where block is removed
+  type: before_after
+  before: |
+    match x {
+        _ => {
+            x
+        },
+    }
+  after: |
+    match x {
+        _ => x,
     }

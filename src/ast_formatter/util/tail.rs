@@ -14,9 +14,9 @@ pub struct Tail(Option<TailImpl>);
 enum TailImpl {
     And(Rc<(TailImpl, TailImpl)>),
     Token(&'static str),
+    TokenInsert(&'static str),
     TokenMaybeMissing(&'static str),
     TokenMissing(&'static str),
-    TokenSkipIfPresent(&'static str),
 }
 
 impl Tail {
@@ -28,16 +28,16 @@ impl Tail {
         Tail(Some(TailImpl::Token(token)))
     }
 
+    pub const fn token_insert(token: &'static str) -> Self {
+        Tail(Some(TailImpl::TokenInsert(token)))
+    }
+
     pub const fn token_maybe_missing(token: &'static str) -> Self {
         Tail(Some(TailImpl::TokenMaybeMissing(token)))
     }
 
     pub const fn token_missing(token: &'static str) -> Self {
         Tail(Some(TailImpl::TokenMissing(token)))
-    }
-
-    pub const fn token_skip_if_present(token: &'static str) -> Self {
-        Tail(Some(TailImpl::TokenSkipIfPresent(token)))
     }
 
     pub fn and(&self, other: &Tail) -> Tail {
@@ -77,9 +77,9 @@ impl AstFormatter {
                 self.tail_inner(b)?;
             }
             TailImpl::Token(token) => self.out.token(token)?,
+            TailImpl::TokenInsert(token) => self.out.token_insert(token)?,
             TailImpl::TokenMaybeMissing(token) => self.out.token_maybe_missing(token)?,
             TailImpl::TokenMissing(token) => self.out.token_missing(token)?,
-            TailImpl::TokenSkipIfPresent(token) => self.out.skip_token_if_present(token)?,
         }
         Ok(())
     }

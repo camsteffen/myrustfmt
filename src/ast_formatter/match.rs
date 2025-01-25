@@ -70,20 +70,16 @@ impl AstFormatter {
 
     fn arm_body(&self, body: &ast::Expr, force_block: bool) -> FormatResult {
         self.skip_single_expr_blocks(body, |body| {
-            let with_add_block = || {
-                self.add_block(|| self.expr(body))?;
-                self.out.skip_token_if_present(",")?;
-                Ok(())
-            };
+            let with_add_block = || self.add_block(|| self.expr(body));
             if force_block || arm_body_requires_block(body) {
                 with_add_block()
             } else {
                 self.fallback(|| {
                     // todo should be block-like?
                     let tail = if plain_block(body).is_some() {
-                        Tail::token_skip_if_present(",")
+                        Tail::none()
                     } else {
-                        Tail::token_maybe_missing(",")
+                        &Tail::token_insert(",")
                     };
                     self.out
                         .constraints()
@@ -93,6 +89,8 @@ impl AstFormatter {
                 })
                 .otherwise(with_add_block)
             }
-        })
+        })?;
+        self.out.skip_token_if_present(",")?;
+        Ok(())
     }
 }

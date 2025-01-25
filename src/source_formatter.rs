@@ -191,6 +191,12 @@ impl SourceFormatter {
         self.out.token(&token)?;
         Ok(())
     }
+    
+    /// Inserts a token without expecting it from source 
+    pub fn token_insert(&self, token: &str) -> FormatResult {
+        self.out.token(&token)?;
+        Ok(())
+    }
 
     /** Writes a space and accounts for spaces and comments in source */
     // todo do newlines and comments sneak in when it should be single line?

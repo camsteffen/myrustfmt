@@ -6,8 +6,8 @@ use rustc_expand::module::DirOwnership;
 use rustc_expand::module::ModError;
 use rustc_expand::module::default_submod_path;
 use rustc_session::parse::ParseSess;
+use rustc_span::sym;
 use rustc_span::symbol::Ident;
-use rustc_span::{Symbol, sym};
 use std::path::Path;
 use std::path::PathBuf;
 

@@ -3,5 +3,5 @@
 set -e
 
 # todo drop rustfmt here once visiting modules is supported
-cargo fmt
+#cargo fmt
 ./dogfood
