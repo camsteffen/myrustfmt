@@ -57,9 +57,9 @@ impl<'a> CrateSource<'a> {
     }
 }
 
-pub fn format_file(path: &Path, config: Config, is_check: bool) -> bool {
+pub fn format_file(root_path: &Path, config: Config, is_check: bool) -> bool {
     rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
-        do_file(path, None, Rc::new(config), |result, source| {
+        do_file(root_path, None, Rc::new(config), |path, result, source| {
             let FormatModuleResult {
                 formatted,
                 exceeded_max_width,
@@ -69,8 +69,10 @@ pub fn format_file(path: &Path, config: Config, is_check: bool) -> bool {
             }
             if is_check {
                 check_file(path, source, &formatted)
-            } else {
+            } else if formatted != source {
                 fs::write(path, formatted).unwrap();
+                true
+            } else {
                 true
             }
         })
@@ -82,7 +84,8 @@ fn do_file(
     path: &Path,
     relative: Option<Ident>,
     config: Rc<Config>,
-    reacter: impl Fn(FormatModuleResult, &str) -> bool + Copy,
+    // todo rename
+    reacter: impl Fn(&Path, FormatModuleResult, &str) -> bool + Copy,
 ) -> bool {
     match do_one(path, relative, Rc::clone(&config), reacter) {
         Err(()) => false,
@@ -103,7 +106,7 @@ fn do_one(
     path: &Path,
     relative: Option<Ident>,
     config: Rc<Config>,
-    reacter: impl Fn(FormatModuleResult, &str) -> bool + Copy,
+    reacter: impl Fn(&Path, FormatModuleResult, &str) -> bool + Copy,
 ) -> Result<Vec<Submodule>, ()> {
     let result = parse_module(CrateSource::File(path), relative);
     let result = match result {
@@ -122,7 +125,7 @@ fn do_one(
         config,
     );
     let result = ast_formatter.module(&module);
-    if !reacter(result, &source) {
+    if !reacter(path, result, &source) {
         return Err(());
     }
     Ok(submodules)
