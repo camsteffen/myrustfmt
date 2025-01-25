@@ -1,8 +1,8 @@
+use crate::ast_module::AstModule;
 use crate::config::Config;
 use crate::constraints::Constraints;
 use crate::error_emitter::ErrorEmitter;
 use crate::source_formatter::SourceFormatter;
-use rustc_ast::ast;
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -26,18 +26,18 @@ mod ty;
 mod util;
 
 pub struct AstFormatter {
-    config: Config,
+    config: Rc<Config>,
     error_emitter: Rc<ErrorEmitter>,
     out: SourceFormatter,
 }
 
-pub struct FormatCrateResult {
-    pub source: String,
+// todo rename?
+pub struct FormatModuleResult {
     pub formatted: String,
     pub exceeded_max_width: bool,
 }
 
-impl FormatCrateResult {
+impl FormatModuleResult {
     pub fn expect_not_exceeded_max_width(&self) {
         if self.exceeded_max_width {
             panic!("Exceeded max width");
@@ -46,7 +46,7 @@ impl FormatCrateResult {
 }
 
 impl AstFormatter {
-    pub fn new(source: String, path: Option<PathBuf>, config: Config) -> Self {
+    pub fn new(source: Rc<String>, path: Option<PathBuf>, config: Rc<Config>) -> Self {
         let constraints = Constraints::new(config.max_width);
         let error_emitter = Rc::new(ErrorEmitter::new(path));
         let out = SourceFormatter::new(source, constraints, Rc::clone(&error_emitter));
@@ -57,9 +57,9 @@ impl AstFormatter {
         }
     }
 
-    pub fn crate_(self, crate_: &ast::Crate) -> FormatCrateResult {
-        let result = self.with_attrs(&crate_.attrs, crate_.spans.inner_span, || {
-            for item in &crate_.items {
+    pub fn module(self, module: &AstModule) -> FormatModuleResult {
+        let result = self.with_attrs(&module.attrs, module.spans.inner_span, || {
+            for item in &module.items {
                 self.item(item)?;
                 self.out.newline_between_indent()?;
             }

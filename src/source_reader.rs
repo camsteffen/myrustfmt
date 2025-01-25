@@ -1,14 +1,15 @@
 use crate::error::{ParseError, ParseErrorKind, ParseResult};
 use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
+use std::rc::Rc;
 
 pub struct SourceReader {
-    pub source: String,
+    pub source: Rc<String>,
     pub pos: Cell<BytePos>,
 }
 
 impl SourceReader {
-    pub fn new(source: String) -> SourceReader {
+    pub fn new(source: Rc<String>) -> SourceReader {
         SourceReader {
             source,
             pos: Cell::new(BytePos(0)),

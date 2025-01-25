@@ -5,11 +5,8 @@ extern crate rustc_span;
 use getopts::Options;
 use myrustfmt::config::Config;
 use myrustfmt::format_file;
-use rustc_span::ErrorGuaranteed;
-use std::io::Write;
-use std::path::Path;
-use std::process::{Command, ExitCode, Stdio};
-use std::{env, fs};
+use std::env;
+use std::process::ExitCode;
 
 fn main() -> ExitCode {
     let args = Vec::from_iter(env::args());
@@ -25,43 +22,11 @@ fn main() -> ExitCode {
     }
     let is_check = options_matches.opt_present("check");
     for path in &options_matches.free {
-        let format_result = format_file(Path::new(path), Config::default());
-        let format_result = match format_result {
-            Ok(formatted) => formatted,
-            Err(ErrorGuaranteed { .. }) => return ExitCode::FAILURE,
-        };
-        if is_check {
-            if !check_file(&path, &format_result.source, &format_result.formatted) {
-                return ExitCode::FAILURE;
-            }
-        } else {
-            fs::write(path, format_result.formatted).unwrap();
-        }
-        if format_result.exceeded_max_width {
+        if !format_file(path.as_ref(), Config::default(), is_check) {
             return ExitCode::FAILURE;
         }
     }
     ExitCode::SUCCESS
-}
-
-fn check_file(path: &str, contents: &str, formatted: &str) -> bool {
-    if contents == formatted {
-        return true;
-    }
-    eprintln!("Mismatch for {path}");
-    let mut child = Command::new("diff")
-        .arg("--color")
-        .arg(&path)
-        .arg("-")
-        .stdin(Stdio::piped())
-        .spawn()
-        .unwrap();
-    {
-        let mut stdin = child.stdin.take().unwrap();
-        stdin.write_all(formatted.as_bytes()).unwrap();
-    }
-    child.wait().unwrap();
-    false
 }
 
 fn build_options() -> Options {

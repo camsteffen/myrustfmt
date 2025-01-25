@@ -1,6 +1,6 @@
-use crate::ast_formatter::FormatCrateResult;
+use crate::ast_formatter::FormatModuleResult;
 use crate::constraint_writer::{
-    ConstraintWriter, ConstraintWriterResult, ConstraintWriterSnapshot,
+    ConstraintWriter, ConstraintWriterSnapshot,
 };
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
@@ -28,7 +28,7 @@ pub struct SourceFormatter {
 
 impl SourceFormatter {
     pub fn new(
-        source: String,
+        source: Rc<String>,
         constraints: Constraints,
         error_emitter: Rc<ErrorEmitter>,
     ) -> SourceFormatter {
@@ -41,23 +41,14 @@ impl SourceFormatter {
 
     pub fn new_defaults(source: impl Into<String>) -> SourceFormatter {
         Self::new(
-            source.into(),
+            Rc::new(source.into()),
             Constraints::default(),
             Rc::new(ErrorEmitter::new(None)),
         )
     }
 
-    pub fn finish(self) -> FormatCrateResult {
-        // todo rename these structs
-        let ConstraintWriterResult {
-            formatted,
-            exceeded_max_width,
-        } = self.out.finish();
-        FormatCrateResult {
-            source: self.source.source,
-            formatted,
-            exceeded_max_width,
-        }
+    pub fn finish(self) -> FormatModuleResult {
+        self.out.finish()
     }
 
     pub fn constraints(&self) -> &Constraints {
@@ -313,7 +304,7 @@ mod tests {
         let sf = SourceFormatter::new_defaults(" \naa");
         sf.token("aa").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa");
+        assert_eq!(sf.finish().formatted, "aa");
     }
 
     #[test]
@@ -323,7 +314,7 @@ mod tests {
         sf.newline_within_indent().unwrap();
         sf.token("aa").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa\naa");
+        assert_eq!(sf.finish().formatted, "aa\naa");
     }
 
     #[test]
@@ -334,7 +325,7 @@ mod tests {
         sf.newline_within_indent().unwrap();
         sf.token("aa").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa\n\n    aa");
+        assert_eq!(sf.finish().formatted, "aa\n\n    aa");
     }
 
     #[test]
@@ -344,7 +335,7 @@ mod tests {
         sf.space().unwrap();
         sf.token("bb").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa bb");
+        assert_eq!(sf.finish().formatted, "aa bb");
     }
 
     #[test]
@@ -355,7 +346,7 @@ mod tests {
         sf.space().unwrap();
         sf.token("bb").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa, bb");
+        assert_eq!(sf.finish().formatted, "aa, bb");
     }
 
     #[test]
@@ -365,7 +356,7 @@ mod tests {
         sf.space().unwrap();
         sf.token("bb").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa/*comment*/bb");
+        assert_eq!(sf.finish().formatted, "aa/*comment*/bb");
     }
 
     #[test]
@@ -375,7 +366,7 @@ mod tests {
         sf.space().unwrap();
         sf.token("bb").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa /*comment*/bb");
+        assert_eq!(sf.finish().formatted, "aa /*comment*/bb");
     }
 
     #[test]
@@ -385,7 +376,7 @@ mod tests {
         sf.space().unwrap();
         sf.token("bb").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa/*comment*/ bb");
+        assert_eq!(sf.finish().formatted, "aa/*comment*/ bb");
     }
 
     #[test]
@@ -395,7 +386,7 @@ mod tests {
         sf.space().unwrap();
         sf.token("bb").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa /*comment*/ bb");
+        assert_eq!(sf.finish().formatted, "aa /*comment*/ bb");
     }
 
     #[test]
@@ -405,7 +396,7 @@ mod tests {
         sf.space().unwrap();
         sf.token("bb").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa /*comment*/ bb");
+        assert_eq!(sf.finish().formatted, "aa /*comment*/ bb");
     }
 
     #[test]
@@ -414,7 +405,7 @@ mod tests {
         sf.token("(").unwrap();
         sf.token("aa").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish(), "( /*comment*/ aa");
+        assert_eq!(sf.finish().formatted, "( /*comment*/ aa");
     }
 
     #[test]
@@ -423,6 +414,6 @@ mod tests {
         sf.token("(").unwrap();
         sf.token("aa").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish(), "(aa");
+        assert_eq!(sf.finish().formatted, "(aa");
     }
 }

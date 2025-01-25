@@ -4,6 +4,7 @@ use crate::error_emitter::ErrorEmitter;
 use crate::util::option::merge_options;
 use std::cell::Cell;
 use std::rc::Rc;
+use crate::ast_formatter::FormatModuleResult;
 
 pub struct ConstraintWriter {
     constraints: Constraints,
@@ -41,8 +42,8 @@ impl ConstraintWriter {
         }
     }
 
-    pub fn finish(self) -> ConstraintWriterResult {
-        ConstraintWriterResult {
+    pub fn finish(self) -> FormatModuleResult {
+        FormatModuleResult {
             formatted: self.buffer.into_inner(),
             exceeded_max_width: self.exceeded_max_width.get(),
         }
