@@ -186,20 +186,17 @@ impl AstFormatter {
             false
         };
         if impl_.of_trait.is_some() {
-            let for_ty = || -> FormatResult {
-                self.out.token_space("for")?;
-                self.ty(&impl_.self_ty)?;
-                Ok(())
-            };
             self.fallback(|| {
                 self.out.space()?;
-                for_ty()?;
+                self.out.token_space("for")?;
+                self.ty(&impl_.self_ty)?;
                 Ok(())
             })
             .otherwise(|| {
                 self.indented_optional(!indented, || {
                     self.out.newline_within_indent()?;
-                    for_ty()?;
+                    self.out.token_space("for")?;
+                    self.ty(&impl_.self_ty)?;
                     Ok(())
                 })
             })?;

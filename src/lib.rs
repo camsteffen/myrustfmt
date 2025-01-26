@@ -15,30 +15,32 @@ extern crate rustc_span;
 extern crate thin_vec;
 
 pub mod ast_formatter;
+mod ast_module;
 mod ast_utils;
 pub mod config;
 pub mod constraint_writer;
 mod constraints;
 mod error;
 mod error_emitter;
-mod submodules;
 mod parse;
 mod rustfmt_config_defaults;
 pub mod source_formatter;
 mod source_reader;
+mod submodules;
 mod util;
-mod ast_module;
 
 use crate::ast_formatter::{AstFormatter, FormatModuleResult};
 use crate::config::Config;
-use crate::submodules::Submodule;
 use crate::parse::{ParseModuleResult, parse_module};
+use crate::submodules::Submodule;
 use rustc_span::ErrorGuaranteed;
 use rustc_span::edition::Edition;
 use rustc_span::symbol::Ident;
+use std::collections::VecDeque;
 use std::fs;
 use std::io::Write;
-use std::path::Path;
+use std::ops::ControlFlow;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::rc::Rc;
 
@@ -57,78 +59,98 @@ impl<'a> CrateSource<'a> {
     }
 }
 
-pub fn format_file(root_path: &Path, config: Config, is_check: bool) -> bool {
-    rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
-        do_file(root_path, None, Rc::new(config), |path, result, source| {
-            let FormatModuleResult {
-                formatted,
-                exceeded_max_width,
-            } = result;
-            if exceeded_max_width {
-                return false;
-            }
-            if is_check {
-                check_file(path, source, &formatted)
-            } else if formatted != source {
-                fs::write(path, formatted).unwrap();
-                true
-            } else {
-                true
-            }
-        })
-    })
+struct OnFormatModule {
+    is_check: bool,
 }
 
-// todo bool really?
-fn do_file(
-    path: &Path,
-    relative: Option<Ident>,
-    config: Rc<Config>,
-    // todo rename
-    reacter: impl Fn(&Path, FormatModuleResult, &str) -> bool + Copy,
-) -> bool {
-    match do_one(path, relative, Rc::clone(&config), reacter) {
-        Err(()) => false,
-        Ok(submodules) => {
-            submodules.into_iter().all(|submodule| {
-                do_file(
-                    &submodule.path,
-                    submodule.relative,
-                    Rc::clone(&config),
-                    reacter,
-                )
-            })
-        },
+impl OnFormatModule {
+    fn on_format_module(
+        &self,
+        path: &Path,
+        result: FormatModuleResult,
+        source: &str,
+    ) -> ControlFlow<()> {
+        let FormatModuleResult {
+            formatted,
+            exceeded_max_width,
+        } = result;
+        if exceeded_max_width {
+            ControlFlow::Break(())
+        } else if self.is_check {
+            Self::check_file(path, source, &formatted)
+        } else if formatted != source {
+            fs::write(path, formatted).unwrap();
+            ControlFlow::Continue(())
+        } else {
+            ControlFlow::Continue(())
+        }
+    }
+
+    fn check_file(path: &Path, contents: &str, formatted: &str) -> ControlFlow<()> {
+        if contents == formatted {
+            return ControlFlow::Continue(());
+        }
+        eprintln!("Mismatch for {}", path.display());
+        let mut child = Command::new("diff")
+            .arg("--color")
+            .arg(path)
+            .arg("-")
+            .stdin(Stdio::piped())
+            .spawn()
+            .unwrap();
+        {
+            let mut stdin = child.stdin.take().unwrap();
+            stdin.write_all(formatted.as_bytes()).unwrap();
+        }
+        child.wait().unwrap();
+        ControlFlow::Break(())
     }
 }
 
-fn do_one(
+pub fn format_module_file_roots(
+    paths: Vec<String>,
+    config: Config,
+    is_check: bool,
+) -> Result<(), ()> {
+    rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
+        let config = Rc::new(config);
+        let mut queue = VecDeque::<(PathBuf, Option<Ident>)>::from_iter(
+            paths.into_iter().map(|path| (path.into(), None)),
+        );
+        let on_format_module = OnFormatModule { is_check };
+        while let Some((path, relative)) = queue.pop_front() {
+            let submodules =
+                format_module_file(&path, relative, Rc::clone(&config), &on_format_module)?;
+            queue.extend(
+                submodules
+                    .into_iter()
+                    .map(|submod| (submod.path, submod.relative)),
+            );
+        }
+        Ok(())
+    })
+}
+
+fn format_module_file(
     path: &Path,
     relative: Option<Ident>,
     config: Rc<Config>,
-    reacter: impl Fn(&Path, FormatModuleResult, &str) -> bool + Copy,
+    on_format_module: &OnFormatModule,
 ) -> Result<Vec<Submodule>, ()> {
-    let result = parse_module(CrateSource::File(path), relative);
-    let result = match result {
-        Ok(result) => result,
-        Err(ErrorGuaranteed { .. }) => return Err(()),
-    };
+    let result =
+        parse_module(CrateSource::File(path), relative).map_err(|ErrorGuaranteed { .. }| ())?;
     let ParseModuleResult {
         module,
         source,
         submodules,
     } = result;
     let source = Rc::new(source);
-    let ast_formatter = AstFormatter::new(
-        Rc::clone(&source),
-        Some(path.to_path_buf()),
-        config,
-    );
+    let ast_formatter = AstFormatter::new(Rc::clone(&source), Some(path.to_path_buf()), config);
     let result = ast_formatter.module(&module);
-    if !reacter(path, result, &source) {
-        return Err(());
+    match on_format_module.on_format_module(path, result, &source) {
+        ControlFlow::Continue(()) => Ok(submodules),
+        ControlFlow::Break(()) => Err(()),
     }
-    Ok(submodules)
 }
 
 pub fn format_str_defaults(source: &str) -> Result<FormatModuleResult, ErrorGuaranteed> {
@@ -152,24 +174,4 @@ pub fn format_str_config(
         let ast_formatter = AstFormatter::new(Rc::new(source), None, Rc::new(config));
         Ok(ast_formatter.module(&module))
     })
-}
-
-fn check_file(path: &Path, contents: &str, formatted: &str) -> bool {
-    if contents == formatted {
-        return true;
-    }
-    eprintln!("Mismatch for {}", path.display());
-    let mut child = Command::new("diff")
-        .arg("--color")
-        .arg(path)
-        .arg("-")
-        .stdin(Stdio::piped())
-        .spawn()
-        .unwrap();
-    {
-        let mut stdin = child.stdin.take().unwrap();
-        stdin.write_all(formatted.as_bytes()).unwrap();
-    }
-    child.wait().unwrap();
-    false
 }

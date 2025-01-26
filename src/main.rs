@@ -4,7 +4,7 @@ extern crate rustc_span;
 
 use getopts::Options;
 use myrustfmt::config::Config;
-use myrustfmt::format_file;
+use myrustfmt::format_module_file_roots;
 use std::env;
 use std::process::ExitCode;
 
@@ -21,12 +21,12 @@ fn main() -> ExitCode {
         eprintln!("WARNING: Ignoring --edition option");
     }
     let is_check = options_matches.opt_present("check");
-    for path in &options_matches.free {
-        if !format_file(path.as_ref(), Config::default(), is_check) {
-            return ExitCode::FAILURE;
-        }
+    // todo dedupe files and their submodules (two files can have a shared submodule, like in tests/)
+    let paths = options_matches.free;
+    match format_module_file_roots(paths, Config::default(), is_check) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(()) => ExitCode::FAILURE,
     }
-    ExitCode::SUCCESS
 }
 
 fn build_options() -> Options {
