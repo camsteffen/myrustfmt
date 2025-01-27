@@ -18,11 +18,10 @@ impl AstFormatter {
         self.expr(first)?;
         self.fallback(|| {
             self.with_single_line(|| {
-                chain.iter().try_for_each(|(op, expr)| -> FormatResult {
+                for (op, expr) in &chain {
                     self.out.space_token_space(op.as_str())?;
                     self.expr(expr)?;
-                    Ok(())
-                })?;
+                }
                 self.tail(tail)?;
                 Ok(())
             })
@@ -58,11 +57,9 @@ impl AstFormatter {
                 ast::ExprKind::Binary(op, ref left, ref right)
                     if AssocOp::from_ast_binop(op.node).precedence() == precedence =>
                 {
-                    {
-                        operators.push(op.node);
-                        current = left;
-                        stack.push(right);
-                    }
+                    operators.push(op.node);
+                    current = left;
+                    stack.push(right);
                 }
                 _ => {
                     if first.is_none() {
