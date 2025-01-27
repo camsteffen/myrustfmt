@@ -290,16 +290,9 @@ impl AstFormatter {
             self.out.space()?;
         }
         self.with_width_limit_first_line_opt(max_width, || -> FormatResult {
-            let do_rest = || -> FormatResult {
-                self.out.token("..")?;
-                if let ListRest::Base(expr) = rest {
-                    self.expr(expr)?;
-                }
-                Ok(())
-            };
             let Some((last, until_last)) = list.split_last() else {
                 if !matches!(rest, ListRest::None) {
-                    do_rest()?;
+                    self.list_rest(rest)?;
                 }
                 return Ok(());
             };
@@ -325,7 +318,7 @@ impl AstFormatter {
                     trailing_comma()?;
                     if !matches!(rest, ListRest::None) {
                         self.out.space()?;
-                        do_rest()?;
+                        self.list_rest(rest)?;
                     }
                     Ok(())
                 })
@@ -450,15 +443,20 @@ impl AstFormatter {
                         item_comma(item)?;
                         self.out.newline_within_indent()?;
                     }
-                    self.out.token("..")?;
-                    if let ListRest::Base(expr) = rest {
-                        self.expr(expr)?;
-                    }
+                    self.list_rest(rest)?;
                 }
             }
             Ok(())
         })?;
         self.tail(tail)?;
+        Ok(())
+    }
+    
+    fn list_rest(&self, rest: ListRest<'_>) -> FormatResult {
+        self.out.token("..")?;
+        if let ListRest::Base(expr) = rest {
+            self.expr(expr)?;
+        }
         Ok(())
     }
 }
