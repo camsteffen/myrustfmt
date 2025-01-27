@@ -40,7 +40,7 @@ impl AstFormatter {
             ast::TyKind::BareFn(bare_fn_ty) => self.bare_fn_ty(bare_fn_ty)?,
             ast::TyKind::Never => todo!(),
             ast::TyKind::Tup(elements) => list(Braces::PARENS, elements, |ty| self.ty(ty))
-                .config(&TupleListConfig {
+                .config(TupleListConfig {
                     len: elements.len(),
                     single_line_max_contents_width: None,
                 })

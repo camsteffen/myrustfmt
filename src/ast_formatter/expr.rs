@@ -24,7 +24,7 @@ impl AstFormatter {
         match expr.kind {
             ast::ExprKind::Array(ref items) => {
                 list(Braces::SQUARE, items, self.expr_list_item_fn(items))
-                    .config(&ArrayListConfig)
+                    .config(ArrayListConfig)
                     .overflow()
                     .tail(take_tail())
                     .format(self)?
@@ -34,7 +34,7 @@ impl AstFormatter {
             expr_kind::postfix!() => self.postfix_chain(expr, take_tail())?,
             ast::ExprKind::Tup(ref items) => {
                 list(Braces::PARENS, items, self.expr_list_item_fn(items))
-                    .config(&TupleListConfig {
+                    .config(TupleListConfig {
                         len: items.len(),
                         single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
                     })
@@ -289,7 +289,7 @@ impl AstFormatter {
         tail: &Tail,
     ) -> impl ListBuilderTrait {
         list(Braces::PARENS, args, self.expr_list_item_fn(args))
-            .config(&CallParamListConfig)
+            .config(CallParamListConfig)
             .omit_open_brace()
             .overflow()
             .tail(tail)
@@ -406,7 +406,7 @@ impl AstFormatter {
         self.out.space()?;
         // todo touchy margins?
         list(Braces::CURLY, &struct_.fields, |f| self.expr_field(f))
-            .config(&struct_field_list_config(
+            .config(struct_field_list_config(
                 RUSTFMT_CONFIG_DEFAULTS.struct_lit_width,
             ))
             .rest(ListRest::from(&struct_.rest))

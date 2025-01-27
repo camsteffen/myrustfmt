@@ -124,7 +124,7 @@ impl AstFormatter {
         self.out.token_space(":")?;
         let Some(expr) = &const_item.expr else {
             self.ty_tail(&const_item.ty, &Tail::token(";"))?;
-            return Ok(())
+            return Ok(());
         };
         self.ty(&const_item.ty)?;
         self.out.space_token_space("=")?;
@@ -271,8 +271,9 @@ impl AstFormatter {
         match variants {
             ast::VariantData::Struct { fields, .. } => {
                 self.out.space()?;
-                let config = struct_field_list_config(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width);
-                let list = list(Braces::CURLY, fields, |f| self.field_def(f)).config(&config);
+                let list = list(Braces::CURLY, fields, |f| self.field_def(f)).config(
+                    struct_field_list_config(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width),
+                );
                 if is_enum {
                     list.format(self)?;
                 } else {
@@ -282,7 +283,7 @@ impl AstFormatter {
             }
             ast::VariantData::Tuple(fields, _) => {
                 list(Braces::PARENS, fields, |f| self.field_def(f))
-                    .config(&ParamListConfig {
+                    .config(ParamListConfig {
                         single_line_max_contents_width: None,
                     })
                     .format(self)
@@ -322,7 +323,7 @@ impl AstFormatter {
                 list(Braces::CURLY_NO_PAD, items, |(use_tree, _)| {
                     self.use_tree(use_tree)
                 })
-                .config(&UseTreeListConfig)
+                .config(UseTreeListConfig)
                 .item_config(UseTreeListItemConfig)
                 .tail(tail)
                 .format(self)?;

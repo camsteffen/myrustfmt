@@ -23,7 +23,6 @@ pub fn list<'a, 'list, Item, FormatItem>(
 ) -> ListBuilder<
     'list,
     'static,
-    'static,
     Item,
     FormatItem,
     DefaultListConfig,
@@ -39,7 +38,7 @@ where
         rest: ListRest::None,
         format_item,
         tail: &Tail::none(),
-        config: &DefaultListConfig,
+        config: DefaultListConfig,
         item_config: DefaultListItemConfig::default(),
         overflow: ListOverflowNo::default(),
         omit_open_brace: false,
@@ -49,30 +48,30 @@ where
 // Yikes, lots of generics here. This allows the compiler to optimize away unneeded features.
 // The monomorphization shouldn't be too much since there is a finite number of list cases, and the
 // builder delegates to less generic functions for the actual formatting implementation.
-pub struct ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfig, Overflow> {
+pub struct ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfig, Overflow> {
     braces: &'static Braces,
     list: &'ast [Item],
     format_item: FormatItem,
     rest: ListRest<'ast>,
     tail: &'tail Tail,
-    config: &'config Config,
+    config: Config,
     item_config: ItemConfig,
     overflow: Overflow,
     omit_open_brace: bool,
 }
 
-impl<'a, 'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfig, Overflow>
-    ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfig, Overflow>
+impl<'a, 'ast, 'tail, Item, FormatItem, Config, ItemConfig, Overflow>
+    ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfig, Overflow>
 where
     Config: ListConfig,
     ItemConfig: ListItemConfig<Item = Item>,
     FormatItem: Fn(&Item) -> FormatResult,
     Overflow: ListOverflow<Item = Item>,
 {
-    pub fn config<'config_new, ConfigNew: ListConfig>(
+    pub fn config<ConfigNew: ListConfig>(
         self,
-        config: &'config_new ConfigNew,
-    ) -> ListBuilder<'ast, 'tail, 'config_new, Item, FormatItem, ConfigNew, ItemConfig, Overflow>
+        config: ConfigNew,
+    ) -> ListBuilder<'ast, 'tail, Item, FormatItem, ConfigNew, ItemConfig, Overflow>
     {
         ListBuilder {
             braces: self.braces,
@@ -90,7 +89,7 @@ where
     pub fn item_config<ItemConfigNew: ListItemConfig<Item = Item>>(
         self,
         item_config: ItemConfigNew,
-    ) -> ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfigNew, Overflow> {
+    ) -> ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfigNew, Overflow> {
         ListBuilder {
             braces: self.braces,
             list: self.list,
@@ -109,7 +108,6 @@ where
     ) -> ListBuilder<
         'ast,
         'tail,
-        'config,
         Item,
         FormatItem,
         Config,
@@ -136,7 +134,7 @@ where
     pub fn tail<'tail_new>(
         self,
         tail: &'tail_new Tail,
-    ) -> ListBuilder<'ast, 'tail_new, 'config, Item, FormatItem, Config, ItemConfig, Overflow> {
+    ) -> ListBuilder<'ast, 'tail_new, Item, FormatItem, Config, ItemConfig, Overflow> {
         ListBuilder {
             braces: self.braces,
             list: self.list,
@@ -256,8 +254,8 @@ pub trait ListBuilderTrait {
     fn format_single_line(&self, af: &AstFormatter) -> FormatResult;
 }
 
-impl<'a, 'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfig, Overflow> ListBuilderTrait
-    for ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfig, Overflow>
+impl<'a, 'ast, 'tail, Item, FormatItem, Config, ItemConfig, Overflow> ListBuilderTrait
+    for ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfig, Overflow>
 where
     Config: ListConfig,
     ItemConfig: ListItemConfig<Item = Item>,

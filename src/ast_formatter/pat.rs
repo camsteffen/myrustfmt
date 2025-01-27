@@ -39,7 +39,7 @@ impl AstFormatter {
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 self.qpath(qself, path, false)?;
                 list(Braces::PARENS, fields, |pat| self.pat(pat))
-                    .config(&ParamListConfig {
+                    .config(ParamListConfig {
                         single_line_max_contents_width: None,
                     })
                     .tail(end)
@@ -50,7 +50,7 @@ impl AstFormatter {
             }
             ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false)?,
             ast::PatKind::Tuple(ref fields) => list(Braces::PARENS, fields, |pat| self.pat(pat))
-                .config(&ParamListConfig {
+                .config(ParamListConfig {
                     single_line_max_contents_width: None,
                 })
                 .tail(end)
@@ -87,7 +87,7 @@ impl AstFormatter {
         self.qpath(qself, path, false)?;
         self.out.space()?;
         list(Braces::CURLY, fields, |f| self.pat_field(f))
-            .config(&struct_field_list_config(
+            .config(struct_field_list_config(
                 RUSTFMT_CONFIG_DEFAULTS.struct_lit_width,
             ))
             .rest(ListRest::from(rest))

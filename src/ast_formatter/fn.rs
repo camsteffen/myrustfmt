@@ -3,7 +3,7 @@ use crate::ast_formatter::list::{Braces, list};
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 
-use crate::ast_formatter::list::list_config::{DefaultListConfig, ListConfig, ParamListConfig};
+use crate::ast_formatter::list::list_config::ParamListConfig;
 use crate::ast_utils::expr_kind;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
@@ -23,7 +23,7 @@ impl AstFormatter {
         self.generic_params(&generics.params)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
         let param_list = list(Braces::PARENS, &sig.decl.inputs, |param| self.param(param)).config(
-            &ParamListConfig {
+            ParamListConfig {
                 single_line_max_contents_width: None,
             },
         );
@@ -88,7 +88,7 @@ impl AstFormatter {
         if let Some(coroutine_kind) = coroutine_kind {
             self.coroutine_kind(coroutine_kind)?;
         }
-        self.fn_decl(fn_decl, Braces::PIPE, &DefaultListConfig, false)?;
+        self.fn_decl(fn_decl, Braces::PIPE, false)?;
         self.out.space()?;
         self.closure_body(body, tail)?;
         Ok(())
@@ -119,7 +119,7 @@ impl AstFormatter {
         // self.extern_(&bare_fn_ty.ext)?;
         // self.generic_params(&bare_fn_ty.generic_params)?;
         self.out.token("fn")?;
-        self.fn_decl(&bare_fn_ty.decl, Braces::PARENS, &DefaultListConfig, false)?;
+        self.fn_decl(&bare_fn_ty.decl, Braces::PARENS, false)?;
         Ok(())
     }
 
@@ -133,7 +133,7 @@ impl AstFormatter {
             ast::FnRetTy::Ty(_) => (Tail::none(), tail),
         };
         list(Braces::PARENS, &parenthesized_args.inputs, |ty| self.ty(ty))
-            .config(&ParamListConfig {
+            .config(ParamListConfig {
                 single_line_max_contents_width: None,
             })
             .tail(list_tail)
@@ -162,18 +162,16 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn fn_decl<C: ListConfig>(
+    fn fn_decl(
         &self,
         fn_decl: &ast::FnDecl,
         braces: &'static Braces,
-        input_list_config: &C,
         single_line: bool,
     ) -> FormatResult {
         // args and return type all on one line
+        let param_list = list(braces, &fn_decl.inputs, |param| self.param(param));
         let do_single_line = || {
-            list(braces, &fn_decl.inputs, |param| self.param(param))
-                .config(input_list_config)
-                .format_single_line(self)?;
+            param_list.format_single_line(self)?;
             self.with_single_line(|| self.fn_ret_ty(&fn_decl.output))?;
             Ok(())
         };
@@ -183,9 +181,7 @@ impl AstFormatter {
         self.fallback(do_single_line)
             // args on separate lines
             .otherwise(|| {
-                list(braces, &fn_decl.inputs, |param| self.param(param))
-                    .config(input_list_config)
-                    .format_separate_lines(self)?;
+                param_list.format_separate_lines(self)?;
                 self.fn_ret_ty(&fn_decl.output)?;
                 Ok(())
             })

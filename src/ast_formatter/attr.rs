@@ -73,7 +73,7 @@ impl AstFormatter {
                 ast::MetaItemInner::MetaItem(item) => self.meta_item(item),
                 ast::MetaItemInner::Lit(lit) => self.meta_item_lit(lit),
             })
-            .config(&ParamListConfig {
+            .config(ParamListConfig {
                 single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
             })
             .overflow()
