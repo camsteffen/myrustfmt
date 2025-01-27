@@ -16,6 +16,13 @@ impl SourceReader {
         }
     }
 
+    pub fn finish(self) {
+        if self.pos.get().to_usize() != self.source.len() {
+            // todo don't panic?
+            panic!("Failed to reach end of file")
+        }
+    }
+
     pub fn advance(&self, len: usize) {
         self.pos.set(self.pos.get() + BytePos::from_usize(len));
     }

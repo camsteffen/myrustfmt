@@ -15,6 +15,9 @@ impl AstFormatter {
     }
 
     pub fn pat_tail(&self, pat: &ast::Pat, end: &Tail) -> FormatResult {
+        // todo is this right?
+        self.out.skip_token_if_present("|")?;
+
         match pat.kind {
             ast::PatKind::Wild => self.out.token("_")?,
             ast::PatKind::Ident(ast::BindingMode(by_ref, mutbl), ident, ref pat) => {

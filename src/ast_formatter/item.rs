@@ -128,7 +128,7 @@ impl AstFormatter {
         };
         self.ty(&const_item.ty)?;
         self.out.space_token_space("=")?;
-        self.expr(expr)?;
+        self.expr_tail(expr, &Tail::token(";"))?;
         Ok(())
     }
 

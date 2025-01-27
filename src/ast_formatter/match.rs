@@ -18,9 +18,6 @@ impl AstFormatter {
     }
 
     fn arm_after_attrs(&self, arm: &ast::Arm) -> FormatResult {
-        // todo is this right?
-        self.out.skip_token_if_present("|")?;
-        
         let first_line = self.out.line();
         self.pat(&arm.pat)?;
         if let Some(guard) = arm.guard.as_deref() {

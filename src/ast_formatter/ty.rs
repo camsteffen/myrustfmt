@@ -38,7 +38,7 @@ impl AstFormatter {
             }
             ast::TyKind::PinnedRef(_lifetime, _mut_ty) => todo!(),
             ast::TyKind::BareFn(bare_fn_ty) => self.bare_fn_ty(bare_fn_ty)?,
-            ast::TyKind::Never => todo!(),
+            ast::TyKind::Never => self.out.token("!")?,
             ast::TyKind::Tup(elements) => list(Braces::PARENS, elements, |ty| self.ty(ty))
                 .config(TupleListConfig {
                     len: elements.len(),

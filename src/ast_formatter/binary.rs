@@ -58,9 +58,11 @@ impl AstFormatter {
                 ast::ExprKind::Binary(op, ref left, ref right)
                     if AssocOp::from_ast_binop(op.node).precedence() == precedence =>
                 {
-                    operators.push(op.node);
-                    current = left;
-                    stack.push(right);
+                    {
+                        operators.push(op.node);
+                        current = left;
+                        stack.push(right);
+                    }
                 }
                 _ => {
                     if first.is_none() {

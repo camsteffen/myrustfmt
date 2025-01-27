@@ -69,15 +69,23 @@ impl AstFormatter {
         self.path(&meta.path, false)?;
         match &meta.kind {
             ast::MetaItemKind::Word => {}
-            ast::MetaItemKind::List(items) => list(Braces::PARENS, items, |item| match item {
-                ast::MetaItemInner::MetaItem(item) => self.meta_item(item),
-                ast::MetaItemInner::Lit(lit) => self.meta_item_lit(lit),
-            })
-            .config(ParamListConfig {
-                single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
-            })
-            .overflow()
-            .format(self)?,
+            ast::MetaItemKind::List(items) => {
+                list(Braces::PARENS, items, |item| {
+                    match item {
+                        ast::MetaItemInner::MetaItem(item) => self.meta_item(item),
+                        ast::MetaItemInner::Lit(lit) => self.meta_item_lit(lit),
+                    }
+                })
+                .config(
+                    ParamListConfig {
+                        single_line_max_contents_width: Some(
+                            RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width,
+                        ),
+                    },
+                )
+                .overflow()
+                .format(self)?
+            }
             ast::MetaItemKind::NameValue(lit) => {
                 self.out.space_token_space("=")?;
                 self.meta_item_lit(lit)?;

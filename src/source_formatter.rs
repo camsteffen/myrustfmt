@@ -1,7 +1,5 @@
 use crate::ast_formatter::FormatModuleResult;
-use crate::constraint_writer::{
-    ConstraintWriter, ConstraintWriterSnapshot,
-};
+use crate::constraint_writer::{ConstraintWriter, ConstraintWriterSnapshot};
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::ErrorEmitter;
@@ -48,6 +46,7 @@ impl SourceFormatter {
     }
 
     pub fn finish(self) -> FormatModuleResult {
+        self.source.finish();
         self.out.finish()
     }
 
@@ -191,7 +190,7 @@ impl SourceFormatter {
         self.out.token(&token)?;
         Ok(())
     }
-    
+
     /// Inserts a token without expecting it from source 
     pub fn token_insert(&self, token: &str) -> FormatResult {
         self.out.token(&token)?;

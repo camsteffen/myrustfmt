@@ -59,9 +59,13 @@ impl AstFormatter {
 
     pub fn module(self, module: &AstModule) -> FormatModuleResult {
         let result = self.with_attrs(&module.attrs, module.spans.inner_span, || {
-            for item in &module.items {
-                self.item(item)?;
-                self.out.newline_between_indent()?;
+            if let [until_last @ .., last] = &module.items[..] {
+                for item in until_last {
+                    self.item(item)?;
+                    self.out.newline_between_indent()?;
+                }
+                self.item(last)?;
+                self.out.newline_below()?;
             }
             Ok(())
         });
