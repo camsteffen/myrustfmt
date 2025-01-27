@@ -1,3 +1,19 @@
+- name: single line declaration with type
+  type: no_change
+  formatted: |
+    let x: String;
+- name: declaration type breaks into multi-line
+  type: breakpoint
+  before: |
+    let aaaaa: (bbbbb,);
+  after: |
+    let aaaaa: (
+        bbbbb,
+    );
+- name: single line initialization with type
+  type: no_change
+  formatted: |
+    let x: String = foo;
 - name: initializer breaks onto next line
   type: breakpoint
   before: |

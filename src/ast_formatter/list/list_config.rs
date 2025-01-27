@@ -2,6 +2,10 @@ use crate::config::Config;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 pub trait ListConfig {
+    fn force_trailing_comma(&self) -> bool {
+        false
+    }
+    
     fn overflow_max_first_line_contents_width(&self, _config: &Config) -> Option<u32> {
         None
     }
@@ -53,6 +57,19 @@ pub struct ParamListConfig {
     pub single_line_max_contents_width: Option<u32>,
 }
 impl ListConfig for ParamListConfig {
+    fn single_line_max_contents_width(&self) -> Option<u32> {
+        self.single_line_max_contents_width
+    }
+}
+
+pub struct TupleListConfig {
+    pub len: usize,
+    pub single_line_max_contents_width: Option<u32>,
+}
+impl ListConfig for TupleListConfig {
+    fn force_trailing_comma(&self) -> bool {
+        self.len == 1
+    }
     fn single_line_max_contents_width(&self) -> Option<u32> {
         self.single_line_max_contents_width
     }

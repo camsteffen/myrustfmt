@@ -122,12 +122,13 @@ impl AstFormatter {
         self.out.token_space("const")?;
         self.ident(ident)?;
         self.out.token_space(":")?;
+        let Some(expr) = &const_item.expr else {
+            self.ty_tail(&const_item.ty, &Tail::token(";"))?;
+            return Ok(())
+        };
         self.ty(&const_item.ty)?;
-        if let Some(expr) = &const_item.expr {
-            self.out.space_token_space("=")?;
-            self.expr(expr)?;
-        }
-        self.out.token(";")?;
+        self.out.space_token_space("=")?;
+        self.expr(expr)?;
         Ok(())
     }
 

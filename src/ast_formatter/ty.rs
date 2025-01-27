@@ -1,12 +1,19 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
 use crate::ast_formatter::list::list;
-use crate::ast_formatter::list::list_config::ParamListConfig;
+use crate::ast_formatter::list::list_config::TupleListConfig;
+use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use rustc_ast::ast;
 
 impl AstFormatter {
     pub fn ty(&self, ty: &ast::Ty) -> FormatResult {
+        self.ty_tail(ty, Tail::none())
+    }
+
+    pub fn ty_tail(&self, ty: &ast::Ty, tail: &Tail) -> FormatResult {
+        let mut tail = Some(tail);
+        let mut take_tail = || tail.take().unwrap();
         match &ty.kind {
             ast::TyKind::Slice(elem) => {
                 self.out.token("[")?;
@@ -33,9 +40,11 @@ impl AstFormatter {
             ast::TyKind::BareFn(bare_fn_ty) => self.bare_fn_ty(bare_fn_ty)?,
             ast::TyKind::Never => todo!(),
             ast::TyKind::Tup(elements) => list(Braces::PARENS, elements, |ty| self.ty(ty))
-                .config(&ParamListConfig {
+                .config(&TupleListConfig {
+                    len: elements.len(),
                     single_line_max_contents_width: None,
                 })
+                .tail(take_tail())
                 .format(self)?,
             ast::TyKind::Path(qself, path) => self.qpath(qself, path, false)?,
             ast::TyKind::TraitObject(bounds, syntax) => {
@@ -65,6 +74,9 @@ impl AstFormatter {
             ast::TyKind::Pat(_ty, _pat) => todo!(),
             ast::TyKind::Dummy => todo!(),
             ast::TyKind::Err(_) => todo!(),
+        }
+        if let Some(tail) = tail {
+            self.tail(tail)?;
         }
         Ok(())
     }

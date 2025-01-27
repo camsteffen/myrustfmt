@@ -111,7 +111,6 @@ use crate::CrateSource;
     #[test]
     fn test_submodules_non_relative() {
         rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
-            dbg!(std::env::current_dir().unwrap());
             let module = parse_module(
                 CrateSource::File(Path::new("tests/submodules_tests/non_relative/main.rs")),
                 None,

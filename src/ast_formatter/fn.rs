@@ -63,7 +63,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn closure(&self, closure: &ast::Closure, end: &Tail) -> FormatResult {
+    pub fn closure(&self, closure: &ast::Closure, tail: &Tail) -> FormatResult {
         let ast::Closure {
             ref binder,
             capture_clause,
@@ -90,7 +90,7 @@ impl AstFormatter {
         }
         self.fn_decl(fn_decl, Braces::PIPE, &DefaultListConfig, false)?;
         self.out.space()?;
-        self.closure_body(body, end)?;
+        self.closure_body(body, tail)?;
         Ok(())
     }
 

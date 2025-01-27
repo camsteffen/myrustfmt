@@ -39,10 +39,10 @@ where
         rest: ListRest::None,
         format_item,
         tail: &Tail::none(),
-        omit_open_brace: false,
         config: &DefaultListConfig,
         item_config: DefaultListItemConfig::default(),
         overflow: ListOverflowNo::default(),
+        omit_open_brace: false,
     }
 }
 
@@ -55,10 +55,10 @@ pub struct ListBuilder<'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfi
     format_item: FormatItem,
     rest: ListRest<'ast>,
     tail: &'tail Tail,
-    omit_open_brace: bool,
     config: &'config Config,
     item_config: ItemConfig,
     overflow: Overflow,
+    omit_open_brace: bool,
 }
 
 impl<'a, 'ast, 'tail, 'config, Item, FormatItem, Config, ItemConfig, Overflow>
@@ -80,17 +80,10 @@ where
             format_item: self.format_item,
             rest: self.rest,
             tail: self.tail,
-            omit_open_brace: self.omit_open_brace,
             config,
             item_config: self.item_config,
             overflow: self.overflow,
-        }
-    }
-
-    pub fn omit_open_brace(self) -> Self {
-        ListBuilder {
-            omit_open_brace: true,
-            ..self
+            omit_open_brace: self.omit_open_brace,
         }
     }
 
@@ -104,10 +97,10 @@ where
             format_item: self.format_item,
             rest: self.rest,
             tail: self.tail,
-            omit_open_brace: self.omit_open_brace,
             config: self.config,
             item_config,
             overflow: self.overflow,
+            omit_open_brace: self.omit_open_brace,
         }
     }
 
@@ -129,10 +122,10 @@ where
             format_item: self.format_item,
             rest: self.rest,
             tail: self.tail,
-            omit_open_brace: self.omit_open_brace,
             config: self.config,
             item_config: self.item_config,
             overflow: ListOverflowYes::default(),
+            omit_open_brace: self.omit_open_brace,
         }
     }
 
@@ -150,10 +143,17 @@ where
             format_item: self.format_item,
             rest: self.rest,
             tail,
-            omit_open_brace: self.omit_open_brace,
             config: self.config,
             item_config: self.item_config,
             overflow: self.overflow,
+            omit_open_brace: self.omit_open_brace,
+        }
+    }
+
+    pub fn omit_open_brace(self) -> Self {
+        ListBuilder {
+            omit_open_brace: true,
+            ..self
         }
     }
 
@@ -215,6 +215,7 @@ where
             self.braces.end,
             self.tail,
             self.overflow,
+            self.config.force_trailing_comma(),
             self.braces.pad,
             self.config.single_line_max_contents_width(),
             self.config
@@ -282,6 +283,7 @@ impl AstFormatter {
         close_brace: &str,
         tail: &Tail,
         _overflow: Overflow,
+        force_trailing_comma: bool,
         pad: bool,
         max_width: Option<u32>,
         max_width_overflow: Option<u32>,
@@ -289,9 +291,18 @@ impl AstFormatter {
         if pad {
             self.out.space()?;
         }
-
-        let until_rest = || -> FormatResult {
+        self.with_width_limit_first_line_opt(max_width, || -> FormatResult {
+            let do_rest = || -> FormatResult {
+                self.out.token("..")?;
+                if let ListRest::Base(expr) = rest {
+                    self.expr(expr)?;
+                }
+                Ok(())
+            };
             let Some((last, until_last)) = list.split_last() else {
+                if !matches!(rest, ListRest::None) {
+                    do_rest()?;
+                }
                 return Ok(());
             };
             let start = self.out.last_line_len();
@@ -303,45 +314,43 @@ impl AstFormatter {
                 }
                 Ok(())
             })?;
+            let trailing_comma = || {
+                if !matches!(rest, ListRest::None) || force_trailing_comma {
+                    self.out.token(",")
+                } else {
+                    self.out.skip_token_if_present(",")
+                }
+            };
+            let last_without_overflow = || {
+                self.with_single_line(|| {
+                    format_item(last)?;
+                    trailing_comma()?;
+                    if !matches!(rest, ListRest::None) {
+                        self.out.space()?;
+                        do_rest()?;
+                    }
+                    Ok(())
+                })
+            };
             let can_overflow = matches!(rest, ListRest::None)
                 && Overflow::can_overflow(self, last, list.len() == 1);
             if can_overflow {
-                self.fallback(|| self.with_single_line(|| format_item(last)))
-                    .otherwise(|| {
-                        self.with_width_limit_from_start_first_line_opt(
-                            start,
-                            max_width_overflow,
-                            || Overflow::format_overflow(self, last),
-                        )
-                    })?;
+                self.fallback(last_without_overflow).otherwise(|| {
+                    self.with_width_limit_from_start_first_line_opt(
+                        start,
+                        max_width_overflow,
+                        || {
+                            Overflow::format_overflow(self, last)?;
+                            trailing_comma()?;
+                            Ok(())
+                        },
+                    )
+                })?;
             } else {
-                self.with_single_line(|| format_item(last))?;
+                last_without_overflow()?;
             }
             Ok(())
-        };
-
-        let format = || {
-            until_rest()?;
-            if matches!(rest, ListRest::None) {
-                if !list.is_empty() {
-                    self.out.skip_token_if_present(",")?;
-                }
-            } else {
-                self.with_single_line(|| -> FormatResult {
-                    if !list.is_empty() {
-                        self.out.token_maybe_missing(",")?;
-                        self.out.space()?;
-                    }
-                    self.out.token("..")?;
-                    if let ListRest::Base(expr) = rest {
-                        self.expr(expr)?;
-                    }
-                    Ok(())
-                })?;
-            }
-            FormatResult::Ok(())
-        };
-        self.with_width_limit_first_line_opt(max_width, format)?;
+        })?;
         if pad {
             self.out.space()?;
         }

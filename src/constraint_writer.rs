@@ -1,15 +1,16 @@
+use crate::ast_formatter::FormatModuleResult;
 use crate::constraints::Constraints;
 use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededError};
 use crate::error_emitter::ErrorEmitter;
 use crate::util::option::merge_options;
 use std::cell::Cell;
 use std::rc::Rc;
-use crate::ast_formatter::FormatModuleResult;
 
 pub struct ConstraintWriter {
     constraints: Constraints,
     buffer: Cell<String>,
     error_emitter: Rc<ErrorEmitter>,
+    /// True if max width was ever exceeded (and there was no fallback)
     exceeded_max_width: Cell<bool>,
     last_line_start: Cell<usize>,
     last_width_exceeded_line: Cell<Option<u32>>,
@@ -147,9 +148,11 @@ impl ConstraintWriter {
                 } else {
                     let line = self.line.get();
                     if self.last_width_exceeded_line.get() != Some(line) {
-                        self.last_width_exceeded_line.set(Some(line));
-                        self.error_emitter.emit_width_exceeded(line);
                         self.exceeded_max_width.set(true);
+                        self.last_width_exceeded_line.set(Some(line));
+                        self.with_last_line(|line_str| {
+                            self.error_emitter.emit_width_exceeded(line, line_str)
+                        });
                     }
                     Ok(())
                 }

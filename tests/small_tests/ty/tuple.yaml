@@ -1,0 +1,12 @@
+- name: single item tuple
+  type: no_change
+  formatted: |
+    const X: (Type,);
+- name: Breakpoint with semicolon
+  type: breakpoint
+  before: |
+    const X: (Type,);
+  after: |
+    const X: (
+        Type,
+    );

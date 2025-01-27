@@ -22,6 +22,7 @@ getopts = "0.2.21"
 #rustc_span = { path = "../../.rustup/toolchains/nightly-2024-09-10-aarch64-apple-darwin/lib/rustlib/rustc-src/rust/compiler/rustc_span" }
 
 [dev-dependencies]
+datatest-stable = "0.3.2"
 diff = "0.1.13"
 regex = "1.11.1"
 serde_yaml = "0.9.33"
@@ -34,3 +35,7 @@ tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 [features]
 intellij-hack = []
 other-feature = []
+
+[[test]]
+name = "small_tests"
+harness = false

@@ -10,12 +10,15 @@ impl ErrorEmitter {
         ErrorEmitter { path }
     }
 
-    pub fn emit_width_exceeded(&self, line: u32) {
-        let place = match &self.path {
-            None => format!("line {line}"),
-            Some(path) => format!("{}:{line}", path.display()),
-        };
-        eprintln!("Max width exceeded at {place}");
+    pub fn emit_width_exceeded(&self, line_no: u32, line: &str) {
+        eprint!("Max width exceeded at ");
+        match &self.path {
+            None => eprintln!("line {line_no}"),
+            Some(path) => eprintln!("{}:{line_no}", path.display()),
+        }
+        if cfg!(debug_assertions) {
+            eprintln!("line: {line}");
+        }
     }
 
     // todo rename

@@ -11,6 +11,7 @@ use rustc_span::symbol::Ident;
 use std::path::Path;
 use std::path::PathBuf;
 
+#[derive(Debug)]
 pub struct Submodule {
     pub path: PathBuf,
     pub relative: Option<Ident>,

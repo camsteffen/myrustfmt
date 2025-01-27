@@ -8,42 +8,22 @@ use std::fs;
 use std::io::BufReader;
 use std::path::Path;
 
-macro_rules! breakpoint_tests {
-    ($($name:ident,)*) => {
-        $(
-        #[test]
-        fn $name() {
-            breakpoint_test_file(&Path::new("tests/small_tests").join(concat!(stringify!($name), ".yaml")));
-        }
-        )*
-    };
-
+datatest_stable::harness! {
+    { test = small_test_file, root = "tests/small_tests", pattern = r".yaml" },
 }
 
-breakpoint_tests! {
-    array,
-    binop,
-    call,
-    comments,
-    index,
-    local,
-    match_,
-    paren,
-    postfix,
-    touchy_margins,
-}
-
-fn breakpoint_test_file(test_source_path: &Path) {
+fn small_test_file(test_source_path: &Path) -> datatest_stable::Result<()> {
     println!("Running breakpoint tests in {}", test_source_path.display());
     let file = fs::File::open(test_source_path).unwrap();
     let reader = BufReader::new(file);
     let tests: Vec<Test> = serde_yaml::from_reader(reader).unwrap();
     for test in &tests {
-        breakpoint_test(test)
+        small_test(test)
     }
+    Ok(())
 }
 
-fn breakpoint_test(test: &Test) {
+fn small_test(test: &Test) {
     println!("Test: {}", &test.name);
     match &test.kind {
         TestKind::Breakpoint { before, after } => stmt_breakpoint_test(before, after),

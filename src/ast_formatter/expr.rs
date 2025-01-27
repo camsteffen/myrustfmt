@@ -6,7 +6,7 @@ use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::list_config::{
-    ArrayListConfig, CallParamListConfig, ParamListConfig, struct_field_list_config,
+    ArrayListConfig, CallParamListConfig, TupleListConfig, struct_field_list_config,
 };
 use crate::ast_utils::{expr_kind, plain_block};
 use crate::util::cell_ext::CellExt;
@@ -19,36 +19,34 @@ impl AstFormatter {
     }
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
-        let mut tail_used = false;
-        let mut use_tail = || {
-            tail_used = true;
-            tail
-        };
+        let mut tail = Some(tail);
+        let mut take_tail = || tail.take().unwrap();
         match expr.kind {
             ast::ExprKind::Array(ref items) => {
                 list(Braces::SQUARE, items, self.expr_list_item_fn(items))
                     .config(&ArrayListConfig)
                     .overflow()
-                    .tail(use_tail())
+                    .tail(take_tail())
                     .format(self)?
             }
             ast::ExprKind::ConstBlock(_) => todo!(),
-            ast::ExprKind::Call(ref func, ref args) => self.call(func, args, use_tail())?,
-            expr_kind::postfix!() => self.postfix_chain(expr, use_tail())?,
+            ast::ExprKind::Call(ref func, ref args) => self.call(func, args, take_tail())?,
+            expr_kind::postfix!() => self.postfix_chain(expr, take_tail())?,
             ast::ExprKind::Tup(ref items) => {
                 list(Braces::PARENS, items, self.expr_list_item_fn(items))
-                    .config(&ParamListConfig {
+                    .config(&TupleListConfig {
+                        len: items.len(),
                         single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
                     })
-                    .tail(use_tail())
+                    .tail(take_tail())
                     .format(self)?
             }
             ast::ExprKind::Binary(op, ref left, ref right) => {
-                self.binary(left, right, op, use_tail())?
+                self.binary(left, right, op, take_tail())?
             }
             ast::ExprKind::Unary(op, ref target) => {
                 self.out.token(op.as_str())?;
-                self.expr_tail(target, use_tail())?;
+                self.expr_tail(target, take_tail())?;
             }
             ast::ExprKind::Lit(_) => self.out.copy_span(expr.span)?,
             ast::ExprKind::Cast(ref target, ref ty) => {
@@ -72,10 +70,10 @@ impl AstFormatter {
                 self.out.token_space("let")?;
                 self.pat(pat)?;
                 self.out.space_token_space("=")?;
-                self.expr_tail(init, use_tail())?;
+                self.expr_tail(init, take_tail())?;
             }
             ast::ExprKind::If(ref condition, ref block, ref else_) => {
-                self.if_(condition, block, else_.as_deref(), use_tail())?
+                self.if_(condition, block, else_.as_deref(), take_tail())?
             }
             ast::ExprKind::While(ref condition, ref block, _label) => {
                 self.while_(condition, block)?
@@ -104,7 +102,7 @@ impl AstFormatter {
                 ast::MatchKind::Postfix => todo!(),
                 ast::MatchKind::Prefix => self.match_(scrutinee, arms)?,
             },
-            ast::ExprKind::Closure(ref closure) => self.closure(closure, use_tail())?,
+            ast::ExprKind::Closure(ref closure) => self.closure(closure, take_tail())?,
             ast::ExprKind::Block(ref block, label) => {
                 self.label(label)?;
                 self.block(block)?;
@@ -114,7 +112,7 @@ impl AstFormatter {
             ast::ExprKind::Assign(ref left, ref right, _) => {
                 self.expr(left)?;
                 self.out.space_token_space("=")?;
-                self.expr_tail(right, use_tail())?;
+                self.expr_tail(right, take_tail())?;
             }
             ast::ExprKind::AssignOp(op, ref left, ref right) => {
                 self.expr(left)?;
@@ -124,13 +122,13 @@ impl AstFormatter {
                 self.expr(right)?;
             }
             ast::ExprKind::Range(ref start, ref end, limits) => {
-                self.range(start.as_deref(), end.as_deref(), limits, use_tail())?
+                self.range(start.as_deref(), end.as_deref(), limits, take_tail())?
             }
             ast::ExprKind::Underscore => todo!(),
             ast::ExprKind::Path(ref qself, ref path) => self.qpath(qself, path, true)?,
             ast::ExprKind::AddrOf(borrow_kind, mutability, ref target) => {
                 self.addr_of(borrow_kind, mutability)?;
-                self.expr_tail(target, use_tail())?;
+                self.expr_tail(target, take_tail())?;
             }
             ast::ExprKind::Break(label, ref inner) => {
                 self.out.token("break")?;
@@ -139,7 +137,7 @@ impl AstFormatter {
                 }
                 self.label(label)?;
                 if let Some(inner) = inner {
-                    self.expr_tail(inner, use_tail())?;
+                    self.expr_tail(inner, take_tail())?;
                 }
             }
             ast::ExprKind::Continue(_) => todo!(),
@@ -147,16 +145,16 @@ impl AstFormatter {
                 self.out.token("return")?;
                 if let Some(target) = target {
                     self.out.space()?;
-                    self.expr_tail(target, use_tail())?;
+                    self.expr_tail(target, take_tail())?;
                 }
             }
             ast::ExprKind::InlineAsm(_) => todo!(),
             ast::ExprKind::OffsetOf(_, _) => todo!(),
             ast::ExprKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,
-            ast::ExprKind::Struct(ref struct_) => self.struct_expr(struct_, use_tail())?,
+            ast::ExprKind::Struct(ref struct_) => self.struct_expr(struct_, take_tail())?,
             ast::ExprKind::Repeat(_, _) => todo!(),
             ast::ExprKind::Paren(ref inner) => {
-                let tail = use_tail();
+                let tail = take_tail();
                 self.out.token("(")?;
                 self.fallback(|| {
                     self.with_single_line(|| {
@@ -180,7 +178,7 @@ impl AstFormatter {
             ast::ExprKind::Err(_) => todo!(),
             ast::ExprKind::Dummy => todo!(),
         }
-        if !tail_used {
+        if let Some(tail) = tail {
             self.tail(tail)?;
         }
         Ok(())

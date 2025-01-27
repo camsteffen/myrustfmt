@@ -21,9 +21,10 @@ fn main() -> ExitCode {
         eprintln!("WARNING: Ignoring --edition option");
     }
     let is_check = options_matches.opt_present("check");
+    let is_verbose = options_matches.opt_present("verbose");
     // todo dedupe files and their submodules (two files can have a shared submodule, like in tests/)
     let paths = options_matches.free;
-    match format_module_file_roots(paths, Config::default(), is_check) {
+    match format_module_file_roots(paths, Config::default(), is_check, is_verbose) {
         Ok(()) => ExitCode::SUCCESS,
         Err(()) => ExitCode::FAILURE,
     }
@@ -86,7 +87,7 @@ fn build_options() -> Options {
     //     "[key1=val1,key2=val2...]",
     // );
 
-    // opts.optflag("v", "verbose", "Print verbose output");
+    opts.optflag("v", "verbose", "Print verbose output");
     // opts.optflag("q", "quiet", "Print less output");
     // opts.optflag("V", "version", "Show version information");
     // let help_topics = if is_nightly {

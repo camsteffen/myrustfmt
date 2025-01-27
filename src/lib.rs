@@ -61,11 +61,13 @@ impl<'a> CrateSource<'a> {
 
 struct OnFormatModule {
     is_check: bool,
+    is_verbose: bool,
+    has_errors: bool,
 }
 
 impl OnFormatModule {
     fn on_format_module(
-        &self,
+        &mut self,
         path: &Path,
         result: FormatModuleResult,
         source: &str,
@@ -75,19 +77,29 @@ impl OnFormatModule {
             exceeded_max_width,
         } = result;
         if exceeded_max_width {
-            ControlFlow::Break(())
+            self.has_errors = true;
+            ControlFlow::Continue(())
         } else if self.is_check {
-            Self::check_file(path, source, &formatted)
+            self.check_file(path, source, &formatted)
         } else if formatted != source {
             fs::write(path, formatted).unwrap();
+            if self.is_verbose {
+                eprintln!("Reformatted: {}", path.display());
+            }
             ControlFlow::Continue(())
         } else {
+            if self.is_verbose {
+                eprintln!("Already formatted: {}", path.display());
+            }
             ControlFlow::Continue(())
         }
     }
 
-    fn check_file(path: &Path, contents: &str, formatted: &str) -> ControlFlow<()> {
+    fn check_file(&self, path: &Path, contents: &str, formatted: &str) -> ControlFlow<()> {
         if contents == formatted {
+            if self.is_verbose {
+                eprintln!("Ok: {}", path.display());
+            }
             return ControlFlow::Continue(());
         }
         eprintln!("Mismatch for {}", path.display());
@@ -103,6 +115,7 @@ impl OnFormatModule {
             stdin.write_all(formatted.as_bytes()).unwrap();
         }
         child.wait().unwrap();
+        // todo continue?
         ControlFlow::Break(())
     }
 }
@@ -111,21 +124,29 @@ pub fn format_module_file_roots(
     paths: Vec<String>,
     config: Config,
     is_check: bool,
+    is_verbose: bool,
 ) -> Result<(), ()> {
     rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
         let config = Rc::new(config);
         let mut queue = VecDeque::<(PathBuf, Option<Ident>)>::from_iter(
             paths.into_iter().map(|path| (path.into(), None)),
         );
-        let on_format_module = OnFormatModule { is_check };
+        let mut on_format_module = OnFormatModule {
+            is_check,
+            is_verbose,
+            has_errors: false,
+        };
         while let Some((path, relative)) = queue.pop_front() {
             let submodules =
-                format_module_file(&path, relative, Rc::clone(&config), &on_format_module)?;
+                format_module_file(&path, relative, Rc::clone(&config), &mut on_format_module)?;
             queue.extend(
                 submodules
                     .into_iter()
                     .map(|submod| (submod.path, submod.relative)),
             );
+        }
+        if on_format_module.has_errors {
+            return Err(());
         }
         Ok(())
     })
@@ -135,10 +156,10 @@ fn format_module_file(
     path: &Path,
     relative: Option<Ident>,
     config: Rc<Config>,
-    on_format_module: &OnFormatModule,
+    on_format_module: &mut OnFormatModule,
 ) -> Result<Vec<Submodule>, ()> {
-    let result =
-        parse_module(CrateSource::File(path), relative).map_err(|ErrorGuaranteed { .. }| ())?;
+    let result = parse_module(CrateSource::File(path), relative)
+        .map_err(|ErrorGuaranteed { .. }| ())?;
     let ParseModuleResult {
         module,
         source,
