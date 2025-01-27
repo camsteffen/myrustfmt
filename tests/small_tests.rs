@@ -57,15 +57,7 @@ enum TestKind {
     /// a max width that is just one character smaller than the width required for the "before"
     /// string. The result should equal the "after" string. Also, the "before" string is formatted
     /// with exactly a large enough max width to test that it is not changed.
-    Breakpoint {
-        before: String,
-        after: String,
-    },
-    NoChange {
-        formatted: String,
-    },
-    BeforeAfter {
-        before: String,
-        after: String,
-    },
+    Breakpoint { before: String, after: String },
+    NoChange { formatted: String },
+    BeforeAfter { before: String, after: String },
 }

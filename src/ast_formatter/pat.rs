@@ -70,7 +70,7 @@ impl AstFormatter {
             ast::PatKind::Rest => self.out.token("..")?,
             ast::PatKind::Never => todo!(),
             ast::PatKind::Paren(_) => todo!(),
-            ast::PatKind::MacCall(_) => todo!(),
+            ast::PatKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,
             ast::PatKind::Err(_) => todo!(),
         }
         Ok(())

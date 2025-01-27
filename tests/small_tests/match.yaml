@@ -1,3 +1,13 @@
+- name: leading pipe
+  type: before_after
+  before: |
+    match x {
+        | () => {}
+    }
+  after: |
+    match x {
+        () => {}
+    }
 - name: remove needless block
   type: before_after
   before: |
