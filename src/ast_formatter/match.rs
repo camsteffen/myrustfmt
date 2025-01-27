@@ -72,6 +72,7 @@ impl AstFormatter {
         self.skip_single_expr_blocks(body, |body| {
             let with_add_block = || self.add_block(|| self.expr(body));
             if force_block || arm_body_requires_block(body) {
+                // todo don't add a block if it's already a block
                 with_add_block()
             } else {
                 self.fallback(|| {

@@ -56,7 +56,6 @@ pub mod expr_kind {
 
 pub fn arm_body_requires_block(expr: &ast::Expr) -> bool {
     match expr.kind {
-        // todo touchy margins
         expr_kind::postfix!(non_single_line) => false,
         // so as not to be easily confused with if guards
         ast::ExprKind::If(..) => true,
