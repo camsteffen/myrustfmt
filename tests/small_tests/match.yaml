@@ -50,10 +50,12 @@
   type: no_change
   formatted: |
     match x {
-        x => aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-            .aaaaaaaaaaaaaa({
-                let x;
-            }),
+        x => {
+            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                .aaaaaaaaaaaaaa({
+                    let x;
+                })
+        }
     }
 - name: arm body is chain on single line except final multiline method call
   type: no_change
@@ -125,4 +127,36 @@
   after: |
     match x {
         _ => x,
+    }
+- name: multi-line chain
+  type: no_change
+  formatted: |
+    match x {
+        PPPPPPPPPPPPPPPPPPPP => {
+            ccccccccccccccccccccccccccccccc
+                .cccccccccc
+                .cccccccccccccccccc
+        }
+    }
+- name: guard on separate line and plain, single-expression block
+  type: no_change
+  formatted: |
+    match x {
+        TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+            if CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC =>
+        {
+            x
+        }
+    }
+
+- name: guard on separate line and plain, multi-statement block
+  type: no_change
+  formatted: |
+    match x {
+        TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+            if CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC =>
+        {
+            let x;
+            x
+        }
     }

@@ -44,6 +44,11 @@ impl AstFormatter {
         if apply { self.with_single_line(f) } else { f() }
     }
 
+
+    pub fn with_touchy_margins<T>(&self, f: impl FnOnce() -> T) -> T {
+        self.constraints().touchy_margin.with_replaced(true, f)
+    }
+    
     /** Enforces a max number of characters until a newline is printed */
     pub fn with_width_limit_first_line<T>(&self, width_limit: u32, f: impl FnOnce() -> T) -> T {
         let line = self.out.line();

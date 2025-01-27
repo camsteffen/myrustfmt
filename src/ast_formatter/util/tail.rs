@@ -16,7 +16,6 @@ enum TailImpl {
     Token(&'static str),
     TokenInsert(&'static str),
     TokenMaybeMissing(&'static str),
-    TokenMissing(&'static str),
 }
 
 impl Tail {
@@ -34,10 +33,6 @@ impl Tail {
 
     pub const fn token_maybe_missing(token: &'static str) -> Self {
         Tail(Some(TailImpl::TokenMaybeMissing(token)))
-    }
-
-    pub const fn token_missing(token: &'static str) -> Self {
-        Tail(Some(TailImpl::TokenMissing(token)))
     }
 
     pub fn and(&self, other: &Tail) -> Tail {
@@ -79,7 +74,6 @@ impl AstFormatter {
             TailImpl::Token(token) => self.out.token(token)?,
             TailImpl::TokenInsert(token) => self.out.token_insert(token)?,
             TailImpl::TokenMaybeMissing(token) => self.out.token_maybe_missing(token)?,
-            TailImpl::TokenMissing(token) => self.out.token_missing(token)?,
         }
         Ok(())
     }

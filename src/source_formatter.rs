@@ -79,6 +79,7 @@ impl SourceFormatter {
             .set(next_is_whitespace_or_comments);
     }
 
+    // todo make sure any math using two values of this are guaranteed to be on the same line
     pub fn last_line_len(&self) -> usize {
         self.out.last_line_len()
     }
@@ -191,7 +192,7 @@ impl SourceFormatter {
         Ok(())
     }
 
-    /// Inserts a token without expecting it from source 
+    /// Inserts a token without consuming it from source 
     pub fn token_insert(&self, token: &str) -> FormatResult {
         self.out.token(&token)?;
         Ok(())
@@ -233,7 +234,7 @@ impl SourceFormatter {
         if self.source.remaining().starts_with(token) {
             self.token_unchecked(token)
         } else {
-            self.token_missing(token)
+            self.token_insert(token)
         }
     }
 
@@ -290,12 +291,6 @@ impl SourceFormatter {
         self.out.token(&token)?;
         self.source.advance(token.len());
         self.next_is_whitespace_or_comments.set(true);
-        Ok(())
-    }
-
-    /** Write a token assuming it is missing from source */
-    pub fn token_missing(&self, token: &str) -> FormatResult {
-        self.out.token(&token)?;
         Ok(())
     }
 }

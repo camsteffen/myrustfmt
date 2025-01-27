@@ -2,6 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use rustc_ast::ast;
+use crate::ast_utils::expr_kind;
 
 impl AstFormatter {
     pub fn block(&self, block: &ast::Block) -> FormatResult {
@@ -46,14 +47,14 @@ impl AstFormatter {
         match &stmt.kind {
             ast::StmtKind::Let(local) => self.local(local),
             ast::StmtKind::Item(item) => self.item(item),
-            ast::StmtKind::Expr(expr) => self.expr_tail(
-                expr,
-                if stmt_expr_add_semi(expr) {
-                    const { &Tail::token_missing(";") }
+            ast::StmtKind::Expr(expr) => {
+                let tail = if matches!(expr.kind, expr_kind::control_flow!()) {
+                    &Tail::token_insert(";")
                 } else {
                     Tail::none()
-                },
-            ),
+                };
+                self.expr_tail(expr, tail)
+            }
             ast::StmtKind::Semi(expr) => self.expr_tail(expr, &Tail::token(";")),
             ast::StmtKind::Empty => self.out.token(";"),
             ast::StmtKind::MacCall(mac_call_stmt) => {
@@ -71,12 +72,5 @@ impl AstFormatter {
                 })
             }
         }
-    }
-}
-
-fn stmt_expr_add_semi(expr: &ast::Expr) -> bool {
-    match expr.kind {
-        ast::ExprKind::Break(..) | ast::ExprKind::Continue(_) | ast::ExprKind::Ret(_) => true,
-        _ => false,
     }
 }

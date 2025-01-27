@@ -3,7 +3,7 @@ use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::list::ListBuilderTrait;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::expr_kind;
-use crate::error::{ConstraintError, FormatResult};
+use crate::error::FormatResult;
 use crate::error::{FormatError, WidthLimitExceededError};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
@@ -20,34 +20,51 @@ enum PostfixChainItem<'a> {
 
 impl AstFormatter {
     pub fn postfix_chain(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
+        self.with_single_line_opt(false, || self.do_postfix_chain(expr, tail))
+    }
+
+    pub fn do_postfix_chain(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
         let (root, chain) = build_postfix_chain(expr);
+
         let first_line = self.out.line();
         let start_pos = self.out.last_line_len();
-        self.expr(root)?;
-        let chain = self.chain_unbreakables(&chain)?;
-        if chain.is_empty() {
+        let indent_margin = self.out.constraints().indent.get() + INDENT_WIDTH;
+
+        // simple case - just a root expression with some unbreakables
+        if chain.iter().all(|item| is_unbreakable(item)) {
+            self.expr(root)?;
+            self.postfix_chain_items(&chain)?;
             self.tail(tail)?;
             return Ok(());
         }
-        let indent_margin = self.out.constraints().indent.get() + INDENT_WIDTH;
-        let mut chain_remaining = chain;
+
+        // touchy margins - everything must be a single line (with overflow)
+        if self.out.constraints().touchy_margin.get() {
+            self.with_single_line(|| self.expr(root))?;
+            self.postfix_chain_single_line(&chain, start_pos, tail)?;
+            return Ok(());
+        }
+
+        self.expr(root)?;
+        let mut chain_remaining = self.chain_unbreakables(&chain)?;
+
+        // don't wrap items as long as they start close to the margin
         while self.out.line() == first_line && self.out.last_line_len() <= indent_margin {
             chain_remaining = self.chain_item_and_unbreakables(chain_remaining)?;
             if chain_remaining.is_empty() {
                 return self.tail(tail);
             }
         }
+
         if self.out.line() != first_line {
-            if self.out.constraints().touchy_margin.get() {
-                return Err(ConstraintError::Logical.into());
-            }
             // each item on a separate line, no indent
-            return self.postfix_chain_separate_lines(chain_remaining, tail);
+            self.postfix_chain_separate_lines(chain_remaining, tail)
+        } else {
+            self.fallback(|| self.postfix_chain_single_line(chain_remaining, start_pos, tail))
+                .otherwise(|| {
+                    self.indented(|| self.postfix_chain_separate_lines(chain_remaining, tail))
+                })
         }
-        self.fallback(|| self.postfix_chain_single_line(chain_remaining, start_pos, tail))
-            .otherwise(|| {
-                self.indented(|| self.postfix_chain_separate_lines(chain_remaining, tail))
-            })
     }
 
     fn postfix_chain_single_line(
@@ -90,6 +107,7 @@ impl AstFormatter {
         });
         if result.is_ok() {
             // ...if so, go to the separate lines approach
+            // todo is this over-complicated?
             return Err(WidthLimitExceededError.into());
         }
         self.out.restore(&snapshot);

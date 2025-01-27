@@ -105,7 +105,7 @@ impl AstFormatter {
                 // add a block unless it fits on a single line
                 self.fallback(|| self.with_single_line(|| self.expr_tail(body, tail)))
                     .otherwise(|| {
-                        self.add_block(|| self.expr(body))?;
+                        self.expr_add_block(body)?;
                         self.tail(tail)?;
                         Ok(())
                     })

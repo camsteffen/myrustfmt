@@ -15,6 +15,7 @@
   This formatter always puts all fields on separate lines if the struct does not fit on one line.
 * Large expressions in an index operator are broken into a separate line
 * Large expressions in parentheses are broken into a separate line
+* A match arm with a guard on a separate line may have its body on one line without a block
 
 Chains
 * Chains may include index operators

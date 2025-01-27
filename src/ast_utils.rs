@@ -1,7 +1,10 @@
+use crate::ast_utils::expr_kind::receiver_from_postfix_expr;
 use rustc_ast::ast;
 use rustc_span::{Symbol, sym};
 
 pub mod expr_kind {
+    use rustc_ast::ast;
+
     #[macro_export]
     macro_rules! block_like {
         () => {
@@ -14,89 +17,66 @@ pub mod expr_kind {
     pub use block_like;
 
     #[macro_export]
+    macro_rules! control_flow {
+        () => {
+            ::rustc_ast::ast::ExprKind::Become(..)
+                | ::rustc_ast::ast::ExprKind::Break(..)
+                | ::rustc_ast::ast::ExprKind::Continue(..)
+                | ::rustc_ast::ast::ExprKind::Ret(..)
+                | ::rustc_ast::ast::ExprKind::Yeet(..)
+                | ::rustc_ast::ast::ExprKind::Yield(..)
+        };
+        (Some($target:pat)) => {
+            ::rustc_ast::ast::ExprKind::Become($target)
+                | ::rustc_ast::ast::ExprKind::Break(_, Some($target))
+                | ::rustc_ast::ast::ExprKind::Ret(Some($target))
+                | ::rustc_ast::ast::ExprKind::Yeet(Some($target))
+                | ::rustc_ast::ast::ExprKind::Yield(Some($target))
+        };
+    }
+    pub use control_flow;
+
+    #[macro_export]
     macro_rules! postfix {
         () => {
-            $crate::ast_utils::expr_kind::postfix!(single_line)
-                | $crate::ast_utils::expr_kind::postfix!(non_single_line)
-        };
-        (single_line) => {
-            ::rustc_ast::ast::ExprKind::Await(..) | ::rustc_ast::ast::ExprKind::Try(_)
-        };
-        (non_single_line) => {
-            ::rustc_ast::ast::ExprKind::Field(..)
+            ::rustc_ast::ast::ExprKind::Await(..)
+                | ::rustc_ast::ast::ExprKind::Field(..)
                 | ::rustc_ast::ast::ExprKind::Index(..)
-                | ::rustc_ast::ast::ExprKind::MethodCall(_)
+                | ::rustc_ast::ast::ExprKind::MethodCall(..)
+                | ::rustc_ast::ast::ExprKind::Try(..)
         };
     }
     pub use postfix;
 
-    /// adds to one inner expression and may be formatted on one line
-    #[macro_export]
-    macro_rules! unary_like {
-        ($target:pat) => {
-            // around
-            | ::rustc_ast::ast::ExprKind::Paren($target)
-            // prefix
-            | ::rustc_ast::ast::ExprKind::AddrOf(_, _, $target)
-            | ::rustc_ast::ast::ExprKind::Unary(_, $target)
-            // suffix
-            | ::rustc_ast::ast::ExprKind::Await($target, _)
-            | ::rustc_ast::ast::ExprKind::Cast($target, _)
-            | ::rustc_ast::ast::ExprKind::Try($target)
-            // control flow
-            | ::rustc_ast::ast::ExprKind::Become($target)
-            | ::rustc_ast::ast::ExprKind::Break(_, Some($target))
-            | ::rustc_ast::ast::ExprKind::Ret(Some($target))
-            | ::rustc_ast::ast::ExprKind::Yeet(Some($target))
-            | ::rustc_ast::ast::ExprKind::Yield(Some($target))
-        };
+    pub fn receiver_from_postfix_expr(postfix_expr: &ast::Expr) -> &ast::Expr {
+        match &postfix_expr.kind {
+            ::rustc_ast::ast::ExprKind::Await(receiver, _)
+            | ::rustc_ast::ast::ExprKind::Field(receiver, _)
+            | ::rustc_ast::ast::ExprKind::Index(receiver, _, _)
+            | ::rustc_ast::ast::ExprKind::Try(receiver) => receiver,
+            ::rustc_ast::ast::ExprKind::MethodCall(method_call) => &method_call.receiver,
+            _ => panic!("Called postfix_receiver with non-postfix expression"),
+        }
     }
-    pub use unary_like;
 }
 
+/// Returns true if the given arm body expression requires to be wrapped in a block.
+/// For false cases, we may still decide to add a block for more dynamic reasons.
 pub fn arm_body_requires_block(expr: &ast::Expr) -> bool {
-    match expr.kind {
-        expr_kind::postfix!(non_single_line) => false,
-        // so as not to be easily confused with if guards
-        ast::ExprKind::If(..) => true,
-        // todo for loops and while loops should not require a block IFF the header fits on one line
-        //   same with closures
-        //   same for struct?
-        //   same for match?
-        ast::ExprKind::ForLoop { .. } | ast::ExprKind::While(..) => true,
-        expr_kind::block_like!()
-        // todo require single line?
-        | ast::ExprKind::Binary(..)
-        | ast::ExprKind::Lit(..)
-        | ast::ExprKind::Type(..)
-        | ast::ExprKind::Let(..)
-        // todo require single line?
-        | ast::ExprKind::Assign(..)
-        | ast::ExprKind::AssignOp(..)
-        | ast::ExprKind::Range(..)
-        | ast::ExprKind::Call(..)
-        | ast::ExprKind::Repeat(..)
-        | ast::ExprKind::Underscore
-        | ast::ExprKind::Path(..)
-        | ast::ExprKind::InlineAsm(..)
-        | ast::ExprKind::OffsetOf(..)
-        | ast::ExprKind::Continue(..)
-        | ast::ExprKind::IncludedBytes(..)
-        | ast::ExprKind::FormatArgs(..)
-        | ast::ExprKind::Err(..)
-        | ast::ExprKind::Break(_, None)
-        | ast::ExprKind::Ret(None)
-        | ast::ExprKind::Yield(None)
-        | ast::ExprKind::Yeet(None)
-        | ast::ExprKind::Dummy
-        | ast::ExprKind::Loop(..)
-        | ast::ExprKind::Match(..)
-        | ast::ExprKind::Closure(..)
-        | ast::ExprKind::Array(..)
-        | ast::ExprKind::MacCall(..)
-        | ast::ExprKind::Struct(..)
-        | ast::ExprKind::Tup(..) => false,
-        expr_kind::unary_like!(ref target) => arm_body_requires_block(target),
+    match &expr.kind {
+        // if/for/while headers deserve their own line for scan-ability
+        // Also `if` could be easily mistaken for a guard otherwise
+        ast::ExprKind::If(..) | ast::ExprKind::ForLoop { .. } | ast::ExprKind::While(..) => true,
+
+        // prefix/postfix operations - see the underlying expression
+        ::rustc_ast::ast::ExprKind::AddrOf(_, _, target)
+        | ::rustc_ast::ast::ExprKind::Unary(_, target)
+        | ::rustc_ast::ast::ExprKind::Cast(target, _)
+        | expr_kind::control_flow!(Some(target)) => arm_body_requires_block(target),
+        expr_kind::postfix!() => arm_body_requires_block(receiver_from_postfix_expr(expr)),
+
+        // everything else - no block required
+        _ => false,
     }
 }
 
@@ -105,6 +85,11 @@ pub fn is_rustfmt_skip(attr: &ast::Attribute) -> bool {
     attr.path_matches(&PATH)
 }
 
+pub fn is_plain_block(expr: &ast::Expr) -> bool {
+    plain_block(expr).is_some()
+}
+
+// a block with no label, no `async`, no `unsafe`
 pub fn plain_block(expr: &ast::Expr) -> Option<&ast::Block> {
     match &expr.kind {
         ast::ExprKind::Block(block, None)

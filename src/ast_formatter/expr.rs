@@ -198,6 +198,7 @@ impl AstFormatter {
 
     pub fn expr_touchy_margins(&self, expr: &ast::Expr) -> FormatResult {
         self.skip_single_expr_blocks(expr, |expr| {
+            // optimization: touchy_margins only affects multi-line expressions
             if self.out.constraints().single_line.get() {
                 self.expr(expr)
             } else {
@@ -207,7 +208,7 @@ impl AstFormatter {
                         .touchy_margin
                         .with_replaced(true, || self.expr(expr))
                 })
-                .otherwise(|| self.add_block(|| self.expr(expr)))
+                .otherwise(|| self.expr_add_block(expr))
             }
         })
     }
@@ -434,10 +435,10 @@ impl AstFormatter {
 
     // utils
 
-    pub fn add_block(&self, inside: impl FnOnce() -> FormatResult) -> FormatResult {
-        self.out.token_missing("{")?;
-        self.embraced_inside(inside)?;
-        self.out.token_missing("}")?;
+    pub fn expr_add_block(&self, expr: &ast::Expr) -> FormatResult {
+        self.out.token_insert("{")?;
+        self.embraced_inside(|| self.expr(expr))?;
+        self.out.token_insert("}")?;
         Ok(())
     }
 

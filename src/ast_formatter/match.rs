@@ -2,9 +2,8 @@ use rustc_ast::ast;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::util::tail::Tail;
-use crate::ast_utils::{arm_body_requires_block, plain_block};
+use crate::ast_utils::{arm_body_requires_block, is_plain_block};
 use crate::error::FormatResult;
-use crate::util::cell_ext::CellExt;
 
 impl AstFormatter {
     pub fn match_(&self, scrutinee: &ast::Expr, arms: &[ast::Arm]) -> FormatResult {
@@ -69,28 +68,28 @@ impl AstFormatter {
     }
 
     fn arm_body(&self, body: &ast::Expr, force_block: bool) -> FormatResult {
-        self.skip_single_expr_blocks(body, |body| {
-            let with_add_block = || self.add_block(|| self.expr(body));
-            if force_block || arm_body_requires_block(body) {
-                // todo don't add a block if it's already a block
-                with_add_block()
+        if force_block {
+            if is_plain_block(body) {
+                self.expr(body)?;
             } else {
-                self.fallback(|| {
-                    // todo should be block-like?
-                    let tail = if plain_block(body).is_some() {
-                        Tail::none()
-                    } else {
-                        &Tail::token_insert(",")
-                    };
-                    self.out
-                        .constraints()
-                        .touchy_margin
-                        .with_replaced(true, || self.expr_tail(body, &tail))?;
-                    Ok(())
-                })
-                .otherwise(with_add_block)
+                self.expr_add_block(body)?;
             }
-        })?;
+        } else if arm_body_requires_block(body) {
+            self.expr_add_block(body)?;
+        } else {
+            self.skip_single_expr_blocks(body, |body| {
+                if is_plain_block(body)  {
+                    self.expr(body)
+                } else {
+                    self.fallback(|| {
+                        // todo closures and structs should have single-line headers
+                        // todo exclude comma for block-like expressions?
+                        self.with_touchy_margins(|| self.expr_tail(body, &Tail::token_insert(",")))
+                    })
+                    .otherwise(|| self.expr_add_block(body))
+                }
+            })?;
+        }
         self.out.skip_token_if_present(",")?;
         Ok(())
     }
