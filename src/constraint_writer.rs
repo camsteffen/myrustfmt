@@ -98,6 +98,7 @@ impl ConstraintWriter {
             line,
         } = *snapshot;
         // todo do we really need to restore constraints if modifications are always scoped?
+        //   otherwise make sure each field is actually scoped
         assert_eq!(&self.constraints, constraints);
         self.constraints.set(constraints);
         self.last_line_start.set(last_line_start);

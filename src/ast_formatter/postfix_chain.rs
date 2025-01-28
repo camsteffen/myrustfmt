@@ -2,12 +2,12 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::list::ListBuilderTrait;
 use crate::ast_formatter::util::tail::Tail;
-use crate::ast_utils::expr_kind::postfix_expr_receiver;
 use crate::error::FormatResult;
 use crate::error::{FormatError, WidthLimitExceededError};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use std::iter::successors;
+use crate::ast_utils::{postfix_expr_is_breakable, postfix_expr_receiver};
 
 impl AstFormatter {
     pub fn postfix_chain(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
@@ -188,20 +188,16 @@ fn split_overflowable<'a, 'b>(
 }
 
 fn is_unbreakable(item: &ast::Expr) -> bool {
-    matches!(item.kind, ast::ExprKind::Index(..) | ast::ExprKind::Try(..))
+    !postfix_expr_is_breakable(item).unwrap()
 }
 
-// todo use take_while,count()?
 fn take_next_with_unbreakables<'a, 'b>(
     slice: &mut &'a [&'b ast::Expr],
 ) -> Option<&'a [&'b ast::Expr]> {
     match slice {
         [] => None,
         [_, rest @ ..] => {
-            let pos = rest
-                .iter()
-                .position(|item| !is_unbreakable(item))
-                .unwrap_or(rest.len());
+            let pos = rest.iter().take_while(|e| is_unbreakable(e)).count();
             let out;
             (out, *slice) = slice.split_at(pos + 1);
             Some(out)
@@ -210,10 +206,7 @@ fn take_next_with_unbreakables<'a, 'b>(
 }
 
 fn take_unbreakables<'a, 'b>(slice: &mut &'b [&'a ast::Expr]) -> &'b [&'a ast::Expr] {
-    let pos = slice
-        .iter()
-        .position(|item| !is_unbreakable(item))
-        .unwrap_or(slice.len());
+    let pos = slice.iter().take_while(|e| is_unbreakable(e)).count();
     let out;
     (out, *slice) = slice.split_at(pos);
     out

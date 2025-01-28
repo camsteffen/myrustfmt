@@ -1,69 +1,76 @@
-use crate::ast_utils::expr_kind::postfix_expr_receiver;
 use rustc_ast::ast;
 use rustc_span::{Symbol, sym};
 
-pub mod expr_kind {
-    use rustc_ast::ast;
+macro_rules! block_like_expr_kind {
+    () => {
+        ast::ExprKind::Block(..)
+            | ast::ExprKind::ConstBlock(_)
+            | ast::ExprKind::Gen(..)
+            | ast::ExprKind::TryBlock(..)
+    };
+}
+pub(crate) use block_like_expr_kind;
 
-    #[macro_export]
-    macro_rules! block_like {
-        () => {
-            ast::ExprKind::Block(..)
-                | ast::ExprKind::ConstBlock(_)
-                | ast::ExprKind::Gen(..)
-                | ast::ExprKind::TryBlock(..)
-        };
-    }
-    pub use block_like;
+macro_rules! control_flow_expr_kind {
+    () => {
+        ::rustc_ast::ast::ExprKind::Become(..)
+            | ::rustc_ast::ast::ExprKind::Break(..)
+            | ::rustc_ast::ast::ExprKind::Continue(..)
+            | ::rustc_ast::ast::ExprKind::Ret(..)
+            | ::rustc_ast::ast::ExprKind::Yeet(..)
+            | ::rustc_ast::ast::ExprKind::Yield(..)
+    };
+    (Some($target:pat)) => {
+        ::rustc_ast::ast::ExprKind::Become($target)
+            | ::rustc_ast::ast::ExprKind::Break(_, Some($target))
+            | ::rustc_ast::ast::ExprKind::Ret(Some($target))
+            | ::rustc_ast::ast::ExprKind::Yeet(Some($target))
+            | ::rustc_ast::ast::ExprKind::Yield(Some($target))
+    };
+}
+pub(crate) use control_flow_expr_kind;
 
-    #[macro_export]
-    macro_rules! control_flow {
-        () => {
-            ::rustc_ast::ast::ExprKind::Become(..)
-                | ::rustc_ast::ast::ExprKind::Break(..)
-                | ::rustc_ast::ast::ExprKind::Continue(..)
-                | ::rustc_ast::ast::ExprKind::Ret(..)
-                | ::rustc_ast::ast::ExprKind::Yeet(..)
-                | ::rustc_ast::ast::ExprKind::Yield(..)
-        };
-        (Some($target:pat)) => {
-            ::rustc_ast::ast::ExprKind::Become($target)
-                | ::rustc_ast::ast::ExprKind::Break(_, Some($target))
-                | ::rustc_ast::ast::ExprKind::Ret(Some($target))
-                | ::rustc_ast::ast::ExprKind::Yeet(Some($target))
-                | ::rustc_ast::ast::ExprKind::Yield(Some($target))
-        };
-    }
-    pub use control_flow;
-
-    #[macro_export]
-    macro_rules! postfix {
-        () => {
-            ::rustc_ast::ast::ExprKind::Await(..)
-                | ::rustc_ast::ast::ExprKind::Field(..)
-                | ::rustc_ast::ast::ExprKind::Index(..)
-                | ::rustc_ast::ast::ExprKind::MethodCall(..)
-                | ::rustc_ast::ast::ExprKind::Try(..)
-        };
-    }
-    pub use postfix;
-
-    /// If the given expression is postfix, returns its receiver expression.
-    /// This MUST match the same expressions as the postfix! macro defined above.
-    pub fn postfix_expr_receiver(postfix_expr: &ast::Expr) -> Option<&ast::Expr> {
-        match &postfix_expr.kind {
-            ::rustc_ast::ast::ExprKind::Await(receiver, _)
-            | ::rustc_ast::ast::ExprKind::Field(receiver, _)
-            | ::rustc_ast::ast::ExprKind::Index(receiver, _, _)
-            | ::rustc_ast::ast::ExprKind::Try(receiver) => Some(receiver),
-            ::rustc_ast::ast::ExprKind::MethodCall(method_call) => Some(&method_call.receiver),
-            _ => None,
+macro_rules! postfix_meta {
+    ($mac:path) => {
+        $mac! {
+            // (ExprKind pattern, receiver expression, is_breakable)
+            (Await(ref receiver, _), receiver, true),
+            (Field(ref receiver, _), receiver, true),
+            (Index(ref receiver, _, _), receiver, false),
+            (MethodCall(ref method_call), &method_call.receiver, true),
+            (Try(ref receiver), receiver, false),
         }
-    }
+    };
 }
 
+macro_rules! postfix_utils {
+    ($(($kind:ident $fields:tt, $receiver:expr, $breakable:literal),)*) => {
+        macro_rules! postfix_expr_kind {
+            () => ($(::rustc_ast::ast::ExprKind::$kind(..))|*);
+        }
+        pub(crate) use postfix_expr_kind;
+        
+        /// If the given expression is postfix, returns its receiver expression.
+        pub fn postfix_expr_receiver(postfix_expr: &ast::Expr) -> Option<&ast::Expr> {
+            match postfix_expr.kind {
+                $(::rustc_ast::ast::ExprKind::$kind$fields => Some($receiver),)|*
+                _ => None,
+            }
+        }
+
+        pub fn postfix_expr_is_breakable(postfix_expr: &ast::Expr) -> Option<bool> {
+            match postfix_expr.kind {
+                $(::rustc_ast::ast::ExprKind::$kind(..) => Some($breakable),)|*
+                _ => None,
+            }
+        }
+    };
+}
+
+postfix_meta!(postfix_utils);
+
 /// Returns true if the given arm body expression requires to be wrapped in a block.
-/// For false cases, we may still decide to add a block for more dynamic reasons.
+/// For false cases, we may still decide to add a block later in the process.
 pub fn arm_body_requires_block(expr: &ast::Expr) -> bool {
     match &expr.kind {
         // if/for/while headers get their own line for scan-ability
@@ -74,8 +81,10 @@ pub fn arm_body_requires_block(expr: &ast::Expr) -> bool {
         ::rustc_ast::ast::ExprKind::AddrOf(_, _, target)
         | ::rustc_ast::ast::ExprKind::Unary(_, target)
         | ::rustc_ast::ast::ExprKind::Cast(target, _)
-        | expr_kind::control_flow!(Some(target)) => arm_body_requires_block(target),
-        expr_kind::postfix!() => arm_body_requires_block(postfix_expr_receiver(expr).unwrap()),
+        | control_flow_expr_kind!(Some(target)) => arm_body_requires_block(target),
+        postfix_expr_kind!() => {
+            arm_body_requires_block(postfix_expr_receiver(expr).unwrap())
+        }
 
         // everything else - no block required
         _ => false,

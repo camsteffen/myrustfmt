@@ -8,10 +8,11 @@ use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::list_config::{
     ArrayListConfig, CallParamListConfig, TupleListConfig, struct_field_list_config,
 };
-use crate::ast_utils::{expr_kind, plain_block};
+use crate::ast_utils::{plain_block};
 use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
+use crate::ast_utils::postfix_expr_kind;
 
 impl AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
@@ -31,7 +32,7 @@ impl AstFormatter {
             }
             ast::ExprKind::ConstBlock(_) => todo!(),
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, take_tail())?,
-            expr_kind::postfix!() => self.postfix_chain(expr, take_tail())?,
+            postfix_expr_kind!() => self.postfix_chain(expr, take_tail())?,
             ast::ExprKind::Tup(ref items) => {
                 list(Braces::PARENS, items, self.expr_list_item_fn(items))
                     .config(TupleListConfig {
@@ -326,18 +327,12 @@ impl AstFormatter {
         };
 
         let single_line_parts = || {
-            let Some(block_expr) = self.expr_only_block(block) else {
+            let else_ = else_?;
+            let ast::ExprKind::Block(else_block, _) = &else_.kind else {
                 return None;
             };
-            let Some(else_) = else_ else {
-                return None;
-            };
-            let ast::ExprKind::Block(block, _) = &else_.kind else {
-                return None;
-            };
-            let Some(else_expr) = self.expr_only_block(block) else {
-                return None;
-            };
+            let block_expr = self.expr_only_block(block)?;
+            let else_expr = self.expr_only_block(else_block)?;
             Some((block_expr, else_expr))
         };
 
@@ -442,19 +437,20 @@ impl AstFormatter {
         Ok(())
     }
 
-    // todo be more conservative about skipping?
-    pub fn skip_single_expr_blocks<T>(
+    /// `{{{ expr }}}` -> `expr`
+    pub fn skip_single_expr_blocks(
         &self,
         expr: &ast::Expr,
-        format: impl FnOnce(&ast::Expr) -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        let inner_expr = plain_block(expr).and_then(|b| self.expr_only_block(b));
-        let Some(inner_expr) = inner_expr else {
-            return format(expr);
-        };
-        self.out.skip_token("{")?;
-        let out = self.skip_single_expr_blocks(inner_expr, format)?;
-        self.out.skip_token("}")?;
-        Ok(out)
+        format: impl FnOnce(&ast::Expr) -> FormatResult,
+    ) -> FormatResult {
+        match plain_block(expr).and_then(|b| self.expr_only_block(b)) {
+            None => format(expr),
+            Some(inner) => {
+                self.out.skip_token("{")?;
+                self.skip_single_expr_blocks(inner, format)?;
+                self.out.skip_token("}")?;
+                Ok(())
+            },
+        }
     }
 }

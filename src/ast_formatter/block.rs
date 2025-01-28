@@ -2,7 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use rustc_ast::ast;
-use crate::ast_utils::expr_kind;
+use crate::ast_utils::control_flow_expr_kind;
 
 impl AstFormatter {
     pub fn block(&self, block: &ast::Block) -> FormatResult {
@@ -48,7 +48,7 @@ impl AstFormatter {
             ast::StmtKind::Let(local) => self.local(local),
             ast::StmtKind::Item(item) => self.item(item),
             ast::StmtKind::Expr(expr) => {
-                let tail = if matches!(expr.kind, expr_kind::control_flow!()) {
+                let tail = if matches!(expr.kind, control_flow_expr_kind!()) {
                     &Tail::token_insert(";")
                 } else {
                     Tail::none()

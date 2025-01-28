@@ -4,6 +4,10 @@ use crate::util::whitespace_utils::is_whitespace;
 use rustc_ast::ast;
 
 impl AstFormatter {
+    /// `{ expr }` -> `expr`
+    ///
+    /// If a block contains only an expression, return the expression.
+    /// This may be used together with `plain_block`.
     pub fn expr_only_block<'a>(&self, block: &'a ast::Block) -> Option<&'a ast::Expr> {
         let [stmt] = &block.stmts[..] else {
             return None;
