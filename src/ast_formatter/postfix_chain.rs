@@ -35,9 +35,9 @@ impl AstFormatter {
 
         self.expr(root)?;
         let mut chain_rest = chain.as_slice();
-        self.chain_unbreakables(&mut chain_rest)?;
+        self.postfix_chain_items(take_unbreakables(&mut chain_rest))?;
 
-        // don't wrap items as long as they start close to the margin
+        // items that start within the first indent-width
         let multi_line_root = loop {
             if self.out.line() != first_line {
                 break true;
@@ -45,12 +45,10 @@ impl AstFormatter {
             if self.out.last_line_len() > indent_margin {
                 break false;
             }
-            let Some((next, chain_rest_next)) = chain_rest.split_first() else {
+            let Some(next) = take_next_with_unbreakables(&mut chain_rest) else {
                 return self.tail(tail);
             };
-            chain_rest = chain_rest_next;
-            self.postfix_chain_item(next)?;
-            self.chain_unbreakables(&mut chain_rest)?;
+            self.postfix_chain_items(next)?
         };
 
         if multi_line_root {
@@ -74,19 +72,24 @@ impl AstFormatter {
                 self.with_single_line(|| self.postfix_chain_items(chain))
             })
         };
+        
         let Some((until_overflow, overflowable)) = split_overflowable(chain) else {
             items_single_line(chain)?;
             self.tail(tail)?;
             return Ok(());
         };
         items_single_line(until_overflow)?;
+        
         let snapshot = self.out.snapshot();
+        
+        // first try without overflow
         let result = items_single_line(overflowable).and_then(|()| self.tail(tail));
         match result {
             Ok(()) | Err(FormatError::Parse(_)) => return result,
-            Err(FormatError::Constraint(_)) => {}
+            Err(FormatError::Constraint(_)) => {
+                self.out.restore(&snapshot);
+            }
         }
-        self.out.restore(&snapshot);
 
         // experimentally check if wrapping the last item makes it fit on one line
         // the width limit would not apply
@@ -106,8 +109,9 @@ impl AstFormatter {
             return Err(WidthLimitExceededError.into());
         }
         self.out.restore(&snapshot);
+        
+        // finally, use overflow
         self.with_width_limit_from_start_first_line(start_pos, width_limit, || {
-            // try with overflow
             let (first, rest) = overflowable.split_first().unwrap();
             self.postfix_chain_item(first)?;
             self.with_single_line(|| self.postfix_chain_items(rest))?;
@@ -122,26 +126,12 @@ impl AstFormatter {
         mut chain: &[PostfixChainItem<'_>],
         tail: &Tail,
     ) -> FormatResult {
-        while let Some((next, rest)) = chain.split_first() {
-            chain = rest;
+        while let Some(next) = take_next_with_unbreakables(&mut chain) {
             self.out.newline_within_indent()?;
-            self.postfix_chain_item(next)?;
-            self.chain_unbreakables(&mut chain)?;
+            self.postfix_chain_items(next)?;
         }
         self.tail(tail)?;
         Ok(())
-    }
-
-    fn chain_unbreakables(&self, chain: &mut &[PostfixChainItem<'_>]) -> FormatResult {
-        loop {
-            match chain {
-                [next, rest @ ..] if is_unbreakable(next) => {
-                    self.postfix_chain_item(next)?;
-                    *chain = rest;
-                }
-                _ => return Ok(()),
-            }
-        }
     }
 
     fn postfix_chain_item(&self, item: &PostfixChainItem<'_>) -> FormatResult {
@@ -236,4 +226,24 @@ fn split_overflowable<'a, 'b>(
 
 fn is_unbreakable(item: &PostfixChainItem<'_>) -> bool {
     matches!(item, PostfixChainItem::Index(_) | PostfixChainItem::Try)
+}
+
+fn take_next_with_unbreakables<'a, 'b>(slice: &mut &'a [PostfixChainItem<'b>]) -> Option<&'a [PostfixChainItem<'b>]> { 
+    match slice {
+        [] => None,
+        [_, rest @ ..] => {
+            let pos = rest.iter().position(|item| !is_unbreakable(item)).unwrap_or(rest.len());
+            let out;
+            (out, *slice) = slice.split_at(pos + 1);
+            Some(out)
+        }
+    }
+}
+
+
+fn take_unbreakables<'a, 'b>(slice: &mut &'a [PostfixChainItem<'b>]) -> &'a [PostfixChainItem<'b>] {
+    let pos = slice.iter().position(|item| !is_unbreakable(item)).unwrap_or(slice.len());
+    let out;
+    (out, *slice) = slice.split_at(pos);
+    out
 }
