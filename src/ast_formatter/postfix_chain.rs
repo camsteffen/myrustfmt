@@ -20,10 +20,6 @@ enum PostfixChainItem<'a> {
 
 impl AstFormatter {
     pub fn postfix_chain(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
-        self.with_single_line_opt(false, || self.do_postfix_chain(expr, tail))
-    }
-
-    pub fn do_postfix_chain(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
         let (root, chain) = build_postfix_chain(expr);
 
         let first_line = self.out.line();
@@ -38,30 +34,31 @@ impl AstFormatter {
         }
 
         self.expr(root)?;
-        let mut chain_remaining = self.chain_unbreakables(&chain)?;
+        let mut chain_rest = chain.as_slice();
+        self.chain_unbreakables(&mut chain_rest)?;
 
         // don't wrap items as long as they start close to the margin
         let multi_line_root = loop {
-            if chain_remaining.is_empty() {
-                return self.tail(tail);
-            }
             if self.out.line() != first_line {
                 break true;
             }
             if self.out.last_line_len() > indent_margin {
                 break false;
             }
-            chain_remaining = self.chain_item_and_unbreakables(chain_remaining)?;
+            let Some((next, chain_rest_next)) = chain_rest.split_first() else {
+                return self.tail(tail);
+            };
+            chain_rest = chain_rest_next;
+            self.postfix_chain_item(next)?;
+            self.chain_unbreakables(&mut chain_rest)?;
         };
 
         if multi_line_root {
             // each item on a separate line, no indent
-            self.postfix_chain_separate_lines(chain_remaining, tail)
+            self.postfix_chain_separate_lines(chain_rest, tail)
         } else {
-            self.fallback(|| self.postfix_chain_single_line(chain_remaining, start_pos, tail))
-                .otherwise(|| {
-                    self.indented(|| self.postfix_chain_separate_lines(chain_remaining, tail))
-                })
+            self.fallback(|| self.postfix_chain_single_line(chain_rest, start_pos, tail))
+                .otherwise(|| self.indented(|| self.postfix_chain_separate_lines(chain_rest, tail)))
         }
     }
 
@@ -94,6 +91,7 @@ impl AstFormatter {
         // experimentally check if wrapping the last item makes it fit on one line
         // the width limit would not apply
         // todo wouldn't the first line width limit be removed anyways from the newline?
+        // todo is this over-complicated?
         let result = self.indented(|| {
             self.out.newline_within_indent()?;
             self.with_single_line(|| {
@@ -105,7 +103,6 @@ impl AstFormatter {
         });
         if result.is_ok() {
             // ...if so, go to the separate lines approach
-            // todo is this over-complicated?
             return Err(WidthLimitExceededError.into());
         }
         self.out.restore(&snapshot);
@@ -125,38 +122,26 @@ impl AstFormatter {
         mut chain: &[PostfixChainItem<'_>],
         tail: &Tail,
     ) -> FormatResult {
-        while !chain.is_empty() {
+        while let Some((next, rest)) = chain.split_first() {
+            chain = rest;
             self.out.newline_within_indent()?;
-            chain = self.chain_item_and_unbreakables(chain)?;
+            self.postfix_chain_item(next)?;
+            self.chain_unbreakables(&mut chain)?;
         }
         self.tail(tail)?;
         Ok(())
     }
 
-    fn chain_item_and_unbreakables<'a, 'b>(
-        &self,
-        chain: &'b [PostfixChainItem<'a>],
-    ) -> FormatResult<&'b [PostfixChainItem<'a>]> {
-        let (first, mut rest) = chain.split_first().unwrap();
-        self.postfix_chain_item(first)?;
-        rest = self.chain_unbreakables(rest)?;
-        Ok(rest)
-    }
-
-    fn chain_unbreakables<'a, 'b>(
-        &self,
-        mut chain: &'b [PostfixChainItem<'a>],
-    ) -> FormatResult<&'b [PostfixChainItem<'a>]> {
+    fn chain_unbreakables(&self, chain: &mut &[PostfixChainItem<'_>]) -> FormatResult {
         loop {
             match chain {
                 [next, rest @ ..] if is_unbreakable(next) => {
-                    chain = rest;
                     self.postfix_chain_item(next)?;
+                    *chain = rest;
                 }
-                _ => break,
+                _ => return Ok(()),
             }
         }
-        Ok(chain)
     }
 
     fn postfix_chain_item(&self, item: &PostfixChainItem<'_>) -> FormatResult {
