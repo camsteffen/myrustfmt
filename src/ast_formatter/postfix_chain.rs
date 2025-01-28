@@ -30,14 +30,6 @@ impl AstFormatter {
         let start_pos = self.out.last_line_len();
         let indent_margin = self.out.constraints().indent.get() + INDENT_WIDTH;
 
-        // simple case - just a root expression with some unbreakables
-        if chain.iter().all(|item| is_unbreakable(item)) {
-            self.expr(root)?;
-            self.postfix_chain_items(&chain)?;
-            self.tail(tail)?;
-            return Ok(());
-        }
-
         // touchy margins - everything must be a single line (with overflow)
         if self.out.constraints().touchy_margin.get() {
             self.with_single_line(|| self.expr(root))?;
@@ -49,14 +41,20 @@ impl AstFormatter {
         let mut chain_remaining = self.chain_unbreakables(&chain)?;
 
         // don't wrap items as long as they start close to the margin
-        while self.out.line() == first_line && self.out.last_line_len() <= indent_margin {
-            chain_remaining = self.chain_item_and_unbreakables(chain_remaining)?;
+        let multi_line_root = loop {
             if chain_remaining.is_empty() {
                 return self.tail(tail);
             }
-        }
+            if self.out.line() != first_line {
+                break true;
+            }
+            if self.out.last_line_len() > indent_margin {
+                break false;
+            }
+            chain_remaining = self.chain_item_and_unbreakables(chain_remaining)?;
+        };
 
-        if self.out.line() != first_line {
+        if multi_line_root {
             // each item on a separate line, no indent
             self.postfix_chain_separate_lines(chain_remaining, tail)
         } else {
