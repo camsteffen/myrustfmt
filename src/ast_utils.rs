@@ -1,4 +1,4 @@
-use crate::ast_utils::expr_kind::receiver_from_postfix_expr;
+use crate::ast_utils::expr_kind::postfix_expr_receiver;
 use rustc_ast::ast;
 use rustc_span::{Symbol, sym};
 
@@ -48,14 +48,16 @@ pub mod expr_kind {
     }
     pub use postfix;
 
-    pub fn receiver_from_postfix_expr(postfix_expr: &ast::Expr) -> &ast::Expr {
+    /// If the given expression is postfix, returns its receiver expression.
+    /// This MUST match the same expressions as the postfix! macro defined above.
+    pub fn postfix_expr_receiver(postfix_expr: &ast::Expr) -> Option<&ast::Expr> {
         match &postfix_expr.kind {
             ::rustc_ast::ast::ExprKind::Await(receiver, _)
             | ::rustc_ast::ast::ExprKind::Field(receiver, _)
             | ::rustc_ast::ast::ExprKind::Index(receiver, _, _)
-            | ::rustc_ast::ast::ExprKind::Try(receiver) => receiver,
-            ::rustc_ast::ast::ExprKind::MethodCall(method_call) => &method_call.receiver,
-            _ => panic!("Called postfix_receiver with non-postfix expression"),
+            | ::rustc_ast::ast::ExprKind::Try(receiver) => Some(receiver),
+            ::rustc_ast::ast::ExprKind::MethodCall(method_call) => Some(&method_call.receiver),
+            _ => None,
         }
     }
 }
@@ -64,7 +66,7 @@ pub mod expr_kind {
 /// For false cases, we may still decide to add a block for more dynamic reasons.
 pub fn arm_body_requires_block(expr: &ast::Expr) -> bool {
     match &expr.kind {
-        // if/for/while headers deserve their own line for scan-ability
+        // if/for/while headers get their own line for scan-ability
         // Also `if` could be easily mistaken for a guard otherwise
         ast::ExprKind::If(..) | ast::ExprKind::ForLoop { .. } | ast::ExprKind::While(..) => true,
 
@@ -73,7 +75,7 @@ pub fn arm_body_requires_block(expr: &ast::Expr) -> bool {
         | ::rustc_ast::ast::ExprKind::Unary(_, target)
         | ::rustc_ast::ast::ExprKind::Cast(target, _)
         | expr_kind::control_flow!(Some(target)) => arm_body_requires_block(target),
-        expr_kind::postfix!() => arm_body_requires_block(receiver_from_postfix_expr(expr)),
+        expr_kind::postfix!() => arm_body_requires_block(postfix_expr_receiver(expr).unwrap()),
 
         // everything else - no block required
         _ => false,
