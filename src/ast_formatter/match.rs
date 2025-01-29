@@ -28,7 +28,7 @@ impl AstFormatter {
             }
         } else if let Some(body) = arm.body.as_deref() {
             self.out.space_token_space("=>")?;
-            self.arm_body(body, false)?;
+            self.arm_body(body)?;
         }
         Ok(())
     }
@@ -41,7 +41,7 @@ impl AstFormatter {
         })?;
         if let Some(body) = arm.body.as_deref() {
             self.out.space_token_space("=>")?;
-            self.arm_body(body, false)?;
+            self.arm_body(body)?;
         }
         Ok(())
     }
@@ -56,7 +56,7 @@ impl AstFormatter {
             self.out.space_token("=>")?;
             self.out.newline_within_indent()?;
             // todo allow single line without block?
-            self.arm_body(body, true)?;
+            self.arm_body_force_block(body)?;
         }
         Ok(())
     }
@@ -67,18 +67,12 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn arm_body(&self, body: &ast::Expr, force_block: bool) -> FormatResult {
-        if force_block {
-            if is_plain_block(body) {
-                self.expr(body)?;
-            } else {
-                self.expr_add_block(body)?;
-            }
-        } else if arm_body_requires_block(body) {
+    fn arm_body(&self, body: &ast::Expr) -> FormatResult {
+        if arm_body_requires_block(body) {
             self.expr_add_block(body)?;
         } else {
             self.skip_single_expr_blocks(body, |body| {
-                if is_plain_block(body)  {
+                if is_plain_block(body) {
                     self.expr(body)
                 } else {
                     self.fallback(|| {
@@ -89,6 +83,16 @@ impl AstFormatter {
                     .otherwise(|| self.expr_add_block(body))
                 }
             })?;
+        }
+        self.out.skip_token_if_present(",")?;
+        Ok(())
+    }
+
+    fn arm_body_force_block(&self, body: &ast::Expr) -> FormatResult {
+        if is_plain_block(body) {
+            self.expr(body)?;
+        } else {
+            self.expr_add_block(body)?;
         }
         self.out.skip_token_if_present(",")?;
         Ok(())
