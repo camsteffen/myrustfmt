@@ -39,7 +39,7 @@ pub struct Constraints {
     ///     _ => {}
     /// }
     /// ```
-    // todo rename to indent_middle, or list_margin?
+    // todo rename to indent_middle, or list_margin, or fallback_type=ArmBody?
     pub touchy_margin: Cell<bool>,
 }
 

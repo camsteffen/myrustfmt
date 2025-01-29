@@ -75,12 +75,7 @@ impl AstFormatter {
                 if is_plain_block(body) {
                     self.expr(body)
                 } else {
-                    self.fallback(|| {
-                        // todo closures and structs should have single-line headers
-                        // todo exclude comma for block-like expressions?
-                        self.with_touchy_margins(|| self.expr_tail(body, &Tail::token_insert(",")))
-                    })
-                    .otherwise(|| self.expr_add_block(body))
+                    self.arm_body_maybe_add_block(body)
                 }
             })?;
         }
@@ -96,5 +91,53 @@ impl AstFormatter {
         }
         self.out.skip_token_if_present(",")?;
         Ok(())
+    }
+
+    fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
+        self.fallback(|| {
+            // todo closures and structs should have single-line headers
+            // todo exclude comma for block-like expressions?
+            self.with_touchy_margins(|| {
+                // todo fail if multi-line could be avoided by block
+                // todo share logic with local which also wraps to avoid multi-line
+                // todo should we count lines or simply observe whether it's multi-line?
+                /*
+                FallbackShape
+                    first_line_offset
+                    indent_offset
+                derive max_width difference
+                
+                
+                Only the first line needs to be considered when deciding to add a block.
+                    - the first line (might) be shifted left when adding a block
+                    - subsequent lines would be shifted right
+                    
+                    
+                Try to format with block with constraint that fails if first line could have fit without block
+                    if success
+                        if entire thing could fit in one line without block
+                            remove the block
+                        else
+                            ok
+                    else
+                        if failed due to "first line could have fit"
+                            remove the block
+                        else
+                            rethrow
+                    
+                Try to format on same line but allow extra width on the first line that would be available with block.
+                Throw when the width is exceeded and the top fallback matches.
+                    if the first line fits and extra width was unused
+                        ok (but touchy margins may fail)
+                    else if first line fits using extra width
+                        add a block
+                    else
+                        add a block
+                            
+                 */
+                self.expr_tail(body, &Tail::token_insert(","))
+            })
+        })
+        .otherwise(|| self.expr_add_block(body))
     }
 }
