@@ -1,5 +1,5 @@
 use crate::config::Config;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MaxWidthForLine {
@@ -11,7 +11,7 @@ pub struct MaxWidthForLine {
 pub struct Constraints {
     /// True when there is a fallback routine planned for if the current routine produces code
     /// that does not meet the given constraints.
-    pub has_fallback: Cell<bool>,
+    pub fallback_stack: RefCell<Vec<()>>,
     pub max_width: Cell<Option<u32>>,
     /// Used to set the max width for the current line, so it no longer applies after a newline
     /// character is printed
@@ -52,7 +52,7 @@ impl Default for Constraints {
 impl Constraints {
     pub fn new(max_width: u32) -> Constraints {
         Constraints {
-            has_fallback: Cell::new(false),
+            fallback_stack: RefCell::new(Vec::new()),
             indent: Cell::new(0),
             max_width: Cell::new(Some(max_width)),
             max_width_for_line: Cell::new(None),
@@ -63,18 +63,22 @@ impl Constraints {
 
     pub fn set(&self, other: &Constraints) {
         let Constraints {
-            has_fallback,
+            fallback_stack,
             indent,
             max_width,
             max_width_for_line,
             single_line,
             touchy_margin,
         } = other;
-        self.has_fallback.set(has_fallback.get());
+        *self.fallback_stack.borrow_mut() = fallback_stack.borrow().clone();
         self.indent.set(indent.get());
         self.max_width.set(max_width.get());
         self.max_width_for_line.set(max_width_for_line.get());
         self.single_line.set(single_line.get());
         self.touchy_margin.set(touchy_margin.get());
+    }
+    
+    pub fn has_fallback(&self) -> bool {
+        !self.fallback_stack.borrow().is_empty()
     }
 }

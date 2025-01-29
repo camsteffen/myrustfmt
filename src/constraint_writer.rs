@@ -146,7 +146,7 @@ impl ConstraintWriter {
         match self.remaining_width() {
             None | Some(Ok(_)) => Ok(()),
             Some(Err(WidthLimitExceededError { .. })) => {
-                if self.constraints.has_fallback.get() {
+                if self.constraints.has_fallback() {
                     Err(WidthLimitExceededError)
                 } else {
                     let line = self.line.get();

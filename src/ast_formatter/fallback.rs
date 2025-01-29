@@ -6,12 +6,9 @@ impl AstFormatter {
     // todo should fallback be specific to a constraint? unless_too_wide(..).otherwise(..)
     /// Begins a fallback chain with an initial formatting attempt function
     pub fn fallback<T>(&self, first: impl FnOnce() -> FormatResult<T>) -> Fallback<T> {
-        let has_fallback_prev = self.constraints().has_fallback.replace(true);
+        self.constraints().fallback_stack.borrow_mut().push(());
         let snapshot = Box::new(self.out.snapshot());
-        let state = FallbackState::Incomplete {
-            has_fallback_prev,
-            snapshot,
-        };
+        let state = FallbackState::Pending(snapshot);
         let mut fallback = Fallback { af: self, state };
         let result = first();
         fallback.maybe_complete(result);
@@ -27,10 +24,7 @@ pub struct Fallback<'a, T = ()> {
 
 enum FallbackState<T> {
     Complete(FormatResult<T>),
-    Incomplete {
-        has_fallback_prev: bool,
-        snapshot: Box<SourceFormatterSnapshot>,
-    },
+    Pending(Box<SourceFormatterSnapshot>),
 }
 
 impl<T> Fallback<'_, T> {
@@ -38,7 +32,7 @@ impl<T> Fallback<'_, T> {
     pub fn next(mut self, fallback: impl FnOnce() -> FormatResult<T>) -> Self {
         match &self.state {
             FallbackState::Complete(_) => self,
-            FallbackState::Incomplete { snapshot, .. } => {
+            FallbackState::Pending(snapshot) => {
                 self.af.out.restore(snapshot);
                 let result = fallback();
                 self.maybe_complete(result);
@@ -52,12 +46,9 @@ impl<T> Fallback<'_, T> {
     pub fn otherwise(self, fallback: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         match self.state {
             FallbackState::Complete(result) => result,
-            FallbackState::Incomplete {
-                has_fallback_prev,
-                snapshot,
-            } => {
+            FallbackState::Pending(snapshot) => {
                 self.af.out.restore(&snapshot);
-                self.af.constraints().has_fallback.set(has_fallback_prev);
+                self.af.constraints().fallback_stack.borrow_mut().pop();
                 fallback()
             }
         }
@@ -66,11 +57,9 @@ impl<T> Fallback<'_, T> {
     fn maybe_complete(&mut self, result: FormatResult<T>) {
         match self.state {
             FallbackState::Complete(_) => panic!("fallback is already complete"),
-            FallbackState::Incomplete {
-                has_fallback_prev, ..
-            } => {
+            FallbackState::Pending(_) => {
                 if is_result_terminal(&result) {
-                    self.af.constraints().has_fallback.set(has_fallback_prev);
+                    self.af.constraints().fallback_stack.borrow_mut().pop();
                     self.state = FallbackState::Complete(result);
                 }
             }
