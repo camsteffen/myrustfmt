@@ -46,6 +46,18 @@
             asdfasdf,
         ],
     }
+- name: arm body is long list that fits on one line iff wrapped in a block
+  type: before_after
+  before: |
+    match X {
+        PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP => [LLLL, LLLL, LLLL, LLLL, LLLL, LLLL, LLLL],
+    }
+  after: |
+    match X {
+        PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP => {
+            [LLLL, LLLL, LLLL, LLLL, LLLL, LLLL, LLLL]
+        }
+    }
 - name: arm body is chain on multiple lines with final multiline method call
   type: no_change
   formatted: |
