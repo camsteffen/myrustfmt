@@ -79,7 +79,7 @@ impl AstFormatter {
                 if is_plain_block(body) {
                     self.expr(body)
                 } else {
-                    self.arm_body_maybe_add_block(body)
+                    self.arm_body_add_block_if_first_line_is_longer(body)
                 }
             })?;
         }
@@ -97,43 +97,28 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
-        // todo share logic with local which also wraps to avoid multi-line
-        // todo should we count lines or simply observe whether it's multi-line?
-        self.expr_add_block_if_first_line_is_longer(body)
-    }
-
+    // todo share logic with local which also wraps to avoid multi-line
+    // todo should we count lines or simply observe whether it's multi-line?
     /// Call this function with a fallback that will format the code on the next line and indented.
     /// This function will return `Err(WidthLimitExceeded)` if it can prove that the fallback will
     /// allow more code to fit in the first line of the output.
-    fn expr_add_block_if_first_line_is_longer(&self, body: &ast::Expr) -> FormatResult {
-        let add_block = || self.expr_add_block(body);
-        let same_line_or_add_block = |fallback: Fallback| {
-            // todo closures and structs should have single-line headers
-            // todo exclude comma for block-like expressions?
-            fallback
-                .next(|| {
-                    self.with_touchy_margins(|| self.expr_tail(body, &Tail::token_insert(",")))
-                })
-                .otherwise(add_block)
-        };
+    fn arm_body_add_block_if_first_line_is_longer(&self, body: &ast::Expr) -> FormatResult {
         let Some(max_width) = self.constraints().max_width.get() else {
-            return same_line_or_add_block(self.start_fallback());
+            return self.arm_body_same_line(body, self.start_fallback());
         };
 
         let start = self.out.last_line_len();
         let next_line_start = self.constraints().indent.get() + INDENT_WIDTH;
         if start <= next_line_start {
             // wrap-indent wouldn't afford us more width so just continue normally
-            return same_line_or_add_block(self.start_fallback());
+            return self.arm_body_same_line(body, self.start_fallback());
         }
         let extra_width = start - next_line_start;
 
-        // let checkpoint = self.checkpoint();
-        // Try to format allowing the extra width that we would have.
-        // Use single-line to limit the experiment to the first line
-        // Also we are not applying touchy_margins here to simulate being in a block
         let result = self.start_fallback().next_control_flow(|| {
+            // We're going to try formatting on the same line, but adding extra width to simulate
+            // wrapping with a block. Use the single-line constraint since we just want to see what
+            // fits on the first line. Also, we need to defer the touchy_margins constraint for now.
             let result = self.with_single_line(|| {
                 self.constraints()
                     .max_width
@@ -144,31 +129,44 @@ impl AstFormatter {
                 (
                     true,
                     Ok(()) | Err(FormatError::Constraint(ConstraintError::NewlineNotAllowed)),
-                ) => ControlFlow::Continue(false),
-                (false, Err(FormatError::Constraint(ConstraintError::NewlineNotAllowed))) => {
-                    // the first line fits without extra width;
-                    // try again without the single-line and extra width
+                ) => {
+                    // we used the extra width, so we need to add a block to make the first line
+                    // (or only line) fit
                     ControlFlow::Continue(true)
+                }
+                (false, Err(FormatError::Constraint(ConstraintError::NewlineNotAllowed))) => {
+                    // we did not use the extra width, but it also did not fit on one line,
+                    // so try formatting without a block next
+                    ControlFlow::Continue(false)
                 }
                 (false, Ok(())) => {
                     // it fits on one line, but now we need a comma
                     match self.out.token_insert(",") {
-                        Err(FormatError::Constraint(_)) => ControlFlow::Continue(false),
+                        // welp the comma didn't fit,
+                        // but the expression will fit on one line if we add a block
+                        Err(FormatError::Constraint(_)) => ControlFlow::Continue(true),
+                        // it all fits on one line! Or terminal error
                         result => ControlFlow::Break(result),
                     }
                 }
+                // terminal error
                 (_, Err(e)) => ControlFlow::Break(Err(e)),
             }
         });
         match result {
             ControlFlow::Break(result) => result,
-            ControlFlow::Continue((fallback, should_try_without_block)) => {
-                if should_try_without_block {
-                    same_line_or_add_block(fallback)
-                } else {
-                    fallback.otherwise(add_block)
-                }
+            ControlFlow::Continue((fallback, true)) => {
+                fallback.otherwise(|| self.expr_add_block(body))
             }
+            ControlFlow::Continue((fallback, false)) => self.arm_body_same_line(body, fallback),
         }
+    }
+
+    fn arm_body_same_line(&self, body: &ast::Expr, fallback: Fallback) -> FormatResult {
+        // todo closures and structs should have single-line headers
+        // todo exclude comma for block-like expressions?
+        fallback
+            .next(|| self.with_touchy_margins(|| self.expr_tail(body, &Tail::token_insert(","))))
+            .otherwise(|| self.expr_add_block(body))
     }
 }
