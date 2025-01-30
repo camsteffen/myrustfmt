@@ -33,7 +33,7 @@ pub(crate) use control_flow_expr_kind;
 macro_rules! postfix_meta {
     ($mac:path) => {
         $mac! {
-            // (ExprKind pattern, receiver expression, is_breakable)
+            // (ExprKind(..), receiver expression, wrappable)
             (Await(ref receiver, _), receiver, true),
             (Field(ref receiver, _), receiver, true),
             (Index(ref receiver, _, _), receiver, false),
@@ -43,31 +43,33 @@ macro_rules! postfix_meta {
     };
 }
 
-macro_rules! postfix_utils {
-    ($(($kind:ident $fields:tt, $receiver:expr, $breakable:literal),)*) => {
+macro_rules! postfix_defs {
+    ($(($kind:ident$fields:tt, $receiver:expr, $wrappable:literal),)*) => {
         macro_rules! postfix_expr_kind {
             () => ($(::rustc_ast::ast::ExprKind::$kind(..))|*);
         }
         pub(crate) use postfix_expr_kind;
         
         /// If the given expression is postfix, returns its receiver expression.
-        pub fn postfix_expr_receiver(postfix_expr: &ast::Expr) -> Option<&ast::Expr> {
+        pub fn postfix_expr_receiver_opt(postfix_expr: &ast::Expr) -> Option<&ast::Expr> {
             match postfix_expr.kind {
                 $(::rustc_ast::ast::ExprKind::$kind$fields => Some($receiver),)|*
                 _ => None,
             }
         }
 
-        pub fn postfix_expr_is_breakable(postfix_expr: &ast::Expr) -> Option<bool> {
+        /// A "wrappable" postfix expression can be wrapped to the next line.
+        /// Otherwise, the expression is affixed to the right of its receiver.
+        pub fn postfix_expr_is_wrappable(postfix_expr: &ast::Expr) -> bool {
             match postfix_expr.kind {
-                $(::rustc_ast::ast::ExprKind::$kind(..) => Some($breakable),)|*
-                _ => None,
+                $(::rustc_ast::ast::ExprKind::$kind(..) => $wrappable,)|*
+                _ => panic!("expected a postfix expression"),
             }
         }
     };
 }
 
-postfix_meta!(postfix_utils);
+postfix_meta!(postfix_defs);
 
 /// Returns true if the given arm body expression requires to be wrapped in a block.
 /// For false cases, we may still decide to add a block later in the process.
@@ -83,7 +85,7 @@ pub fn arm_body_requires_block(expr: &ast::Expr) -> bool {
         | ::rustc_ast::ast::ExprKind::Cast(target, _)
         | control_flow_expr_kind!(Some(target)) => arm_body_requires_block(target),
         postfix_expr_kind!() => {
-            arm_body_requires_block(postfix_expr_receiver(expr).unwrap())
+            arm_body_requires_block(postfix_expr_receiver_opt(expr).unwrap())
         }
 
         // everything else - no block required

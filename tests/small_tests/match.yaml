@@ -34,11 +34,25 @@
             let x;
         }
     }
-- name: arm body breakpoint (do not add block)
+- name: arm body breakpoint add block
   type: breakpoint
   before: |
     match x {
         _ => [asdfasdf],
+    }
+  after: |
+    match x {
+        _ => {
+            [asdfasdf]
+        }
+    }
+- name: arm body breakpoint remove block
+  type: breakpoint
+  before: |
+    match x {
+        _ => {
+            [asdfasdf]
+        }
     }
   after: |
     match x {

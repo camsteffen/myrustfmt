@@ -16,15 +16,13 @@ impl AstFormatter {
     ) -> FormatResult {
         let (first, chain) = self.collect_binary_chain(left, right, op);
         self.expr(first)?;
-        self.fallback(|| {
-            self.with_single_line(|| {
-                for (op, expr) in &chain {
-                    self.out.space_token_space(op.as_str())?;
-                    self.expr(expr)?;
-                }
-                self.tail(tail)?;
-                Ok(())
-            })
+        self.fallback_with_single_line(|| {
+            for (op, expr) in &chain {
+                self.out.space_token_space(op.as_str())?;
+                self.expr(expr)?;
+            }
+            self.tail(tail)?;
+            Ok(())
         })
         .otherwise(|| {
             self.indented(|| {

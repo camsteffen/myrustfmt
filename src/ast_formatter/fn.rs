@@ -27,15 +27,12 @@ impl AstFormatter {
                 single_line_max_contents_width: None,
             },
         );
-        self.fallback(|| {
+        self.fallback_with_single_line(|| {
             param_list.format_single_line(self)?;
-            self.with_single_line(|| -> FormatResult {
-                self.fn_ret_ty(&sig.decl.output)?;
-                if is_block_after_decl {
-                    self.out.space_token("{")?;
-                }
-                Ok(())
-            })?;
+            self.fn_ret_ty(&sig.decl.output)?;
+            if is_block_after_decl {
+                self.out.space_token("{")?;
+            }
             Ok(())
         })
         .otherwise(|| {
@@ -103,7 +100,7 @@ impl AstFormatter {
                 self.expr_tail(body, tail)
             } else {
                 // add a block unless it fits on a single line
-                self.fallback(|| self.with_single_line(|| self.expr_tail(body, tail)))
+                self.fallback_with_single_line(|| self.expr_tail(body, tail))
                     .otherwise(|| {
                         self.expr_add_block(body)?;
                         self.tail(tail)?;
@@ -165,9 +162,9 @@ impl AstFormatter {
     fn fn_decl(&self, fn_decl: &ast::FnDecl, braces: &'static Braces) -> FormatResult {
         let param_list = list(braces, &fn_decl.inputs, |param| self.param(param));
         // args and return type all on one line
-        self.fallback(|| {
+        self.fallback_with_single_line(|| {
             param_list.format_single_line(self)?;
-            self.with_single_line(|| self.fn_ret_ty(&fn_decl.output))?;
+            self.fn_ret_ty(&fn_decl.output)?;
             Ok(())
         })
         // args on separate lines

@@ -5,8 +5,8 @@ pub fn stmt_breakpoint_test(before: &str, after: &str) {
     let before = before.trim();
     let after = after.trim();
     let initial_used_width = before.lines().map(|line| line.len() as u32).max().unwrap();
-    format_stmt_max_width_expected(before, Some(initial_used_width), before);
-    format_stmt_max_width_expected(before, Some(initial_used_width - 1), after);
+    format_stmt_max_width_expected(before, Some(initial_used_width), before, "without max width reduction");
+    format_stmt_max_width_expected(before, Some(initial_used_width - 1), after, "with max width reduction");
 }
 
 fn format_stmt(stmt: &str, max_width: Option<u32>) -> String {
@@ -44,7 +44,7 @@ fn format_stmt(stmt: &str, max_width: Option<u32>) -> String {
     formatted_stmt
 }
 
-pub fn format_stmt_max_width_expected(stmt: &str, max_width: Option<u32>, expected: &str) {
+pub fn format_stmt_max_width_expected(stmt: &str, max_width: Option<u32>, expected: &str, name: &str) {
     let formatted = format_stmt(stmt, max_width);
     if formatted != expected {
         for line in diff::lines(expected, &formatted) {
@@ -54,7 +54,7 @@ pub fn format_stmt_max_width_expected(stmt: &str, max_width: Option<u32>, expect
                 diff::Result::Both(s, _) => println!("  {s}"),
             }
         }
-        panic!("Formatted code does not match expected");
+        panic!("\"{name}\" formatted does not match expected");
         // panic!("Unformatted: {:?}\n  Formatted: {:?}\n   Expected: {:?}", stmt, formatted, expected);
     }
 }

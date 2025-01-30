@@ -1,9 +1,13 @@
 use rustc_ast::ast;
+use std::ops::ControlFlow;
 
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
+use crate::ast_formatter::fallback::Fallback;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{arm_body_requires_block, is_plain_block};
-use crate::error::FormatResult;
+use crate::error::{ConstraintError, FormatError, FormatResult};
+use crate::util::cell_ext::CellExt;
 
 impl AstFormatter {
     pub fn match_(&self, scrutinee: &ast::Expr, arms: &[ast::Arm]) -> FormatResult {
@@ -94,50 +98,77 @@ impl AstFormatter {
     }
 
     fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
-        self.fallback(|| {
+        // todo share logic with local which also wraps to avoid multi-line
+        // todo should we count lines or simply observe whether it's multi-line?
+        self.expr_add_block_if_first_line_is_longer(body)
+    }
+
+    /// Call this function with a fallback that will format the code on the next line and indented.
+    /// This function will return `Err(WidthLimitExceeded)` if it can prove that the fallback will
+    /// allow more code to fit in the first line of the output.
+    fn expr_add_block_if_first_line_is_longer(&self, body: &ast::Expr) -> FormatResult {
+        let add_block = || self.expr_add_block(body);
+        let same_line_or_add_block = |fallback: Fallback| {
             // todo closures and structs should have single-line headers
             // todo exclude comma for block-like expressions?
-            self.with_touchy_margins(|| {
-                // todo fail if multi-line could be avoided by block
-                // todo share logic with local which also wraps to avoid multi-line
-                // todo should we count lines or simply observe whether it's multi-line?
-                /*
-                FallbackShape
-                    first_line_offset
-                    indent_offset
-                derive max_width difference
-                
-                
-                Only the first line needs to be considered when deciding to add a block.
-                    - the first line (might) be shifted left when adding a block
-                    - subsequent lines would be shifted right
-                    
-                    
-                Try to format with block with constraint that fails if first line could have fit without block
-                    if success
-                        if entire thing could fit in one line without block
-                            remove the block
-                        else
-                            ok
-                    else
-                        if failed due to "first line could have fit"
-                            remove the block
-                        else
-                            rethrow
-                    
-                Try to format on same line but allow extra width on the first line that would be available with block.
-                Throw when the width is exceeded and the top fallback matches.
-                    if the first line fits and extra width was unused
-                        ok (but touchy margins may fail)
-                    else if first line fits using extra width
-                        add a block
-                    else
-                        add a block
-                            
-                 */
-                self.expr_tail(body, &Tail::token_insert(","))
-            })
-        })
-        .otherwise(|| self.expr_add_block(body))
+            fallback
+                .next(|| {
+                    self.with_touchy_margins(|| self.expr_tail(body, &Tail::token_insert(",")))
+                })
+                .otherwise(add_block)
+        };
+        let Some(max_width) = self.constraints().max_width.get() else {
+            return same_line_or_add_block(self.start_fallback());
+        };
+
+        let start = self.out.last_line_len();
+        let next_line_start = self.constraints().indent.get() + INDENT_WIDTH;
+        if start <= next_line_start {
+            // wrap-indent wouldn't afford us more width so just continue normally
+            return same_line_or_add_block(self.start_fallback());
+        }
+        let extra_width = start - next_line_start;
+
+        // let checkpoint = self.checkpoint();
+        // Try to format allowing the extra width that we would have.
+        // Use single-line to limit the experiment to the first line
+        // Also we are not applying touchy_margins here to simulate being in a block
+        let result = self.start_fallback().next_control_flow(|| {
+            let result = self.with_single_line(|| {
+                self.constraints()
+                    .max_width
+                    .with_replaced(Some(max_width + extra_width), || self.expr(body))
+            });
+            let used_extra_width = self.out.last_line_len() > max_width;
+            match (used_extra_width, result) {
+                (
+                    true,
+                    Ok(()) | Err(FormatError::Constraint(ConstraintError::NewlineNotAllowed)),
+                ) => ControlFlow::Continue(false),
+                (false, Err(FormatError::Constraint(ConstraintError::NewlineNotAllowed))) => {
+                    // the first line fits without extra width;
+                    // try again without the single-line and extra width
+                    ControlFlow::Continue(true)
+                }
+                (false, Ok(())) => {
+                    // it fits on one line, but now we need a comma
+                    match self.out.token_insert(",") {
+                        Err(FormatError::Constraint(_)) => ControlFlow::Continue(false),
+                        result => ControlFlow::Break(result),
+                    }
+                }
+                (_, Err(e)) => ControlFlow::Break(Err(e)),
+            }
+        });
+        match result {
+            ControlFlow::Break(result) => result,
+            ControlFlow::Continue((fallback, should_try_without_block)) => {
+                if should_try_without_block {
+                    same_line_or_add_block(fallback)
+                } else {
+                    fallback.otherwise(add_block)
+                }
+            }
+        }
     }
 }

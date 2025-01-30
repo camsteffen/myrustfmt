@@ -370,7 +370,7 @@ impl AstFormatter {
         ItemConfig: ListItemConfig<Item = T>,
     {
         let format_item = |item| match max_element_width {
-            Some(max_width) => self.with_width_limit_single_line(max_width, || format_item(item)),
+            Some(max_width) => self.with_single_line_and_width_limit(max_width, || format_item(item)),
             None => format_item(item),
         };
         self.embraced_after_opening(close_brace, || {

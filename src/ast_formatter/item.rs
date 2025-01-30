@@ -167,12 +167,10 @@ impl AstFormatter {
             None => self.ty(&impl_.self_ty),
         };
         let indented = if self.out.line() == first_line {
-            self.fallback(|| {
-                self.with_single_line(|| {
-                    self.out.space()?;
-                    first_part()?;
-                    Ok(false)
-                })
+            self.fallback_with_single_line(|| {
+                self.out.space()?;
+                first_part()?;
+                Ok(false)
             })
             .otherwise(|| {
                 self.indented(|| {

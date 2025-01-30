@@ -8,11 +8,11 @@ use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::list_config::{
     ArrayListConfig, CallParamListConfig, TupleListConfig, struct_field_list_config,
 };
-use crate::ast_utils::{plain_block};
+use crate::ast_utils::plain_block;
+use crate::ast_utils::postfix_expr_kind;
 use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
-use crate::ast_utils::postfix_expr_kind;
 
 impl AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
@@ -157,13 +157,11 @@ impl AstFormatter {
             ast::ExprKind::Paren(ref inner) => {
                 let tail = take_tail();
                 self.out.token("(")?;
-                self.fallback(|| {
-                    self.with_single_line(|| {
-                        self.expr(inner)?;
-                        self.out.token(")")?;
-                        self.tail(tail)?;
-                        Ok(())
-                    })
+                self.fallback_with_single_line(|| {
+                    self.expr(inner)?;
+                    self.out.token(")")?;
+                    self.tail(tail)?;
+                    Ok(())
                 })
                 .otherwise(|| {
                     self.embraced_after_opening(")", || self.expr(inner))?;
@@ -339,24 +337,22 @@ impl AstFormatter {
         if !is_single_line_cond {
             multiline()?;
         } else if let Some((block_expr, else_expr)) = single_line_parts() {
-            self.fallback(|| {
-                self.with_single_line(|| {
-                    self.with_width_limit_from_start(
-                        start_pos,
-                        RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
-                        || {
-                            self.out.space()?;
-                            self.expr(block_expr)?;
-                            self.out.space_token_space("}")?;
-                            self.out.token_space("else")?;
-                            self.out.token_space("{")?;
-                            self.expr(else_expr)?;
-                            self.out.space_token("}")?;
-                            self.tail(tail)?;
-                            Ok(())
-                        },
-                    )
-                })
+            self.fallback_with_single_line(|| {
+                self.with_width_limit_from_start(
+                    start_pos,
+                    RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
+                    || {
+                        self.out.space()?;
+                        self.expr(block_expr)?;
+                        self.out.space_token_space("}")?;
+                        self.out.token_space("else")?;
+                        self.out.token_space("{")?;
+                        self.expr(else_expr)?;
+                        self.out.space_token("}")?;
+                        self.tail(tail)?;
+                        Ok(())
+                    },
+                )
             })
             .otherwise(multiline)?;
         } else {
@@ -371,7 +367,7 @@ impl AstFormatter {
         self.expr(expr)?;
         let force_newline = self.out.line() != first_line
             && self.out.with_last_line(|line| {
-                let after_indent = &line[self.out.constraints().indent.get()..];
+                let after_indent = &line[self.out.constraints().indent.get() as usize..];
                 after_indent.starts_with(' ')
                     || after_indent
                         .chars()
@@ -385,7 +381,7 @@ impl AstFormatter {
         if force_newline {
             newline_open_block()?;
         } else {
-            self.fallback(|| self.with_single_line(|| self.out.space_token("{")))
+            self.fallback_with_single_line(|| self.out.space_token("{"))
                 .otherwise(newline_open_block)?;
         }
         Ok(self.out.line() == first_line)
@@ -450,7 +446,7 @@ impl AstFormatter {
                 self.skip_single_expr_blocks(inner, format)?;
                 self.out.skip_token("}")?;
                 Ok(())
-            },
+            }
         }
     }
 }

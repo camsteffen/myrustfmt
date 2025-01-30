@@ -80,8 +80,8 @@ impl SourceFormatter {
     }
 
     // todo make sure any math using two values of this are guaranteed to be on the same line
-    pub fn last_line_len(&self) -> usize {
-        self.out.last_line_len()
+    pub fn last_line_len(&self) -> u32 {
+        self.out.last_line_len() as u32
     }
 
     pub fn len(&self) -> usize {

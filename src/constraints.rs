@@ -19,7 +19,8 @@ pub struct Constraints {
     /// If true, no newline characters allowed
     pub single_line: Cell<bool>,
     // todo is this a constraint?
-    pub indent: Cell<usize>,
+    /// The number of spaces for the current level of indentation
+    pub indent: Cell<u32>,
     /// When true, we say the margin doesn't like to be touched by the expression in question.
     /// If an expression is touching the margin too much, we wrap it with a block to push it away.
     /// More specifically, the expression should only touch the margin in its first and last lines.

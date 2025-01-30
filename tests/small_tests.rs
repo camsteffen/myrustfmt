@@ -13,30 +13,31 @@ datatest_stable::harness! {
 }
 
 fn small_test_file(test_source_path: &Path) -> datatest_stable::Result<()> {
-    println!("Running breakpoint tests in {}", test_source_path.display());
     let file = fs::File::open(test_source_path).unwrap();
     let reader = BufReader::new(file);
     let tests: Vec<Test> = serde_yaml::from_reader(reader).unwrap();
+    let has_focus = tests.iter().any(|t| t.focus);
     for test in &tests {
-        small_test(test)
+        if !has_focus || test.focus {
+            small_test(test)
+        }
     }
     Ok(())
 }
 
 fn small_test(test: &Test) {
-    println!("Test: {}", &test.name);
+    eprintln!("Test: {}", &test.name);
     match &test.kind {
         TestKind::Breakpoint { before, after } => stmt_breakpoint_test(before, after),
         TestKind::NoChange { formatted } => {
             let formatted = formatted.trim();
-            format_stmt_max_width_expected(formatted, None, formatted)
+            format_stmt_max_width_expected(formatted, None, formatted, "formatted")
         }
         TestKind::BeforeAfter { before, after } => {
             let before = before.trim();
             let after = after.trim();
-            format_stmt_max_width_expected(before, None, after);
-            // idempotency test
-            format_stmt_max_width_expected(after, None, after);
+            format_stmt_max_width_expected(before, None, after, "before -> after");
+            format_stmt_max_width_expected(after, None, after, "after (idempotency)");
         }
     }
 }
@@ -44,6 +45,8 @@ fn small_test(test: &Test) {
 #[derive(Deserialize)]
 struct Test {
     name: String,
+    #[serde(default)]
+    focus: bool,
     #[serde(flatten)]
     kind: TestKind,
 }

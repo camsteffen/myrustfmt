@@ -3,7 +3,7 @@ use crate::constraints::{Constraints, MaxWidthForLine};
 use crate::error::{FormatResult, WidthLimitExceededError};
 use crate::util::cell_ext::CellExt;
 
-pub const INDENT_WIDTH: usize = 4;
+pub const INDENT_WIDTH: u32 = 4;
 
 impl AstFormatter {
     pub(super) fn constraints(&self) -> &Constraints {
@@ -52,7 +52,7 @@ impl AstFormatter {
     /** Enforces a max number of characters until a newline is printed */
     pub fn with_width_limit_first_line<T>(&self, width_limit: u32, f: impl FnOnce() -> T) -> T {
         let line = self.out.line();
-        let max_width = self.out.last_line_len() as u32 + width_limit;
+        let max_width = self.out.last_line_len() + width_limit;
         if self
             .constraints()
             .max_width_for_line
@@ -79,12 +79,12 @@ impl AstFormatter {
 
     pub fn with_width_limit_from_start<T>(
         &self,
-        line_start_pos: usize,
+        line_start_pos: u32,
         width_limit: u32,
         f: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         let Some(remaining) =
-            width_limit.checked_sub((self.out.last_line_len() - line_start_pos) as u32)
+            width_limit.checked_sub(self.out.last_line_len() - line_start_pos)
         else {
             return Err(WidthLimitExceededError.into());
         };
@@ -93,7 +93,7 @@ impl AstFormatter {
 
     pub fn with_width_limit_from_start_opt<T>(
         &self,
-        line_start_pos: usize,
+        line_start_pos: u32,
         width_limit: Option<u32>,
         f: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
@@ -105,12 +105,12 @@ impl AstFormatter {
 
     pub fn with_width_limit_from_start_first_line<T>(
         &self,
-        line_start_pos: usize,
+        line_start_pos: u32,
         width_limit: u32,
         f: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         let Some(remaining) =
-            width_limit.checked_sub((self.out.last_line_len() - line_start_pos) as u32)
+            width_limit.checked_sub(self.out.last_line_len() - line_start_pos)
         else {
             return Err(WidthLimitExceededError.into());
         };
@@ -119,7 +119,7 @@ impl AstFormatter {
 
     pub fn with_width_limit_from_start_first_line_opt<T>(
         &self,
-        line_start_pos: usize,
+        line_start_pos: u32,
         width_limit: Option<u32>,
         f: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
@@ -134,7 +134,7 @@ impl AstFormatter {
         width_limit: u32,
         f: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        let max_width = self.out.last_line_len() as u32 + width_limit;
+        let max_width = self.out.last_line_len() + width_limit;
         if self
             .constraints()
             .max_width
@@ -160,11 +160,11 @@ impl AstFormatter {
         }
     }
 
-    pub fn with_width_limit_single_line(
+    pub fn with_single_line_and_width_limit(
         &self,
         width_limit: u32,
         f: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
-        self.with_width_limit(width_limit, || self.with_single_line(f))
+        self.with_single_line(|| self.with_width_limit(width_limit, f))
     }
 }

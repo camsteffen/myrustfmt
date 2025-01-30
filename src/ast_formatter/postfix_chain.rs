@@ -2,12 +2,12 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::list::ListBuilderTrait;
 use crate::ast_formatter::util::tail::Tail;
+use crate::ast_utils::{postfix_expr_is_wrappable, postfix_expr_receiver_opt};
 use crate::error::FormatResult;
 use crate::error::{FormatError, WidthLimitExceededError};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use std::iter::successors;
-use crate::ast_utils::{postfix_expr_is_breakable, postfix_expr_receiver};
 
 impl AstFormatter {
     pub fn postfix_chain(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
@@ -25,7 +25,7 @@ impl AstFormatter {
 
         self.expr(root)?;
         let mut chain_rest = chain.as_slice();
-        self.postfix_chain_items(take_unbreakables(&mut chain_rest))?;
+        self.postfix_chain_items(take_non_wrappables(&mut chain_rest))?;
 
         // items that start within the first indent-width on the first line
         let indent_margin = self.out.constraints().indent.get() + INDENT_WIDTH;
@@ -36,7 +36,7 @@ impl AstFormatter {
             if self.out.last_line_len() > indent_margin {
                 break false;
             }
-            let Some(next) = take_next_with_unbreakables(&mut chain_rest) else {
+            let Some(next) = take_next_with_non_wrappables(&mut chain_rest) else {
                 return self.tail(tail);
             };
             self.postfix_chain_items(next)?
@@ -54,7 +54,7 @@ impl AstFormatter {
     fn postfix_chain_single_line(
         &self,
         chain: &[&ast::Expr],
-        start_pos: usize,
+        start_pos: u32,
         tail: &Tail,
     ) -> FormatResult {
         let width_limit = RUSTFMT_CONFIG_DEFAULTS.chain_width;
@@ -86,16 +86,19 @@ impl AstFormatter {
         // the width limit would not apply
         // todo wouldn't the first line width limit be removed anyways from the newline?
         // todo is this over-complicated?
-        let result = self.indented(|| {
-            self.out.newline_within_indent()?;
-            self.with_single_line(|| {
-                self.postfix_chain_items(overflowable)?;
-                self.tail(tail)?;
-                FormatResult::Ok(())
-            })?;
-            Ok(())
-        });
-        if result.is_ok() {
+        // todo share logic with match arm
+        let fits_on_one_line_with_wrap = self
+            .indented(|| {
+                self.out.newline_within_indent()?;
+                self.with_single_line(|| {
+                    self.postfix_chain_items(overflowable)?;
+                    self.tail(tail)?;
+                    FormatResult::Ok(())
+                })?;
+                Ok(())
+            })
+            .is_ok();
+        if fits_on_one_line_with_wrap {
             // ...if so, go to the separate lines approach
             return Err(WidthLimitExceededError.into());
         }
@@ -113,7 +116,7 @@ impl AstFormatter {
     }
 
     fn postfix_chain_separate_lines(&self, mut chain: &[&ast::Expr], tail: &Tail) -> FormatResult {
-        while let Some(next) = take_next_with_unbreakables(&mut chain) {
+        while let Some(next) = take_next_with_non_wrappables(&mut chain) {
             self.out.newline_within_indent()?;
             self.postfix_chain_items(next)?;
         }
@@ -158,13 +161,11 @@ impl AstFormatter {
 }
 
 fn build_postfix_chain(expr: &ast::Expr) -> (&ast::Expr, Vec<&ast::Expr>) {
-    let mut chain = Vec::from_iter(successors(Some(expr), |e| postfix_expr_receiver(e)));
-    // Separate the root because
-    //   1) It allows the chain to be *only* postfix expressions
-    //   2) It puts this unwrap close to the source of the never-empty list
+    let mut chain = Vec::from_iter(successors(Some(expr), |e| postfix_expr_receiver_opt(e)));
     let root = chain.pop().unwrap();
     // order the chain as it appears in code
     chain.reverse();
+    // N.B. `root` can be any expression type, but `chain` is strictly postfix expressions
     (root, chain)
 }
 
@@ -173,41 +174,37 @@ fn build_postfix_chain(expr: &ast::Expr) -> (&ast::Expr, Vec<&ast::Expr>) {
 fn split_overflowable<'a, 'b>(
     chain: &'b [&'a ast::Expr],
 ) -> Option<(&'b [&'a ast::Expr], &'b [&'a ast::Expr])> {
-    let mut count = 0;
+    let mut len = 1;
     for item in chain.iter().rev() {
-        if is_unbreakable(item) {
-            count += 1;
-        } else if matches!(item.kind, ast::ExprKind::MethodCall(_)) {
-            count += 1;
-            return Some(chain.split_at(chain.len() - count));
+        if matches!(item.kind, ast::ExprKind::MethodCall(_)) {
+            return Some(chain.split_at(chain.len() - len));
+        } else if postfix_expr_is_wrappable(item) {
+            return None;
         } else {
-            break;
+            len += 1;
         }
     }
     None
 }
 
-fn is_unbreakable(item: &ast::Expr) -> bool {
-    !postfix_expr_is_breakable(item).unwrap()
-}
-
-fn take_next_with_unbreakables<'a, 'b>(
+fn take_next_with_non_wrappables<'a, 'b>(
     slice: &mut &'a [&'b ast::Expr],
 ) -> Option<&'a [&'b ast::Expr]> {
-    match slice {
-        [] => None,
-        [_, rest @ ..] => {
-            let pos = rest.iter().take_while(|e| is_unbreakable(e)).count();
-            let out;
-            (out, *slice) = slice.split_at(pos + 1);
-            Some(out)
-        }
-    }
+    let (_, rest) = slice.split_first()?;
+    let (out, new_slice) = slice.split_at(count_non_wrappables(rest) + 1);
+    *slice = new_slice;
+    Some(out)
 }
 
-fn take_unbreakables<'a, 'b>(slice: &mut &'b [&'a ast::Expr]) -> &'b [&'a ast::Expr] {
-    let pos = slice.iter().take_while(|e| is_unbreakable(e)).count();
-    let out;
-    (out, *slice) = slice.split_at(pos);
+fn take_non_wrappables<'a, 'b>(slice: &mut &'b [&'a ast::Expr]) -> &'b [&'a ast::Expr] {
+    let (out, new_slice) = slice.split_at(count_non_wrappables(slice));
+    *slice = new_slice;
     out
+}
+
+fn count_non_wrappables(slice: &[&ast::Expr]) -> usize {
+    slice
+        .iter()
+        .take_while(|e| !postfix_expr_is_wrappable(e))
+        .count()
 }

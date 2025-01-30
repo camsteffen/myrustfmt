@@ -83,13 +83,11 @@ impl AstFormatter {
         self.out.space_token("=")?;
         // todo do all these cases apply with else clause?
         // single line
-        self.fallback(|| {
-            self.with_single_line(|| {
-                self.out.space()?;
-                self.expr(expr)?;
-                self.tail(end)?;
-                Ok(())
-            })
+        self.fallback_with_single_line(|| {
+            self.out.space()?;
+            self.expr(expr)?;
+            self.tail(end)?;
+            Ok(())
         })
         // wrap and indent then single line
         .next(|| {
