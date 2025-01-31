@@ -55,7 +55,10 @@ impl<T> Fallback<'_, T> {
                 // restore the checkpoint before continuing to the next formatting strategy
                 Err(FormatError::Constraint(_)) => self.af.out.restore(&checkpoint.0),
                 // if Ok or an unrecoverable error, we're finished
-                result => self.finish(result),
+                result => match std::mem::replace(&mut self.state, FallbackState::Break(result)) {
+                    FallbackState::Continue(checkpoint) => self.af.close_checkpoint(checkpoint),
+                    _ => unreachable!(),
+                },
             }
         }
         self
@@ -64,17 +67,17 @@ impl<T> Fallback<'_, T> {
     /// Chain a formatting attempt with explicit control over whether to break with a result
     /// or continue the fallback chain.
     pub fn next_control_flow<U>(
-        mut self,
+        self,
         attempt: impl FnOnce() -> ControlFlow<FormatResult<T>, U>,
     ) -> ControlFlow<FormatResult<T>, (Self, U)> {
         match self.state {
             FallbackState::Break(result) => ControlFlow::Break(result),
             FallbackState::Continue(ref checkpoint) => match attempt() {
                 ControlFlow::Break(result) => {
-                    self.finish(result);
-                    let FallbackState::Break(result) = self.state else {
+                    let FallbackState::Continue(checkpoint) = self.state else {
                         unreachable!();
                     };
+                    self.af.close_checkpoint(checkpoint);
                     ControlFlow::Break(result)
                 }
                 ControlFlow::Continue(value) => {
@@ -95,14 +98,5 @@ impl<T> Fallback<'_, T> {
                 final_attempt()
             }
         }
-    }
-
-    fn finish(&mut self, result: FormatResult<T>) {
-        let FallbackState::Continue(checkpoint) =
-            std::mem::replace(&mut self.state, FallbackState::Break(result))
-        else {
-            panic!("fallback is already complete")
-        };
-        self.af.close_checkpoint(checkpoint);
     }
 }
