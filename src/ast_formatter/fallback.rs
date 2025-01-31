@@ -12,7 +12,8 @@ impl AstFormatter {
         Checkpoint(self.out.snapshot())
     }
 
-    /// Please return your Checkpoint here as soon as you don't need it anymore.
+    /// It is important to close the checkpoint *before* the final formatting strategy, since the
+    /// absence of an active checkpoint indicates that constraint errors are un-recoverable.
     pub fn close_checkpoint(&self, _: Checkpoint) {
         self.constraints().fallback_stack.borrow_mut().pop();
     }
