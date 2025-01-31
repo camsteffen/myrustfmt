@@ -99,15 +99,14 @@ impl AstFormatter {
 
     // todo share logic with local which also wraps to avoid multi-line
     // todo should we count lines or simply observe whether it's multi-line?
-    /// Call this function with a fallback that will format the code on the next line and indented.
-    /// This function will return `Err(WidthLimitExceeded)` if it can prove that the fallback will
-    /// allow more code to fit in the first line of the output.
+    /// Adds a block only if doing so allows for more code to fit in the first line
     fn arm_body_add_block_if_first_line_is_longer(&self, body: &ast::Expr) -> FormatResult {
         let Some(max_width) = self.constraints().max_width.get() else {
             return self.arm_body_same_line(body, self.start_fallback());
         };
 
         let start = self.out.last_line_len();
+        // the starting position if we wrapped to the next line and indented
         let next_line_start = self.constraints().indent.get() + INDENT_WIDTH;
         if start <= next_line_start {
             // wrap-indent wouldn't afford us more width so just continue normally
@@ -130,13 +129,12 @@ impl AstFormatter {
                     true,
                     Ok(()) | Err(FormatError::Constraint(ConstraintError::NewlineNotAllowed)),
                 ) => {
-                    // we used the extra width, so we need to add a block to make the first line
-                    // (or only line) fit
+                    // we used the extra width, so we need to add a block to make the first line fit
                     ControlFlow::Continue(true)
                 }
                 (false, Err(FormatError::Constraint(ConstraintError::NewlineNotAllowed))) => {
-                    // we did not use the extra width, but it also did not fit on one line,
-                    // so try formatting without a block next
+                    // we did not use the extra width, but it did not fit on one line,
+                    // so try to format normally without a block
                     ControlFlow::Continue(false)
                 }
                 (false, Ok(())) => {
@@ -145,8 +143,10 @@ impl AstFormatter {
                         // welp the comma didn't fit,
                         // but the expression will fit on one line if we add a block
                         Err(FormatError::Constraint(_)) => ControlFlow::Continue(true),
-                        // it all fits on one line! Or terminal error
-                        result => ControlFlow::Break(result),
+                        // it all fits on one line!
+                        Ok(()) => ControlFlow::Break(Ok(())),
+                        // terminal error
+                        Err(e) => ControlFlow::Break(Err(e)),
                     }
                 }
                 // terminal error

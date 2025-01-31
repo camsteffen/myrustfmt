@@ -51,7 +51,7 @@ impl<T> Fallback<'_, T> {
     pub fn next(mut self, attempt: impl FnOnce() -> FormatResult<T>) -> Self {
         if let FallbackState::Continue(checkpoint) = &self.state {
             match attempt() {
-                // continue to the next formatting strategy on constraint errors
+                // restore the checkpoint before continuing to the next formatting strategy
                 Err(FormatError::Constraint(_)) => self.af.out.restore(&checkpoint.0),
                 // if Ok or an unrecoverable error, we're finished
                 result => self.finish(result),
