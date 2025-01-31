@@ -3,7 +3,7 @@ use std::ops::ControlFlow;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
-use crate::ast_formatter::fallback::Fallback;
+use crate::ast_formatter::fallback::BacktrackChain;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{arm_body_requires_block, is_plain_block};
 use crate::error::{ConstraintError, FormatError, FormatResult};
@@ -162,7 +162,7 @@ impl AstFormatter {
         }
     }
 
-    fn arm_body_same_line(&self, body: &ast::Expr, fallback: Fallback) -> FormatResult {
+    fn arm_body_same_line(&self, body: &ast::Expr, fallback: BacktrackChain) -> FormatResult {
         // todo closures and structs should have single-line headers
         // todo exclude comma for block-like expressions?
         fallback
