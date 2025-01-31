@@ -88,8 +88,7 @@ impl<T> Fallback<'_, T> {
         }
     }
 
-    /// Provide the final formatting attempt.
-    /// This is a required terminal operation.
+    /// Provide the final formatting attempt. This is a required terminal operation.
     pub fn otherwise(self, final_attempt: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         match self.state {
             FallbackState::Break(result) => result,
