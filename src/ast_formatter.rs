@@ -12,7 +12,7 @@ mod block;
 mod common;
 mod constraint_modifiers;
 mod expr;
-mod fallback;
+mod backtrack;
 mod r#fn;
 mod generics;
 mod item;
@@ -24,6 +24,7 @@ mod path;
 mod postfix_chain;
 mod ty;
 mod util;
+mod checkpoint;
 
 pub struct AstFormatter {
     config: Rc<Config>,

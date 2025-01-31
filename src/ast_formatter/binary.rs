@@ -16,7 +16,7 @@ impl AstFormatter {
     ) -> FormatResult {
         let (first, chain) = self.collect_binary_chain(left, right, op);
         self.expr(first)?;
-        self.fallback_with_single_line(|| {
+        self.backtrack_with_single_line(|| {
             for (op, expr) in &chain {
                 self.out.space_token_space(op.as_str())?;
                 self.expr(expr)?;

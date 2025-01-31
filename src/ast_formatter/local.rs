@@ -43,39 +43,42 @@ impl AstFormatter {
             self.out.token(";")?;
             Ok(())
         };
-        self.fallback(|| {
-            self.out.space_token_space("else")?;
-            self.out.token("{")?;
-            match self.expr_only_block(else_) {
-                None => else_block()?,
-                Some(else_expr) => self
-                    .fallback(|| {
-                        self.with_width_limit_from_start(
-                            // todo verify still on the same line
-                            start,
-                            RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
-                            || {
-                                self.with_single_line(|| {
-                                    self.out.space()?;
-                                    self.expr(else_expr)?;
-                                    self.out.space_token("}")?;
-                                    self.out.token(";")?;
-                                    Ok(())
-                                })
-                            },
-                        )
-                    })
-                    .otherwise(else_block)?,
-            }
-            Ok(())
-        })
-        .otherwise(|| {
-            self.out.newline_within_indent()?;
-            self.out.token_space("else")?;
-            self.out.token("{")?;
-            else_block()?;
-            Ok(())
-        })?;
+        self.backtrack()
+            .next(|| {
+                self.out.space_token_space("else")?;
+                self.out.token("{")?;
+                match self.expr_only_block(else_) {
+                    None => else_block()?,
+                    Some(else_expr) => {
+                        self.backtrack()
+                            .next(|| {
+                                self.with_width_limit_from_start(
+                                    // todo verify still on the same line
+                                    start,
+                                    RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
+                                    || {
+                                        self.with_single_line(|| {
+                                            self.out.space()?;
+                                            self.expr(else_expr)?;
+                                            self.out.space_token("}")?;
+                                            self.out.token(";")?;
+                                            Ok(())
+                                        })
+                                    },
+                                )
+                            })
+                            .otherwise(else_block)?
+                    }
+                }
+                Ok(())
+            })
+            .otherwise(|| {
+                self.out.newline_within_indent()?;
+                self.out.token_space("else")?;
+                self.out.token("{")?;
+                else_block()?;
+                Ok(())
+            })?;
         Ok(())
     }
 
@@ -83,7 +86,7 @@ impl AstFormatter {
         self.out.space_token("=")?;
         // todo do all these cases apply with else clause?
         // single line
-        self.fallback_with_single_line(|| {
+        self.backtrack_with_single_line(|| {
             self.out.space()?;
             self.expr(expr)?;
             self.tail(end)?;

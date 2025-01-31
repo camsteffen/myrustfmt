@@ -167,7 +167,7 @@ impl AstFormatter {
             None => self.ty(&impl_.self_ty),
         };
         let indented = if self.out.line() == first_line {
-            self.fallback_with_single_line(|| {
+            self.backtrack_with_single_line(|| {
                 self.out.space()?;
                 first_part()?;
                 Ok(false)
@@ -185,20 +185,21 @@ impl AstFormatter {
             false
         };
         if impl_.of_trait.is_some() {
-            self.fallback(|| {
-                self.out.space()?;
-                self.out.token_space("for")?;
-                self.ty(&impl_.self_ty)?;
-                Ok(())
-            })
-            .otherwise(|| {
-                self.indented_optional(!indented, || {
-                    self.out.newline_within_indent()?;
+            self.backtrack()
+                .next(|| {
+                    self.out.space()?;
                     self.out.token_space("for")?;
                     self.ty(&impl_.self_ty)?;
                     Ok(())
                 })
-            })?;
+                .otherwise(|| {
+                    self.indented_optional(!indented, || {
+                        self.out.newline_within_indent()?;
+                        self.out.token_space("for")?;
+                        self.ty(&impl_.self_ty)?;
+                        Ok(())
+                    })
+                })?;
         }
         self.where_clause(&impl_.generics.where_clause)?;
         if impl_.generics.where_clause.is_empty() {

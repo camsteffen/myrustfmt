@@ -52,19 +52,20 @@ impl AstFormatter {
             ast::ExprKind::Lit(_) => self.out.copy_span(expr.span)?,
             ast::ExprKind::Cast(ref target, ref ty) => {
                 self.expr(target)?;
-                self.fallback(|| {
-                    self.out.space_token_space("as")?;
-                    self.ty(ty)?;
-                    Ok(())
-                })
-                .otherwise(|| {
-                    self.indented(|| {
-                        self.out.newline_within_indent()?;
-                        self.out.token_space("as")?;
+                self.backtrack()
+                    .next(|| {
+                        self.out.space_token_space("as")?;
                         self.ty(ty)?;
                         Ok(())
                     })
-                })?;
+                    .otherwise(|| {
+                        self.indented(|| {
+                            self.out.newline_within_indent()?;
+                            self.out.token_space("as")?;
+                            self.ty(ty)?;
+                            Ok(())
+                        })
+                    })?;
             }
             ast::ExprKind::Type(_, _) => todo!(),
             ast::ExprKind::Let(ref pat, ref init, ..) => {
@@ -157,7 +158,7 @@ impl AstFormatter {
             ast::ExprKind::Paren(ref inner) => {
                 let tail = take_tail();
                 self.out.token("(")?;
-                self.fallback_with_single_line(|| {
+                self.backtrack_with_single_line(|| {
                     self.expr(inner)?;
                     self.out.token(")")?;
                     self.tail(tail)?;
@@ -201,13 +202,14 @@ impl AstFormatter {
             if self.out.constraints().single_line.get() {
                 self.expr(expr)
             } else {
-                self.fallback(|| {
-                    self.out
-                        .constraints()
-                        .touchy_margin
-                        .with_replaced(true, || self.expr(expr))
-                })
-                .otherwise(|| self.expr_add_block(expr))
+                self.backtrack()
+                    .next(|| {
+                        self.out
+                            .constraints()
+                            .touchy_margin
+                            .with_replaced(true, || self.expr(expr))
+                    })
+                    .otherwise(|| self.expr_add_block(expr))
             }
         })
     }
@@ -337,7 +339,7 @@ impl AstFormatter {
         if !is_single_line_cond {
             multiline()?;
         } else if let Some((block_expr, else_expr)) = single_line_parts() {
-            self.fallback_with_single_line(|| {
+            self.backtrack_with_single_line(|| {
                 self.with_width_limit_from_start(
                     start_pos,
                     RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
@@ -381,7 +383,7 @@ impl AstFormatter {
         if force_newline {
             newline_open_block()?;
         } else {
-            self.fallback_with_single_line(|| self.out.space_token("{"))
+            self.backtrack_with_single_line(|| self.out.space_token("{"))
                 .otherwise(newline_open_block)?;
         }
         Ok(self.out.line() == first_line)

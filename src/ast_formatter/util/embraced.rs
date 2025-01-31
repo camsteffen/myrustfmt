@@ -4,7 +4,7 @@ use crate::error::FormatResult;
 impl AstFormatter {
     /// Writes a closing brace. Allows for indented comments between braces.
     pub fn embraced_empty_after_opening(&self, closing_brace: &str) -> FormatResult {
-        self.fallback_with_single_line(|| self.out.token(closing_brace))
+        self.backtrack_with_single_line(|| self.out.token(closing_brace))
             .otherwise(|| {
                 self.indented(|| self.out.newline_within())?;
                 self.out.token(closing_brace)?;

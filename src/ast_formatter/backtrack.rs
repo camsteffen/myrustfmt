@@ -1,0 +1,88 @@
+use crate::ast_formatter::AstFormatter;
+use crate::error::{FormatError, FormatResult};
+use std::ops::ControlFlow;
+use crate::ast_formatter::checkpoint::Checkpoint;
+
+impl AstFormatter {
+    // todo should fallback be specific to a constraint? unless_too_wide(..).otherwise(..)
+    pub fn backtrack<T>(&self) -> Backtrack<T> {
+        Backtrack {
+            af: self,
+            state: BacktrackState::Continue(self.open_checkpoint()),
+        }
+    }
+
+    pub fn backtrack_with_single_line<T>(
+        &self,
+        first: impl FnOnce() -> FormatResult<T>,
+    ) -> Backtrack<T> {
+        self.backtrack().next(|| self.with_single_line(first))
+    }
+}
+
+/// Executes a series of formatting strategies to find one that succeeds with the given constraints.
+/// Each strategy is chained by calling `next` with a formatting function, and the final strategy
+/// is chained with `otherwise`. If a strategy fails with a constraint error, it will restore a
+/// checkpoint before running the next strategy. If a strategy succeeds, it will hold the result
+/// until the end, and all subsequent strategies will be ignored.
+#[must_use]
+pub struct Backtrack<'a, T = ()> {
+    af: &'a AstFormatter,
+    state: BacktrackState<T>,
+}
+
+type BacktrackState<T> = ControlFlow<FormatResult<T>, Checkpoint>;
+
+impl<T> Backtrack<'_, T> {
+    /// Provides the next formatting strategy, but not the final one.
+    pub fn next(mut self, strategy: impl FnOnce() -> FormatResult<T>) -> Self {
+        if let BacktrackState::Continue(checkpoint) = &self.state {
+            match strategy() {
+                // restore the checkpoint before continuing to the next formatting strategy
+                Err(FormatError::Constraint(_)) => self.af.restore_checkpoint(checkpoint),
+                // if Ok or an unrecoverable error, we're finished
+                result => match std::mem::replace(&mut self.state, BacktrackState::Break(result)) {
+                    BacktrackState::Continue(checkpoint) => self.af.close_checkpoint(checkpoint),
+                    _ => unreachable!(),
+                },
+            }
+        }
+        self
+    }
+
+    /// Provides the final formatting strategy and returns the result of the backtracking chain.
+    /// This is a required terminal operation.
+    pub fn otherwise(self, final_attempt: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
+        match self.state {
+            BacktrackState::Break(result) => result,
+            BacktrackState::Continue(checkpoint) => {
+                self.af.close_checkpoint(checkpoint);
+                final_attempt()
+            }
+        }
+    }
+
+    /// Provides the next formatting strategy with explicit control of whether to break with a
+    /// result or continue with subsequent strategies.
+    pub fn next_control_flow<C>(
+        self,
+        strategy: impl FnOnce() -> ControlFlow<FormatResult<T>, C>,
+    ) -> ControlFlow<FormatResult<T>, (Self, C)> {
+        match self.state {
+            BacktrackState::Break(result) => ControlFlow::Break(result),
+            BacktrackState::Continue(ref checkpoint) => match strategy() {
+                ControlFlow::Break(result) => {
+                    let BacktrackState::Continue(checkpoint) = self.state else {
+                        unreachable!();
+                    };
+                    self.af.close_checkpoint(checkpoint);
+                    ControlFlow::Break(result)
+                }
+                ControlFlow::Continue(value) => {
+                    self.af.restore_checkpoint(checkpoint);
+                    ControlFlow::Continue((self, value))
+                }
+            },
+        }
+    }
+}

@@ -10,7 +10,7 @@ impl AstFormatter {
         should_indent: bool,
     ) -> FormatResult {
         let (first, rest) = items.split_first().unwrap();
-        self.fallback_with_single_line(|| {
+        self.backtrack_with_single_line(|| {
             format_item(first)?;
             for item in rest {
                 self.out.space_token_space(token)?;

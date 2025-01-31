@@ -4,10 +4,11 @@ use crate::ast_formatter::list::ListBuilderTrait;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{postfix_expr_is_wrappable, postfix_expr_receiver_opt};
 use crate::error::FormatResult;
-use crate::error::{FormatError, WidthLimitExceededError};
+use crate::error::WidthLimitExceededError;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use std::iter::successors;
+use std::ops::ControlFlow;
 
 impl AstFormatter {
     pub fn postfix_chain(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
@@ -46,7 +47,8 @@ impl AstFormatter {
             // each item on a separate line, no indent
             self.postfix_chain_separate_lines(chain_rest, tail)
         } else {
-            self.fallback(|| self.postfix_chain_single_line(chain_rest, start_pos, tail))
+            self.backtrack()
+                .next(|| self.postfix_chain_single_line(chain_rest, start_pos, tail))
                 .otherwise(|| self.indented(|| self.postfix_chain_separate_lines(chain_rest, tail)))
         }
     }
@@ -71,48 +73,78 @@ impl AstFormatter {
         };
         items_single_line(until_overflow)?;
 
-        let snapshot = self.out.snapshot();
+        let mut backtrack = self.backtrack();
 
-        // first try without overflow
-        let result = items_single_line(overflowable).and_then(|()| self.tail(tail));
-        match result {
-            Ok(()) | Err(FormatError::Parse(_)) => return result,
-            Err(FormatError::Constraint(_)) => {
-                self.out.restore(&snapshot);
-            }
-        }
-
-        // experimentally check if wrapping the last item makes it fit on one line
-        // the width limit would not apply
-        // todo wouldn't the first line width limit be removed anyways from the newline?
-        // todo is this over-complicated?
-        // todo share logic with match arm
-        let fits_on_one_line_with_wrap = self
-            .indented(|| {
-                self.out.newline_within_indent()?;
-                self.with_single_line(|| {
-                    self.postfix_chain_items(overflowable)?;
-                    self.tail(tail)?;
-                    FormatResult::Ok(())
-                })?;
+        // todo break this up more cleanly, avoid needless backtrack
+        if !self.constraints().touchy_margin.get() {
+            // first try without overflow
+            backtrack = backtrack.next(|| {
+                items_single_line(overflowable)?;
+                self.tail(tail)?;
                 Ok(())
-            })
-            .is_ok();
-        if fits_on_one_line_with_wrap {
-            // ...if so, go to the separate lines approach
-            return Err(WidthLimitExceededError.into());
-        }
-        self.out.restore(&snapshot);
+            });
 
-        // finally, use overflow
-        self.with_width_limit_from_start_first_line(start_pos, width_limit, || {
-            let (first, rest) = overflowable.split_first().unwrap();
-            self.postfix_chain_item(first)?;
-            self.with_single_line(|| self.postfix_chain_items(rest))?;
+            let result = backtrack.next_control_flow(|| {
+                // experimentally check if wrapping the last item makes it fit on one line
+                // the width limit would not apply
+                // todo wouldn't the first line width limit be removed anyways from the newline?
+                // todo is this over-complicated?
+                // todo share logic with match arm
+                let fits_on_one_line_with_wrap = self
+                    .indented(|| {
+                        self.out.newline_within_indent()?;
+                        self.with_single_line(|| {
+                            self.postfix_chain_items(overflowable)?;
+                            self.tail(tail)?;
+                            FormatResult::Ok(())
+                        })?;
+                        Ok(())
+                    })
+                    .is_ok();
+                if fits_on_one_line_with_wrap {
+                    // ...if so, go to the separate lines approach
+                    // todo perhaps there is a concept of "fallback cost" that can be passed down
+                    //   - if you err out, there will be a cost of increased indent and added lines
+                    /* todo
+                         1. Count total number of lines when deciding to fall back to multi-line chain
+                            - we can count the number of wrappables leading up to the method call, and
+                              we know they will take one line each since they all fit on one line
+                         2. Consider touchy_margins
+                            - Consider 2 lines added by block
+                            - Consider increased indentation
+                              - less room for wrapped method call
+                              - less room for items leading up to method call, so multi-line may already be a given
+                     */
+                    // fragment, probe, segment, lookahead
+                    let wrappable_count = until_overflow.iter().filter(|e| postfix_expr_is_wrappable(e)).count();
+                    ControlFlow::Break(Err(WidthLimitExceededError.into()))
+                } else {
+                    ControlFlow::Continue(())
+                }
+            });
+            backtrack = match result {
+                ControlFlow::Break(result) => return result,
+                ControlFlow::Continue((backtrack, ())) => backtrack,
+            };
+        }
+
+        backtrack.otherwise(|| {
+            // finally, use overflow
+            self.with_width_limit_from_start_first_line(start_pos, width_limit, || {
+                let (first, rest) = overflowable.split_first().unwrap();
+                self.postfix_chain_item(first)?;
+                // single line constraint here avoids cascading overflow along the margin like:
+                // chain.method({
+                //     expr
+                // })[
+                //     expr
+                // ]
+                self.with_single_line(|| self.postfix_chain_items(rest))?;
+                Ok(())
+            })?;
+            self.tail(tail)?;
             Ok(())
-        })?;
-        self.tail(tail)?;
-        Ok(())
+        })
     }
 
     fn postfix_chain_separate_lines(&self, mut chain: &[&ast::Expr], tail: &Tail) -> FormatResult {
@@ -142,10 +174,9 @@ impl AstFormatter {
             }
             ast::ExprKind::Index(_, ref index, _) => {
                 self.out.token("[")?;
-                self.fallback(|| {
-                    self.with_single_line(|| self.expr_tail(index, &Tail::token("]")))
-                })
-                .otherwise(|| self.embraced_after_opening("]", || self.expr(index)))?;
+                self.backtrack()
+                    .next(|| self.with_single_line(|| self.expr_tail(index, &Tail::token("]"))))
+                    .otherwise(|| self.embraced_after_opening("]", || self.expr(index)))?;
             }
             ast::ExprKind::Try(..) => self.out.token("?")?,
             _ => unreachable!(),
@@ -169,7 +200,7 @@ fn build_postfix_chain(expr: &ast::Expr) -> (&ast::Expr, Vec<&ast::Expr>) {
     (root, chain)
 }
 
-/// Splits of the trailing method call, with optional unbreakable items after that,
+/// Splits off the trailing method call, possibly followed by non-wrappable items,
 /// or returns None if the chain doesn't end with a method call.
 fn split_overflowable<'a, 'b>(
     chain: &'b [&'a ast::Expr],
@@ -191,18 +222,18 @@ fn take_next_with_non_wrappables<'a, 'b>(
     slice: &mut &'a [&'b ast::Expr],
 ) -> Option<&'a [&'b ast::Expr]> {
     let (_, rest) = slice.split_first()?;
-    let (out, new_slice) = slice.split_at(count_non_wrappables(rest) + 1);
+    let (out, new_slice) = slice.split_at(count_leading_non_wrappables(rest) + 1);
     *slice = new_slice;
     Some(out)
 }
 
 fn take_non_wrappables<'a, 'b>(slice: &mut &'b [&'a ast::Expr]) -> &'b [&'a ast::Expr] {
-    let (out, new_slice) = slice.split_at(count_non_wrappables(slice));
+    let (out, new_slice) = slice.split_at(count_leading_non_wrappables(slice));
     *slice = new_slice;
     out
 }
 
-fn count_non_wrappables(slice: &[&ast::Expr]) -> usize {
+fn count_leading_non_wrappables(slice: &[&ast::Expr]) -> usize {
     slice
         .iter()
         .take_while(|e| !postfix_expr_is_wrappable(e))

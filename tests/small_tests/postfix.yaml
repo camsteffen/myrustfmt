@@ -50,3 +50,28 @@
             asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf
                 + asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf
         ]
+- name: prefer multi-line chain over overflow if the number of lines would be the same
+  type: breakpoint
+  before: |
+    rooty
+        .asdf
+        .asdf
+        .asdfasdf(Thing { thing, thing })
+  after: |
+    rooty.asdf.asdf.asdfasdf(Thing {
+        thing,
+        thing,
+    })
+- name: prefer overflow over multi-line chain if it is fewer lines
+  type: breakpoint
+  before: |
+    oneone.two.three.four.five(Thing {
+        foo,
+        foo,
+    })
+  after: |
+    oneone
+        .two
+        .three
+        .four
+        .five(Thing { foo, foo })

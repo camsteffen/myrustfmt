@@ -2,7 +2,7 @@
 
 mod test_lib;
 
-use crate::test_lib::{format_stmt_max_width_expected, stmt_breakpoint_test};
+use crate::test_lib::{format_stmt_max_width_expected, stmt_breakpoint_test, TestResult};
 use serde::Deserialize;
 use std::fs;
 use std::io::BufReader;
@@ -12,34 +12,35 @@ datatest_stable::harness! {
     { test = small_test_file, root = "tests/small_tests", pattern = r".yaml" },
 }
 
-fn small_test_file(test_source_path: &Path) -> datatest_stable::Result<()> {
+fn small_test_file(test_source_path: &Path) -> TestResult {
     let file = fs::File::open(test_source_path).unwrap();
     let reader = BufReader::new(file);
     let tests: Vec<Test> = serde_yaml::from_reader(reader).unwrap();
     let has_focus = tests.iter().any(|t| t.focus);
     for test in &tests {
         if !has_focus || test.focus {
-            small_test(test)
+            small_test(test)?;
         }
     }
     Ok(())
 }
 
-fn small_test(test: &Test) {
+fn small_test(test: &Test) -> TestResult {
     eprintln!("Test: {}", &test.name);
     match &test.kind {
-        TestKind::Breakpoint { before, after } => stmt_breakpoint_test(before, after),
+        TestKind::Breakpoint { before, after } => stmt_breakpoint_test(before, after)?,
         TestKind::NoChange { formatted } => {
             let formatted = formatted.trim();
-            format_stmt_max_width_expected(formatted, None, formatted, "formatted")
+            format_stmt_max_width_expected(formatted, None, formatted, "formatted")?;
         }
         TestKind::BeforeAfter { before, after } => {
             let before = before.trim();
             let after = after.trim();
-            format_stmt_max_width_expected(before, None, after, "before -> after");
-            format_stmt_max_width_expected(after, None, after, "after (idempotency)");
+            format_stmt_max_width_expected(before, None, after, "before -> after")?;
+            format_stmt_max_width_expected(after, None, after, "after (idempotency)")?;
         }
     }
+    Ok(())
 }
 
 #[derive(Deserialize)]

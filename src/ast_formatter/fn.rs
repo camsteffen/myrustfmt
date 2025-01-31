@@ -27,7 +27,7 @@ impl AstFormatter {
                 single_line_max_contents_width: None,
             },
         );
-        self.fallback_with_single_line(|| {
+        self.backtrack_with_single_line(|| {
             param_list.format_single_line(self)?;
             self.fn_ret_ty(&sig.decl.output)?;
             if is_block_after_decl {
@@ -39,11 +39,13 @@ impl AstFormatter {
             param_list.format_separate_lines(self)?;
             self.fn_ret_ty(&sig.decl.output)?;
             if is_block_after_decl {
-                self.fallback(|| self.out.space_token("{")).otherwise(|| {
-                    self.out.newline_within_indent()?;
-                    self.out.token("{")?;
-                    Ok(())
-                })?;
+                self.backtrack()
+                    .next(|| self.out.space_token("{"))
+                    .otherwise(|| {
+                        self.out.newline_within_indent()?;
+                        self.out.token("{")?;
+                        Ok(())
+                    })?;
             }
             Ok(())
         })?;
@@ -100,7 +102,7 @@ impl AstFormatter {
                 self.expr_tail(body, tail)
             } else {
                 // add a block unless it fits on a single line
-                self.fallback_with_single_line(|| self.expr_tail(body, tail))
+                self.backtrack_with_single_line(|| self.expr_tail(body, tail))
                     .otherwise(|| {
                         self.expr_add_block(body)?;
                         self.tail(tail)?;
@@ -162,7 +164,7 @@ impl AstFormatter {
     fn fn_decl(&self, fn_decl: &ast::FnDecl, braces: &'static Braces) -> FormatResult {
         let param_list = list(braces, &fn_decl.inputs, |param| self.param(param));
         // args and return type all on one line
-        self.fallback_with_single_line(|| {
+        self.backtrack_with_single_line(|| {
             param_list.format_single_line(self)?;
             self.fn_ret_ty(&fn_decl.output)?;
             Ok(())
@@ -215,7 +217,8 @@ impl AstFormatter {
         match output {
             ast::FnRetTy::Default(_) => {}
             ast::FnRetTy::Ty(ty) => {
-                self.fallback(|| self.out.space_token_space("->"))
+                self.backtrack()
+                    .next(|| self.out.space_token_space("->"))
                     .otherwise(|| {
                         self.out.newline_within_indent()?;
                         self.out.token_space("->")?;

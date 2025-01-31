@@ -71,8 +71,7 @@ where
     pub fn config<ConfigNew: ListConfig>(
         self,
         config: ConfigNew,
-    ) -> ListBuilder<'ast, 'tail, Item, FormatItem, ConfigNew, ItemConfig, Overflow>
-    {
+    ) -> ListBuilder<'ast, 'tail, Item, FormatItem, ConfigNew, ItemConfig, Overflow> {
         ListBuilder {
             braces: self.braces,
             list: self.list,
@@ -105,15 +104,7 @@ where
 
     pub fn overflow(
         self,
-    ) -> ListBuilder<
-        'ast,
-        'tail,
-        Item,
-        FormatItem,
-        Config,
-        ItemConfig,
-        ListOverflowYes<Item>,
-    > {
+    ) -> ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfig, ListOverflowYes<Item>> {
         ListBuilder {
             braces: self.braces,
             list: self.list,
@@ -184,7 +175,7 @@ where
     }
 
     fn contents_default(&self, af: &AstFormatter) -> FormatResult {
-        let mut fallback = af.fallback(|| {
+        let mut backtrack = af.backtrack().next(|| {
             if ItemConfig::ITEMS_POSSIBLY_MUST_HAVE_OWN_LINE
                 && self.list.iter().any(ItemConfig::item_must_have_own_line)
             {
@@ -198,11 +189,11 @@ where
                     matches!(self.rest, ListRest::None),
                     "rest cannot be used with wrap-to-fit"
                 );
-                fallback = fallback.next(|| self.contents_wrap_to_fit(af, max_element_width));
+                backtrack = backtrack.next(|| self.contents_wrap_to_fit(af, max_element_width));
             }
             ListWrapToFitConfig::No => {}
         }
-        fallback.otherwise(|| self.contents_separate_lines(af))
+        backtrack.otherwise(|| self.contents_separate_lines(af))
     }
 
     fn contents_single_line(&self, af: &AstFormatter) -> FormatResult {
@@ -326,17 +317,19 @@ impl AstFormatter {
             let can_overflow = matches!(rest, ListRest::None)
                 && Overflow::can_overflow(self, last, list.len() == 1);
             if can_overflow {
-                self.fallback(last_without_overflow).otherwise(|| {
-                    self.with_width_limit_from_start_first_line_opt(
-                        start,
-                        max_width_overflow,
-                        || {
-                            Overflow::format_overflow(self, last)?;
-                            trailing_comma()?;
-                            Ok(())
-                        },
-                    )
-                })?;
+                self.backtrack()
+                    .next(last_without_overflow)
+                    .otherwise(|| {
+                        self.with_width_limit_from_start_first_line_opt(
+                            start,
+                            max_width_overflow,
+                            || {
+                                Overflow::format_overflow(self, last)?;
+                                trailing_comma()?;
+                                Ok(())
+                            },
+                        )
+                    })?;
             } else {
                 last_without_overflow()?;
             }
@@ -370,7 +363,9 @@ impl AstFormatter {
         ItemConfig: ListItemConfig<Item = T>,
     {
         let format_item = |item| match max_element_width {
-            Some(max_width) => self.with_single_line_and_width_limit(max_width, || format_item(item)),
+            Some(max_width) => {
+                self.with_single_line_and_width_limit(max_width, || format_item(item))
+            }
             None => format_item(item),
         };
         self.embraced_after_opening(close_brace, || {
@@ -398,7 +393,9 @@ impl AstFormatter {
                     item_next_line()?;
                     prev_must_have_own_line = !prev_must_have_own_line;
                 } else {
-                    self.fallback(item_same_line).otherwise(item_next_line)?;
+                    self.backtrack()
+                        .next(item_same_line)
+                        .otherwise(item_next_line)?;
                 }
             }
             Ok(())
@@ -451,7 +448,7 @@ impl AstFormatter {
         self.tail(tail)?;
         Ok(())
     }
-    
+
     fn list_rest(&self, rest: ListRest<'_>) -> FormatResult {
         self.out.token("..")?;
         if let ListRest::Base(expr) = rest {

@@ -3,7 +3,7 @@ use std::ops::ControlFlow;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
-use crate::ast_formatter::fallback::BacktrackChain;
+use crate::ast_formatter::backtrack::Backtrack;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{arm_body_requires_block, is_plain_block};
 use crate::error::{ConstraintError, FormatError, FormatResult};
@@ -25,7 +25,8 @@ impl AstFormatter {
         self.pat(&arm.pat)?;
         if let Some(guard) = arm.guard.as_deref() {
             if self.out.line() == first_line {
-                self.fallback(|| self.arm_guard_same_line(arm, guard))
+                self.backtrack()
+                    .next(|| self.arm_guard_same_line(arm, guard))
                     .otherwise(|| self.arm_guard_separate_line(arm, guard))?;
             } else {
                 self.arm_guard_separate_line(arm, guard)?;
@@ -102,7 +103,7 @@ impl AstFormatter {
     /// Adds a block only if doing so allows for more code to fit in the first line
     fn arm_body_add_block_if_first_line_is_longer(&self, body: &ast::Expr) -> FormatResult {
         let Some(max_width) = self.constraints().max_width.get() else {
-            return self.arm_body_same_line(body, self.start_fallback());
+            return self.arm_body_same_line(body, self.backtrack());
         };
 
         let start = self.out.last_line_len();
@@ -110,11 +111,11 @@ impl AstFormatter {
         let next_line_start = self.constraints().indent.get() + INDENT_WIDTH;
         if start <= next_line_start {
             // wrap-indent wouldn't afford us more width so just continue normally
-            return self.arm_body_same_line(body, self.start_fallback());
+            return self.arm_body_same_line(body, self.backtrack());
         }
         let extra_width = start - next_line_start;
 
-        let result = self.start_fallback().next_control_flow(|| {
+        let result = self.backtrack().next_control_flow(|| {
             // We're going to try formatting on the same line, but adding extra width to simulate
             // wrapping with a block. Use the single-line constraint since we just want to see what
             // fits on the first line. Also, we need to defer the touchy_margins constraint for now.
@@ -155,17 +156,17 @@ impl AstFormatter {
         });
         match result {
             ControlFlow::Break(result) => result,
-            ControlFlow::Continue((fallback, true)) => {
-                fallback.otherwise(|| self.expr_add_block(body))
+            ControlFlow::Continue((backtrack, true)) => {
+                backtrack.otherwise(|| self.expr_add_block(body))
             }
-            ControlFlow::Continue((fallback, false)) => self.arm_body_same_line(body, fallback),
+            ControlFlow::Continue((backtrack, false)) => self.arm_body_same_line(body, backtrack),
         }
     }
 
-    fn arm_body_same_line(&self, body: &ast::Expr, fallback: BacktrackChain) -> FormatResult {
+    fn arm_body_same_line(&self, body: &ast::Expr, backtrack: Backtrack) -> FormatResult {
         // todo closures and structs should have single-line headers
         // todo exclude comma for block-like expressions?
-        fallback
+        backtrack
             .next(|| self.with_touchy_margins(|| self.expr_tail(body, &Tail::token_insert(","))))
             .otherwise(|| self.expr_add_block(body))
     }
