@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::checkpoint::Checkpoint;
 use crate::error::{FormatError, FormatResult};
 use std::ops::ControlFlow;
-use crate::ast_formatter::checkpoint::Checkpoint;
 
 impl AstFormatter {
     // todo should fallback be specific to a constraint? unless_too_wide(..).otherwise(..)
@@ -86,3 +86,68 @@ impl<T> Backtrack<'_, T> {
         }
     }
 }
+
+
+/*
+impl AstFormatter {
+    pub fn choose_fewer_lines(
+        &self,
+        checkpoint: &Checkpoint,
+        strategy_a: impl FnOnce() -> FormatResult,
+        strategy_b: impl FnOnce() -> FormatResult,
+    ) -> FormatResult {
+        let first_line = self.out.line();
+        let result_a = self.lookahead(checkpoint, ||{
+            strategy_a()?;
+            Ok(self.out.line() - first_line)
+        });
+        match result_a {
+            Err(FormatError::Constraint(_)) => strategy_b(),
+            Err(e) => Err(e),
+            Ok((lookahead_a, lines_a)) => match strategy_b() {
+                Err(FormatError::Constraint(_)) => {
+                    self.restore_checkpoint(checkpoint);
+                    self.restore_lookahead(lookahead_a);
+                    Ok(())
+                }
+                Err(e) => Err(e),
+                Ok(()) =>  {
+                    let lines_b = self.out.line() - first_line;
+                    if lines_b < lines_a {
+                        return Ok(())
+                    }
+                    self.restore_checkpoint(checkpoint);
+                    self.restore_lookahead(lookahead_a);
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    // always restores the checkpoint
+    fn lookahead<T>(
+        &self,
+        checkpoint: &Checkpoint,
+        format: impl Fn() -> FormatResult<T>,
+    ) -> FormatResult<(Lookahead, T)> {
+        let buffer = self.out.take_buffer();
+        self.out.write_some_whitespace_to_restore_line_line();
+        match format() {
+            Err(e) => {
+                self.restore_checkpoint(checkpoint);
+                Err(e)
+            }
+            Ok(value) => {
+                let lookahead = self.out.split_off_out(checkpoint.)
+                self.restore_checkpoint(checkpoint);
+                Ok((lookahead, value))
+            }
+        }
+    }
+    
+}
+
+type Lookahead = String;
+
+
+ */

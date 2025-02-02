@@ -189,4 +189,8 @@ impl ConstraintWriter {
     pub fn last_line_len(&self) -> usize {
         self.len() - self.last_line_start.get()
     }
+    
+    pub fn split_off(&self, at: usize) -> String {
+        self.with_buffer(|b| b.split_off(at))
+    }
 }

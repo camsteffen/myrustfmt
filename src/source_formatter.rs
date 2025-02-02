@@ -293,6 +293,10 @@ impl SourceFormatter {
         self.next_is_whitespace_or_comments.set(true);
         Ok(())
     }
+    
+    pub fn split_off_out(&self, at: usize) -> String {
+        self.out.split_off(at)
+    }
 }
 
 #[cfg(test)]
