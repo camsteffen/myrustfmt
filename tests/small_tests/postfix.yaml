@@ -50,7 +50,7 @@
             asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf
                 + asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf
         ]
-- name: prefer multi-line chain over overflow if the number of lines is the same
+- name: prefer separate-lines chain over overflow if the number of lines is the same, and the method call can fit on one line
   type: breakpoint
   before: |
     rooty
@@ -75,16 +75,17 @@
         .three
         .four
         .five(foo, foo)
-- name: something about the method call is always multi-line???
+- name: prefer separate-lines chain over overflow when same number of lines, even when method call is multi-line
   type: breakpoint
   before: |
-    oneone.two.three(
-        Thing { foo, bar }
-    )
+    oneone.two.three(Foo {
+        foooooey,
+        gooooooey,
+    })
   after: |
     oneone
         .two
-        .three(Thing {
-            foo,
-            bar,
+        .three(Foo {
+            foooooey,
+            gooooooey,
         })

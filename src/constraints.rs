@@ -17,6 +17,9 @@ pub struct Constraints {
     /// character is printed
     pub max_width_for_line: Cell<Option<MaxWidthForLine>>,
     /// If true, no newline characters allowed
+    // todo clarify whether it is okay to short circuit strategies when this is true. There is a problem
+    //   when we do an experiment with single-line constraint assuming that downstream code will attempt multi-line strategies.
+    //   Maybe there should be an "experimental" mode or "no short-circuit" mode
     pub single_line: Cell<bool>,
     // todo is this a constraint?
     /// The number of spaces for the current level of indentation
@@ -42,6 +45,7 @@ pub struct Constraints {
     /// ```
     // todo rename to indent_middle, or list_margin, or fallback_type=ArmBody?
     // todo consider splitting off another constraint that disallows "wrap-indent" or just "wrapping"
+    //   that is, binary and postfix
     // this constraint is enforced at the AST layer and not ConstraintWriter
     //   1) the semantics are peculiar and feels more naturally understood in AST layer
     //   2) A ConstraintWriter implementation would not be able to fast-fail as quickly.

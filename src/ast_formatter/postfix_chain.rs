@@ -112,17 +112,16 @@ impl AstFormatter {
             })
         };
 
-        // first try without overflow
         let result = self
             .backtrack()
+            // first try without overflow
             .next(|| {
                 items_single_line(overflowable)?;
                 self.tail(tail)?;
                 Ok(())
             })
+            // experimentally check if wrapping the last item makes it fit on one line
             .next_control_flow(|| {
-                // experimentally check if wrapping the last item makes it fit on one line
-                // the width limit would not apply
                 // todo can we use first line width limit and rely on the newline here to disable it?
                 // todo share logic with match arm
                 // todo should we check if the wrap allows a *longer* first line, like match arm?
@@ -138,6 +137,8 @@ impl AstFormatter {
                     })
                     // todo check parse error
                     .is_ok();
+                self.out.with_last_line(|l| {dbg!(l);});
+                dbg!(fits_on_one_line_with_wrap);
                 ControlFlow::Continue(fits_on_one_line_with_wrap)
                 // ...if so, go to the separate lines approach
                 // todo perhaps there is a concept of "fallback cost" that can be passed down
@@ -172,7 +173,7 @@ impl AstFormatter {
             self.postfix_overflowable(overflowable, start_pos)?;
             self.tail(tail)?;
             let overflow_height = self.out.line() - first_line;
-            if overflowable_can_be_single_line && separate_lines_height <= overflow_height {
+            if dbg!(overflowable_can_be_single_line ) && separate_lines_height <= overflow_height {
                 // fallback to separate lines strategy
                 return Err(ConstraintError::Logical.into());
             }
