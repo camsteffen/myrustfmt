@@ -2,7 +2,6 @@ use crate::ast_formatter::FormatModuleResult;
 use crate::constraints::Constraints;
 use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededError};
 use crate::error_emitter::ErrorEmitter;
-use crate::util::option::merge_options;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -137,7 +136,10 @@ impl ConstraintWriter {
 
     pub fn indent(&self) -> Result<(), WidthLimitExceededError> {
         self.with_buffer(|b| {
-            b.extend(std::iter::repeat_n(' ', self.constraints.indent.get() as usize))
+            b.extend(std::iter::repeat_n(
+                ' ',
+                self.constraints.indent.get() as usize,
+            ))
         });
         self.check_width_constraints()
     }
@@ -164,14 +166,13 @@ impl ConstraintWriter {
     }
 
     pub fn max_width(&self) -> Option<u32> {
-        let max_width = self.constraints.max_width.get();
-        let max_width_for_current_line = self
+        self
             .constraints
             .max_width_for_line
             .get()
             .filter(|m| m.line == self.line())
-            .map(|m| m.max_width);
-        merge_options(max_width, max_width_for_current_line, u32::min)
+            .map(|m| m.max_width)
+            .or(self.constraints.max_width.get())
     }
 
     pub fn remaining_width(&self) -> Option<Result<u32, WidthLimitExceededError>> {
@@ -189,7 +190,7 @@ impl ConstraintWriter {
     pub fn last_line_len(&self) -> usize {
         self.len() - self.last_line_start.get()
     }
-    
+
     pub fn split_off(&self, at: usize) -> String {
         self.with_buffer(|b| b.split_off(at))
     }

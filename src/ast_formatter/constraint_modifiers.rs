@@ -44,7 +44,6 @@ impl AstFormatter {
         if apply { self.with_single_line(f) } else { f() }
     }
 
-
     pub fn with_touchy_margins<T>(&self, f: impl FnOnce() -> T) -> T {
         self.constraints().touchy_margin.with_replaced(true, f)
     }
@@ -55,9 +54,14 @@ impl AstFormatter {
         let max_width = self.out.last_line_len() + width_limit;
         if self
             .constraints()
-            .max_width_for_line
+            .max_width
             .get()
-            .is_some_and(|m| m.line == line && m.max_width <= max_width)
+            .is_some_and(|mw| max_width >= mw)
+            || self
+                .constraints()
+                .max_width_for_line
+                .get()
+                .is_some_and(|m| m.line == line && m.max_width <= max_width)
         {
             return f();
         }
@@ -83,8 +87,7 @@ impl AstFormatter {
         width_limit: u32,
         f: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        let Some(remaining) =
-            width_limit.checked_sub(self.out.last_line_len() - line_start_pos)
+        let Some(remaining) = width_limit.checked_sub(self.out.last_line_len() - line_start_pos)
         else {
             return Err(WidthLimitExceededError.into());
         };
@@ -109,8 +112,7 @@ impl AstFormatter {
         width_limit: u32,
         f: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        let Some(remaining) =
-            width_limit.checked_sub(self.out.last_line_len() - line_start_pos)
+        let Some(remaining) = width_limit.checked_sub(self.out.last_line_len() - line_start_pos)
         else {
             return Err(WidthLimitExceededError.into());
         };

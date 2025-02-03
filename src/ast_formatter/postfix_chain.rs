@@ -3,7 +3,7 @@ use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::list::ListBuilderTrait;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{postfix_expr_is_wrappable, postfix_expr_receiver_opt};
-use crate::error::{ConstraintError, FormatResult};
+use crate::error::{ConstraintError, FormatError, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use std::iter::successors;
@@ -86,14 +86,11 @@ impl AstFormatter {
             .iter()
             .filter(|e| postfix_expr_is_wrappable(e))
             .count() as u32;
-        // Each wrappable leading up to the overflowable will occupy one line each since we were
-        // previously able to format them all on one line.
-        let separate_lines_height = wrappable_count + 1;
         self.postfix_overflowable_unless_separate_lines_is_better(
             overflowable,
             start_pos,
             tail,
-            separate_lines_height,
+            wrappable_count,
         )?;
         Ok(())
     }
@@ -103,7 +100,7 @@ impl AstFormatter {
         overflowable: &[&ast::Expr],
         start_pos: u32,
         tail: &Tail,
-        separate_lines_height: u32,
+        wrappable_count: u32,
     ) -> FormatResult {
         let width_limit = RUSTFMT_CONFIG_DEFAULTS.chain_width;
         let items_single_line = |chain| {
@@ -112,32 +109,31 @@ impl AstFormatter {
             })
         };
 
-        let result = self
-            .backtrack()
-            // first try without overflow
-            .next(|| {
-                items_single_line(overflowable)?;
-                self.tail(tail)?;
-                Ok(())
-            })
-            // experimentally check if wrapping the last item makes it fit on one line
+        // first try writing in one line without overflow
+        let backtrack = self.backtrack().next(|| {
+            items_single_line(overflowable)?;
+            self.tail(tail)?;
+            Ok(())
+        });
+
+        // try writing the overflowable on the next line to measure its height in separate lines format
+        let result = backtrack
             .next_control_flow(|| {
                 // todo can we use first line width limit and rely on the newline here to disable it?
                 // todo share logic with match arm
                 // todo should we check if the wrap allows a *longer* first line, like match arm?
-                let fits_on_one_line_with_wrap = self
-                    .indented(|| {
-                        self.out.newline_within_indent()?;
-                        self.with_single_line(|| {
-                            self.postfix_chain_items(overflowable)?;
-                            self.tail(tail)?;
-                            FormatResult::Ok(())
-                        })?;
-                        Ok(())
-                    })
-                    // todo check parse error
-                    .is_ok();
-                ControlFlow::Continue(fits_on_one_line_with_wrap)
+                let result = self.indented(|| {
+                    self.out.newline_within_indent()?;
+                    let line = self.out.line();
+                    self.postfix_chain_items(overflowable)?;
+                    self.tail(tail)?;
+                    Ok(self.out.line() - line + 1)
+                });
+                match result {
+                    Err(FormatError::Constraint(_)) => ControlFlow::Continue(None),
+                    Err(e) => ControlFlow::Break(Err(e)),
+                    Ok(height) => ControlFlow::Continue(Some(height)),
+                }
                 // ...if so, go to the separate lines approach
                 // todo perhaps there is a concept of "fallback cost" that can be passed down
                 //   - if you err out, there will be a cost of increased indent and added lines
@@ -151,30 +147,28 @@ impl AstFormatter {
                          - less room for wrapped method call
                          - less room for items leading up to method call, so multi-line may already be a given
                 */
-                // fragment, probe, segment, lookahead
-                /*
-                1. Format up to overflowable
-                2. Try overflowable single line, same line.
-                3. Check if the overflowable can fit on one line, on the next line
-                4. Try with overflow
-                5. If overflowable could have fit on one line, compare overflow to multi-line
-                 */
             });
-        let (backtrack, overflowable_can_be_single_line) = match result {
+        let (backtrack, overflowable_separate_line_height) = match result {
             ControlFlow::Break(result) => return result,
             ControlFlow::Continue(c) => c,
         };
 
+        // finally, use overflow, but reject it if separate lines is preferable
         backtrack.otherwise(|| {
             let first_line = self.out.line();
-            // finally, use overflow
             self.postfix_overflowable(overflowable, start_pos)?;
             self.tail(tail)?;
             let overflow_height = self.out.line() - first_line;
-            if overflowable_can_be_single_line && separate_lines_height <= overflow_height {
-                // fallback to separate lines strategy
-                return Err(ConstraintError::Logical.into());
+            if let Some(overflowable_separate_line_height) = overflowable_separate_line_height {
+                // Each wrappable leading up to the overflowable will occupy one line each since we were
+                // previously able to format them all on one line.
+                let separate_lines_height = wrappable_count + overflowable_separate_line_height;
+                if separate_lines_height <= overflow_height {
+                    // fallback to separate lines strategy
+                    return Err(ConstraintError::Logical.into());
+                }
             }
+            // keep overflow format
             Ok(())
         })
     }

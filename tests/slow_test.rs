@@ -20,7 +20,7 @@ mod modA {
     }
 }"#;
     assert_eq!(
-        format_str(source, 800).unwrap(),
+        format_str(source, 800).unwrap().formatted,
         r#"
 mod modA {
     mod modB {

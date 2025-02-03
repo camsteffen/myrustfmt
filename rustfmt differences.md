@@ -22,6 +22,8 @@ Chains
 * Multi-line chains as a match arm body are always wrapped with a block. Rustfmt makes an exception when the chain
   ends in a multi-line method call (this is probably a bug).
 * Multi-line chains with no indent as a list item (e.g. array element) are wrapped with a block
+* Separate line chains are preferred over overflow if the number of lines is the same
+  * Rationale: it's better for higher level structures to use line breaks than more deeply nested structures
 
 rustfmt Bugs:
 * fn_call_width is reduced by 2 when the last argument overflows into multiple lines
