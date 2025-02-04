@@ -1,5 +1,7 @@
 use crate::ast_formatter::FormatModuleResult;
-use crate::constraint_writer::{ConstraintWriter, ConstraintWriterCheckpoint, ConstraintWriterLookahead};
+use crate::constraint_writer::{
+    ConstraintWriter, ConstraintWriterCheckpoint, ConstraintWriterLookahead,
+};
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::ErrorEmitter;
@@ -85,7 +87,7 @@ impl SourceFormatter {
         self.out.restore_checkpoint(writer_checkpoint);
         self.restore_self_checkpoint(self_checkpoint);
     }
-    
+
     fn restore_self_checkpoint(&self, checkpoint: &SourceFormatterSelfCheckpoint) {
         let SourceFormatterSelfCheckpoint {
             source_pos,
@@ -95,14 +97,17 @@ impl SourceFormatter {
         self.next_is_whitespace_or_comments
             .set(next_is_whitespace_or_comments);
     }
-    
+
     pub fn capture_lookahead(&self, from: &SourceFormatterCheckpoint) -> SourceFormatterLookahead {
+        let writer_lookahead = self.out.capture_lookahead(&from.writer_checkpoint);
+        let self_checkpoint = self.self_checkpoint();
+        self.restore_self_checkpoint(&from.self_checkpoint);
         SourceFormatterLookahead {
-            writer_lookahead: self.out.capture_lookahead(&from.writer_checkpoint),
-            self_checkpoint: self.self_checkpoint(),
+            writer_lookahead,
+            self_checkpoint,
         }
     }
-    
+
     pub fn restore_lookahead(&self, lookahead: &SourceFormatterLookahead) {
         self.out.restore_lookahead(&lookahead.writer_lookahead);
         self.restore_self_checkpoint(&lookahead.self_checkpoint);
@@ -221,7 +226,7 @@ impl SourceFormatter {
         Ok(())
     }
 
-    /// Inserts a token without consuming it from source 
+    /// Inserts a token without consuming it from source
     pub fn token_insert(&self, token: &str) -> FormatResult {
         self.out.token(&token)?;
         Ok(())

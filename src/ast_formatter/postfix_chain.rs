@@ -25,8 +25,12 @@ impl AstFormatter {
             self.postfix_chain_given_width_limit(&chain, tail)
         })
     }
-    
-    fn postfix_chain_given_width_limit(&self, chain: &[PostfixItem<'_>], tail: &Tail) -> FormatResult {
+
+    fn postfix_chain_given_width_limit(
+        &self,
+        chain: &[PostfixItem<'_>],
+        tail: &Tail,
+    ) -> FormatResult {
         // touchy margins - everything must be a single line (with overflow)
         if self.out.constraints().touchy_margin.get() {
             self.postfix_chain_single_line_with_overflow(&chain, tail, false)?;
@@ -61,9 +65,7 @@ impl AstFormatter {
         } else {
             self.backtrack()
                 .next(|| self.postfix_chain_single_line_with_overflow(chain_rest, tail, true))
-                .otherwise(|| {
-                    self.indented(|| self.postfix_chain_separate_lines(chain_rest, tail))
-                })
+                .otherwise(|| self.indented(|| self.postfix_chain_separate_lines(chain_rest, tail)))
         }
     }
 
@@ -107,13 +109,27 @@ impl AstFormatter {
         tail: &Tail,
         wrappable_count: u32,
     ) -> FormatResult {
-        // first try writing in one line without overflow
-        // todo allow overflow in the first go, then go back and compare with separate lines
-        let backtrack = self.backtrack().next(|| {
-            self.with_single_line(|| self.postfix_item(overflowable))?;
-            self.tail(tail)?;
-            Ok(())
+        let first_line = self.out.line();
+        let result = self.backtrack().next_control_flow_lookahead(|| {
+            let result = (|| -> FormatResult {
+                self.postfix_overflowable(overflowable)?;
+                self.tail(tail)?;
+                Ok(())
+            })();
+            match result {
+                Err(e) => return ControlFlow::Break(Err(e)),
+                Ok(()) => {}
+            }
+            if self.out.line() - first_line == 1 {
+                // it all fits on one line
+                return ControlFlow::Break(Ok(()));
+            }
+            ControlFlow::Continue(self.out.line() - first_line + 1)
         });
+        let (backtrack, lookahead, overflow_height) = match result {
+            ControlFlow::Break(result) => return result,
+            ControlFlow::Continue(c) => c,
+        };
 
         // try writing the overflowable on the next line to measure its height in separate lines format
         let result = backtrack.next_control_flow(|| {
@@ -121,43 +137,35 @@ impl AstFormatter {
             // todo should we check if the wrap allows a *longer* first line, like match arm?
             let result = self.indented(|| {
                 // N.B. this newline evades the first line width limit
+                self.out.line();
                 self.out.newline_within_indent()?;
-                let line = self.out.line();
                 self.postfix_item(overflowable)?;
                 self.tail(tail)?;
-                Ok(self.out.line() - line + 1)
+                Ok(self.out.line() - first_line + 1)
             });
             match result {
-                Err(FormatError::Constraint(_)) => ControlFlow::Continue(None),
+                Err(FormatError::Constraint(_)) => todo!(), // is this possible?
                 Err(e) => ControlFlow::Break(Err(e)),
-                Ok(height) => ControlFlow::Continue(Some(height)),
+                Ok(overflowable_separate_line_height) => {
+                    // Each wrappable leading up to the overflowable will occupy one line each since we were
+                    // previously able to format them all on one line.
+                    let separate_lines_height = wrappable_count + overflowable_separate_line_height;
+                    if separate_lines_height <= overflow_height {
+                        // fallback to separate lines strategy
+                        return ControlFlow::Break(Err(ConstraintError::Logical.into()));
+                    }
+                    // restore overflow strategy
+                    ControlFlow::Continue(())
+                }
             }
             // todo perhaps there is a concept of "fallback cost" that can be passed down
             //   - if you err out, there will be a cost of increased indent and added lines
         });
-        let (backtrack, overflowable_separate_line_height) = match result {
-            ControlFlow::Break(result) => return result,
-            ControlFlow::Continue(c) => c,
-        };
 
-        // finally, use overflow, but reject it if separate lines is preferable
-        backtrack.otherwise(|| {
-            let first_line = self.out.line();
-            self.postfix_overflowable(overflowable)?;
-            self.tail(tail)?;
-            let overflow_height = self.out.line() - first_line;
-            if let Some(overflowable_separate_line_height) = overflowable_separate_line_height {
-                // Each wrappable leading up to the overflowable will occupy one line each since we were
-                // previously able to format them all on one line.
-                let separate_lines_height = wrappable_count + overflowable_separate_line_height;
-                if separate_lines_height <= overflow_height {
-                    // fallback to separate lines strategy
-                    return Err(ConstraintError::Logical.into());
-                }
-            }
-            // keep overflow format
-            Ok(())
-        })
+        match result {
+            ControlFlow::Break(result) => result,
+            ControlFlow::Continue((backtrack, ())) => backtrack.otherwise_lookahead(&lookahead, ()),
+        }
     }
 
     fn postfix_overflowable(&self, overflowable: &PostfixItem<'_>) -> FormatResult {
@@ -246,7 +254,10 @@ fn build_postfix_chain(expr: &ast::Expr) -> Vec<PostfixItem<'_>> {
         current = receiver;
     };
     tail.reverse();
-    items.push(PostfixItem { root_or_dot_item: root, tail });
+    items.push(PostfixItem {
+        root_or_dot_item: root,
+        tail,
+    });
     items.reverse();
     items
 }

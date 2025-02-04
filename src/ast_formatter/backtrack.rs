@@ -1,9 +1,9 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::checkpoint::Checkpoint;
+use crate::ast_formatter::checkpoint::{Checkpoint, Lookahead};
 use crate::error::{FormatError, FormatResult};
 use std::ops::ControlFlow;
 
-macro_rules! try_finish_backtrack {
+macro_rules! try_backtrack {
     ($backtrack:expr) => {{
         match $backtrack.into_inner() {
             ::std::ops::ControlFlow::Break(result) => return result,
@@ -11,13 +11,18 @@ macro_rules! try_finish_backtrack {
         }
     }};
 }
+pub(crate) use try_backtrack;
 
 impl AstFormatter {
     // todo should fallback be specific to a constraint? unless_too_wide(..).otherwise(..)
     pub fn backtrack<T>(&self) -> Backtrack<T> {
+        self.backtrack_from_checkpoint(self.open_checkpoint())
+    }
+    
+    pub fn backtrack_from_checkpoint<T>(&self, checkpoint: Checkpoint) -> Backtrack<T> {
         Backtrack {
             af: self,
-            state: BacktrackState::Continue(self.open_checkpoint()),
+            state: BacktrackState::Continue(checkpoint),
         }
     }
 
@@ -71,6 +76,17 @@ impl<T> Backtrack<'_, T> {
         }
     }
     
+    pub fn otherwise_lookahead(self, lookahead: &Lookahead, value: T) -> FormatResult<T> {
+        match self.state {
+            BacktrackState::Break(result) => result,
+            BacktrackState::Continue(checkpoint) => {
+                self.af.restore_lookahead(lookahead);
+                self.af.close_checkpoint(checkpoint);
+                Ok(value)
+            }
+        } 
+    }
+    
     pub fn into_inner(self) -> BacktrackState<T> {
         self.state
     }
@@ -99,30 +115,26 @@ impl<T> Backtrack<'_, T> {
         }
     }
 
-    pub fn next_choose<U>(
-        mut self,
-        strategy_a: impl FnOnce() -> FormatResult<U>,
-        strategy_b: impl FnOnce(U) -> FormatResult<T>,
-    ) -> Self {
-        if let BacktrackState::Continue(checkpoint) = &self.state {
-            match strategy_a() {
-                // restore the checkpoint before continuing to the next formatting strategy
-                Err(FormatError::Constraint(_)) => self.af.restore_checkpoint(checkpoint),
-                // if Ok or an unrecoverable error, we're finished
-                Ok(()) => {
+    pub fn next_control_flow_lookahead<C>(
+        self,
+        strategy: impl FnOnce() -> ControlFlow<FormatResult<T>, C>,
+    ) -> ControlFlow<FormatResult<T>, (Self, Lookahead, C)> {
+        match self.state {
+            BacktrackState::Break(result) => ControlFlow::Break(result),
+            BacktrackState::Continue(ref checkpoint) => match strategy() {
+                ControlFlow::Break(value) => {
+                    let BacktrackState::Continue(checkpoint) = self.state else {
+                        unreachable!();
+                    };
+                    self.af.close_checkpoint(checkpoint);
+                    ControlFlow::Break(value) 
+                }
+                ControlFlow::Continue(value) => {
                     let lookahead = self.af.capture_lookahead(checkpoint);
+                    ControlFlow::Continue((self, lookahead, value))
                 }
-                result @ Err(_) => {
-                    match std::mem::replace(&mut self.state, BacktrackState::Break(result)) {
-                        BacktrackState::Continue(checkpoint) => {
-                            self.af.close_checkpoint(checkpoint)
-                        }
-                        _ => unreachable!(),
-                    }
-                }
-            }
+            },
         }
-        self
     }
 }
 

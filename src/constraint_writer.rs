@@ -18,16 +18,21 @@ pub struct ConstraintWriter {
 }
 
 pub struct ConstraintWriterCheckpoint {
+    len: usize,
+    self_checkpoint: ConstraintWriterSelfCheckpoint,
+}
+
+// todo rename
+pub struct ConstraintWriterSelfCheckpoint {
     #[cfg(debug_assertions)]
     constraints: Constraints,
     line: u32,
-    len: usize,
     last_line_start: usize,
     last_width_exceeded_line: Option<u32>,
 }
 
 pub struct ConstraintWriterLookahead {
-    checkpoint: ConstraintWriterCheckpoint,
+    checkpoint: ConstraintWriterSelfCheckpoint,
     buf_segment: String,
 }
 
@@ -69,6 +74,13 @@ impl ConstraintWriter {
     }
 
     pub fn checkpoint(&self) -> ConstraintWriterCheckpoint {
+        ConstraintWriterCheckpoint {
+            self_checkpoint: self.self_checkpoint(),
+            len: self.len(),
+        }
+    }
+    
+    pub fn self_checkpoint(&self) -> ConstraintWriterSelfCheckpoint {
         let Self {
             #[cfg(debug_assertions)]
             ref constraints,
@@ -82,23 +94,27 @@ impl ConstraintWriter {
             ref last_width_exceeded_line,
             ref line,
         } = *self;
-        ConstraintWriterCheckpoint {
+        ConstraintWriterSelfCheckpoint {
             #[cfg(debug_assertions)]
             constraints: constraints.clone(),
             line: line.get(),
-            len: self.len(),
             last_line_start: last_line_start.get(),
             last_width_exceeded_line: last_width_exceeded_line.get(),
         }
     }
 
     pub fn restore_checkpoint(&self, checkpoint: &ConstraintWriterCheckpoint) {
-        let ConstraintWriterCheckpoint {
+        let ConstraintWriterCheckpoint { ref self_checkpoint, len } = *checkpoint;
+        self.restore_self_checkpoint(self_checkpoint);
+        self.buffer.with_taken(|b| b.truncate(len));
+    }
+    
+    pub fn restore_self_checkpoint(&self, checkpoint: &ConstraintWriterSelfCheckpoint) {
+        let ConstraintWriterSelfCheckpoint {
             #[cfg(debug_assertions)]
             ref constraints,
             last_line_start,
             last_width_exceeded_line,
-            len,
             line,
         } = *checkpoint;
         #[cfg(debug_assertions)]
@@ -106,15 +122,15 @@ impl ConstraintWriter {
         self.last_line_start.set(last_line_start);
         self.last_width_exceeded_line.set(last_width_exceeded_line);
         self.line.set(line);
-        self.buffer.with_taken(|b| b.truncate(len));
     }
 
     pub fn capture_lookahead(
         &self,
         from: &ConstraintWriterCheckpoint,
     ) -> ConstraintWriterLookahead {
-        let checkpoint = self.checkpoint();
+        let checkpoint = self.self_checkpoint();
         let buf_segment = self.buffer.with_taken(|b| b.split_off(from.len));
+        self.restore_self_checkpoint(&from.self_checkpoint);
         ConstraintWriterLookahead {
             buf_segment,
             checkpoint,
@@ -123,7 +139,7 @@ impl ConstraintWriter {
     
     pub fn restore_lookahead(&self, lookahead: &ConstraintWriterLookahead) {
         self.buffer.with_taken(|b| b.push_str(&lookahead.buf_segment));
-        self.restore_checkpoint(&lookahead.checkpoint);
+        self.restore_self_checkpoint(&lookahead.checkpoint);
     }
 
     pub fn token(&self, token: &str) -> Result<(), WidthLimitExceededError> {
