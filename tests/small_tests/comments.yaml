@@ -102,3 +102,13 @@
     (  /* comment */  x );
   after: |
     ( /* comment */ x);
+- name: line command after if block opening
+  type: before_after
+  before: |
+    if cond {  // super helpful comment
+        booya();
+    }
+  after: |
+    if cond { // super helpful comment
+        booya();
+    }

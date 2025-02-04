@@ -30,6 +30,7 @@ macro_rules! control_flow_expr_kind {
 }
 pub(crate) use control_flow_expr_kind;
 
+// note: ExprKind::Cast isn't here since it is lower precedence and so it doesn't chain
 macro_rules! postfix_meta {
     ($mac:path) => {
         $mac! {
@@ -50,11 +51,15 @@ macro_rules! postfix_defs {
         }
         pub(crate) use postfix_expr_kind;
         
+        pub fn is_postfix_expr(expr: &ast::Expr) -> bool {
+            matches!(expr.kind, $(::rustc_ast::ast::ExprKind::$kind(..))|*)
+        }
+        
         /// If the given expression is postfix, returns its receiver expression.
-        pub fn postfix_expr_receiver_opt(postfix_expr: &ast::Expr) -> Option<&ast::Expr> {
+        pub fn postfix_expr_receiver(postfix_expr: &ast::Expr) -> &ast::Expr {
             match postfix_expr.kind {
-                $(::rustc_ast::ast::ExprKind::$kind$fields => Some($receiver),)|*
-                _ => None,
+                $(::rustc_ast::ast::ExprKind::$kind$fields => $receiver,)|*
+                _ => panic!("expected a postfix expression"),
             }
         }
 
@@ -85,7 +90,7 @@ pub fn arm_body_requires_block(expr: &ast::Expr) -> bool {
         | ::rustc_ast::ast::ExprKind::Cast(target, _)
         | control_flow_expr_kind!(Some(target)) => arm_body_requires_block(target),
         postfix_expr_kind!() => {
-            arm_body_requires_block(postfix_expr_receiver_opt(expr).unwrap())
+            arm_body_requires_block(postfix_expr_receiver(expr))
         }
 
         // everything else - no block required

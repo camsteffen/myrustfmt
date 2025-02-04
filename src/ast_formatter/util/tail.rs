@@ -7,7 +7,6 @@ use std::rc::Rc;
 /// * DO accept a Tail argument to "coerce" a node to leave room for trailing tokens
 /// * DON'T accept a Tail argument if it is not used to trigger fallback formats
 /// * DON'T pass a Tail argument when the single-line constraint is invariably enabled
-#[derive(Clone)]
 pub struct Tail(Option<TailImpl>);
 
 #[derive(Clone)]

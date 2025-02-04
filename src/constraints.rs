@@ -70,23 +70,6 @@ impl Constraints {
         }
     }
 
-    pub fn set(&self, other: &Constraints) {
-        let Constraints {
-            open_checkpoint_count,
-            indent,
-            max_width,
-            max_width_for_line,
-            single_line,
-            touchy_margin,
-        } = other;
-        self.open_checkpoint_count.set(open_checkpoint_count.get());
-        self.indent.set(indent.get());
-        self.max_width.set(max_width.get());
-        self.max_width_for_line.set(max_width_for_line.get());
-        self.single_line.set(single_line.get());
-        self.touchy_margin.set(touchy_margin.get());
-    }
-
     pub fn has_open_checkpoints(&self) -> bool {
         self.open_checkpoint_count.get() > 0
     }

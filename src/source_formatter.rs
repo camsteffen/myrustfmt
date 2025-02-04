@@ -1,5 +1,5 @@
 use crate::ast_formatter::FormatModuleResult;
-use crate::constraint_writer::{ConstraintWriter, ConstraintWriterSnapshot};
+use crate::constraint_writer::{ConstraintWriter, ConstraintWriterCheckpoint, ConstraintWriterLookahead};
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::ErrorEmitter;
@@ -11,10 +11,19 @@ use std::rc::Rc;
 
 mod whitespace;
 
-pub struct SourceFormatterSnapshot {
-    writer_snapshot: ConstraintWriterSnapshot,
-    pos: BytePos,
+pub struct SourceFormatterCheckpoint {
+    self_checkpoint: SourceFormatterSelfCheckpoint,
+    writer_checkpoint: ConstraintWriterCheckpoint,
+}
+
+struct SourceFormatterSelfCheckpoint {
+    source_pos: BytePos,
     next_is_whitespace_or_comments: bool,
+}
+
+pub struct SourceFormatterLookahead {
+    self_checkpoint: SourceFormatterSelfCheckpoint,
+    writer_lookahead: ConstraintWriterLookahead,
 }
 
 pub struct SourceFormatter {
@@ -54,29 +63,49 @@ impl SourceFormatter {
         self.out.constraints()
     }
 
-    pub fn snapshot(&self) -> SourceFormatterSnapshot {
-        let Self {
-            out,
-            source,
-            next_is_whitespace_or_comments,
-        } = self;
-        SourceFormatterSnapshot {
-            writer_snapshot: out.snapshot(),
-            pos: source.pos.get(),
-            next_is_whitespace_or_comments: next_is_whitespace_or_comments.get(),
+    pub fn checkpoint(&self) -> SourceFormatterCheckpoint {
+        SourceFormatterCheckpoint {
+            self_checkpoint: self.self_checkpoint(),
+            writer_checkpoint: self.out.checkpoint(),
         }
     }
 
-    pub fn restore(&self, snapshot: &SourceFormatterSnapshot) {
-        let SourceFormatterSnapshot {
-            ref writer_snapshot,
-            pos,
+    fn self_checkpoint(&self) -> SourceFormatterSelfCheckpoint {
+        SourceFormatterSelfCheckpoint {
+            source_pos: self.source.pos.get(),
+            next_is_whitespace_or_comments: self.next_is_whitespace_or_comments.get(),
+        }
+    }
+
+    pub fn restore_checkpoint(&self, checkpoint: &SourceFormatterCheckpoint) {
+        let SourceFormatterCheckpoint {
+            ref self_checkpoint,
+            ref writer_checkpoint,
+        } = *checkpoint;
+        self.out.restore_checkpoint(writer_checkpoint);
+        self.restore_self_checkpoint(self_checkpoint);
+    }
+    
+    fn restore_self_checkpoint(&self, checkpoint: &SourceFormatterSelfCheckpoint) {
+        let SourceFormatterSelfCheckpoint {
+            source_pos,
             next_is_whitespace_or_comments,
-        } = *snapshot;
-        self.source.pos.set(pos);
-        self.out.restore(writer_snapshot);
+        } = *checkpoint;
+        self.source.pos.set(source_pos);
         self.next_is_whitespace_or_comments
             .set(next_is_whitespace_or_comments);
+    }
+    
+    pub fn capture_lookahead(&self, from: &SourceFormatterCheckpoint) -> SourceFormatterLookahead {
+        SourceFormatterLookahead {
+            writer_lookahead: self.out.capture_lookahead(&from.writer_checkpoint),
+            self_checkpoint: self.self_checkpoint(),
+        }
+    }
+    
+    pub fn restore_lookahead(&self, lookahead: &SourceFormatterLookahead) {
+        self.out.restore_lookahead(&lookahead.writer_lookahead);
+        self.restore_self_checkpoint(&lookahead.self_checkpoint);
     }
 
     // todo make sure any math using two values of this are guaranteed to be on the same line
@@ -148,7 +177,7 @@ impl SourceFormatter {
     pub fn skip_token_if_present(&self, token: &str) -> FormatResult {
         let snapshot;
         if self.next_is_whitespace_or_comments.get() {
-            snapshot = Some(self.snapshot());
+            snapshot = Some(self.checkpoint());
             self.handle_whitespace_and_comments(WhitespaceMode::Void)?;
         } else {
             snapshot = None;
@@ -158,7 +187,7 @@ impl SourceFormatter {
             self.source.advance(token.len());
             self.next_is_whitespace_or_comments.set(true);
         } else if let Some(snapshot) = snapshot {
-            self.restore(&snapshot);
+            self.restore_checkpoint(&snapshot);
         }
         Ok(())
     }
@@ -292,10 +321,6 @@ impl SourceFormatter {
         self.source.advance(token.len());
         self.next_is_whitespace_or_comments.set(true);
         Ok(())
-    }
-    
-    pub fn split_off_out(&self, at: usize) -> String {
-        self.out.split_off(at)
     }
 }
 

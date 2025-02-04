@@ -4,6 +4,7 @@ use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededEr
 use crate::error_emitter::ErrorEmitter;
 use std::cell::Cell;
 use std::rc::Rc;
+use crate::util::cell_ext::CellExt;
 
 pub struct ConstraintWriter {
     constraints: Constraints,
@@ -16,12 +17,18 @@ pub struct ConstraintWriter {
     line: Cell<u32>,
 }
 
-pub struct ConstraintWriterSnapshot {
+pub struct ConstraintWriterCheckpoint {
+    #[cfg(debug_assertions)]
     constraints: Constraints,
     line: u32,
     len: usize,
     last_line_start: usize,
     last_width_exceeded_line: Option<u32>,
+}
+
+pub struct ConstraintWriterLookahead {
+    checkpoint: ConstraintWriterCheckpoint,
+    buf_segment: String,
 }
 
 pub struct ConstraintWriterResult {
@@ -54,23 +61,19 @@ impl ConstraintWriter {
     }
 
     pub fn len(&self) -> usize {
-        self.with_buffer(|b| b.len())
+        self.buffer.with_taken(|b| b.len())
     }
 
     pub fn line(&self) -> u32 {
         self.line.get()
     }
 
-    fn with_buffer<T>(&self, f: impl FnOnce(&mut String) -> T) -> T {
-        let mut buffer = self.buffer.take();
-        let out = f(&mut buffer);
-        self.buffer.set(buffer);
-        out
-    }
-
-    pub fn snapshot(&self) -> ConstraintWriterSnapshot {
+    pub fn checkpoint(&self) -> ConstraintWriterCheckpoint {
         let Self {
+            #[cfg(debug_assertions)]
             ref constraints,
+            #[cfg(not(debug_assertions))]
+            constraints: _,
             buffer: _,
             error_emitter: _,
             // exceeded_max_width should only be changed when there is no fallback
@@ -79,7 +82,8 @@ impl ConstraintWriter {
             ref last_width_exceeded_line,
             ref line,
         } = *self;
-        ConstraintWriterSnapshot {
+        ConstraintWriterCheckpoint {
+            #[cfg(debug_assertions)]
             constraints: constraints.clone(),
             line: line.get(),
             len: self.len(),
@@ -88,26 +92,42 @@ impl ConstraintWriter {
         }
     }
 
-    pub fn restore(&self, snapshot: &ConstraintWriterSnapshot) {
-        let ConstraintWriterSnapshot {
+    pub fn restore_checkpoint(&self, checkpoint: &ConstraintWriterCheckpoint) {
+        let ConstraintWriterCheckpoint {
+            #[cfg(debug_assertions)]
             ref constraints,
             last_line_start,
             last_width_exceeded_line,
             len,
             line,
-        } = *snapshot;
-        // todo do we really need to restore constraints if modifications are always scoped?
-        //   otherwise make sure each field is actually scoped
+        } = *checkpoint;
+        #[cfg(debug_assertions)]
         assert_eq!(&self.constraints, constraints);
-        self.constraints.set(constraints);
         self.last_line_start.set(last_line_start);
         self.last_width_exceeded_line.set(last_width_exceeded_line);
         self.line.set(line);
-        self.with_buffer(|b| b.truncate(len));
+        self.buffer.with_taken(|b| b.truncate(len));
+    }
+
+    pub fn capture_lookahead(
+        &self,
+        from: &ConstraintWriterCheckpoint,
+    ) -> ConstraintWriterLookahead {
+        let checkpoint = self.checkpoint();
+        let buf_segment = self.buffer.with_taken(|b| b.split_off(from.len));
+        ConstraintWriterLookahead {
+            buf_segment,
+            checkpoint,
+        }
+    }
+    
+    pub fn restore_lookahead(&self, lookahead: &ConstraintWriterLookahead) {
+        self.buffer.with_taken(|b| b.push_str(&lookahead.buf_segment));
+        self.restore_checkpoint(&lookahead.checkpoint);
     }
 
     pub fn token(&self, token: &str) -> Result<(), WidthLimitExceededError> {
-        self.with_buffer(|b| b.push_str(token));
+        self.buffer.with_taken(|b| b.push_str(token));
         self.check_width_constraints()
     }
 
@@ -116,7 +136,7 @@ impl ConstraintWriter {
             if c == '\n' {
                 self.newline()?;
             } else {
-                self.with_buffer(|b| b.push(c));
+                self.buffer.with_taken(|b| b.push(c));
                 self.check_width_constraints()?;
             }
         }
@@ -127,15 +147,14 @@ impl ConstraintWriter {
         if self.constraints.single_line.get() {
             return Err(NewlineNotAllowedError);
         }
-        self.with_buffer(|b| b.push('\n'));
+        self.buffer.with_taken(|b| b.push('\n'));
         self.last_line_start.set(self.len());
         self.line.set(self.line.get() + 1);
-        self.constraints.max_width_for_line.set(None);
         Ok(())
     }
 
     pub fn indent(&self) -> Result<(), WidthLimitExceededError> {
-        self.with_buffer(|b| {
+        self.buffer.with_taken(|b| {
             b.extend(std::iter::repeat_n(
                 ' ',
                 self.constraints.indent.get() as usize,
@@ -166,8 +185,7 @@ impl ConstraintWriter {
     }
 
     pub fn max_width(&self) -> Option<u32> {
-        self
-            .constraints
+        self.constraints
             .max_width_for_line
             .get()
             .filter(|m| m.line == self.line())
@@ -184,14 +202,10 @@ impl ConstraintWriter {
     }
 
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T {
-        self.with_buffer(|b| f(&b[self.last_line_start.get()..]))
+        self.buffer.with_taken(|b| f(&b[self.last_line_start.get()..]))
     }
 
     pub fn last_line_len(&self) -> usize {
         self.len() - self.last_line_start.get()
-    }
-
-    pub fn split_off(&self, at: usize) -> String {
-        self.with_buffer(|b| b.split_off(at))
     }
 }

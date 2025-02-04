@@ -3,6 +3,15 @@ use crate::ast_formatter::checkpoint::Checkpoint;
 use crate::error::{FormatError, FormatResult};
 use std::ops::ControlFlow;
 
+macro_rules! try_finish_backtrack {
+    ($backtrack:expr) => {{
+        match $backtrack.into_inner() {
+            ::std::ops::ControlFlow::Break(result) => return result,
+            ::std::ops::ControlFlow::Continue(checkpoint) => checkpoint,
+        }
+    }};
+}
+
 impl AstFormatter {
     // todo should fallback be specific to a constraint? unless_too_wide(..).otherwise(..)
     pub fn backtrack<T>(&self) -> Backtrack<T> {
@@ -61,6 +70,10 @@ impl<T> Backtrack<'_, T> {
             }
         }
     }
+    
+    pub fn into_inner(self) -> BacktrackState<T> {
+        self.state
+    }
 
     /// Provides the next formatting strategy with explicit control of whether to break with a
     /// result or continue with subsequent strategies.
@@ -85,8 +98,33 @@ impl<T> Backtrack<'_, T> {
             },
         }
     }
-}
 
+    pub fn next_choose<U>(
+        mut self,
+        strategy_a: impl FnOnce() -> FormatResult<U>,
+        strategy_b: impl FnOnce(U) -> FormatResult<T>,
+    ) -> Self {
+        if let BacktrackState::Continue(checkpoint) = &self.state {
+            match strategy_a() {
+                // restore the checkpoint before continuing to the next formatting strategy
+                Err(FormatError::Constraint(_)) => self.af.restore_checkpoint(checkpoint),
+                // if Ok or an unrecoverable error, we're finished
+                Ok(()) => {
+                    let lookahead = self.af.capture_lookahead(checkpoint);
+                }
+                result @ Err(_) => {
+                    match std::mem::replace(&mut self.state, BacktrackState::Break(result)) {
+                        BacktrackState::Continue(checkpoint) => {
+                            self.af.close_checkpoint(checkpoint)
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+            }
+        }
+        self
+    }
+}
 
 /*
 impl AstFormatter {
@@ -144,7 +182,7 @@ impl AstFormatter {
             }
         }
     }
-    
+
 }
 
 type Lookahead = String;
