@@ -158,17 +158,18 @@ impl AstFormatter {
             ast::ExprKind::Paren(ref inner) => {
                 let tail = take_tail();
                 self.out.token("(")?;
-                self.backtrack_with_single_line(|| {
-                    self.expr(inner)?;
-                    self.out.token(")")?;
-                    self.tail(tail)?;
-                    Ok(())
-                })
-                .otherwise(|| {
-                    self.embraced_after_opening(")", || self.expr(inner))?;
-                    self.tail(tail)?;
-                    Ok(())
-                })?;
+                self.backtrack()
+                    .next_single_line(|| {
+                        self.expr(inner)?;
+                        self.out.token(")")?;
+                        self.tail(tail)?;
+                        Ok(())
+                    })
+                    .otherwise(|| {
+                        self.embraced_after_opening(")", || self.expr(inner))?;
+                        self.tail(tail)?;
+                        Ok(())
+                    })?;
             }
             ast::ExprKind::Yield(_) => todo!(),
             ast::ExprKind::Yeet(_) => todo!(),
@@ -339,24 +340,25 @@ impl AstFormatter {
         if !is_single_line_cond {
             multiline()?;
         } else if let Some((block_expr, else_expr)) = single_line_parts() {
-            self.backtrack_with_single_line(|| {
-                self.with_width_limit_from_start(
-                    start_pos,
-                    RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
-                    || {
-                        self.out.space()?;
-                        self.expr(block_expr)?;
-                        self.out.space_token_space("}")?;
-                        self.out.token_space("else")?;
-                        self.out.token_space("{")?;
-                        self.expr(else_expr)?;
-                        self.out.space_token("}")?;
-                        self.tail(tail)?;
-                        Ok(())
-                    },
-                )
-            })
-            .otherwise(multiline)?;
+            self.backtrack()
+                .next_single_line(|| {
+                    self.with_width_limit_from_start(
+                        start_pos,
+                        RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
+                        || {
+                            self.out.space()?;
+                            self.expr(block_expr)?;
+                            self.out.space_token_space("}")?;
+                            self.out.token_space("else")?;
+                            self.out.token_space("{")?;
+                            self.expr(else_expr)?;
+                            self.out.space_token("}")?;
+                            self.tail(tail)?;
+                            Ok(())
+                        },
+                    )
+                })
+                .otherwise(multiline)?;
         } else {
             multiline()?;
         }
@@ -383,7 +385,8 @@ impl AstFormatter {
         if force_newline {
             newline_open_block()?;
         } else {
-            self.backtrack_with_single_line(|| self.out.space_token("{"))
+            self.backtrack()
+                .next_single_line(|| self.out.space_token("{"))
                 .otherwise(newline_open_block)?;
         }
         Ok(self.out.line() == first_line)

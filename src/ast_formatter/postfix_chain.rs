@@ -1,9 +1,11 @@
+use std::ops::ControlFlow;
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::checkpoint::{Checkpoint, Lookahead};
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::list::ListBuilderTrait;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_wrappable, postfix_expr_receiver};
-use crate::error::{ConstraintError, FormatError, FormatResult};
+use crate::error::{return_break, ConstraintError, FormatControlFlow, FormatError, FormatResult, FormatResultExt};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 
@@ -109,48 +111,55 @@ impl AstFormatter {
         wrappable_count: u32,
     ) -> FormatResult {
         let first_line = self.out.line();
-        let backtrack = self.backtrack().next_with_checkpoint(|checkpoint| {
-            self.postfix_overflowable(overflowable)?;
-            self.tail(tail)?;
+        
+        
+        let checkpoint = self.open_checkpoint();
+        let result = self.maybe_lookahead(checkpoint, || {
+            self.postfix_overflowable(overflowable).break_err()?;
+            self.tail(tail).break_err()?;
             if self.out.line() - first_line == 1 {
                 // it all fits on one line
-                return Ok(());
+                return ControlFlow::Break(Ok(()));
             }
             let overflow_height = self.out.line() - first_line + 1;
-            let lookahead = self.capture_lookahead(checkpoint);
+            ControlFlow::Continue(overflow_height)
+        });
+        let (checkpoint, lookahead, overflow_height) = return_break!(result);
 
-            // try writing the overflowable on the next line to measure its height in separate lines format
-            // todo share logic with match arm
-            // todo should we check if the wrap allows a *longer* first line, like match arm?
-            let result = self.indented(|| {
-                // N.B. this newline evades the first line width limit
-                self.out.line();
-                self.out.newline_within_indent()?;
-                self.postfix_item(overflowable)?;
-                self.tail(tail)?;
-                Ok(self.out.line() - first_line + 1)
-            });
-            match result {
-                Err(FormatError::Constraint(_)) => todo!(), // is this possible?
-                Err(e) => return Err(e),
-                Ok(overflowable_separate_line_height) => {
-                    // Each wrappable leading up to the overflowable will occupy one line each since we were
-                    // previously able to format them all on one line.
-                    let separate_lines_height = wrappable_count + overflowable_separate_line_height;
-                    if separate_lines_height <= overflow_height {
-                        // fallback to separate lines strategy
-                        return Err(ConstraintError::Logical.into());
-                    }
+        // try writing the overflowable on the next line to measure its height in separate lines format
+        // todo share logic with match arm
+        // todo should we check if the wrap allows a *longer* first line, like match arm?
+        let result = self.indented(|| {
+            // N.B. this newline evades the first line width limit
+            self.out.line();
+            self.out.newline_within_indent()?;
+            self.postfix_item(overflowable)?;
+            self.tail(tail)?;
+            Ok(self.out.line() - first_line + 1)
+        });
+        
+        let result = match result {
+            Err(FormatError::Constraint(_)) => todo!(), // is this possible?
+            Err(e) => Err(e),
+            Ok(overflowable_separate_line_height) => {
+                // Each wrappable leading up to the overflowable will occupy one line each since we were
+                // previously able to format them all on one line.
+                let separate_lines_height = wrappable_count + overflowable_separate_line_height;
+                if separate_lines_height <= overflow_height {
+                    // fallback to separate lines strategy
+                    Err(ConstraintError::Logical.into())
+                } else {
+                    // restore overflow strategy
+                    self.restore_checkpoint(&checkpoint);
+                    self.restore_lookahead(&lookahead);
+                    Ok(())
                 }
             }
-            // restore overflow strategy
-            self.restore_checkpoint(checkpoint);
-            self.restore_lookahead(&lookahead);
-            Ok(())
-            // todo perhaps there is a concept of "fallback cost" that can be passed down
-            //   - if you err out, there will be a cost of increased indent and added lines
-        });
-        backtrack.otherwise(|| Err(ConstraintError::Logical.into()))
+        };
+        self.close_checkpoint(checkpoint);
+        result
+        // todo perhaps there is a concept of "fallback cost" that can be passed down
+        //   - if you err out, there will be a cost of increased indent and added lines
     }
 
     fn postfix_overflowable(&self, overflowable: &PostfixItem<'_>) -> FormatResult {
@@ -216,6 +225,25 @@ impl AstFormatter {
             }
         }
         Ok(())
+    }
+    
+    // todo move these
+
+    fn maybe_lookahead<T>(
+        &self,
+        checkpoint: Checkpoint,
+        strategy: impl FnOnce() -> FormatControlFlow<T>,
+    ) -> FormatControlFlow<(Checkpoint, Lookahead, T)> {
+        match strategy() {
+            ControlFlow::Break(value) => {
+                self.close_checkpoint(checkpoint);
+                ControlFlow::Break(value)
+            }
+            ControlFlow::Continue(value) => {
+                let lookahead = self.capture_lookahead(&checkpoint);
+                ControlFlow::Continue((checkpoint, lookahead, value))
+            }
+        }
     }
 }
 

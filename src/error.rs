@@ -1,9 +1,36 @@
 use crate::util::line_col::line_col;
 use std::backtrace::Backtrace;
 use std::fmt::{Display, Formatter};
+use std::ops::ControlFlow;
 use std::path::Path;
 
 pub type FormatResult<T = ()> = Result<T, FormatError>;
+
+pub type FormatControlFlow<C> = ControlFlow<FormatResult, C>;
+
+pub trait FormatResultExt<T> {
+    fn break_err(self) -> FormatControlFlow<T>;
+}
+
+impl<T> FormatResultExt<T> for FormatResult<T> {
+    fn break_err(self) -> FormatControlFlow<T> {
+        match self {
+            Ok(value) => ControlFlow::Continue(value),
+            Err(e) => ControlFlow::Break(Err(e)),
+        }
+    }
+}
+
+macro_rules! return_break {
+    ($control_flow:expr) => {{
+        use std::ops::ControlFlow;
+        match $control_flow {
+            ControlFlow::Break(value) => return value,
+            ControlFlow::Continue(value) => value,
+        }
+    }};
+}
+pub(crate) use return_break;
 
 #[derive(Debug)]
 pub enum FormatError {

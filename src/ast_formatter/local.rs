@@ -86,36 +86,37 @@ impl AstFormatter {
         self.out.space_token("=")?;
         // todo do all these cases apply with else clause?
         // single line
-        self.backtrack_with_single_line(|| {
-            self.out.space()?;
-            self.expr(expr)?;
-            self.tail(end)?;
-            Ok(())
-        })
-        // wrap and indent then single line
-        .next(|| {
-            self.indented(|| {
-                self.out.newline_within_indent()?;
-                self.with_single_line(|| self.expr(expr))?;
-                self.tail(end)?;
-                Ok(())
-            })
-        })
-        // normal
-        .next(|| {
-            self.out.space()?;
-            self.expr(expr)?;
-            self.tail(end)?;
-            Ok(())
-        })
-        // wrap and indent
-        .otherwise(|| {
-            self.indented(|| {
-                self.out.newline_within_indent()?;
+        self.backtrack()
+            .next_single_line(|| {
+                self.out.space()?;
                 self.expr(expr)?;
                 self.tail(end)?;
                 Ok(())
             })
-        })
+            // wrap and indent then single line
+            .next(|| {
+                self.indented(|| {
+                    self.out.newline_within_indent()?;
+                    self.with_single_line(|| self.expr(expr))?;
+                    self.tail(end)?;
+                    Ok(())
+                })
+            })
+            // normal
+            .next(|| {
+                self.out.space()?;
+                self.expr(expr)?;
+                self.tail(end)?;
+                Ok(())
+            })
+            // wrap and indent
+            .otherwise(|| {
+                self.indented(|| {
+                    self.out.newline_within_indent()?;
+                    self.expr(expr)?;
+                    self.tail(end)?;
+                    Ok(())
+                })
+            })
     }
 }

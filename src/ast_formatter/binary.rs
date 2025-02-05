@@ -16,25 +16,26 @@ impl AstFormatter {
     ) -> FormatResult {
         let (first, chain) = self.collect_binary_chain(left, right, op);
         self.expr(first)?;
-        self.backtrack_with_single_line(|| {
-            for (op, expr) in &chain {
-                self.out.space_token_space(op.as_str())?;
-                self.expr(expr)?;
-            }
-            self.tail(tail)?;
-            Ok(())
-        })
-        .otherwise(|| {
-            self.indented(|| {
-                for (op, expr) in chain {
-                    self.out.newline_within_indent()?;
-                    self.out.token_space(op.as_str())?;
+        self.backtrack()
+            .next_single_line(|| {
+                for (op, expr) in &chain {
+                    self.out.space_token_space(op.as_str())?;
                     self.expr(expr)?;
                 }
                 self.tail(tail)?;
                 Ok(())
             })
-        })
+            .otherwise(|| {
+                self.indented(|| {
+                    for (op, expr) in chain {
+                        self.out.newline_within_indent()?;
+                        self.out.token_space(op.as_str())?;
+                        self.expr(expr)?;
+                    }
+                    self.tail(tail)?;
+                    Ok(())
+                })
+            })
     }
 
     fn collect_binary_chain<'a>(

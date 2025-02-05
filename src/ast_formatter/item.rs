@@ -167,18 +167,19 @@ impl AstFormatter {
             None => self.ty(&impl_.self_ty),
         };
         let indented = if self.out.line() == first_line {
-            self.backtrack_with_single_line(|| {
-                self.out.space()?;
-                first_part()?;
-                Ok(false)
-            })
-            .otherwise(|| {
-                self.indented(|| {
-                    self.out.newline_within_indent()?;
+            self.backtrack()
+                .next_single_line(|| {
+                    self.out.space()?;
                     first_part()?;
-                    Ok(true)
+                    Ok(false)
                 })
-            })?
+                .otherwise(|| {
+                    self.indented(|| {
+                        self.out.newline_within_indent()?;
+                        first_part()?;
+                        Ok(true)
+                    })
+                })?
         } else {
             self.out.space()?;
             first_part()?;

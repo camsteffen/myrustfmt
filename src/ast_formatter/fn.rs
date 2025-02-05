@@ -27,28 +27,29 @@ impl AstFormatter {
                 single_line_max_contents_width: None,
             },
         );
-        self.backtrack_with_single_line(|| {
-            param_list.format_single_line(self)?;
-            self.fn_ret_ty(&sig.decl.output)?;
-            if is_block_after_decl {
-                self.out.space_token("{")?;
-            }
-            Ok(())
-        })
-        .otherwise(|| {
-            param_list.format_separate_lines(self)?;
-            self.fn_ret_ty(&sig.decl.output)?;
-            if is_block_after_decl {
-                self.backtrack()
-                    .next(|| self.out.space_token("{"))
-                    .otherwise(|| {
-                        self.out.newline_within_indent()?;
-                        self.out.token("{")?;
-                        Ok(())
-                    })?;
-            }
-            Ok(())
-        })?;
+        self.backtrack()
+            .next_single_line(|| {
+                param_list.format_single_line(self)?;
+                self.fn_ret_ty(&sig.decl.output)?;
+                if is_block_after_decl {
+                    self.out.space_token("{")?;
+                }
+                Ok(())
+            })
+            .otherwise(|| {
+                param_list.format_separate_lines(self)?;
+                self.fn_ret_ty(&sig.decl.output)?;
+                if is_block_after_decl {
+                    self.backtrack()
+                        .next(|| self.out.space_token("{"))
+                        .otherwise(|| {
+                            self.out.newline_within_indent()?;
+                            self.out.token("{")?;
+                            Ok(())
+                        })?;
+                }
+                Ok(())
+            })?;
         self.where_clause(&generics.where_clause)?;
         if let Some(body) = body {
             if is_block_after_decl {
@@ -102,7 +103,8 @@ impl AstFormatter {
                 self.expr_tail(body, tail)
             } else {
                 // add a block unless it fits on a single line
-                self.backtrack_with_single_line(|| self.expr_tail(body, tail))
+                self.backtrack()
+                    .next_single_line(|| self.expr_tail(body, tail))
                     .otherwise(|| {
                         self.expr_add_block(body)?;
                         self.tail(tail)?;
@@ -164,17 +166,18 @@ impl AstFormatter {
     fn fn_decl(&self, fn_decl: &ast::FnDecl, braces: &'static Braces) -> FormatResult {
         let param_list = list(braces, &fn_decl.inputs, |param| self.param(param));
         // args and return type all on one line
-        self.backtrack_with_single_line(|| {
-            param_list.format_single_line(self)?;
-            self.fn_ret_ty(&fn_decl.output)?;
-            Ok(())
-        })
-        // args on separate lines
-        .otherwise(|| {
-            param_list.format_separate_lines(self)?;
-            self.fn_ret_ty(&fn_decl.output)?;
-            Ok(())
-        })
+        self.backtrack()
+            .next_single_line(|| {
+                param_list.format_single_line(self)?;
+                self.fn_ret_ty(&fn_decl.output)?;
+                Ok(())
+            })
+            // args on separate lines
+            .otherwise(|| {
+                param_list.format_separate_lines(self)?;
+                self.fn_ret_ty(&fn_decl.output)?;
+                Ok(())
+            })
     }
 
     fn param(&self, param: &ast::Param) -> FormatResult {
