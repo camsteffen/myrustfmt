@@ -1,5 +1,6 @@
 - name: line comment after block opening and closing brace
   type: before_after
+  in_block: true
   before: |
     {    // open
         let x;
@@ -10,12 +11,14 @@
     } // close
 - name: line comment after block opening brace without space
   type: no_change
+  in_block: true
   formatted: |
     {// open
         let x;
     }// close
 - name: trim all but one blank line leading and trailing line comments in block
   type: before_after
+  in_block: true
   before: |
     {
 
@@ -38,6 +41,7 @@
     }
 - name: comment in an empty array
   type: before_after
+  in_block: true
   before: |
     [
 
@@ -50,6 +54,7 @@
     ]
 - name: leading and trailing comments in an array
   type: before_after
+  in_block: true
   before: |
     [
 
@@ -70,18 +75,21 @@
     ]
 - name: prefix a token with a single-line block
   type: before_after
+  in_block: true
   before: |
     let  /*comment*/x;
   after: |
     let /*comment*/x;
 - name: suffix a token with a single-line block comment
   type: before_after
+  in_block: true
   before: |
     let/*comment*/  x;
   after: |
     let/*comment*/ x;
 - name: prefix a token with a multi-line block
   type: before_after
+  in_block: true
   before: |
     let  /*comment
           second line*/x;
@@ -90,6 +98,7 @@
           second line*/x;
 - name: suffix a token with a multi-line block
   type: before_after
+  in_block: true
   before: |
     let/*comment
           second line*/  x;
@@ -98,12 +107,14 @@
           second line*/ x;
 - name: block comment padded with spaces where there would be no space
   type: before_after
+  in_block: true
   before: |
     (  /* comment */  x );
   after: |
     ( /* comment */ x);
 - name: line command after if block opening
   type: before_after
+  in_block: true
   before: |
     if cond {  // super helpful comment
         booya();

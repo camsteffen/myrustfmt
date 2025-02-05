@@ -1,5 +1,6 @@
 - name: call function (not args) breakpoint
   type: breakpoint
+  in_block: true
   before: |
     (aaaaaaa + bbbbb)(
         aaaaaaaaaa,

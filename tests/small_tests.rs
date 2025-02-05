@@ -2,7 +2,7 @@
 
 mod test_lib;
 
-use crate::test_lib::{format_stmt_max_width_expected, stmt_breakpoint_test, TestResult};
+use crate::test_lib::{breakpoint_test, format_max_width_expected, TestResult};
 use serde::Deserialize;
 use std::fs;
 use std::io::BufReader;
@@ -28,31 +28,16 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
 fn small_test(test: &Test) -> TestResult {
     eprintln!("Test: {}", &test.name);
     match &test.kind {
-        TestKind::Breakpoint { before, after } => stmt_breakpoint_test(before, after)?,
+        TestKind::Breakpoint { before, after } => breakpoint_test(before, after, test.in_block)?,
         TestKind::NoChange { formatted } => {
             let formatted = formatted.trim();
-            format_stmt_max_width_expected(
-                formatted,
-                None,
-                formatted,
-                "formatted",
-            )?;
+            format_max_width_expected(formatted, None, formatted, "formatted", test.in_block)?;
         }
         TestKind::BeforeAfter { before, after } => {
             let before = before.trim();
             let after = after.trim();
-            format_stmt_max_width_expected(
-                before,
-                None,
-                after,
-                "before -> after",
-            )?;
-            format_stmt_max_width_expected(
-                after,
-                None,
-                after,
-                "after (idempotency)",
-            )?;
+            format_max_width_expected(before, None, after, "before -> after", test.in_block)?;
+            format_max_width_expected(after, None, after, "after (idempotency)", test.in_block)?;
         }
     }
     Ok(())
@@ -65,6 +50,8 @@ struct Test {
     focus: bool,
     #[serde(flatten)]
     kind: TestKind,
+    #[serde(default)]
+    in_block: bool,
 }
 
 #[derive(Deserialize)]
@@ -76,7 +63,15 @@ enum TestKind {
     /// a max width that is just one character smaller than the width required for the "before"
     /// string. The result should equal the "after" string. Also, the "before" string is formatted
     /// with exactly a large enough max width to test that it is not changed.
-    Breakpoint { before: String, after: String },
-    NoChange { formatted: String },
-    BeforeAfter { before: String, after: String },
+    Breakpoint {
+        before: String,
+        after: String,
+    },
+    NoChange {
+        formatted: String,
+    },
+    BeforeAfter {
+        before: String,
+        after: String,
+    },
 }

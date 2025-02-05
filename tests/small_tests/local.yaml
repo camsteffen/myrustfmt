@@ -1,9 +1,11 @@
 - name: single line declaration with type
   type: no_change
+  in_block: true
   formatted: |
     let x: String;
 - name: declaration type breaks into multi-line
   type: breakpoint
+  in_block: true
   before: |
     let aaaaa: (bbbbb,);
   after: |
@@ -12,10 +14,12 @@
     );
 - name: single line initialization with type
   type: no_change
+  in_block: true
   formatted: |
     let x: String = foo;
 - name: initializer breaks onto next line
   type: breakpoint
+  in_block: true
   before: |
     let x = y;
   after: |
@@ -23,6 +27,7 @@
         y;
 - name: initializer goes from next-line-single-line to overflow
   type: breakpoint
+  in_block: true
   before: |
     let x =
         [yyyy];
@@ -32,6 +37,7 @@
     ];
 - name: initializer goes from overflow to break onto next line
   type: breakpoint
+  in_block: true
   before: |
     let x = Struct {
         y,
@@ -45,6 +51,7 @@
 # let...else
 - name: else block breaks into multi-line
   type: breakpoint
+  in_block: true
   before: |
     let xxxxxxxxxxxxx = aaaaaaaaaa else { return x };
   after: |
@@ -53,6 +60,7 @@
     };
 - name: else keyword breaks onto next line
   type: breakpoint
+  in_block: true
   before: |
     let xxxxxxxxxxxxx = aaaaaaaaaa else {
         return x;

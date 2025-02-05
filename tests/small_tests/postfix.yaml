@@ -1,5 +1,6 @@
 - name: index operations in multiline chain
   type: no_change
+  in_block: true
   formatted: |
     aaaaaaa
         .aaaaaaaa[bbbbbbbb]
@@ -12,6 +13,7 @@
         .aaaaaaa
 - name: multiline root with chained items
   type: no_change
+  in_block: true
   formatted: |
     asdfasdf({
         let x;
@@ -20,6 +22,7 @@
     .aaaa
 - name: field after multiline method call
   type: no_change
+  in_block: true
   formatted: |
     asdfasdf
         .ab
@@ -29,18 +32,21 @@
         .hi
 - name: simple index after multiline method call
   type: no_change
+  in_block: true
   formatted: |
     asdfasdf.ab.method_call(|| {
         let x;
     })[0]
 - name: try after multiline method call
   type: no_change
+  in_block: true
   formatted: |
     asdfasdf.ab.method_call(|| {
         let x;
     })?
 - name: multiline index after multiline method call
   type: no_change
+  in_block: true
   formatted: |
     asdfasdf
         .ab
@@ -52,6 +58,7 @@
         ]
 - name: prefer separate lines chain over overflow if the number of lines is the same, and the method call can fit on one line
   type: breakpoint
+  in_block: true
   before: |
     rooty
         .asdf
@@ -64,6 +71,7 @@
     })
 - name: prefer overflow over multi-line chain if it is fewer lines
   type: breakpoint
+  in_block: true
   before: |
     oneone.two.three.four.five(
         foo,
@@ -77,6 +85,7 @@
         .five(foo, foo)
 - name: prefer separate lines chain over overflow when same number of lines, even when method call is multi-line
   type: breakpoint
+  in_block: true
   before: |
     oneone.two.three(Foo {
         foooooey,
@@ -91,6 +100,7 @@
         })
 - name: prefer overflow over separate lines chain when fewer lines, when method call is multi-line
   type: breakpoint
+  in_block: true
   before: |
     oneone.two.three.four(Foo {
         foooooey,

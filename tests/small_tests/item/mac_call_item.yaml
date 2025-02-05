@@ -1,0 +1,4 @@
+- name: mac call item
+  type: no_change
+  formatted: |
+    macro_call!();

@@ -1,5 +1,6 @@
 - name: call
   type: before_after
+  in_block: true
   before: |
     match x {
         _ => (

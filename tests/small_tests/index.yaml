@@ -1,5 +1,6 @@
 - name: index breakpoint
   type: breakpoint
+  in_block: true
   before: |
     aaaaa[bbbbb]
   after: |

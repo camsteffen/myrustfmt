@@ -90,7 +90,10 @@ impl AstFormatter {
             ast::ItemKind::Trait(trait_) => self.trait_(trait_, item)?,
             ast::ItemKind::TraitAlias(_, _) => todo!(),
             ast::ItemKind::Impl(impl_) => self.impl_(impl_)?,
-            ast::ItemKind::MacCall(mac_call) => self.mac_call(mac_call)?,
+            ast::ItemKind::MacCall(mac_call) => {
+                self.mac_call(mac_call)?;
+                self.out.token(";")?;
+            },
             // todo
             ast::ItemKind::MacroDef(_) => self.out.copy_span(item.span)?,
             ast::ItemKind::Delegation(_) => todo!(),

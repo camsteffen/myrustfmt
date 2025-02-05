@@ -1,5 +1,6 @@
 - name: group operators of same precedence at the edges
   type: no_change
+  in_block: true
   formatted: |
     111111111111111111 * 11111111111111111
         + 1111111111111111
@@ -7,6 +8,7 @@
         + 2222222222222222 * 333333
 - name: group operators of same precedence in the middle
   type: no_change
+  in_block: true
   formatted: |
     111111111111111111
         - 11111111111111111

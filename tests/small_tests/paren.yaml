@@ -1,5 +1,6 @@
 - name: paren breakpoint
   type: breakpoint
+  in_block: true
   before: |
     (aaaaaaa + bbbbb)
   after: |

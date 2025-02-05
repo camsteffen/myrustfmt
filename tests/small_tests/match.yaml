@@ -1,5 +1,6 @@
 - name: leading pipe
   type: before_after
+  in_block: true
   before: |
     match x {
         | () => {}
@@ -10,6 +11,7 @@
     }
 - name: remove needless block
   type: before_after
+  in_block: true
   before: |
     match x {
         X => {
@@ -22,6 +24,7 @@
     }
 - name: remove comma after block
   type: before_after
+  in_block: true
   before: |
     match x {
         _ => {
@@ -36,6 +39,7 @@
     }
 - name: arm body breakpoint add block
   type: breakpoint
+  in_block: true
   before: |
     match x {
         _ => [asdfasdf],
@@ -48,6 +52,7 @@
     }
 - name: arm body breakpoint remove block
   type: breakpoint
+  in_block: true
   before: |
     match x {
         _ => {
@@ -62,6 +67,7 @@
     }
 - name: arm body is long list that fits on one line iff wrapped in a block
   type: before_after
+  in_block: true
   before: |
     match X {
         PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP => [LLLL, LLLL, LLLL, LLLL, LLLL, LLLL, LLLL],
@@ -74,6 +80,7 @@
     }
 - name: arm body is chain on multiple lines with final multiline method call
   type: no_change
+  in_block: true
   formatted: |
     match x {
         x => {
@@ -85,6 +92,7 @@
     }
 - name: arm body is chain on single line except final multiline method call
   type: no_change
+  in_block: true
   formatted: |
     match x {
         x => a.b.aaaaaaa({
@@ -93,6 +101,7 @@
     }
 - name: arm body is chain with all overflowing method calls
   type: before_after
+  in_block: true
   before: |
     match x {
         x => aaaaaaa({
@@ -115,6 +124,7 @@
     }
 - name: arm body is multi-line range
   type: before_after
+  in_block: true
   before: |
     match x {
         x => [{
@@ -135,6 +145,7 @@
     }
 - name: comment in first line of arm block that prevents block removal
   type: no_change
+  in_block: true
   formatted: |
     match x {
         _ => {
@@ -144,6 +155,7 @@
     }
 - name: comma after arm block where block is removed
   type: before_after
+  in_block: true
   before: |
     match x {
         _ => {
@@ -156,6 +168,7 @@
     }
 - name: multi-line chain
   type: no_change
+  in_block: true
   formatted: |
     match x {
         PPPPPPPPPPPPPPPPPPPP => {
@@ -166,6 +179,7 @@
     }
 - name: guard on separate line and plain, single-expression block
   type: no_change
+  in_block: true
   formatted: |
     match x {
         TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
@@ -177,6 +191,7 @@
 
 - name: guard on separate line and plain, multi-statement block
   type: no_change
+  in_block: true
   formatted: |
     match x {
         TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT

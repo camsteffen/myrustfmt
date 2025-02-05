@@ -1,15 +1,18 @@
 - name: array at max width of 60 chars
   type: no_change
+  in_block: true
   formatted: |
     [aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaaaa]
 - name: array would one above max width, elements are all <= 10 chars
   type: no_change
+  in_block: true
   formatted: |
     [
         aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, aaaa, a, aaaaaaaaaa,
     ]
 - name: array would be one above max width, one element is 11 chars
   type: no_change
+  in_block: true
   formatted: |
     [
         aaaa,
@@ -25,6 +28,7 @@
     ]
 - name: wrap to fit with multiple lines of contents
   type: no_change
+  in_block: true
   formatted: |
       [
           aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa,
@@ -32,6 +36,7 @@
       ]
 - name: single-item list has a chain with multiline root
   type: before_after
+  in_block: true
   before: |
     [asdfasdf({
         let x;
@@ -48,6 +53,7 @@
     ]
 - name: multiple-item list has a chain with multiline root
   type: before_after
+  in_block: true
   before: |
     [asdfasdf({
         let x;

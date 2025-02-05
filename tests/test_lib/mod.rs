@@ -4,26 +4,28 @@ use std::error::Error;
 
 pub type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-pub fn stmt_breakpoint_test(before: &str, after: &str) -> TestResult {
+pub fn breakpoint_test(before: &str, after: &str, in_block: bool) -> TestResult {
     let before = before.trim();
     let after = after.trim();
     let initial_used_width = before.lines().map(|line| line.len() as u32).max().unwrap();
-    format_stmt_max_width_expected(
+    format_max_width_expected(
         before,
         Some(initial_used_width),
         before,
-        "without max width reduction",
+        "before max width reduction",
+        in_block,
     )?;
-    format_stmt_max_width_expected(
+    format_max_width_expected(
         before,
         Some(initial_used_width - 1),
         after,
-        "with max width reduction",
+        "after max width reduction",
+        in_block,
     )?;
     Ok(())
 }
 
-fn format_stmt(stmt: &str, max_width: Option<u32>) -> String {
+fn format_in_block(stmt: &str, max_width: Option<u32>) -> String {
     let (prefix, indent, suffix) = ("fn test() {\n", "    ", "}\n");
     let stmt = String::from_iter(stmt.lines().map(|s| format!("{indent}{s}\n")));
     let crate_source = format!("{prefix}{stmt}{suffix}");
@@ -31,26 +33,16 @@ fn format_stmt(stmt: &str, max_width: Option<u32>) -> String {
     if let Some(max_width) = max_width {
         config = config.max_width(max_width + indent.len() as u32)
     }
-    let result = format_str_config(&crate_source, config).unwrap();
-    result.expect_not_exceeded_max_width();
+    let result = format_str_config(&crate_source, config).unwrap().expect_not_exceeded_max_width();
     let mut formatted_stmt = result
-        .formatted
         .strip_prefix(prefix)
         .unwrap()
         .strip_suffix(suffix)
         .unwrap()
         .lines()
-        .map(|mut line| {
-            for _ in 0..4 {
-                match line.strip_prefix(' ') {
-                    None => break,
-                    Some(l) => line = l,
-                }
-            }
-            line
-        })
         .fold(String::new(), |mut acc, line| {
-            acc.push_str(line);
+            let spaces = line.bytes().take(4).take_while(|&b| b == b' ').count();
+            acc.push_str(&line[spaces..]);
             acc.push('\n');
             acc
         });
@@ -58,22 +50,38 @@ fn format_stmt(stmt: &str, max_width: Option<u32>) -> String {
     formatted_stmt
 }
 
-pub fn format_stmt_max_width_expected(
-    stmt: &str,
+pub fn format_max_width_expected(
+    source: &str,
     max_width: Option<u32>,
     expected: &str,
     name: &str,
+    in_block: bool,
 ) -> TestResult {
-    let formatted = format_stmt(stmt, max_width);
-    if formatted != expected {
-        for line in diff::lines(expected, &formatted) {
-            match line {
-                diff::Result::Left(s) => println!("- {s}"),
-                diff::Result::Right(s) => println!("+ {s}"),
-                diff::Result::Both(s, _) => println!("  {s}"),
-            }
+    let formatted = if in_block {
+        format_in_block(source, max_width)
+    } else {
+        let mut config = Config::default();
+        if let Some(max_width) = max_width {
+            config = config.max_width(max_width)
         }
-        return Err(format!("\"{name}\" formatted does not match expected").into());
-    }
+        let mut formatted = format_str_config(source, config).unwrap().expect_not_exceeded_max_width();
+        formatted.pop();
+        formatted
+    };
+    expect_formatted_equals(&formatted, expected, name)?;
     Ok(())
+}
+
+fn expect_formatted_equals(formatted: &str, expected: &str, name: &str) -> TestResult {
+    if formatted == expected {
+        return Ok(());
+    }
+    for line in diff::lines(expected, &formatted) {
+        match line {
+            diff::Result::Left(s) => println!("- {s}"),
+            diff::Result::Right(s) => println!("+ {s}"),
+            diff::Result::Both(s, _) => println!("  {s}"),
+        }
+    }
+    Err(format!("\"{name}\" formatted does not match expected").into())
 }

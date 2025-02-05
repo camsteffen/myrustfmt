@@ -39,10 +39,11 @@ pub struct FormatModuleResult {
 }
 
 impl FormatModuleResult {
-    pub fn expect_not_exceeded_max_width(&self) {
+    pub fn expect_not_exceeded_max_width(self) -> String {
         if self.exceeded_max_width {
             panic!("Exceeded max width");
         }
+        self.formatted
     }
 }
 

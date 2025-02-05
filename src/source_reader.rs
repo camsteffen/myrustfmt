@@ -19,7 +19,7 @@ impl SourceReader {
     pub fn finish(self) {
         if self.pos.get().to_usize() != self.source.len() {
             // todo don't panic?
-            panic!("Failed to reach end of file")
+            panic!("Failed to reach end of file. Next char: {:?}", self.source[self.pos.get().to_usize()..].chars().next().unwrap());
         }
     }
 
