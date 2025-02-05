@@ -1,0 +1,4 @@
+- name: pub(crate)
+  type: no_change
+  formatted: |
+    pub(crate) type X;

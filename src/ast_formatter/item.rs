@@ -109,8 +109,10 @@ impl AstFormatter {
                 shorthand: _,
                 ..
             } => {
-                self.out.token_space("pub")?;
+                self.out.token("pub")?;
+                self.out.token("(")?;
                 self.path(path, false)?;
+                self.out.token(")")?;
                 self.out.space()?;
             }
             ast::VisibilityKind::Inherited => {}
