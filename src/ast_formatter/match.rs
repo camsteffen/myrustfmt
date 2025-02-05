@@ -6,7 +6,7 @@ use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::backtrack::Backtrack;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{arm_body_requires_block, is_plain_block};
-use crate::error::{return_break, ConstraintError, FormatError, FormatResult};
+use crate::error::{return_if_break, ConstraintError, FormatError, FormatResult};
 use crate::util::cell_ext::CellExt;
 
 impl AstFormatter {
@@ -154,7 +154,7 @@ impl AstFormatter {
                 (_, Err(e)) => ControlFlow::Break(Err(e)),
             }
         });
-        let (backtrack, should_add_block) = return_break!(result);
+        let (backtrack, should_add_block) = return_if_break!(result);
         if should_add_block {
             backtrack.otherwise(|| self.expr_add_block(body))
         } else {

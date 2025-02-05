@@ -2,6 +2,5 @@
 
 set -e
 
-# todo drop rustfmt here once visiting modules is supported
-#cargo fmt
-./dogfood "$@"
+cargo build --bin myrustfmt
+RUSTFMT=./target/debug/myrustfmt RUST_BACKTRACE=1 exec cargo fmt "$@"

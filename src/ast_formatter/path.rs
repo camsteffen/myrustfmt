@@ -11,51 +11,51 @@ impl AstFormatter {
         &self,
         qself: &Option<P<ast::QSelf>>,
         path: &ast::Path,
-        is_expr: bool,
+        turbofish: bool,
     ) -> FormatResult {
-        if let Some(qself) = qself.as_deref() {
-            self.out.token("<")?;
-            self.ty(&qself.ty)?;
-            let rest = if qself.position > 0 {
-                self.out.space_token_space("as")?;
-                let (as_path, rest) = path.segments.split_at(qself.position);
-                self.path_segments(as_path, false)?;
-                rest
-            } else {
-                &path.segments
-            };
-            self.out.token(">")?;
-            self.out.token("::")?;
-            self.path_segments(rest, is_expr)?;
+        let Some(qself) = qself.as_deref() else {
+            return self.path(path, turbofish);
+        };
+        self.out.token("<")?;
+        self.ty(&qself.ty)?;
+        let rest = if qself.position > 0 {
+            self.out.space_token_space("as")?;
+            let (as_path, rest) = path.segments.split_at(qself.position);
+            self.path_segments(as_path, false)?;
+            rest
         } else {
-            self.path(path, is_expr)?;
-        }
+            &path.segments
+        };
+        self.out.token(">")?;
+        self.out.token("::")?;
+        self.path_segments(rest, turbofish)?;
         Ok(())
     }
 
-    pub fn path(&self, path: &ast::Path, is_expr: bool) -> FormatResult {
-        self.path_segments(&path.segments, is_expr)
+    pub fn path(&self, path: &ast::Path, turbofish: bool) -> FormatResult {
+        self.path_segments(&path.segments, turbofish)
     }
 
-    pub fn path_segments(&self, segments: &[ast::PathSegment], is_expr: bool) -> FormatResult {
+    pub fn path_segments(&self, segments: &[ast::PathSegment], turbofish: bool) -> FormatResult {
         let (first, rest) = segments.split_first().unwrap();
-        self.path_segment(first, is_expr, Tail::none())?;
+        self.path_segment(first, turbofish, Tail::none())?;
         for segment in rest {
             self.out.token("::")?;
-            self.path_segment(segment, is_expr, Tail::none())?;
+            self.path_segment(segment, turbofish, Tail::none())?;
         }
         Ok(())
     }
 
+    /// `turbofish` is needed for expressions and patterns, but not for types and modules
     pub fn path_segment(
         &self,
         segment: &ast::PathSegment,
-        is_expr: bool,
+        turbofish: bool,
         tail: &Tail,
     ) -> FormatResult {
         self.ident(segment.ident)?;
         if let Some(generic_args) = segment.args.as_deref() {
-            if is_expr {
+            if turbofish {
                 self.out.token("::")?;
             }
             self.generic_args(generic_args, tail)?;

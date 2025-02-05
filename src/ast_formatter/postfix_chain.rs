@@ -1,13 +1,12 @@
-use std::ops::ControlFlow;
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::checkpoint::{Checkpoint, Lookahead};
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::list::ListBuilderTrait;
 use crate::ast_formatter::util::tail::Tail;
-use crate::ast_utils::{is_postfix_expr, postfix_expr_is_wrappable, postfix_expr_receiver};
-use crate::error::{return_break, ConstraintError, FormatControlFlow, FormatError, FormatResult, FormatResultExt};
+use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
+use crate::error::{ConstraintError, FormatError, FormatResult, FormatResultExt, return_if_break};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
+use std::ops::ControlFlow;
 
 struct PostfixItem<'a> {
     /// The first item in the chain has the root expression, which is not a postfix expression.
@@ -84,9 +83,9 @@ impl AstFormatter {
             self.tail(tail)?;
             return Ok(());
         }
-        let (overflowable, until_overflow) = chain.split_last().unwrap();
+        let (overflowable, before_overflow) = chain.split_last().unwrap();
 
-        self.with_single_line(|| self.postfix_items(until_overflow))?;
+        self.with_single_line(|| self.postfix_items(before_overflow))?;
 
         if !has_separate_lines_fallback {
             // todo consider comparing line count with adding a block for touchy_margins
@@ -95,11 +94,11 @@ impl AstFormatter {
             return Ok(());
         }
 
-        let wrappable_count = until_overflow.len() as u32;
+        let before_overflow_count = before_overflow.len() as u32;
         self.postfix_chain_overflow_last_unless_separate_lines_preferred(
             overflowable,
             tail,
-            wrappable_count,
+            before_overflow_count,
         )?;
         Ok(())
     }
@@ -108,54 +107,51 @@ impl AstFormatter {
         &self,
         overflowable: &PostfixItem<'_>,
         tail: &Tail,
-        wrappable_count: u32,
+        before_overflow_count: u32,
     ) -> FormatResult {
         let first_line = self.out.line();
-        
-        
         let checkpoint = self.open_checkpoint();
+
         let result = self.maybe_lookahead(checkpoint, || {
             self.postfix_overflowable(overflowable).break_err()?;
             self.tail(tail).break_err()?;
-            if self.out.line() - first_line == 1 {
+            if self.out.line() == first_line {
                 // it all fits on one line
                 return ControlFlow::Break(Ok(()));
             }
-            let overflow_height = self.out.line() - first_line + 1;
-            ControlFlow::Continue(overflow_height)
+            ControlFlow::Continue(self.out.line() - first_line + 1)
         });
-        let (checkpoint, lookahead, overflow_height) = return_break!(result);
+        let (checkpoint, overflow_lookahead, overflow_height) = return_if_break!(result);
 
         // try writing the overflowable on the next line to measure its height in separate lines format
         // todo share logic with match arm
         // todo should we check if the wrap allows a *longer* first line, like match arm?
         let result = self.indented(|| {
             // N.B. this newline evades the first line width limit
-            self.out.line();
             self.out.newline_within_indent()?;
             self.postfix_item(overflowable)?;
             self.tail(tail)?;
             Ok(self.out.line() - first_line + 1)
         });
-        
+
         let result = match result {
             Err(FormatError::Constraint(_)) => todo!(), // is this possible?
             Err(e) => Err(e),
             Ok(overflowable_separate_line_height) => {
-                // Each wrappable leading up to the overflowable will occupy one line each since we were
-                // previously able to format them all on one line.
-                let separate_lines_height = wrappable_count + overflowable_separate_line_height;
+                // Each dot item leading up to the overflowable will occupy one line each since we
+                // were previously able to format them all on one line.
+                let separate_lines_height = before_overflow_count + overflowable_separate_line_height;
                 if separate_lines_height <= overflow_height {
                     // fallback to separate lines strategy
                     Err(ConstraintError::Logical.into())
                 } else {
-                    // restore overflow strategy
                     self.restore_checkpoint(&checkpoint);
-                    self.restore_lookahead(&lookahead);
+                    self.restore_lookahead(&overflow_lookahead);
                     Ok(())
                 }
             }
         };
+
         self.close_checkpoint(checkpoint);
         result
         // todo perhaps there is a concept of "fallback cost" that can be passed down
@@ -226,25 +222,6 @@ impl AstFormatter {
         }
         Ok(())
     }
-    
-    // todo move these
-
-    fn maybe_lookahead<T>(
-        &self,
-        checkpoint: Checkpoint,
-        strategy: impl FnOnce() -> FormatControlFlow<T>,
-    ) -> FormatControlFlow<(Checkpoint, Lookahead, T)> {
-        match strategy() {
-            ControlFlow::Break(value) => {
-                self.close_checkpoint(checkpoint);
-                ControlFlow::Break(value)
-            }
-            ControlFlow::Continue(value) => {
-                let lookahead = self.capture_lookahead(&checkpoint);
-                ControlFlow::Continue((checkpoint, lookahead, value))
-            }
-        }
-    }
 }
 
 fn build_postfix_chain(expr: &ast::Expr) -> Vec<PostfixItem<'_>> {
@@ -252,7 +229,7 @@ fn build_postfix_chain(expr: &ast::Expr) -> Vec<PostfixItem<'_>> {
     let mut items = Vec::new();
     let mut tail = Vec::new();
     let root = loop {
-        if postfix_expr_is_wrappable(current) {
+        if postfix_expr_is_dot(current) {
             items.push(PostfixItem {
                 root_or_dot_item: current,
                 tail: tail.drain(..).rev().collect(),

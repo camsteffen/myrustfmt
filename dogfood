@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-
-set -e
-
-cargo build --bin myrustfmt
-RUSTFMT=./target/debug/myrustfmt RUST_BACKTRACE=1 exec cargo fmt "$@"

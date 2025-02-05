@@ -21,7 +21,7 @@ impl<T> FormatResultExt<T> for FormatResult<T> {
     }
 }
 
-macro_rules! return_break {
+macro_rules! return_if_break {
     ($control_flow:expr) => {{
         use std::ops::ControlFlow;
         match $control_flow {
@@ -30,7 +30,7 @@ macro_rules! return_break {
         }
     }};
 }
-pub(crate) use return_break;
+pub(crate) use return_if_break;
 
 #[derive(Debug)]
 pub enum FormatError {

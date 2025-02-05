@@ -34,18 +34,18 @@ pub(crate) use control_flow_expr_kind;
 macro_rules! postfix_meta {
     ($mac:path) => {
         $mac! {
-            // (ExprKind(..), receiver expression, wrappable)
+            // (ExprKind(..), receiver expression, is_dot)
             (Await(ref receiver, _), receiver, true),
             (Field(ref receiver, _), receiver, true),
-            (Index(ref receiver, _, _), receiver, false),
             (MethodCall(ref method_call), &method_call.receiver, true),
+            // non-dot kinds
+            (Index(ref receiver, _, _), receiver, false),
             (Try(ref receiver), receiver, false),
         }
     };
 }
-
 macro_rules! postfix_defs {
-    ($(($kind:ident$fields:tt, $receiver:expr, $wrappable:literal),)*) => {
+    ($(($kind:ident$fields:tt, $receiver:expr, $is_dot:literal),)*) => {
         macro_rules! postfix_expr_kind {
             () => ($(::rustc_ast::ast::ExprKind::$kind(..))|*);
         }
@@ -63,17 +63,15 @@ macro_rules! postfix_defs {
             }
         }
 
-        /// A "wrappable" postfix expression can be wrapped to the next line.
-        /// Otherwise, the expression is affixed to the right of its receiver.
-        pub fn postfix_expr_is_wrappable(postfix_expr: &ast::Expr) -> bool {
+        /// Postfix expressions with a dot can be wrapped to the next line
+        pub fn postfix_expr_is_dot(postfix_expr: &ast::Expr) -> bool {
             match postfix_expr.kind {
-                $(::rustc_ast::ast::ExprKind::$kind(..) => $wrappable,)|*
+                $(::rustc_ast::ast::ExprKind::$kind(..) => $is_dot,)|*
                 _ => panic!("expected a postfix expression"),
             }
         }
     };
 }
-
 postfix_meta!(postfix_defs);
 
 /// Returns true if the given arm body expression requires to be wrapped in a block.
