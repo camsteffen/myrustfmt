@@ -13,6 +13,7 @@ pub enum FormatError {
 
 #[derive(Clone, Copy, Debug)]
 pub enum ConstraintError {
+    // todo rename to NextStrategy?
     Logical,
     NewlineNotAllowed,
     WidthLimitExceeded,

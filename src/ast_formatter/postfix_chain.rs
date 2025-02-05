@@ -6,7 +6,6 @@ use crate::ast_utils::{is_postfix_expr, postfix_expr_is_wrappable, postfix_expr_
 use crate::error::{ConstraintError, FormatError, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
-use std::ops::ControlFlow;
 
 struct PostfixItem<'a> {
     /// The first item in the chain has the root expression, which is not a postfix expression.
@@ -110,29 +109,17 @@ impl AstFormatter {
         wrappable_count: u32,
     ) -> FormatResult {
         let first_line = self.out.line();
-        let result = self.backtrack().next_control_flow_lookahead(|| {
-            let result = (|| -> FormatResult {
-                self.postfix_overflowable(overflowable)?;
-                self.tail(tail)?;
-                Ok(())
-            })();
-            match result {
-                Err(e) => return ControlFlow::Break(Err(e)),
-                Ok(()) => {}
-            }
+        let backtrack = self.backtrack().next_with_checkpoint(|checkpoint| {
+            self.postfix_overflowable(overflowable)?;
+            self.tail(tail)?;
             if self.out.line() - first_line == 1 {
                 // it all fits on one line
-                return ControlFlow::Break(Ok(()));
+                return Ok(());
             }
-            ControlFlow::Continue(self.out.line() - first_line + 1)
-        });
-        let (backtrack, lookahead, overflow_height) = match result {
-            ControlFlow::Break(result) => return result,
-            ControlFlow::Continue(c) => c,
-        };
+            let overflow_height = self.out.line() - first_line + 1;
+            let lookahead = self.capture_lookahead(checkpoint);
 
-        // try writing the overflowable on the next line to measure its height in separate lines format
-        let result = backtrack.next_control_flow(|| {
+            // try writing the overflowable on the next line to measure its height in separate lines format
             // todo share logic with match arm
             // todo should we check if the wrap allows a *longer* first line, like match arm?
             let result = self.indented(|| {
@@ -145,27 +132,25 @@ impl AstFormatter {
             });
             match result {
                 Err(FormatError::Constraint(_)) => todo!(), // is this possible?
-                Err(e) => ControlFlow::Break(Err(e)),
+                Err(e) => return Err(e),
                 Ok(overflowable_separate_line_height) => {
                     // Each wrappable leading up to the overflowable will occupy one line each since we were
                     // previously able to format them all on one line.
                     let separate_lines_height = wrappable_count + overflowable_separate_line_height;
                     if separate_lines_height <= overflow_height {
                         // fallback to separate lines strategy
-                        return ControlFlow::Break(Err(ConstraintError::Logical.into()));
+                        return Err(ConstraintError::Logical.into());
                     }
-                    // restore overflow strategy
-                    ControlFlow::Continue(())
                 }
             }
+            // restore overflow strategy
+            self.restore_checkpoint(checkpoint);
+            self.restore_lookahead(&lookahead);
+            Ok(())
             // todo perhaps there is a concept of "fallback cost" that can be passed down
             //   - if you err out, there will be a cost of increased indent and added lines
         });
-
-        match result {
-            ControlFlow::Break(result) => result,
-            ControlFlow::Continue((backtrack, ())) => backtrack.otherwise_lookahead(&lookahead, ()),
-        }
+        backtrack.otherwise(|| Err(ConstraintError::Logical.into()))
     }
 
     fn postfix_overflowable(&self, overflowable: &PostfixItem<'_>) -> FormatResult {

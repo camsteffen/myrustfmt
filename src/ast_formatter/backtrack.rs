@@ -64,6 +64,21 @@ impl<T> Backtrack<'_, T> {
         self
     }
 
+    pub fn next_with_checkpoint(mut self, strategy: impl FnOnce(&Checkpoint) -> FormatResult<T>) -> Self {
+        if let BacktrackState::Continue(checkpoint) = &self.state {
+            match strategy(checkpoint) {
+                // restore the checkpoint before continuing to the next formatting strategy
+                Err(FormatError::Constraint(_)) => self.af.restore_checkpoint(checkpoint),
+                // if Ok or an unrecoverable error, we're finished
+                result => match std::mem::replace(&mut self.state, BacktrackState::Break(result)) {
+                    BacktrackState::Continue(checkpoint) => self.af.close_checkpoint(checkpoint),
+                    _ => unreachable!(),
+                },
+            }
+        }
+        self
+    }
+
     /// Provides the final formatting strategy and returns the result of the backtracking chain.
     /// This is a required terminal operation.
     pub fn otherwise(self, final_attempt: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
@@ -74,17 +89,6 @@ impl<T> Backtrack<'_, T> {
                 final_attempt()
             }
         }
-    }
-    
-    pub fn otherwise_lookahead(self, lookahead: &Lookahead, value: T) -> FormatResult<T> {
-        match self.state {
-            BacktrackState::Break(result) => result,
-            BacktrackState::Continue(checkpoint) => {
-                self.af.restore_lookahead(lookahead);
-                self.af.close_checkpoint(checkpoint);
-                Ok(value)
-            }
-        } 
     }
     
     pub fn into_inner(self) -> BacktrackState<T> {
