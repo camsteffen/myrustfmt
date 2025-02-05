@@ -31,13 +31,28 @@ fn small_test(test: &Test) -> TestResult {
         TestKind::Breakpoint { before, after } => stmt_breakpoint_test(before, after)?,
         TestKind::NoChange { formatted } => {
             let formatted = formatted.trim();
-            format_stmt_max_width_expected(formatted, None, formatted, "formatted")?;
+            format_stmt_max_width_expected(
+                formatted,
+                None,
+                formatted,
+                "formatted",
+            )?;
         }
         TestKind::BeforeAfter { before, after } => {
             let before = before.trim();
             let after = after.trim();
-            format_stmt_max_width_expected(before, None, after, "before -> after")?;
-            format_stmt_max_width_expected(after, None, after, "after (idempotency)")?;
+            format_stmt_max_width_expected(
+                before,
+                None,
+                after,
+                "before -> after",
+            )?;
+            format_stmt_max_width_expected(
+                after,
+                None,
+                after,
+                "after (idempotency)",
+            )?;
         }
     }
     Ok(())
