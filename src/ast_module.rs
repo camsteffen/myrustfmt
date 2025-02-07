@@ -1,5 +1,5 @@
-use rustc_ast::ptr::P;
 use rustc_ast::ast;
+use rustc_ast::ptr::P;
 use thin_vec::ThinVec;
 
 pub struct AstModule {

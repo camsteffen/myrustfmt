@@ -92,8 +92,10 @@ impl AstFormatter {
             ast::ItemKind::Impl(impl_) => self.impl_(impl_)?,
             ast::ItemKind::MacCall(mac_call) => {
                 self.mac_call(mac_call)?;
-                self.out.token(";")?;
-            },
+                if !matches!(mac_call.args.delim, rustc_ast::token::Delimiter::Brace) {
+                    self.out.token(";")?;
+                }
+            }
             // todo
             ast::ItemKind::MacroDef(_) => self.out.copy_span(item.span)?,
             ast::ItemKind::Delegation(_) => todo!(),
@@ -265,7 +267,7 @@ impl AstFormatter {
     fn trait_(&self, trait_: &ast::Trait, item: &ast::Item) -> FormatResult {
         self.out.token_space("trait")?;
         self.ident(item.ident)?;
-        // self.generic_params(&trait_.generics.params)?;
+        self.generic_params(&trait_.generics.params)?;
         self.generic_bounds_optional(&trait_.bounds)?;
         self.out.space()?;
         self.block_generic(&trait_.items, |item| self.assoc_item(item))?;

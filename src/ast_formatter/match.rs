@@ -2,11 +2,11 @@ use rustc_ast::ast;
 use std::ops::ControlFlow;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::backtrack::Backtrack;
+use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{arm_body_requires_block, is_plain_block};
-use crate::error::{return_if_break, ConstraintError, FormatError, FormatResult};
+use crate::error::{ConstraintError, FormatError, FormatResult, return_if_break};
 use crate::util::cell_ext::CellExt;
 
 impl AstFormatter {

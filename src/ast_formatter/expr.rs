@@ -14,6 +14,7 @@ use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
+
 impl AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
         self.expr_tail(expr, Tail::none())
@@ -31,7 +32,9 @@ impl AstFormatter {
                     .format(self)?
             }
             ast::ExprKind::ConstBlock(_) => todo!(),
-            ast::ExprKind::Call(ref func, ref args) => self.call(func, args, take_tail())?,
+            ast::ExprKind::Call(ref func, ref args) => {
+                self.call(func, args, take_tail())?
+            }
             postfix_expr_kind!() => self.postfix_chain(expr, take_tail())?,
             ast::ExprKind::Tup(ref items) => {
                 list(Braces::PARENS, items, self.expr_list_item_fn(items))
@@ -124,7 +127,11 @@ impl AstFormatter {
                 self.expr(right)?;
             }
             ast::ExprKind::Range(ref start, ref end, limits) => {
-                self.range(start.as_deref(), end.as_deref(), limits, take_tail())?
+                let delim = match limits {
+                    ast::RangeLimits::Closed => "..=",
+                    ast::RangeLimits::HalfOpen => "..",
+                };
+                self.range(start.as_deref(), delim, end.as_deref(), take_tail())?
             }
             ast::ExprKind::Underscore => todo!(),
             ast::ExprKind::Path(ref qself, ref path) => self.qpath(qself, path, true)?,
@@ -227,29 +234,31 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn range(
+    pub fn range(
         &self,
         start: Option<&ast::Expr>,
+        delim: &str,
         end: Option<&ast::Expr>,
-        limits: ast::RangeLimits,
         tail: &Tail,
     ) -> FormatResult {
         let first_line = self.out.line();
-        if let Some(start) = start {
-            self.expr(start)?;
-        }
-        match limits {
-            ast::RangeLimits::Closed => self.out.token("..=")?,
-            ast::RangeLimits::HalfOpen => self.out.token("..")?,
-        }
-        match end {
-            None => self.tail(tail)?,
-            Some(end) => {
-                let is_single_line = self.out.constraints().touchy_margin.get()
-                    && start.is_some()
-                    && self.out.line() != first_line;
-                self.with_single_line_opt(is_single_line, || self.expr_tail(end, tail))?
+        let after_start = |af: &Self| {
+            af.out.token(delim)?;
+            match end {
+                None => af.tail(tail)?,
+                Some(end) => {
+                    let is_single_line = af.out.constraints().touchy_margin.get()
+                        && start.is_some()
+                        && af.out.line() != first_line;
+                    af.with_single_line_opt(is_single_line, || af.expr_tail(end, tail))?
+                }
             }
+            Ok(())
+        };
+        if let Some(start) = start {
+            self.expr_tail(start, &Tail::func(after_start))?;
+        } else {
+            after_start(self)?;
         }
         Ok(())
     }
@@ -286,11 +295,11 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn call_args_after_open_paren(
-        &self,
-        args: &[P<ast::Expr>],
-        tail: &Tail,
-    ) -> impl ListBuilderTrait {
+    pub fn call_args_after_open_paren<'ast: 'out, 'tail: 'out, 'this: 'out, 'out>(
+        &'this self,
+        args: &'ast [P<ast::Expr>],
+        tail: &'tail Tail<'_>,
+    ) -> impl ListBuilderTrait + 'out {
         list(Braces::PARENS, args, self.expr_list_item_fn(args))
             .config(CallParamListConfig)
             .omit_open_brace()

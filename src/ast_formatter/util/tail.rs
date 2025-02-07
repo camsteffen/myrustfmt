@@ -1,25 +1,27 @@
 use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
-use std::rc::Rc;
 
 /// Used to add trailing tokens to a formatted node
 ///
 /// * DO accept a Tail argument to "coerce" a node to leave room for trailing tokens
 /// * DON'T accept a Tail argument if it is not used to trigger fallback formats
 /// * DON'T pass a Tail argument when the single-line constraint is invariably enabled
-pub struct Tail(Option<TailImpl>);
+pub struct Tail<'a>(Option<TailImpl<'a>>);
 
-#[derive(Clone)]
-enum TailImpl {
-    And(Rc<(TailImpl, TailImpl)>),
+enum TailImpl<'a> {
+    Fn(Box<dyn Fn(&AstFormatter) -> FormatResult + 'a>),
     Token(&'static str),
     TokenInsert(&'static str),
     TokenMaybeMissing(&'static str),
 }
 
-impl Tail {
-    pub const fn none() -> &'static Tail {
+impl<'a> Tail<'a> {
+    pub const fn none() -> &'static Tail<'static> {
         const { &Tail(None) }
+    }
+
+    pub fn func(f: impl Fn(&AstFormatter) -> FormatResult + 'a) -> Tail<'a> {
+        Tail(Some(TailImpl::Fn(Box::new(f))))
     }
 
     pub const fn token(token: &'static str) -> Self {
@@ -33,26 +35,6 @@ impl Tail {
     pub const fn token_maybe_missing(token: &'static str) -> Self {
         Tail(Some(TailImpl::TokenMaybeMissing(token)))
     }
-
-    pub fn and(&self, other: &Tail) -> Tail {
-        let inner = match (&self.0, &other.0) {
-            (None, a) | (a, None) => a.clone(),
-            (Some(this), Some(other)) => {
-                Some(TailImpl::And(Rc::new((this.clone(), other.clone()))))
-            }
-        };
-        Tail(inner)
-    }
-
-    pub fn prefix_token(&self, token: &'static str) -> Self {
-        match &self.0 {
-            None => Tail(Some(TailImpl::Token(token))),
-            Some(after) => Tail(Some(TailImpl::And(Rc::new((
-                TailImpl::Token(token),
-                after.clone(),
-            ))))),
-        }
-    }
 }
 
 impl AstFormatter {
@@ -65,11 +47,7 @@ impl AstFormatter {
 
     fn tail_inner(&self, tail: &TailImpl) -> FormatResult {
         match tail {
-            TailImpl::And(and) => {
-                let (a, b) = &**and;
-                self.tail_inner(a)?;
-                self.tail_inner(b)?;
-            }
+            TailImpl::Fn(f) => f(self)?,
             TailImpl::Token(token) => self.out.token(token)?,
             TailImpl::TokenInsert(token) => self.out.token_insert(token)?,
             TailImpl::TokenMaybeMissing(token) => self.out.token_maybe_missing(token)?,

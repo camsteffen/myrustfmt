@@ -50,11 +50,11 @@ macro_rules! postfix_defs {
             () => ($(::rustc_ast::ast::ExprKind::$kind(..))|*);
         }
         pub(crate) use postfix_expr_kind;
-        
+
         pub fn is_postfix_expr(expr: &ast::Expr) -> bool {
             matches!(expr.kind, $(::rustc_ast::ast::ExprKind::$kind(..))|*)
         }
-        
+
         /// If the given expression is postfix, returns its receiver expression.
         pub fn postfix_expr_receiver(postfix_expr: &ast::Expr) -> &ast::Expr {
             match postfix_expr.kind {
@@ -87,9 +87,7 @@ pub fn arm_body_requires_block(expr: &ast::Expr) -> bool {
         | ::rustc_ast::ast::ExprKind::Unary(_, target)
         | ::rustc_ast::ast::ExprKind::Cast(target, _)
         | control_flow_expr_kind!(Some(target)) => arm_body_requires_block(target),
-        postfix_expr_kind!() => {
-            arm_body_requires_block(postfix_expr_receiver(expr))
-        }
+        postfix_expr_kind!() => arm_body_requires_block(postfix_expr_receiver(expr)),
 
         // everything else - no block required
         _ => false,

@@ -140,7 +140,8 @@ impl AstFormatter {
             Ok(overflowable_separate_line_height) => {
                 // Each dot item leading up to the overflowable will occupy one line each since we
                 // were previously able to format them all on one line.
-                let separate_lines_height = before_overflow_count + overflowable_separate_line_height;
+                let separate_lines_height =
+                    before_overflow_count + overflowable_separate_line_height;
                 if separate_lines_height <= overflow_height {
                     // fallback to separate lines strategy
                     Err(ConstraintError::Logical.into())

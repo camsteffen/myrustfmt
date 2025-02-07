@@ -5,7 +5,7 @@ pub trait ListConfig {
     fn force_trailing_comma(&self) -> bool {
         false
     }
-    
+
     fn overflow_max_first_line_contents_width(&self, _config: &Config) -> Option<u32> {
         None
     }

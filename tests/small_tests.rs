@@ -2,7 +2,7 @@
 
 mod test_lib;
 
-use crate::test_lib::{breakpoint_test, format_max_width_expected, TestResult};
+use crate::test_lib::{TestResult, breakpoint_test, format_max_width_expected};
 use serde::Deserialize;
 use std::fs;
 use std::io::BufReader;

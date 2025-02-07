@@ -22,6 +22,7 @@ impl ErrorEmitter {
     }
 
     // todo rename
+    #[track_caller]
     pub fn fatal_format_error(&self, e: FormatError, source: &str, pos: usize) -> ! {
         // todo don't panic?
         panic!(

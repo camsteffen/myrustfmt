@@ -16,13 +16,13 @@ use crate::error::{ConstraintError, FormatResult};
 use overflow::{ListOverflow, ListOverflowNo, ListOverflowYes};
 
 /// Main entrypoint for formatting a list
-pub fn list<'a, 'list, Item, FormatItem>(
+pub fn list<'ast, 'tail, Item, FormatItem>(
     braces: &'static Braces,
-    list: &'list [Item],
+    list: &'ast [Item],
     format_item: FormatItem,
 ) -> ListBuilder<
-    'list,
-    'static,
+    'ast,
+    'tail,
     Item,
     FormatItem,
     DefaultListConfig,
@@ -53,7 +53,7 @@ pub struct ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfig, Overfl
     list: &'ast [Item],
     format_item: FormatItem,
     rest: ListRest<'ast>,
-    tail: &'tail Tail,
+    tail: &'tail Tail<'ast>,
     config: Config,
     item_config: ItemConfig,
     overflow: Overflow,
@@ -124,7 +124,7 @@ where
 
     pub fn tail<'tail_new>(
         self,
-        tail: &'tail_new Tail,
+        tail: &'tail_new Tail<'ast>,
     ) -> ListBuilder<'ast, 'tail_new, Item, FormatItem, Config, ItemConfig, Overflow> {
         ListBuilder {
             braces: self.braces,
@@ -317,19 +317,17 @@ impl AstFormatter {
             let can_overflow = matches!(rest, ListRest::None)
                 && Overflow::can_overflow(self, last, list.len() == 1);
             if can_overflow {
-                self.backtrack()
-                    .next(last_without_overflow)
-                    .otherwise(|| {
-                        self.with_width_limit_from_start_first_line_opt(
-                            start,
-                            max_width_overflow,
-                            || {
-                                Overflow::format_overflow(self, last)?;
-                                trailing_comma()?;
-                                Ok(())
-                            },
-                        )
-                    })?;
+                self.backtrack().next(last_without_overflow).otherwise(|| {
+                    self.with_width_limit_from_start_first_line_opt(
+                        start,
+                        max_width_overflow,
+                        || {
+                            Overflow::format_overflow(self, last)?;
+                            trailing_comma()?;
+                            Ok(())
+                        },
+                    )
+                })?;
             } else {
                 last_without_overflow()?;
             }

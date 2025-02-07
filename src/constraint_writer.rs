@@ -2,9 +2,9 @@ use crate::ast_formatter::FormatModuleResult;
 use crate::constraints::Constraints;
 use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededError};
 use crate::error_emitter::ErrorEmitter;
+use crate::util::cell_ext::CellExt;
 use std::cell::Cell;
 use std::rc::Rc;
-use crate::util::cell_ext::CellExt;
 
 pub struct ConstraintWriter {
     constraints: Constraints,
@@ -79,13 +79,13 @@ impl ConstraintWriter {
             len: self.len(),
         }
     }
-    
+
     pub fn self_checkpoint(&self) -> ConstraintWriterSelfCheckpoint {
         let Self {
             #[cfg(debug_assertions)]
             ref constraints,
             #[cfg(not(debug_assertions))]
-            constraints: _,
+                constraints: _,
             buffer: _,
             error_emitter: _,
             // exceeded_max_width should only be changed when there is no fallback
@@ -104,11 +104,14 @@ impl ConstraintWriter {
     }
 
     pub fn restore_checkpoint(&self, checkpoint: &ConstraintWriterCheckpoint) {
-        let ConstraintWriterCheckpoint { ref self_checkpoint, len } = *checkpoint;
+        let ConstraintWriterCheckpoint {
+            ref self_checkpoint,
+            len,
+        } = *checkpoint;
         self.restore_self_checkpoint(self_checkpoint);
         self.buffer.with_taken(|b| b.truncate(len));
     }
-    
+
     pub fn restore_self_checkpoint(&self, checkpoint: &ConstraintWriterSelfCheckpoint) {
         let ConstraintWriterSelfCheckpoint {
             #[cfg(debug_assertions)]
@@ -136,9 +139,10 @@ impl ConstraintWriter {
             checkpoint,
         }
     }
-    
+
     pub fn restore_lookahead(&self, lookahead: &ConstraintWriterLookahead) {
-        self.buffer.with_taken(|b| b.push_str(&lookahead.buf_segment));
+        self.buffer
+            .with_taken(|b| b.push_str(&lookahead.buf_segment));
         self.restore_self_checkpoint(&lookahead.checkpoint);
     }
 
@@ -218,7 +222,8 @@ impl ConstraintWriter {
     }
 
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T {
-        self.buffer.with_taken(|b| f(&b[self.last_line_start.get()..]))
+        self.buffer
+            .with_taken(|b| f(&b[self.last_line_start.get()..]))
     }
 
     pub fn last_line_len(&self) -> usize {

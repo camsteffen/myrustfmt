@@ -31,14 +31,31 @@ fn format_in_block(stmt: &str, max_width: Option<u32>) -> String {
     let crate_source = format!("{prefix}{stmt}{suffix}");
     let mut config = Config::default();
     if let Some(max_width) = max_width {
-        config = config.max_width(max_width + indent.len() as u32)
+        let max_width = max_width + indent.len() as u32;
+        let min_max_width = "fn test() {".len() as u32;
+        if max_width < min_max_width {
+            panic!("max width must be at least {min_max_width}");
+        }
+        config = config.max_width(max_width);
     }
-    let result = format_str_config(&crate_source, config).unwrap().expect_not_exceeded_max_width();
+    let result = format_str_config(&crate_source, config)
+        .unwrap()
+        .expect_not_exceeded_max_width();
     let mut formatted_stmt = result
         .strip_prefix(prefix)
-        .unwrap()
+        .unwrap_or_else(|| {
+            panic!(
+                "formatted output does not have expected prefix: {:?}",
+                result
+            )
+        })
         .strip_suffix(suffix)
-        .unwrap()
+        .unwrap_or_else(|| {
+            panic!(
+                "formatted output does not have expected suffix: {:?}",
+                result
+            )
+        })
         .lines()
         .fold(String::new(), |mut acc, line| {
             let spaces = line.bytes().take(4).take_while(|&b| b == b' ').count();
@@ -64,7 +81,9 @@ pub fn format_max_width_expected(
         if let Some(max_width) = max_width {
             config = config.max_width(max_width)
         }
-        let mut formatted = format_str_config(source, config).unwrap().expect_not_exceeded_max_width();
+        let mut formatted = format_str_config(source, config)
+            .unwrap()
+            .expect_not_exceeded_max_width();
         formatted.pop();
         formatted
     };

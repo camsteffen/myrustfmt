@@ -1,8 +1,8 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::util::tail::Tail;
+use crate::ast_utils::control_flow_expr_kind;
 use crate::error::FormatResult;
 use rustc_ast::ast;
-use crate::ast_utils::control_flow_expr_kind;
 
 impl AstFormatter {
     pub fn block(&self, block: &ast::Block) -> FormatResult {

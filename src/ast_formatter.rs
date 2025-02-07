@@ -7,12 +7,13 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 mod attr;
+mod backtrack;
 mod binary;
 mod block;
+mod checkpoint;
 mod common;
 mod constraint_modifiers;
 mod expr;
-mod backtrack;
 mod r#fn;
 mod generics;
 mod item;
@@ -24,7 +25,6 @@ mod path;
 mod postfix_chain;
 mod ty;
 mod util;
-mod checkpoint;
 
 pub struct AstFormatter {
     config: Rc<Config>,
@@ -73,11 +73,9 @@ impl AstFormatter {
         });
         match result {
             Ok(()) => self.out.finish(),
-            Err(e) => self.error_emitter.fatal_format_error(
-                e,
-                self.out.source(),
-                self.out.pos(),
-            ),
+            Err(e) => self
+                .error_emitter
+                .fatal_format_error(e, self.out.source(), self.out.pos()),
         }
     }
 

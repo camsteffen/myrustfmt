@@ -1,7 +1,7 @@
-use std::ops::ControlFlow;
 use crate::ast_formatter::AstFormatter;
 use crate::error::FormatControlFlow;
 use crate::source_formatter::{SourceFormatterCheckpoint, SourceFormatterLookahead};
+use std::ops::ControlFlow;
 
 /// A checkpoint that can be cheaply restored, like an "undo".
 /// All checkpoints must be closed *before* the final formatting strategy.
@@ -33,7 +33,7 @@ impl AstFormatter {
     pub fn capture_lookahead(&self, from: &Checkpoint) -> Lookahead {
         Lookahead(self.out.capture_lookahead(&from.0))
     }
-    
+
     pub fn restore_lookahead(&self, lookahead: &Lookahead) {
         self.out.restore_lookahead(&lookahead.0);
     }

@@ -81,15 +81,20 @@ impl FormatError {
     pub fn display(&self, source: &str, pos: usize, path: Option<&Path>) -> impl Display {
         display_from_fn(move |f| {
             let (line, col) = line_col(source, pos);
-            match path {
-                None => write!(f, "Error formatting at {line}:{col}, ")?,
-                Some(path) => write!(f, "Error formatting {}:{line}:{col}, ", path.display(),)?,
+            write!(f, "Error formatting at ")?;
+            if let Some(path) = path {
+                write!(f, "{}:", path.display())?
             }
+            write!(f, "{line}:{col}, ")?;
             let next_token = |f: &mut Formatter<'_>| {
                 let remaining = &source[pos..];
-                let token = rustc_lexer::tokenize(remaining).next().unwrap();
-                let token_str = &remaining[..token.len as usize];
-                write!(f, ". Next token is `{token_str}`")
+                if let Some(token) = rustc_lexer::tokenize(remaining).next() {
+                    let token_str = &remaining[..token.len as usize];
+                    write!(f, ". Next token is `{token_str}`")?;
+                } else {
+                    write!(f, ". Reached end of file")?;
+                }
+                Ok(())
             };
             match self {
                 FormatError::Constraint(ConstraintError::Logical) => {

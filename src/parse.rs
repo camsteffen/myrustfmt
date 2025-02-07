@@ -101,11 +101,11 @@ fn build_parser<'a>(psess: &'a ParseSess, source: CrateSource) -> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rustc_span::Symbol;
-use rustc_span::symbol::Ident;
-use crate::CrateSource;
+    use crate::CrateSource;
     use crate::parse::parse_module;
+    use rustc_span::Symbol;
     use rustc_span::edition::Edition;
+    use rustc_span::symbol::Ident;
     use std::path::Path;
 
     #[test]
@@ -117,14 +117,32 @@ use crate::CrateSource;
             )
             .unwrap();
             let expected = &[
-                ("tests/submodules_tests/non_relative/inline/file.rs", Some("file")),
-                ("tests/submodules_tests/non_relative/inline/folder/mod.rs", None),
+                (
+                    "tests/submodules_tests/non_relative/inline/file.rs",
+                    Some("file"),
+                ),
+                (
+                    "tests/submodules_tests/non_relative/inline/folder/mod.rs",
+                    None,
+                ),
                 ("tests/submodules_tests/non_relative/file.rs", Some("file")),
                 ("tests/submodules_tests/non_relative/folder/mod.rs", None),
-                ("tests/submodules_tests/non_relative/path_attr/test.rs", None),
-                ("tests/submodules_tests/non_relative/inline_path_value/file.rs", Some("file")),
-                ("tests/submodules_tests/non_relative/inline_path_value/folder/mod.rs", None),
-                ("tests/submodules_tests/non_relative/inline_path_value/path_attr_inside_value.rs", None),
+                (
+                    "tests/submodules_tests/non_relative/path_attr/test.rs",
+                    None,
+                ),
+                (
+                    "tests/submodules_tests/non_relative/inline_path_value/file.rs",
+                    Some("file"),
+                ),
+                (
+                    "tests/submodules_tests/non_relative/inline_path_value/folder/mod.rs",
+                    None,
+                ),
+                (
+                    "tests/submodules_tests/non_relative/inline_path_value/path_attr_inside_value.rs",
+                    None,
+                ),
             ][..];
             let actual = Vec::from_iter(module.submodules.iter().map(|submodule| {
                 (
@@ -144,16 +162,31 @@ use crate::CrateSource;
                 CrateSource::File(Path::new("tests/submodules_tests/relative/main.rs")),
                 Some(Ident::with_dummy_span(Symbol::intern("main"))),
             )
-                .unwrap();
+            .unwrap();
             let expected = &[
-                ("tests/submodules_tests/relative/main/inline/file.rs", Some("file")),
-                ("tests/submodules_tests/relative/main/inline/folder/mod.rs", None),
+                (
+                    "tests/submodules_tests/relative/main/inline/file.rs",
+                    Some("file"),
+                ),
+                (
+                    "tests/submodules_tests/relative/main/inline/folder/mod.rs",
+                    None,
+                ),
                 ("tests/submodules_tests/relative/main/file.rs", Some("file")),
                 ("tests/submodules_tests/relative/main/folder/mod.rs", None),
                 ("tests/submodules_tests/relative/path_attr/test.rs", None),
-                ("tests/submodules_tests/relative/inline_path_value/file.rs", Some("file")),
-                ("tests/submodules_tests/relative/inline_path_value/folder/mod.rs", None),
-                ("tests/submodules_tests/relative/inline_path_value/path_attr_inside_value.rs", None),
+                (
+                    "tests/submodules_tests/relative/inline_path_value/file.rs",
+                    Some("file"),
+                ),
+                (
+                    "tests/submodules_tests/relative/inline_path_value/folder/mod.rs",
+                    None,
+                ),
+                (
+                    "tests/submodules_tests/relative/inline_path_value/path_attr_inside_value.rs",
+                    None,
+                ),
             ][..];
             let actual = Vec::from_iter(module.submodules.iter().map(|submodule| {
                 (

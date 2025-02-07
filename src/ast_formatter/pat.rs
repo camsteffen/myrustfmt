@@ -14,9 +14,12 @@ impl AstFormatter {
         self.pat_tail(pat, Tail::none())
     }
 
-    pub fn pat_tail(&self, pat: &ast::Pat, end: &Tail) -> FormatResult {
+    pub fn pat_tail(&self, pat: &ast::Pat, tail: &Tail) -> FormatResult {
         // todo is this right?
         self.out.skip_token_if_present("|")?;
+
+        let mut tail = Some(tail);
+        let mut take_tail = || tail.take().unwrap();
 
         match pat.kind {
             ast::PatKind::Wild => self.out.token("_")?,
@@ -34,10 +37,9 @@ impl AstFormatter {
                     self.out.space_token_space("@")?;
                     self.pat(pat)?;
                 }
-                self.tail(end)?;
             }
             ast::PatKind::Struct(ref qself, ref path, ref fields, rest) => {
-                self.struct_pat(qself, path, fields, rest, end)?
+                self.struct_pat(qself, path, fields, rest, take_tail())?
             }
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 self.qpath(qself, path, false)?;
@@ -45,7 +47,7 @@ impl AstFormatter {
                     .config(ParamListConfig {
                         single_line_max_contents_width: None,
                     })
-                    .tail(end)
+                    .tail(take_tail())
                     .format(self)?
             }
             ast::PatKind::Or(ref pats) => {
@@ -56,7 +58,7 @@ impl AstFormatter {
                 .config(ParamListConfig {
                     single_line_max_contents_width: None,
                 })
-                .tail(end)
+                .tail(take_tail())
                 .format(self)?,
             ast::PatKind::Box(_) => todo!(),
             ast::PatKind::Deref(_) => todo!(),
@@ -66,9 +68,18 @@ impl AstFormatter {
                 self.pat(pat)?;
             }
             ast::PatKind::Lit(_) => todo!(),
-            ast::PatKind::Range(_, _, _) => todo!(),
+            ast::PatKind::Range(ref start, ref end, ref end_kind) => {
+                let infix = match end_kind.node {
+                    ast::RangeEnd::Included(ast::RangeSyntax::DotDotDot) => "...",
+                    ast::RangeEnd::Included(ast::RangeSyntax::DotDotEq) => "..=",
+                    ast::RangeEnd::Excluded => "..",
+                };
+                self.range(start.as_deref(), infix, end.as_deref(), take_tail())?;
+            }
             ast::PatKind::Slice(ref elements) => {
-                list(Braces::SQUARE, elements, |pat| self.pat(pat)).format(self)?
+                list(Braces::SQUARE, elements, |pat| self.pat(pat))
+                    .tail(take_tail())
+                    .format(self)?
             }
             ast::PatKind::Rest => self.out.token("..")?,
             ast::PatKind::Never => todo!(),
@@ -76,6 +87,11 @@ impl AstFormatter {
             ast::PatKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,
             ast::PatKind::Err(_) => todo!(),
         }
+
+        if let Some(tail) = tail {
+            self.tail(tail)?;
+        }
+
         Ok(())
     }
 
