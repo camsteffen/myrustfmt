@@ -18,11 +18,11 @@
   in_block: true
   before: |
     (aaaaa)..(
-        bb
+        bbbbb
     )
   after: |
     (
         aaaaa
     )..(
-        bb
+        bbbbb
     )

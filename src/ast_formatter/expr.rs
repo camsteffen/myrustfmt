@@ -14,7 +14,6 @@ use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
-
 impl AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
         self.expr_tail(expr, Tail::none())
@@ -32,9 +31,7 @@ impl AstFormatter {
                     .format(self)?
             }
             ast::ExprKind::ConstBlock(_) => todo!(),
-            ast::ExprKind::Call(ref func, ref args) => {
-                self.call(func, args, take_tail())?
-            }
+            ast::ExprKind::Call(ref func, ref args) => self.call(func, args, take_tail())?,
             postfix_expr_kind!() => self.postfix_chain(expr, take_tail())?,
             ast::ExprKind::Tup(ref items) => {
                 list(Braces::PARENS, items, self.expr_list_item_fn(items))
@@ -166,9 +163,12 @@ impl AstFormatter {
                 let tail = take_tail();
                 self.out.token("(")?;
                 self.backtrack()
-                    .next_single_line(|| {
-                        self.expr(inner)?;
-                        self.out.token(")")?;
+                    .next(|| {
+                        self.with_single_line(|| {
+                            self.expr(inner)?;
+                            self.out.token(")")?;
+                            Ok(())
+                        })?;
                         self.tail(tail)?;
                         Ok(())
                     })
@@ -241,24 +241,24 @@ impl AstFormatter {
         end: Option<&ast::Expr>,
         tail: &Tail,
     ) -> FormatResult {
-        let first_line = self.out.line();
-        let after_start = |af: &Self| {
-            af.out.token(delim)?;
-            match end {
-                None => af.tail(tail)?,
-                Some(end) => {
-                    let is_single_line = af.out.constraints().touchy_margin.get()
-                        && start.is_some()
-                        && af.out.line() != first_line;
-                    af.with_single_line_opt(is_single_line, || af.expr_tail(end, tail))?
-                }
-            }
-            Ok(())
-        };
         if let Some(start) = start {
-            self.expr_tail(start, &Tail::func(after_start))?;
+            let first_line = self.out.line();
+            self.expr_tail(start, &Tail::func(|af| {
+                af.out.token(delim)?;
+                let Some(end) = end else {
+                    return af.tail(tail);
+                };
+                let is_single_line =
+                    af.out.constraints().touchy_margin.get() && af.out.line() != first_line;
+                af.with_single_line_opt(is_single_line, || af.expr_tail(end, tail))?;
+                Ok(())
+            }))?;
         } else {
-            after_start(self)?;
+            self.out.token(delim)?;
+            match end {
+                None => self.tail(tail)?,
+                Some(end) => self.expr_tail(end, tail)?,
+            }
         }
         Ok(())
     }

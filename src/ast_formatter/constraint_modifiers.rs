@@ -28,7 +28,7 @@ impl AstFormatter {
         self.indented(f)
     }
 
-    pub fn with_single_line<T>(&self, f: impl FnOnce() -> T) -> T {
+    pub fn with_single_line<T>(&self, f: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         assert!(
             self.constraints().has_open_checkpoints(),
             "single line constraint applied with no fallback"
