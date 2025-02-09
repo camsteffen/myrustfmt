@@ -1,10 +1,10 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
-use crate::ast_formatter::list::list;
 use crate::ast_formatter::list::list_config::TupleListConfig;
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use rustc_ast::ast;
+use crate::ast_formatter::list::builder::list;
 
 impl AstFormatter {
     pub fn ty(&self, ty: &ast::Ty) -> FormatResult {
@@ -39,7 +39,7 @@ impl AstFormatter {
             ast::TyKind::PinnedRef(_lifetime, _mut_ty) => todo!(),
             ast::TyKind::BareFn(bare_fn_ty) => self.bare_fn_ty(bare_fn_ty)?,
             ast::TyKind::Never => self.out.token("!")?,
-            ast::TyKind::Tup(elements) => list(Braces::PARENS, elements, |ty| self.ty(ty))
+            ast::TyKind::Tup(elements) => list(Braces::PARENS, elements, |af, ty, _lcx| af.ty(ty))
                 .config(TupleListConfig {
                     len: elements.len(),
                     single_line_max_contents_width: None,

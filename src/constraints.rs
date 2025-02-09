@@ -7,6 +7,17 @@ pub struct MaxWidthForLine {
     pub max_width: u32,
 }
 
+enum MultiLineConstraint {
+    /// No constraint
+    Any,
+    /// All lines between the first and last lines must be indented away from the margin
+    IndentMiddle,
+    /// Same as IndentMiddle, but also disallow multi-line prefix chains and postfix chains
+    SingleLineChains,
+    /// No multi-line allowed
+    SingleLine,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Constraints {
     /// The presence of an open checkpoint indicates that an alternate formatting strategy is
@@ -44,6 +55,9 @@ pub struct Constraints {
     /// }
     /// ```
     // todo rename to indent_middle, or list_margin, or fallback_type=ArmBody?
+    //   is the concept here that it is a same line nested scope?
+    //   that is, the expression is nested in a match arm or closure body or list item,
+    //   so we want the boundary of that outer scope to be clear
     // todo consider splitting off another constraint that disallows "wrap-indent" or just "wrapping"
     //   that is, binary and postfix
     // this constraint is enforced at the AST layer and not ConstraintWriter

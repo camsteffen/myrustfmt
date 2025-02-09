@@ -5,7 +5,8 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::list_config::{
     ListConfig, ListWrapToFitConfig, ParamListConfig, struct_field_list_config,
 };
-use crate::ast_formatter::list::{Braces, ListItemConfig, list};
+use crate::ast_formatter::list::{Braces, ListItemConfig};
+use crate::ast_formatter::list::builder::list;
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -149,7 +150,7 @@ impl AstFormatter {
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         self.out.space()?;
-        list(Braces::CURLY, variants, |v| self.variant(v)).format_separate_lines(self)?;
+        list(Braces::CURLY, variants, |af, v, _lcx| af.variant(v)).format_separate_lines(self)?;
         Ok(())
     }
 
@@ -278,7 +279,7 @@ impl AstFormatter {
         match variants {
             ast::VariantData::Struct { fields, .. } => {
                 self.out.space()?;
-                let list = list(Braces::CURLY, fields, |f| self.field_def(f)).config(
+                let list = list(Braces::CURLY, fields, |af, f, _lcx| af.field_def(f)).config(
                     struct_field_list_config(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width),
                 );
                 if is_enum {
@@ -289,7 +290,7 @@ impl AstFormatter {
                 Ok(())
             }
             ast::VariantData::Tuple(fields, _) => {
-                list(Braces::PARENS, fields, |f| self.field_def(f))
+                list(Braces::PARENS, fields, |af, f, _lcx| af.field_def(f))
                     .config(ParamListConfig {
                         single_line_max_contents_width: None,
                     })
@@ -327,8 +328,8 @@ impl AstFormatter {
             }
             ast::UseTreeKind::Nested { ref items, span: _ } => {
                 self.out.token("::")?;
-                list(Braces::CURLY_NO_PAD, items, |(use_tree, _)| {
-                    self.use_tree(use_tree)
+                list(Braces::CURLY_NO_PAD, items, |af, (use_tree, _), _lcx| {
+                    af.use_tree(use_tree)
                 })
                 .config(UseTreeListConfig)
                 .item_config(UseTreeListItemConfig)

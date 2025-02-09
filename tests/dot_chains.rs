@@ -14,7 +14,7 @@ fn test() {
     }
 }"#;
     assert_eq!(
-        format_str_defaults(source).unwrap(),
+        format_str_defaults(source).unwrap().expect_not_exceeded_max_width(),
         r#"
 fn test() {
     if self
@@ -37,7 +37,7 @@ fn test() {
     self.fallback(|| { let x; })
 }"#;
     assert_eq!(
-        format_str_config(source, Config::default().max_width(22)).unwrap(),
+        format_str_config(source, Config::default().max_width(22)).unwrap().expect_not_exceeded_max_width(),
         r#"
 fn test() {
     self.fallback(|| {
@@ -61,7 +61,7 @@ fn test() {
     });
 }"#;
     assert_eq!(
-        format_str_config(source, Config::default()).unwrap(),
+        format_str_config(source, Config::default()).unwrap().expect_not_exceeded_max_width(),
         r#"
 fn test() {
     self.fallback(|| {
@@ -82,7 +82,7 @@ fn dot_chain_single_child_can_exceed_chain_width() {
         format_str_defaults(
             "fn test() { fallback = fallback.next(|| self.contents_wrap_to_fit(af, tail, max_element_width)); }",
         )
-            .unwrap(),
+            .unwrap().expect_not_exceeded_max_width(),
         "
 fn test() {
     fallback = fallback.next(|| self.contents_wrap_to_fit(af, tail, max_element_width));
@@ -99,7 +99,7 @@ fn dot_chain_over_chain_width() {
         format_str_defaults(
             "fn test() { self.config.overflow_max_first_line_contents_width(affconfig()); }",
         )
-        .unwrap(),
+        .unwrap().expect_not_exceeded_max_width(),
         "
 fn test() {
     self.config
@@ -117,7 +117,7 @@ fn first_item_within_margin_may_exceed_width() {
         format_str_defaults(
             "fn test() { self.falasdfasdflback(|| self.with_single_line(|| format_item(last))) .next(|| { let x; }) .result()?; }",
         )
-            .unwrap(),
+            .unwrap().expect_not_exceeded_max_width(),
         "
 fn test() {
     self.falasdfasdflback(|| self.with_single_line(|| format_item(last)))
@@ -137,7 +137,7 @@ fn overflow_last_item() {
         format_str_defaults(
             "fn test() { chain.iter().try_for_each(|(op, expr)| -> FormatResult { let x; })?; }",
         )
-        .unwrap(),
+        .unwrap().expect_not_exceeded_max_width(),
         "
 fn test() {
     chain.iter().try_for_each(|(op, expr)| -> FormatResult {
@@ -155,7 +155,7 @@ fn fn_call_width_exceeded_in_chain() {
         format_str_defaults(
             "fn test() { list(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) .config(aaaaaaaaaaaaaaaaaaaaaaaa( false, bbbbbbbbbbbbbbbbbbbbbbbbbbbb, )) .format()?; }",
         )
-            .unwrap(),
+            .unwrap().expect_not_exceeded_max_width(),
         "
 fn test() {
     list(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)

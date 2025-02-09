@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{Braces, list};
+use crate::ast_formatter::list::Braces;
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 
@@ -8,6 +8,7 @@ use crate::ast_utils::block_like_expr_kind;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
 use rustc_span::symbol::kw;
+use crate::ast_formatter::list::builder::list;
 
 impl AstFormatter {
     pub fn fn_<K>(&self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
@@ -22,7 +23,7 @@ impl AstFormatter {
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
-        let param_list = list(Braces::PARENS, &sig.decl.inputs, |param| self.param(param)).config(
+        let param_list = list(Braces::PARENS, &sig.decl.inputs, |af, param, _lcx| af.param(param)).config(
             ParamListConfig {
                 single_line_max_contents_width: None,
             },
@@ -96,8 +97,10 @@ impl AstFormatter {
 
     fn closure_body(&self, body: &ast::Expr, tail: &Tail) -> FormatResult {
         self.skip_single_expr_blocks(body, |body| {
-            // todo consider allowing `match`, `loop`, `for`, `while` if the header fits on one line
+            // todo consider allowing `match`, `loop`, `if`, `for`, `while` if the header fits on one line
             //   should we preserve the block in such cases?
+            //   actually, does touchy_margins make sense here?
+            //   and if/for/while should enforce single line headers when there is touchy_margins
             if matches!(body.kind, block_like_expr_kind!()) {
                 // don't add a block
                 self.expr_tail(body, tail)
@@ -133,7 +136,7 @@ impl AstFormatter {
             ast::FnRetTy::Default(_) => (tail, Tail::none()),
             ast::FnRetTy::Ty(_) => (Tail::none(), tail),
         };
-        list(Braces::PARENS, &parenthesized_args.inputs, |ty| self.ty(ty))
+        list(Braces::PARENS, &parenthesized_args.inputs, |af, ty, _lcx| af.ty(ty))
             .config(ParamListConfig {
                 single_line_max_contents_width: None,
             })
@@ -164,7 +167,7 @@ impl AstFormatter {
     }
 
     fn fn_decl(&self, fn_decl: &ast::FnDecl, braces: &'static Braces) -> FormatResult {
-        let param_list = list(braces, &fn_decl.inputs, |param| self.param(param));
+        let param_list = list(braces, &fn_decl.inputs, |af, param, _lcx| af.param(param));
         // args and return type all on one line
         self.backtrack()
             .next_single_line(|| {

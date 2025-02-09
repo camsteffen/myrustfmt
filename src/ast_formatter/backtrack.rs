@@ -4,7 +4,7 @@ use crate::error::{FormatError, FormatResult};
 use std::ops::ControlFlow;
 
 impl AstFormatter {
-    // todo should fallback be specific to a constraint? unless_too_wide(..).otherwise(..)
+    // todo should backtrack be specific to a constraint? unless_too_wide(..).otherwise(..)
     pub fn backtrack<T>(&self) -> Backtrack<T> {
         Backtrack {
             af: &self,

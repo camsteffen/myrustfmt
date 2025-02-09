@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
-use crate::ast_formatter::list::ListBuilderTrait;
+use crate::ast_formatter::list::builder::ListBuilderTrait;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
 use crate::error::{ConstraintError, FormatError, FormatResult, FormatResultExt, return_if_break};

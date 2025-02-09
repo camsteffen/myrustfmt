@@ -201,3 +201,23 @@
             x
         }
     }
+- name: scrutinee is multi-line array
+  type: no_change
+  in_block: true
+  formatted: |
+    match [
+        AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA,
+        AAAAAAAAAAAAAAAAAAAAAAAAAAAA,
+    ] {
+        x => {}
+    }
+- name: scrutinee is multi-line chain
+  type: no_change
+  in_block: true
+  formatted: |
+    match aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        .bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        .cccccccccccccccccccccccccccccccc
+    {
+        x => {}
+    }

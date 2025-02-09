@@ -1,16 +1,16 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{Braces, ListBuilderTrait, list};
+use crate::ast_formatter::list::{Braces, ListItemContext, ListStrategy};
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 use crate::ast_formatter::list::ListRest;
+use crate::ast_formatter::list::builder::{ListBuilderTrait, list};
 use crate::ast_formatter::list::list_config::{
     ArrayListConfig, CallParamListConfig, TupleListConfig, struct_field_list_config,
 };
 use crate::ast_utils::plain_block;
 use crate::ast_utils::postfix_expr_kind;
-use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
@@ -23,25 +23,21 @@ impl AstFormatter {
         let mut tail = Some(tail);
         let mut take_tail = || tail.take().unwrap();
         match expr.kind {
-            ast::ExprKind::Array(ref items) => {
-                list(Braces::SQUARE, items, self.expr_list_item_fn(items))
-                    .config(ArrayListConfig)
-                    .overflow()
-                    .tail(take_tail())
-                    .format(self)?
-            }
+            ast::ExprKind::Array(ref items) => list(Braces::SQUARE, items, Self::expr_list_item_fn)
+                .config(ArrayListConfig)
+                .overflow()
+                .tail(take_tail())
+                .format(self)?,
             ast::ExprKind::ConstBlock(_) => todo!(),
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, take_tail())?,
             postfix_expr_kind!() => self.postfix_chain(expr, take_tail())?,
-            ast::ExprKind::Tup(ref items) => {
-                list(Braces::PARENS, items, self.expr_list_item_fn(items))
-                    .config(TupleListConfig {
-                        len: items.len(),
-                        single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
-                    })
-                    .tail(take_tail())
-                    .format(self)?
-            }
+            ast::ExprKind::Tup(ref items) => list(Braces::PARENS, items, Self::expr_list_item_fn)
+                .config(TupleListConfig {
+                    len: items.len(),
+                    single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
+                })
+                .tail(take_tail())
+                .format(self)?,
             ast::ExprKind::Binary(op, ref left, ref right) => {
                 self.binary(left, right, op, take_tail())?
             }
@@ -124,11 +120,11 @@ impl AstFormatter {
                 self.expr(right)?;
             }
             ast::ExprKind::Range(ref start, ref end, limits) => {
-                let delim = match limits {
+                let sigil = match limits {
                     ast::RangeLimits::Closed => "..=",
                     ast::RangeLimits::HalfOpen => "..",
                 };
-                self.range(start.as_deref(), delim, end.as_deref(), take_tail())?
+                self.range(start.as_deref(), sigil, end.as_deref(), take_tail())?
             }
             ast::ExprKind::Underscore => todo!(),
             ast::ExprKind::Path(ref qself, ref path) => self.qpath(qself, path, true)?,
@@ -192,32 +188,14 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn expr_list_item_fn(
-        &self,
-        list: &[P<ast::Expr>],
-    ) -> impl Fn(&P<ast::Expr>) -> FormatResult {
-        // todo is this too special?
-        let format_item = match list.len() {
-            2.. => Self::expr_touchy_margins,
-            _ => Self::expr,
-        };
-        move |e| format_item(self, e)
-    }
-
-    pub fn expr_touchy_margins(&self, expr: &ast::Expr) -> FormatResult {
+    pub fn expr_list_item_fn(&self, expr: &P<ast::Expr>, lcx: &ListItemContext) -> FormatResult {
         self.skip_single_expr_blocks(expr, |expr| {
-            // optimization: touchy_margins only affects multi-line expressions
-            if self.out.constraints().single_line.get() {
-                self.expr(expr)
-            } else {
+            if matches!(lcx.strategy, ListStrategy::SeparateLines) && lcx.len > 1 {
                 self.backtrack()
-                    .next(|| {
-                        self.out
-                            .constraints()
-                            .touchy_margin
-                            .with_replaced(true, || self.expr(expr))
-                    })
+                    .next(|| self.with_touchy_margins(|| self.expr(expr)))
                     .otherwise(|| self.expr_add_block(expr))
+            } else {
+                self.expr(expr)
             }
         })
     }
@@ -237,24 +215,27 @@ impl AstFormatter {
     pub fn range(
         &self,
         start: Option<&ast::Expr>,
-        delim: &str,
+        sigil: &str,
         end: Option<&ast::Expr>,
         tail: &Tail,
     ) -> FormatResult {
         if let Some(start) = start {
             let first_line = self.out.line();
-            self.expr_tail(start, &Tail::func(|af| {
-                af.out.token(delim)?;
-                let Some(end) = end else {
-                    return af.tail(tail);
-                };
-                let is_single_line =
-                    af.out.constraints().touchy_margin.get() && af.out.line() != first_line;
-                af.with_single_line_opt(is_single_line, || af.expr_tail(end, tail))?;
-                Ok(())
-            }))?;
+            self.expr_tail(
+                start,
+                &Tail::func(|af| {
+                    af.out.token(sigil)?;
+                    let Some(end) = end else {
+                        return af.tail(tail);
+                    };
+                    let is_single_line =
+                        af.out.constraints().touchy_margin.get() && af.out.line() != first_line;
+                    af.with_single_line_opt(is_single_line, || af.expr_tail(end, tail))?;
+                    Ok(())
+                }),
+            )?;
         } else {
-            self.out.token(delim)?;
+            self.out.token(sigil)?;
             match end {
                 None => self.tail(tail)?,
                 Some(end) => self.expr_tail(end, tail)?,
@@ -300,7 +281,7 @@ impl AstFormatter {
         args: &'ast [P<ast::Expr>],
         tail: &'tail Tail<'_>,
     ) -> impl ListBuilderTrait + 'out {
-        list(Braces::PARENS, args, self.expr_list_item_fn(args))
+        list(Braces::PARENS, args, Self::expr_list_item_fn)
             .config(CallParamListConfig)
             .omit_open_brace()
             .overflow()
@@ -381,10 +362,9 @@ impl AstFormatter {
         let force_newline = self.out.line() != first_line
             && self.out.with_last_line(|line| {
                 let after_indent = &line[self.out.constraints().indent.get() as usize..];
-                after_indent.starts_with(' ')
-                    || after_indent
-                        .chars()
-                        .any(|c| !matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
+                after_indent
+                    .chars()
+                    .any(|c| !matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
             });
         let newline_open_block = || {
             self.out.newline_within_indent()?;
@@ -411,7 +391,7 @@ impl AstFormatter {
         self.qpath(&struct_.qself, &struct_.path, true)?;
         self.out.space()?;
         // todo touchy margins?
-        list(Braces::CURLY, &struct_.fields, |f| self.expr_field(f))
+        list(Braces::CURLY, &struct_.fields, Self::expr_field)
             .config(struct_field_list_config(
                 RUSTFMT_CONFIG_DEFAULTS.struct_lit_width,
             ))
@@ -421,7 +401,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn expr_field(&self, field: &ast::ExprField) -> FormatResult {
+    fn expr_field(&self, field: &ast::ExprField, _lcx: &ListItemContext) -> FormatResult {
         self.with_attrs(&field.attrs, field.span, || {
             self.ident(field.ident)?;
             if !field.is_shorthand {

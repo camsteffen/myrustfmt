@@ -1,0 +1,14 @@
+- name: no overflow in nested list when outer list has multiple items
+  type: before_after
+  in_block: true
+  before: |
+    [aaaa, [bbbb, || {
+        x;
+    }]]
+  after: |
+    [
+        aaaa,
+        [bbbb, || {
+            x;
+        }],
+    ]

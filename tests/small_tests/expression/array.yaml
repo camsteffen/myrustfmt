@@ -51,7 +51,7 @@
         .aaaa
         .aaaa,
     ]
-- name: multiple-item list has a chain with multiline root
+- name: list has a chain with multiline root
   type: before_after
   in_block: true
   before: |
@@ -69,5 +69,15 @@
             .aaaa
             .aaaa
         },
+        item,
+    ]
+- name: list has a chain with hanging indent
+  type: no_change
+  in_block: true
+  formatted: |
+    [
+        asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf
+            .asdfasdfasdfasdfasdfasdfasdfasdf
+            .asdfasdfasdfasdfasdfasdfasdfasdf,
         item,
     ]

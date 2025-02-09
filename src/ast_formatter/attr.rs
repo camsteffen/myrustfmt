@@ -1,12 +1,13 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::list_config::ParamListConfig;
-use crate::ast_formatter::list::{Braces, list};
+use crate::ast_formatter::list::{Braces, };
 use crate::ast_utils::is_rustfmt_skip;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_span::Span;
+use crate::ast_formatter::list::builder::list;
 
 impl AstFormatter {
     // todo test usages
@@ -69,9 +70,9 @@ impl AstFormatter {
         self.path(&meta.path, false)?;
         match &meta.kind {
             ast::MetaItemKind::Word => {}
-            ast::MetaItemKind::List(items) => list(Braces::PARENS, items, |item| match item {
-                ast::MetaItemInner::MetaItem(item) => self.meta_item(item),
-                ast::MetaItemInner::Lit(lit) => self.meta_item_lit(lit),
+            ast::MetaItemKind::List(items) => list(Braces::PARENS, items, |af, item, _lcx| match item {
+                ast::MetaItemInner::MetaItem(item) => af.meta_item(item),
+                ast::MetaItemInner::Lit(lit) => af.meta_item_lit(lit),
             })
             .config(ParamListConfig {
                 single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),

@@ -4,7 +4,8 @@ use rustc_ast::ptr::P;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::list_config::{ParamListConfig, struct_field_list_config};
-use crate::ast_formatter::list::{Braces, list};
+use crate::ast_formatter::list::Braces;
+use crate::ast_formatter::list::builder::list;
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -43,7 +44,7 @@ impl AstFormatter {
             }
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 self.qpath(qself, path, false)?;
-                list(Braces::PARENS, fields, |pat| self.pat(pat))
+                list(Braces::PARENS, fields, |af, pat, _lcx| af.pat(pat))
                     .config(ParamListConfig {
                         single_line_max_contents_width: None,
                     })
@@ -54,7 +55,7 @@ impl AstFormatter {
                 self.infix_chain("|", pats, |pat| self.pat(pat), false)?
             }
             ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false)?,
-            ast::PatKind::Tuple(ref fields) => list(Braces::PARENS, fields, |pat| self.pat(pat))
+            ast::PatKind::Tuple(ref fields) => list(Braces::PARENS, fields, |af, pat, _lcx| af.pat(pat))
                 .config(ParamListConfig {
                     single_line_max_contents_width: None,
                 })
@@ -69,15 +70,15 @@ impl AstFormatter {
             }
             ast::PatKind::Lit(_) => todo!(),
             ast::PatKind::Range(ref start, ref end, ref end_kind) => {
-                let infix = match end_kind.node {
+                let sigil = match end_kind.node {
+                    ast::RangeEnd::Excluded => "..",
                     ast::RangeEnd::Included(ast::RangeSyntax::DotDotDot) => "...",
                     ast::RangeEnd::Included(ast::RangeSyntax::DotDotEq) => "..=",
-                    ast::RangeEnd::Excluded => "..",
                 };
-                self.range(start.as_deref(), infix, end.as_deref(), take_tail())?;
+                self.range(start.as_deref(), sigil, end.as_deref(), take_tail())?;
             }
             ast::PatKind::Slice(ref elements) => {
-                list(Braces::SQUARE, elements, |pat| self.pat(pat))
+                list(Braces::SQUARE, elements, |af, pat, _lcx| af.pat(pat))
                     .tail(take_tail())
                     .format(self)?
             }
@@ -105,7 +106,7 @@ impl AstFormatter {
     ) -> FormatResult {
         self.qpath(qself, path, false)?;
         self.out.space()?;
-        list(Braces::CURLY, fields, |f| self.pat_field(f))
+        list(Braces::CURLY, fields, |af, f, _lcx| af.pat_field(f))
             .config(struct_field_list_config(
                 RUSTFMT_CONFIG_DEFAULTS.struct_lit_width,
             ))
