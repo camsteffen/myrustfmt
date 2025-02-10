@@ -3,7 +3,7 @@ use crate::source_formatter::SourceFormatter;
 use crate::util::cell_ext::CellExt;
 use rustc_lexer::TokenKind;
 
-/// Answers the question: What whitespace to we expect to print, ignoring comments?
+/// What whitespace do we want to print, and how to respond to comments
 #[derive(Clone, Copy)]
 pub enum WhitespaceMode {
     Horizontal {
@@ -52,6 +52,7 @@ struct WhitespaceContext {
 }
 
 impl SourceFormatter {
+    // todo optimize no-op case?
     pub fn handle_whitespace_and_comments(&self, mode: WhitespaceMode) -> FormatResult<bool> {
         let wcx = &mut WhitespaceContext {
             is_comments_before: false,
@@ -59,7 +60,14 @@ impl SourceFormatter {
             mode,
             whitespace_buffer: None,
         };
-        for token in rustc_lexer::tokenize(self.source.remaining()) {
+        let mut tokens = rustc_lexer::tokenize(self.source.remaining());
+        loop {
+            let next_char = self.source.remaining().chars().next();
+            if !next_char.is_some_and(|c| c == '/' || rustc_lexer::is_whitespace(c)) {
+                // save the tokenizer some work
+                break;
+            }
+            let Some(token) = tokens.next() else { break };
             match token.kind {
                 TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
                     self.flush_whitespace(wcx, true)?;
@@ -80,10 +88,8 @@ impl SourceFormatter {
                 _ => break,
             }
         }
-
         self.flush_whitespace(wcx, false)?;
         self.ensure_required_whitespace(wcx)?;
-        self.next_is_whitespace_or_comments.set(false);
 
         Ok(wcx.is_whitespace_mode_out)
     }

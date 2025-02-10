@@ -5,34 +5,26 @@ use crate::constraint_writer::{
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::ErrorEmitter;
-use crate::source_formatter::whitespace::{NewlineKind, WhitespaceMode };
+use crate::source_formatter::whitespace::{NewlineKind, WhitespaceMode};
 use crate::source_reader::SourceReader;
 use rustc_span::{BytePos, Pos, Span};
-use std::cell::Cell;
 use std::rc::Rc;
 
 mod whitespace;
 
 pub struct SourceFormatterCheckpoint {
-    self_checkpoint: SourceFormatterSelfCheckpoint,
+    source_pos: BytePos,
     writer_checkpoint: ConstraintWriterCheckpoint,
 }
 
-struct SourceFormatterSelfCheckpoint {
-    source_pos: BytePos,
-    next_is_whitespace_or_comments: bool,
-}
-
 pub struct SourceFormatterLookahead {
-    self_checkpoint: SourceFormatterSelfCheckpoint,
+    source_pos: BytePos,
     writer_lookahead: ConstraintWriterLookahead,
 }
 
 pub struct SourceFormatter {
     source: SourceReader,
     out: ConstraintWriter,
-    // todo move to SourceReader
-    next_is_whitespace_or_comments: Cell<bool>,
 }
 
 impl SourceFormatter {
@@ -44,14 +36,15 @@ impl SourceFormatter {
         SourceFormatter {
             source: SourceReader::new(source),
             out: ConstraintWriter::new(constraints, error_emitter),
-            next_is_whitespace_or_comments: Cell::new(true),
         }
     }
 
     pub fn new_defaults(source: impl Into<String>) -> SourceFormatter {
-        Self::new(Rc::new(source.into()), Constraints::default(), Rc::new(
-            ErrorEmitter::new(None),
-        ))
+        Self::new(
+            Rc::new(source.into()),
+            Constraints::default(),
+            Rc::new(ErrorEmitter::new(None)),
+        )
     }
 
     pub fn finish(self) -> FormatModuleResult {
@@ -65,50 +58,33 @@ impl SourceFormatter {
 
     pub fn checkpoint(&self) -> SourceFormatterCheckpoint {
         SourceFormatterCheckpoint {
-            self_checkpoint: self.self_checkpoint(),
-            writer_checkpoint: self.out.checkpoint(),
-        }
-    }
-
-    fn self_checkpoint(&self) -> SourceFormatterSelfCheckpoint {
-        SourceFormatterSelfCheckpoint {
             source_pos: self.source.pos.get(),
-            next_is_whitespace_or_comments: self.next_is_whitespace_or_comments.get(),
+            writer_checkpoint: self.out.checkpoint(),
         }
     }
 
     pub fn restore_checkpoint(&self, checkpoint: &SourceFormatterCheckpoint) {
         let SourceFormatterCheckpoint {
-            ref self_checkpoint,
+            source_pos,
             ref writer_checkpoint,
         } = *checkpoint;
         self.out.restore_checkpoint(writer_checkpoint);
-        self.restore_self_checkpoint(self_checkpoint);
-    }
-
-    fn restore_self_checkpoint(&self, checkpoint: &SourceFormatterSelfCheckpoint) {
-        let SourceFormatterSelfCheckpoint {
-            source_pos,
-            next_is_whitespace_or_comments,
-        } = *checkpoint;
         self.source.pos.set(source_pos);
-        self.next_is_whitespace_or_comments
-            .set(next_is_whitespace_or_comments);
     }
 
     pub fn capture_lookahead(&self, from: &SourceFormatterCheckpoint) -> SourceFormatterLookahead {
         let writer_lookahead = self.out.capture_lookahead(&from.writer_checkpoint);
-        let self_checkpoint = self.self_checkpoint();
-        self.restore_self_checkpoint(&from.self_checkpoint);
+        let source_pos = self.source.pos.get();
+        self.source.pos.set(from.source_pos);
         SourceFormatterLookahead {
             writer_lookahead,
-            self_checkpoint,
+            source_pos,
         }
     }
 
     pub fn restore_lookahead(&self, lookahead: &SourceFormatterLookahead) {
         self.out.restore_lookahead(&lookahead.writer_lookahead);
-        self.restore_self_checkpoint(&lookahead.self_checkpoint);
+        self.source.pos.set(lookahead.source_pos);
     }
 
     // todo make sure any math using two values of this are guaranteed to be on the same line
@@ -133,16 +109,12 @@ impl SourceFormatter {
     }
 
     pub fn newline(&self, kind: NewlineKind) -> FormatResult {
-        self.handle_whitespace_and_comments(
-            WhitespaceMode::Vertical(kind),
-        )?;
+        self.handle_whitespace_and_comments(WhitespaceMode::Vertical(kind))?;
         Ok(())
     }
 
     pub fn newline_indent(&self, kind: NewlineKind) -> FormatResult {
-        self.handle_whitespace_and_comments(
-            WhitespaceMode::Vertical(kind),
-        )?;
+        self.handle_whitespace_and_comments(WhitespaceMode::Vertical(kind))?;
         self.indent()?;
         Ok(())
     }
@@ -163,12 +135,6 @@ impl SourceFormatter {
         self.newline(NewlineKind::Below)
     }
 
-    pub fn newline_if_comments(&self) -> FormatResult<bool> {
-        self.handle_whitespace_and_comments(
-            WhitespaceMode::Vertical(NewlineKind::IfComments),
-        )
-    }
-
     pub fn newline_within(&self) -> FormatResult {
         self.newline(NewlineKind::Within)
     }
@@ -177,33 +143,24 @@ impl SourceFormatter {
         self.newline_indent(NewlineKind::Within)
     }
 
-    pub fn char_ending_at(&self, pos: BytePos) -> u8 {
-        self.source.source.as_bytes()[pos.to_usize() - 1]
+    pub fn newline_if_comments(&self) -> FormatResult<bool> {
+        self.handle_whitespace_and_comments(WhitespaceMode::Vertical(NewlineKind::IfComments))
     }
 
     pub fn skip_token(&self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed()?;
         self.source.eat(token)?;
-        self.next_is_whitespace_or_comments.set(true);
         Ok(())
     }
 
     pub fn skip_token_if_present(&self, token: &str) -> FormatResult {
-        let snapshot;
-        if self.next_is_whitespace_or_comments.get() {
-            snapshot = Some(self.checkpoint());
-            self.handle_whitespace_and_comments(
-                WhitespaceMode::Horizontal { space: false },
-            )?;
-        } else {
-            snapshot = None;
-        }
-        // self.handle_whitespace_and_comments_if_needed()?;
+        // todo is this checkpoint avoidable?
+        let checkpoint = self.checkpoint();
+        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal { space: false })?;
         if self.source.remaining().starts_with(token) {
             self.source.advance(token.len());
-            self.next_is_whitespace_or_comments.set(true);
-        } else if let Some(snapshot) = snapshot {
-            self.restore_checkpoint(&snapshot);
+        } else {
+            self.restore_checkpoint(&checkpoint);
         }
         Ok(())
     }
@@ -213,7 +170,6 @@ impl SourceFormatter {
         self.handle_whitespace_and_comments_if_needed()?;
         let token = self.source.eat_next_token();
         self.out.token(&token)?;
-        self.next_is_whitespace_or_comments.set(true);
         Ok(())
     }
 
@@ -232,7 +188,6 @@ impl SourceFormatter {
     pub fn token(&self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed()?;
         self.source.eat(token)?;
-        self.next_is_whitespace_or_comments.set(true);
         self.out.token(&token)?;
         Ok(())
     }
@@ -246,13 +201,7 @@ impl SourceFormatter {
     /** Writes a space and accounts for spaces and comments in source */
     // todo do newlines and comments sneak in when it should be single line?
     pub fn space(&self) -> FormatResult {
-        if self.next_is_whitespace_or_comments.get() {
-            self.handle_whitespace_and_comments(
-                WhitespaceMode::Horizontal { space: true },
-            )?;
-        } else {
-            self.out.token(" ")?;
-        }
+        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal { space: true })?;
         Ok(())
     }
 
@@ -305,11 +254,7 @@ impl SourceFormatter {
     }
 
     fn handle_whitespace_and_comments_if_needed(&self) -> FormatResult {
-        if self.next_is_whitespace_or_comments.get() {
-            self.handle_whitespace_and_comments(
-                WhitespaceMode::Horizontal { space: false },
-            )?;
-        }
+        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal { space: false })?;
         Ok(())
     }
 
@@ -322,7 +267,6 @@ impl SourceFormatter {
         let segment = &self.source.remaining()[..len];
         self.out.write_possibly_multiline(segment)?;
         self.source.advance(len);
-        self.next_is_whitespace_or_comments.set(true);
         Ok(())
     }
 
@@ -341,7 +285,6 @@ impl SourceFormatter {
     fn token_unchecked(&self, token: &str) -> FormatResult {
         self.out.token(&token)?;
         self.source.advance(token.len());
-        self.next_is_whitespace_or_comments.set(true);
         Ok(())
     }
 }

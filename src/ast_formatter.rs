@@ -27,7 +27,6 @@ mod ty;
 mod util;
 
 pub struct AstFormatter {
-    config: Rc<Config>,
     error_emitter: Rc<ErrorEmitter>,
     out: SourceFormatter,
 }
@@ -53,7 +52,6 @@ impl AstFormatter {
         let error_emitter = Rc::new(ErrorEmitter::new(path));
         let out = SourceFormatter::new(source, constraints, Rc::clone(&error_emitter));
         AstFormatter {
-            config,
             error_emitter,
             out,
         }
@@ -78,9 +76,5 @@ impl AstFormatter {
                     .fatal_format_error(e, self.out.source(), self.out.pos())
             }
         }
-    }
-
-    fn config(&self) -> &Config {
-        &self.config
     }
 }
