@@ -1,0 +1,26 @@
+- name: closure with multi-line chain
+  type: before_after
+  in_block: true
+  before: |
+    let x = || aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        + aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        + aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;
+  after: |
+    let x = || {
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            + aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            + aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    };
+- name: body is simple match
+  type: before_after
+  in_block: true
+  before: |
+    let x = || {
+        match x {
+            _ => {}
+        }
+    };
+  after: |
+    let x = || match x {
+        _ => {}
+    };

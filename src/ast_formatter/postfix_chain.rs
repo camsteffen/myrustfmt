@@ -31,12 +31,6 @@ impl AstFormatter {
         chain: &[PostfixItem<'_>],
         tail: &Tail,
     ) -> FormatResult {
-        // touchy margins - everything must be a single line (with overflow)
-        if self.out.constraints().touchy_margin.get() {
-            self.postfix_chain_single_line_with_overflow(&chain, tail, false)?;
-            return Ok(());
-        }
-
         let first_line = self.out.line();
         let mut chain_rest = chain;
 
@@ -46,11 +40,13 @@ impl AstFormatter {
             let Some((next, chain_rest_next)) = chain_rest.split_first() else {
                 return self.tail(tail);
             };
-            self.postfix_item(next)?;
-            if chain_rest_next.is_empty() {
+            chain_rest = chain_rest_next;
+            if chain_rest.is_empty() {
+                self.postfix_item(next)?;
                 return self.tail(tail);
             }
-            chain_rest = chain_rest_next;
+            let next_is_single_line = self.constraints().requires_indent_middle();
+            self.with_single_line_opt(next_is_single_line, || self.postfix_item(next))?;
             if self.out.line() != first_line {
                 break true;
             }
@@ -60,12 +56,20 @@ impl AstFormatter {
         };
 
         if multi_line_root {
+            // should be prevented by single-line constraint in the loop above
+            assert_eq!(self.constraints().requires_single_line_chains(), false);
             // each item on a separate line, no indent
             self.postfix_chain_separate_lines(chain_rest, tail)
         } else {
             self.backtrack()
                 .next(|| self.postfix_chain_single_line_with_overflow(chain_rest, tail, true))
-                .otherwise(|| self.indented(|| self.postfix_chain_separate_lines(chain_rest, tail)))
+                .otherwise(|| {
+                    // see docs for MultiLineConstraint
+                    self.with_single_line_opt(
+                        self.constraints().requires_single_line_chains(),
+                        || self.indented(|| self.postfix_chain_separate_lines(chain_rest, tail)),
+                    )
+                })
         }
     }
 
@@ -88,7 +92,7 @@ impl AstFormatter {
         self.with_single_line(|| self.postfix_items(before_overflow))?;
 
         if !has_separate_lines_fallback {
-            // todo consider comparing line count with adding a block for touchy_margins
+            // todo consider comparing line count with adding a block for multi_line constraint
             self.postfix_overflowable(overflowable)?;
             self.tail(tail)?;
             return Ok(());

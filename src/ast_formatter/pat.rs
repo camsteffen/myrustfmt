@@ -52,7 +52,7 @@ impl AstFormatter {
                     .format(self)?
             }
             ast::PatKind::Or(ref pats) => {
-                self.infix_chain("|", pats, |pat| self.pat(pat), false)?
+                self.simple_infix_chain("|", pats, |pat| self.pat(pat), false)?
             }
             ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false)?,
             ast::PatKind::Tuple(ref fields) => list(Braces::PARENS, fields, |af, pat, _lcx| af.pat(pat))

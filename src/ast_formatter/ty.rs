@@ -100,7 +100,7 @@ impl AstFormatter {
     }
 
     pub fn generic_bounds(&self, bounds: &[ast::GenericBound]) -> FormatResult {
-        self.infix_chain("+", bounds, |b| self.generic_bound(b), true)
+        self.simple_infix_chain("+", bounds, |b| self.generic_bound(b), true)
     }
 
     fn generic_bound(&self, bound: &ast::GenericBound) -> FormatResult {

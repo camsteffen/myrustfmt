@@ -11,6 +11,8 @@ use crate::ast_formatter::list::list_config::{
 };
 use crate::ast_utils::plain_block;
 use crate::ast_utils::postfix_expr_kind;
+use crate::constraints::MultiLineConstraint;
+use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
@@ -192,7 +194,7 @@ impl AstFormatter {
         self.skip_single_expr_blocks(expr, |expr| {
             if matches!(lcx.strategy, ListStrategy::SeparateLines) && lcx.len > 1 {
                 self.backtrack()
-                    .next(|| self.with_touchy_margins(|| self.expr(expr)))
+                    .next(|| self.constraints().with_indent_middle(|| self.expr(expr)))
                     .otherwise(|| self.expr_add_block(expr))
             } else {
                 self.expr(expr)
@@ -228,8 +230,8 @@ impl AstFormatter {
                     let Some(end) = end else {
                         return af.tail(tail);
                     };
-                    let is_single_line =
-                        af.out.constraints().touchy_margin.get() && af.out.line() != first_line;
+                    let is_single_line = af.out.constraints().requires_indent_middle()
+                        && af.out.line() != first_line;
                     af.with_single_line_opt(is_single_line, || af.expr_tail(end, tail))?;
                     Ok(())
                 }),
@@ -261,7 +263,7 @@ impl AstFormatter {
         let first_line = self.out.line();
         self.expr_tail(func, &Tail::token("("))?;
         let args = self.call_args_after_open_paren(args, tail);
-        if self.out.constraints().touchy_margin.get() && self.out.line() != first_line {
+        if self.out.constraints().requires_indent_middle() && self.out.line() != first_line {
             // single line and no overflow
             // this avoids code like
             // (
@@ -356,29 +358,31 @@ impl AstFormatter {
     }
 
     pub fn token_expr_open_brace(&self, token: &str, expr: &ast::Expr) -> FormatResult<bool> {
-        let first_line = self.out.line();
-        self.out.token_space(token)?;
-        self.expr(expr)?;
-        let force_newline = self.out.line() != first_line
-            && self.out.with_last_line(|line| {
-                let after_indent = &line[self.out.constraints().indent.get() as usize..];
-                after_indent
-                    .chars()
-                    .any(|c| !matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
-            });
-        let newline_open_block = || {
-            self.out.newline_within_indent()?;
-            self.out.token("{")?;
-            Ok(())
-        };
-        if force_newline {
-            newline_open_block()?;
-        } else {
-            self.backtrack()
-                .next_single_line(|| self.out.space_token("{"))
-                .otherwise(newline_open_block)?;
-        }
-        Ok(self.out.line() == first_line)
+        self.with_single_line_opt(self.constraints().requires_indent_middle(), || {
+            let first_line = self.out.line();
+            self.out.token_space(token)?;
+            self.expr(expr)?;
+            let force_newline = self.out.line() != first_line
+                && self.out.with_last_line(|line| {
+                    let after_indent = &line[self.out.constraints().indent.get() as usize..];
+                    after_indent
+                        .chars()
+                        .any(|c| !matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
+                });
+            let newline_open_block = || {
+                self.out.newline_within_indent()?;
+                self.out.token("{")?;
+                Ok(())
+            };
+            if force_newline {
+                newline_open_block()?;
+            } else {
+                self.backtrack()
+                    .next_single_line(|| self.out.space_token("{"))
+                    .otherwise(newline_open_block)?;
+            }
+            Ok(self.out.line() == first_line)
+        })
     }
 
     pub fn mac_call(&self, mac_call: &ast::MacCall) -> FormatResult {
@@ -390,8 +394,9 @@ impl AstFormatter {
     fn struct_expr(&self, struct_: &ast::StructExpr, tail: &Tail) -> FormatResult {
         self.qpath(&struct_.qself, &struct_.path, true)?;
         self.out.space()?;
-        // todo touchy margins?
+        // todo indent middle and multi-line qpath?
         list(Braces::CURLY, &struct_.fields, Self::expr_field)
+            // todo not wide enough?
             .config(struct_field_list_config(
                 RUSTFMT_CONFIG_DEFAULTS.struct_lit_width,
             ))
@@ -420,6 +425,7 @@ impl AstFormatter {
 
     // utils
 
+    // todo test removing and adding blocks when there are comments
     pub fn expr_add_block(&self, expr: &ast::Expr) -> FormatResult {
         self.out.token_insert("{")?;
         self.embraced_inside(|| self.expr(expr))?;

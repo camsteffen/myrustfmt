@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::{Constraints, MaxWidthForLine};
+use crate::constraints::{Constraints, MaxWidthForLine, MultiLineConstraint};
 use crate::error::{FormatResult, WidthLimitExceededError};
 use crate::util::cell_ext::CellExt;
 
@@ -13,7 +13,13 @@ impl AstFormatter {
     pub fn indented<T>(&self, f: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         let indent = self.constraints().indent.get() + INDENT_WIDTH;
         self.constraints().indent.with_replaced(indent, || {
-            self.constraints().touchy_margin.with_replaced(false, f)
+            match self.constraints().multi_line.get() {
+                MultiLineConstraint::MultiLine | MultiLineConstraint::SingleLine => f(),
+                MultiLineConstraint::IndentMiddle | MultiLineConstraint::SingleLineChains => self
+                    .constraints()
+                    .multi_line
+                    .with_replaced(MultiLineConstraint::MultiLine, f),
+            }
         })
     }
 
@@ -33,19 +39,15 @@ impl AstFormatter {
             self.constraints().has_open_checkpoints(),
             "single line constraint applied with no fallback"
         );
-        self.constraints().single_line.with_replaced(true, f)
+        self.constraints().multi_line.with_replaced(MultiLineConstraint::SingleLine, f)
     }
 
-    pub fn with_single_line_opt(
+    pub fn with_single_line_opt<T>(
         &self,
         apply: bool,
-        f: impl FnOnce() -> FormatResult,
-    ) -> FormatResult {
+        f: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
         if apply { self.with_single_line(f) } else { f() }
-    }
-
-    pub fn with_touchy_margins<T>(&self, f: impl FnOnce() -> T) -> T {
-        self.constraints().touchy_margin.with_replaced(true, f)
     }
 
     /** Enforces a max number of characters until a newline is printed */

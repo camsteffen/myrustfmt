@@ -22,6 +22,7 @@
     .aaaa
 - name: field after multiline method call
   type: no_change
+  focus: true
   in_block: true
   formatted: |
     asdfasdf

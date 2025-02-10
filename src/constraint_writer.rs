@@ -164,7 +164,7 @@ impl ConstraintWriter {
     }
 
     pub fn newline(&self) -> Result<(), NewlineNotAllowedError> {
-        if self.constraints.single_line.get() {
+        if self.constraints.requires_single_line() {
             return Err(NewlineNotAllowedError);
         }
         self.buffer.with_taken(|b| b.push('\n'));

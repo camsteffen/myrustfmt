@@ -154,17 +154,6 @@ impl Overflow for ast::Expr {
         expr: &Self,
         handler: H,
     ) -> H::Result {
-        /*
-        non-middle-indented expressions
-        zero-indent dot chains
-        hanging indent chains
-        closures: single-line chains only, middle indented only
-        match arm: single-line chains only, middle indented only
-        vertical list item: hanging indent chains allowed, middle indented only
-        horizontal list item: single-line chains only, middle indent N/A
-        
-        hanging indent within a list item is okay because
-         */
         if !expr.attrs.is_empty() {
             return H::no_overflow();
         }

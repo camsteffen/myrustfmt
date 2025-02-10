@@ -6,6 +6,7 @@ use crate::ast_formatter::backtrack::Backtrack;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{arm_body_requires_block, is_plain_block};
+use crate::constraints::MultiLineConstraint;
 use crate::error::{ConstraintError, FormatError, FormatResult, return_if_break};
 use crate::util::cell_ext::CellExt;
 
@@ -118,7 +119,7 @@ impl AstFormatter {
         let result = self.backtrack().next_control_flow(|| {
             // We're going to try formatting on the same line, but adding extra width to simulate
             // wrapping with a block. Use the single-line constraint since we just want to see what
-            // fits on the first line. Also, we need to defer the touchy_margins constraint for now.
+            // fits on the first line.
             let result = self.with_single_line(|| {
                 self.constraints()
                     .max_width
@@ -166,7 +167,10 @@ impl AstFormatter {
         // todo closures and structs should have single-line headers
         // todo exclude comma for block-like expressions?
         backtrack
-            .next(|| self.with_touchy_margins(|| self.expr_tail(body, &Tail::token_insert(","))))
+            .next(|| {
+                self.constraints()
+                    .with_single_line_chains(|| self.expr_tail(body, &Tail::token_insert(",")))
+            })
             .otherwise(|| self.expr_add_block(body))
     }
 }

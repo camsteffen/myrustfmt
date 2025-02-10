@@ -78,7 +78,7 @@ impl AstFormatter {
             };
             let can_overflow = matches!(rest, ListRest::None)
                 && Overflow::can_overflow(self, last, list.len() == 1);
-            if dbg!(can_overflow) {
+            if can_overflow {
                 self.backtrack().next(last_without_overflow).otherwise(|| {
                     self.with_width_limit_from_start_first_line_opt(
                         start,

@@ -2,7 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 
 impl AstFormatter {
-    pub fn infix_chain<T>(
+    pub fn simple_infix_chain<T>(
         &self,
         token: &str,
         items: &[T],

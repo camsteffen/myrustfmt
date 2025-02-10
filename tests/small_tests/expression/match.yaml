@@ -221,3 +221,26 @@
     {
         x => {}
     }
+- name: nested match scrutinee is multi-line array
+  type: before_after
+  in_block: true
+  before: |
+    match x {
+        AAA => match [
+            EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE,
+            EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE,
+        ] {
+            _ => {}
+        },
+    }
+  after: |
+    match x {
+        AAA => {
+            match [
+                EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE,
+                EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE,
+            ] {
+                _ => {}
+            }
+        }
+    }

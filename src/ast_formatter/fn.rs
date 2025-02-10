@@ -3,12 +3,14 @@ use crate::ast_formatter::list::Braces;
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 
+use crate::ast_formatter::list::builder::list;
 use crate::ast_formatter::list::list_config::ParamListConfig;
 use crate::ast_utils::block_like_expr_kind;
+use crate::constraints::MultiLineConstraint;
+use crate::util::cell_ext::CellExt;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
 use rustc_span::symbol::kw;
-use crate::ast_formatter::list::builder::list;
 
 impl AstFormatter {
     pub fn fn_<K>(&self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
@@ -23,11 +25,12 @@ impl AstFormatter {
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
-        let param_list = list(Braces::PARENS, &sig.decl.inputs, |af, param, _lcx| af.param(param)).config(
-            ParamListConfig {
-                single_line_max_contents_width: None,
-            },
-        );
+        let param_list = list(Braces::PARENS, &sig.decl.inputs, |af, param, _lcx| {
+            af.param(param)
+        })
+        .config(ParamListConfig {
+            single_line_max_contents_width: None,
+        });
         self.backtrack()
             .next_single_line(|| {
                 param_list.format_single_line(self)?;
@@ -99,21 +102,20 @@ impl AstFormatter {
         self.skip_single_expr_blocks(body, |body| {
             // todo consider allowing `match`, `loop`, `if`, `for`, `while` if the header fits on one line
             //   should we preserve the block in such cases?
-            //   actually, does touchy_margins make sense here?
-            //   and if/for/while should enforce single line headers when there is touchy_margins
-            if matches!(body.kind, block_like_expr_kind!()) {
-                // don't add a block
-                self.expr_tail(body, tail)
-            } else {
-                // add a block unless it fits on a single line
-                self.backtrack()
-                    .next_single_line(|| self.expr_tail(body, tail))
-                    .otherwise(|| {
-                        self.expr_add_block(body)?;
-                        self.tail(tail)?;
-                        Ok(())
-                    })
-            }
+            //   actually, does indent-middle or SingleLineChains make sense here?
+            //   and if/for/while should enforce single line headers
+
+            // add a block unless it fits on a single line
+            self.backtrack()
+                .next(|| {
+                    self.constraints()
+                        .with_single_line_chains(|| self.expr_tail(body, tail))
+                })
+                .otherwise(|| {
+                    self.expr_add_block(body)?;
+                    self.tail(tail)?;
+                    Ok(())
+                })
         })
     }
 
@@ -136,12 +138,16 @@ impl AstFormatter {
             ast::FnRetTy::Default(_) => (tail, Tail::none()),
             ast::FnRetTy::Ty(_) => (Tail::none(), tail),
         };
-        list(Braces::PARENS, &parenthesized_args.inputs, |af, ty, _lcx| af.ty(ty))
-            .config(ParamListConfig {
-                single_line_max_contents_width: None,
-            })
-            .tail(list_tail)
-            .format(self)?;
+        list(
+            Braces::PARENS,
+            &parenthesized_args.inputs,
+            |af, ty, _lcx| af.ty(ty),
+        )
+        .config(ParamListConfig {
+            single_line_max_contents_width: None,
+        })
+        .tail(list_tail)
+        .format(self)?;
         self.fn_ret_ty(&parenthesized_args.output)?;
         // todo pass tail to ret ty?
         self.tail(final_tail)?;
