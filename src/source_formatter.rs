@@ -5,7 +5,7 @@ use crate::constraint_writer::{
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::ErrorEmitter;
-use crate::source_formatter::whitespace::{NewlineKind, WhitespaceMode, handle_whitespace};
+use crate::source_formatter::whitespace::{NewlineKind, WhitespaceMode };
 use crate::source_reader::SourceReader;
 use rustc_span::{BytePos, Pos, Span};
 use std::cell::Cell;
@@ -302,10 +302,6 @@ impl SourceFormatter {
 
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T {
         self.out.with_last_line(f)
-    }
-
-    fn handle_whitespace_and_comments(&self, mode: WhitespaceMode) -> FormatResult<bool> {
-        handle_whitespace(mode, self)
     }
 
     fn handle_whitespace_and_comments_if_needed(&self) -> FormatResult {
