@@ -51,17 +51,18 @@
         .aaaa
         .aaaa,
     ]
-- name: list has a chain with multiline root
+- name: list ends with a chain with multiline root
   type: before_after
   in_block: true
   before: |
-    [asdfasdf({
+    [item, asdfasdf({
         let x;
     })
     .aaaa
-    .aaaa, item]
+    .aaaa]
   after: |
     [
+        item,
         {
             asdfasdf({
                 let x;
@@ -69,7 +70,6 @@
             .aaaa
             .aaaa
         },
-        item,
     ]
 - name: list has a chain with hanging indent
   type: no_change

@@ -175,7 +175,7 @@ impl Overflow for ast::Expr {
             | ast::ExprKind::MacCall(..)
             | ast::ExprKind::Struct(..)
             | ast::ExprKind::Tup(..) => handler
-                .conditional_overflows(|is_only_list_item| is_only_list_item, || af.expr(expr)),
+                .conditional_overflows(|is_only_list_item| false, || af.expr(expr)),
             // | ast::ExprKind::MethodCall(..) if is_only_list_item => H::overflows(|| af.dot_chain(expr, Tail::NONE, true)),
             // prefix
             ast::ExprKind::AddrOf(borrow_kind, mutability, ref target) => handler

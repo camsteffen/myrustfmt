@@ -5,9 +5,6 @@ use crate::error::FormatResult;
 
 use crate::ast_formatter::list::builder::list;
 use crate::ast_formatter::list::list_config::ParamListConfig;
-use crate::ast_utils::block_like_expr_kind;
-use crate::constraints::MultiLineConstraint;
-use crate::util::cell_ext::CellExt;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
 use rustc_span::symbol::kw;

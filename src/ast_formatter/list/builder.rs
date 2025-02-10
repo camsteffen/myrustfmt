@@ -197,8 +197,6 @@ where
             self.config.force_trailing_comma(),
             self.braces.pad,
             self.config.single_line_max_contents_width(),
-            self.config
-                .overflow_max_first_line_contents_width(af.config()),
         )
     }
 

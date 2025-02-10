@@ -25,21 +25,25 @@ impl AstFormatter {
         let mut tail = Some(tail);
         let mut take_tail = || tail.take().unwrap();
         match expr.kind {
-            ast::ExprKind::Array(ref items) => list(Braces::SQUARE, items, Self::expr_list_item_fn)
-                .config(ArrayListConfig)
-                .overflow()
-                .tail(take_tail())
-                .format(self)?,
+            ast::ExprKind::Array(ref items) => {
+                list(Braces::SQUARE, items, self.expr_list_item_fn(items))
+                    .config(ArrayListConfig)
+                    .overflow()
+                    .tail(take_tail())
+                    .format(self)?
+            }
             ast::ExprKind::ConstBlock(_) => todo!(),
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, take_tail())?,
             postfix_expr_kind!() => self.postfix_chain(expr, take_tail())?,
-            ast::ExprKind::Tup(ref items) => list(Braces::PARENS, items, Self::expr_list_item_fn)
-                .config(TupleListConfig {
-                    len: items.len(),
-                    single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
-                })
-                .tail(take_tail())
-                .format(self)?,
+            ast::ExprKind::Tup(ref items) => {
+                list(Braces::PARENS, items, self.expr_list_item_fn(items))
+                    .config(TupleListConfig {
+                        len: items.len(),
+                        single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
+                    })
+                    .tail(take_tail())
+                    .format(self)?
+            }
             ast::ExprKind::Binary(op, ref left, ref right) => {
                 self.binary(left, right, op, take_tail())?
             }
@@ -190,16 +194,36 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn expr_list_item_fn(&self, expr: &P<ast::Expr>, lcx: &ListItemContext) -> FormatResult {
-        self.skip_single_expr_blocks(expr, |expr| {
-            if matches!(lcx.strategy, ListStrategy::SeparateLines) && lcx.len > 1 {
-                self.backtrack()
-                    .next(|| self.constraints().with_indent_middle(|| self.expr(expr)))
-                    .otherwise(|| self.expr_add_block(expr))
-            } else {
-                self.expr(expr)
-            }
-        })
+    pub fn expr_list_item_fn(
+        &self,
+        list: &[P<ast::Expr>],
+    ) -> impl Fn(&AstFormatter, &P<ast::Expr>, &ListItemContext) -> FormatResult {
+        let outer_multi_line = self.constraints().multi_line.get();
+        move |af, expr, lcx| {
+            af.skip_single_expr_blocks(expr, |expr| {
+                if outer_multi_line < MultiLineConstraint::NoOverflow
+                    && matches!(lcx.strategy, ListStrategy::SingleLine)
+                    && lcx.index == list.len() - 1
+                {
+                    let multi_line_constraint = if list.len() > 1 {
+                        // todo need this? and do we need this variant at all?
+                        // MultiLineConstraint::NoOverflow
+                        MultiLineConstraint::SingleLineChains
+                    } else {
+                        MultiLineConstraint::SingleLineChains
+                    };
+                    af.constraints()
+                        .multi_line
+                        .with_replaced(multi_line_constraint, || af.expr(expr))
+                } else if matches!(lcx.strategy, ListStrategy::SeparateLines) && list.len() > 1 {
+                    af.backtrack()
+                        .next(|| af.constraints().with_indent_middle(|| af.expr(expr)))
+                        .otherwise(|| af.expr_add_block(expr))
+                } else {
+                    af.expr(expr)
+                }
+            })
+        }
     }
 
     pub fn anon_const(&self, anon_const: &ast::AnonConst) -> FormatResult {
@@ -262,7 +286,7 @@ impl AstFormatter {
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
         let first_line = self.out.line();
         self.expr_tail(func, &Tail::token("("))?;
-        let args = self.call_args_after_open_paren(args, tail);
+        let args = || self.call_args_after_open_paren(args, tail);
         if self.out.constraints().requires_indent_middle() && self.out.line() != first_line {
             // single line and no overflow
             // this avoids code like
@@ -271,9 +295,9 @@ impl AstFormatter {
             // )(
             //    multi_line_args,
             // )
-            self.with_single_line(|| args.format_single_line(self))?;
+            self.with_single_line(|| args().format_single_line(self))?;
         } else {
-            args.format(self)?;
+            args().format(self)?;
         }
         Ok(())
     }
@@ -283,7 +307,7 @@ impl AstFormatter {
         args: &'ast [P<ast::Expr>],
         tail: &'tail Tail<'_>,
     ) -> impl ListBuilderTrait + 'out {
-        list(Braces::PARENS, args, Self::expr_list_item_fn)
+        list(Braces::PARENS, args, self.expr_list_item_fn(args))
             .config(CallParamListConfig)
             .omit_open_brace()
             .overflow()

@@ -29,81 +29,49 @@ impl AstFormatter {
         force_trailing_comma: bool,
         pad: bool,
         max_width: Option<u32>,
-        max_width_overflow: Option<u32>,
     ) -> FormatResult {
-        if pad {
-            self.out.space()?;
-        }
-        self.with_width_limit_first_line_opt(max_width, || -> FormatResult {
-            let Some((last, until_last)) = list.split_last() else {
-                if !matches!(rest, ListRest::None) {
-                    self.list_rest(rest)?;
-                }
-                return Ok(());
-            };
-            let start = self.out.last_line_len();
-            self.with_single_line(|| -> FormatResult {
-                for (i, item) in until_last.iter().enumerate() {
+        let do_pad = || -> FormatResult {
+            if pad {
+                self.out.space()?;
+            }
+            Ok(())
+        };
+        self.with_single_line(|| {
+            do_pad()?;
+            self.with_width_limit_first_line_opt(max_width, || {
+                let Some((last, until_last)) = list.split_last() else {
+                    if !matches!(rest, ListRest::None) {
+                        self.list_rest(rest)?;
+                    }
+                    return Ok(());
+                };
+                for (index, item) in until_last.iter().enumerate() {
                     format_item(self, item, &ListItemContext {
-                        index: i,
-                        len: list.len(),
+                        index,
                         strategy: ListStrategy::SingleLine,
                     })?;
                     self.out.token_maybe_missing(",")?;
                     self.out.space()?;
                 }
+                format_item(self, last, &ListItemContext {
+                    index: list.len() - 1,
+                    strategy: ListStrategy::SingleLine,
+                })?;
+                if !matches!(rest, ListRest::None) || force_trailing_comma {
+                    self.out.token(",")?
+                } else {
+                    self.out.skip_token_if_present(",")?
+                }
+                if !matches!(rest, ListRest::None) {
+                    self.out.space()?;
+                    self.list_rest(rest)?;
+                }
                 Ok(())
             })?;
-            let trailing_comma = || {
-                if !matches!(rest, ListRest::None) || force_trailing_comma {
-                    self.out.token(",")
-                } else {
-                    self.out.skip_token_if_present(",")
-                }
-            };
-            let last_without_overflow = || {
-                self.with_single_line(|| {
-                    format_item(self, last, &ListItemContext {
-                        index: list.len() - 1,
-                        len: list.len(),
-                        strategy: ListStrategy::SingleLine,
-                    })?;
-                    trailing_comma()?;
-                    if !matches!(rest, ListRest::None) {
-                        self.out.space()?;
-                        self.list_rest(rest)?;
-                    }
-                    Ok(())
-                })
-            };
-            let can_overflow = matches!(rest, ListRest::None)
-                && Overflow::can_overflow(self, last, list.len() == 1);
-            if can_overflow {
-                self.backtrack().next(last_without_overflow).otherwise(|| {
-                    self.with_width_limit_from_start_first_line_opt(
-                        start,
-                        max_width_overflow,
-                        || {
-                            format_item(self, last, &ListItemContext {
-                                index: list.len() - 1,
-                                len: list.len(),
-                                strategy: ListStrategy::SingleLine,
-                            })?;
-                            // Overflow::format_overflow(self, last)?;
-                            trailing_comma()?;
-                            Ok(())
-                        },
-                    )
-                })?;
-            } else {
-                last_without_overflow()?;
-            }
+            do_pad()?;
+            self.out.token(close_brace)?;
             Ok(())
         })?;
-        if pad {
-            self.out.space()?;
-        }
-        self.out.token(close_brace)?;
         self.tail(tail)?;
         Ok(())
     }
@@ -130,13 +98,11 @@ impl AstFormatter {
         let format_item = |index, item| {
             let lcx = ListItemContext {
                 index,
-                len: list.len(),
                 strategy: ListStrategy::WrapToFit,
             };
             match max_element_width {
-                Some(max_width) => {
-                    self.with_single_line_and_width_limit(max_width, || format_item(self, item, &lcx))
-                }
+                Some(max_width) => self
+                    .with_single_line_and_width_limit(max_width, || format_item(self, item, &lcx)),
                 None => format_item(self, item, &lcx),
             }
         };
@@ -195,7 +161,6 @@ impl AstFormatter {
         let item_comma = |index, item| -> FormatResult {
             format_item(self, item, &ListItemContext {
                 index,
-                len: list.len(),
                 strategy: ListStrategy::SeparateLines,
             })?;
             self.out.token_maybe_missing(",")?;

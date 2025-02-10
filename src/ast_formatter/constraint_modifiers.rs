@@ -14,8 +14,8 @@ impl AstFormatter {
         let indent = self.constraints().indent.get() + INDENT_WIDTH;
         self.constraints().indent.with_replaced(indent, || {
             match self.constraints().multi_line.get() {
-                MultiLineConstraint::MultiLine | MultiLineConstraint::SingleLine => f(),
-                MultiLineConstraint::IndentMiddle | MultiLineConstraint::SingleLineChains => self
+                MultiLineConstraint::SingleLine | MultiLineConstraint::MultiLine => f(),
+                _ => self
                     .constraints()
                     .multi_line
                     .with_replaced(MultiLineConstraint::MultiLine, f),
@@ -39,7 +39,9 @@ impl AstFormatter {
             self.constraints().has_open_checkpoints(),
             "single line constraint applied with no fallback"
         );
-        self.constraints().multi_line.with_replaced(MultiLineConstraint::SingleLine, f)
+        self.constraints()
+            .multi_line
+            .with_replaced(MultiLineConstraint::SingleLine, f)
     }
 
     pub fn with_single_line_opt<T>(
@@ -75,8 +77,8 @@ impl AstFormatter {
     pub fn with_width_limit_first_line_opt<T>(
         &self,
         width_limit: Option<u32>,
-        f: impl FnOnce() -> T,
-    ) -> T {
+        f: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
         match width_limit {
             None => f(),
             Some(width_limit) => self.with_width_limit_first_line(width_limit, f),

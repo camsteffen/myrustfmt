@@ -6,7 +6,6 @@ use crate::ast_formatter::backtrack::Backtrack;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{arm_body_requires_block, is_plain_block};
-use crate::constraints::MultiLineConstraint;
 use crate::error::{ConstraintError, FormatError, FormatResult, return_if_break};
 use crate::util::cell_ext::CellExt;
 
@@ -40,7 +39,7 @@ impl AstFormatter {
     }
 
     fn arm_guard_same_line(&self, arm: &ast::Arm, guard: &ast::Expr) -> FormatResult {
-        self.with_single_line(|| -> FormatResult {
+        self.with_single_line(|| {
             self.out.space()?;
             self.arm_guard(guard)?;
             Ok(())

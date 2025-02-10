@@ -28,6 +28,8 @@ pub enum MultiLineConstraint {
     IndentMiddle,
     /// Same as IndentMiddle, but also disallow multi-line prefix chains and postfix chains
     SingleLineChains,
+    /// Same as SingleLineChains, but also disallow overflow in multi-item lists
+    NoOverflow,
     /// No newline characters allowed (enforced by ConstraintWriter)
     SingleLine,
 }
@@ -82,17 +84,19 @@ impl Constraints {
         self.multi_line.get() == MultiLineConstraint::SingleLine
     }
 
-    pub fn with_indent_middle(&self, f: impl Fn() -> FormatResult) -> FormatResult {
-        if self.multi_line.get() >= MultiLineConstraint::IndentMiddle {
-            return f();
+    pub fn with_multi_line_constraint(&self, constraint: MultiLineConstraint, f: impl Fn() -> FormatResult) -> FormatResult {
+        if self.multi_line.get() >= constraint {
+            f()
+        } else {
+            self.multi_line.with_replaced(constraint, f)
         }
-        self.multi_line.with_replaced(MultiLineConstraint::IndentMiddle, f)
+    }
+
+    pub fn with_indent_middle(&self, f: impl Fn() -> FormatResult) -> FormatResult {
+        self.with_multi_line_constraint(MultiLineConstraint::IndentMiddle, f)
     }
     
     pub fn with_single_line_chains(&self, f: impl Fn() -> FormatResult) -> FormatResult {
-        if self.multi_line.get() >= MultiLineConstraint::SingleLineChains {
-            return f();
-        }
-        self.multi_line.with_replaced(MultiLineConstraint::SingleLineChains, f)
+        self.with_multi_line_constraint(MultiLineConstraint::SingleLineChains, f)
     }
 }

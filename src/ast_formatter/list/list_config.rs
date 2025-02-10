@@ -1,13 +1,8 @@
-use crate::config::Config;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 pub trait ListConfig {
     fn force_trailing_comma(&self) -> bool {
         false
-    }
-
-    fn overflow_max_first_line_contents_width(&self, _config: &Config) -> Option<u32> {
-        None
     }
 
     fn single_line_max_contents_width(&self) -> Option<u32> {
@@ -43,11 +38,6 @@ impl ListConfig for ArrayListConfig {
 pub struct CallParamListConfig;
 
 impl ListConfig for CallParamListConfig {
-    // todo redundant?
-    fn overflow_max_first_line_contents_width(&self, _config: &Config) -> Option<u32> {
-        Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
-    }
-
     fn single_line_max_contents_width(&self) -> Option<u32> {
         Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
     }
