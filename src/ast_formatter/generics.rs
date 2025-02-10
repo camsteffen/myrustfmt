@@ -10,7 +10,10 @@ impl AstFormatter {
         if params.is_empty() {
             return Ok(());
         }
-        list(Braces::ANGLE, params, |af, p, _lcx| af.generic_param(p)).format(self)
+        list(Braces::ANGLE, params, |af, p, _lcx| {
+            af.generic_param(p)
+        })
+        .format(self)
     }
 
     fn generic_param(&self, param: &ast::GenericParam) -> FormatResult {
@@ -29,12 +32,10 @@ impl AstFormatter {
                 self.ty(ty)?;
             }
             ast::GenericParamKind::Lifetime => {}
-            ast::GenericParamKind::Type { ref default } => {
-                if let Some(default) = default {
-                    self.out.space_token_space("=")?;
-                    self.ty(default)?;
-                }
-            }
+            ast::GenericParamKind::Type { ref default } => if let Some(default) = default {
+                self.out.space_token_space("=")?;
+                self.ty(default)?;
+            },
         }
         Ok(())
     }

@@ -12,7 +12,9 @@ impl AstFormatter {
     }
 
     pub fn block_after_open_brace(&self, block: &ast::Block) -> FormatResult {
-        self.block_generic_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))
+        self.block_generic_after_open_brace(&block.stmts, |stmt| {
+            self.stmt(stmt)
+        })
     }
 
     pub fn block_generic<T>(

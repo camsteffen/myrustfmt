@@ -21,10 +21,9 @@ impl AstFormatter {
         // todo make my own attribute? or comment?
         self.attrs(attrs)?;
         if attrs.iter().any(is_rustfmt_skip) {
-            self.out
-                .constraints()
-                .max_width
-                .with_replaced(None, || self.out.copy_span(span))
+            self.out.constraints().max_width.with_replaced(None, || {
+                self.out.copy_span(span)
+            })
         } else {
             f()
         }
@@ -70,17 +69,21 @@ impl AstFormatter {
         self.path(&meta.path, false)?;
         match &meta.kind {
             ast::MetaItemKind::Word => {}
-            ast::MetaItemKind::List(items) => list(Braces::PARENS, items, |af, item, _lcx| {
-                match item {
+            ast::MetaItemKind::List(items) => {
+                list(Braces::PARENS, items, |af, item, _lcx| match item {
                     ast::MetaItemInner::MetaItem(item) => af.meta_item(item),
                     ast::MetaItemInner::Lit(lit) => af.meta_item_lit(lit),
-                }
-            })
-            .config(ParamListConfig {
-                single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
-            })
-            .overflow()
-            .format(self)?,
+                })
+                .config(
+                    ParamListConfig {
+                        single_line_max_contents_width: Some(
+                            RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width,
+                        ),
+                    },
+                )
+                .overflow()
+                .format(self)?
+            }
             ast::MetaItemKind::NameValue(lit) => {
                 self.out.space_token_space("=")?;
                 self.meta_item_lit(lit)?;

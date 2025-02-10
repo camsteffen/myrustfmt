@@ -22,7 +22,6 @@
     .aaaa
 - name: field after multiline method call
   type: no_change
-  focus: true
   in_block: true
   formatted: |
     asdfasdf
@@ -114,3 +113,12 @@
             gooooooey,
         },
     )
+- name: breakpoint on single line chain ending in method call with no args
+  type: breakpoint
+  in_block: true
+  before: |
+    aaaaa.bbb.ccc()
+  after: |
+    aaaaa
+        .bbb
+        .ccc()

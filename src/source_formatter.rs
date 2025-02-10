@@ -49,11 +49,9 @@ impl SourceFormatter {
     }
 
     pub fn new_defaults(source: impl Into<String>) -> SourceFormatter {
-        Self::new(
-            Rc::new(source.into()),
-            Constraints::default(),
-            Rc::new(ErrorEmitter::new(None)),
-        )
+        Self::new(Rc::new(source.into()), Constraints::default(), Rc::new(
+            ErrorEmitter::new(None),
+        ))
     }
 
     pub fn finish(self) -> FormatModuleResult {
@@ -135,11 +133,16 @@ impl SourceFormatter {
     }
 
     pub fn newline(&self, kind: NewlineKind) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Newline(kind))
+        self.handle_whitespace_and_comments(
+            WhitespaceMode::Vertical(kind),
+        )?;
+        Ok(())
     }
 
     pub fn newline_indent(&self, kind: NewlineKind) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Newline(kind))?;
+        self.handle_whitespace_and_comments(
+            WhitespaceMode::Vertical(kind),
+        )?;
         self.indent()?;
         Ok(())
     }
@@ -157,7 +160,13 @@ impl SourceFormatter {
     }
 
     pub fn newline_below(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Newline(NewlineKind::Below))
+        self.newline(NewlineKind::Below)
+    }
+
+    pub fn newline_if_comments(&self) -> FormatResult<bool> {
+        self.handle_whitespace_and_comments(
+            WhitespaceMode::Vertical(NewlineKind::IfComments),
+        )
     }
 
     pub fn newline_within(&self) -> FormatResult {
@@ -183,7 +192,9 @@ impl SourceFormatter {
         let snapshot;
         if self.next_is_whitespace_or_comments.get() {
             snapshot = Some(self.checkpoint());
-            self.handle_whitespace_and_comments(WhitespaceMode::Void)?;
+            self.handle_whitespace_and_comments(
+                WhitespaceMode::Horizontal { space: false },
+            )?;
         } else {
             snapshot = None;
         }
@@ -216,7 +227,7 @@ impl SourceFormatter {
      * Write a token, asserting it is next in source.
      *
      * N.B. a token should not contain whitespace
-     * N.B. a token is indivisible (e.g. "::<" is two tokens since you can write "::  <")
+     * N.B. a token is indivisible (e.g. "::<" is two tokens since you can write it as "::  <")
      */
     pub fn token(&self, token: &str) -> FormatResult {
         self.handle_whitespace_and_comments_if_needed()?;
@@ -236,7 +247,9 @@ impl SourceFormatter {
     // todo do newlines and comments sneak in when it should be single line?
     pub fn space(&self) -> FormatResult {
         if self.next_is_whitespace_or_comments.get() {
-            self.handle_whitespace_and_comments(WhitespaceMode::Space)?;
+            self.handle_whitespace_and_comments(
+                WhitespaceMode::Horizontal { space: true },
+            )?;
         } else {
             self.out.token(" ")?;
         }
@@ -291,13 +304,15 @@ impl SourceFormatter {
         self.out.with_last_line(f)
     }
 
-    fn handle_whitespace_and_comments(&self, mode: WhitespaceMode) -> FormatResult {
+    fn handle_whitespace_and_comments(&self, mode: WhitespaceMode) -> FormatResult<bool> {
         handle_whitespace(mode, self)
     }
 
     fn handle_whitespace_and_comments_if_needed(&self) -> FormatResult {
         if self.next_is_whitespace_or_comments.get() {
-            self.handle_whitespace_and_comments(WhitespaceMode::Void)?;
+            self.handle_whitespace_and_comments(
+                WhitespaceMode::Horizontal { space: false },
+            )?;
         }
         Ok(())
     }

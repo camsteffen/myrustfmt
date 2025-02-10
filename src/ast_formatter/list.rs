@@ -101,8 +101,11 @@ impl AstFormatter {
                 strategy: ListStrategy::WrapToFit,
             };
             match max_element_width {
-                Some(max_width) => self
-                    .with_single_line_and_width_limit(max_width, || format_item(self, item, &lcx)),
+                Some(max_width) => {
+                    self.with_single_line_and_width_limit(max_width, || {
+                        format_item(self, item, &lcx)
+                    })
+                }
                 None => format_item(self, item, &lcx),
             }
         };
@@ -128,7 +131,7 @@ impl AstFormatter {
                     item_comma()?;
                     Ok(())
                 };
-                if prev_must_have_own_line || ItemConfig::item_must_have_own_line(item) {
+                if prev_must_have_own_line || ItemConfig::item_requires_own_line(item) {
                     item_next_line()?;
                     prev_must_have_own_line = !prev_must_have_own_line;
                 } else {

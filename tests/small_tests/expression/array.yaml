@@ -1,3 +1,11 @@
+- name: remove newline inside empty array
+  type: before_after
+  in_block: true
+  before: |
+    [
+    ]
+  after: |
+    []
 - name: array at max width of 60 chars
   type: no_change
   in_block: true

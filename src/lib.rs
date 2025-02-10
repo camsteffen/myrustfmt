@@ -137,8 +137,12 @@ pub fn format_module_file_roots(
             has_errors: false,
         };
         while let Some((path, relative)) = queue.pop_front() {
-            let submodules =
-                format_module_file(&path, relative, Rc::clone(&config), &mut on_format_module)?;
+            let submodules = format_module_file(
+                &path,
+                relative,
+                Rc::clone(&config),
+                &mut on_format_module,
+            )?;
             queue.extend(
                 submodules
                     .into_iter()
@@ -158,8 +162,8 @@ fn format_module_file(
     config: Rc<Config>,
     on_format_module: &mut OnFormatModule,
 ) -> Result<Vec<Submodule>, ()> {
-    let result =
-        parse_module(CrateSource::File(path), relative).map_err(|ErrorGuaranteed { .. }| ())?;
+    let result = parse_module(CrateSource::File(path), relative)
+        .map_err(|ErrorGuaranteed { .. }| ())?;
     let ParseModuleResult {
         module,
         source,

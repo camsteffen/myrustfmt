@@ -43,23 +43,24 @@ fn format_in_block(stmt: &str, max_width: Option<u32>) -> String {
         .expect_not_exceeded_max_width();
     let mut formatted_stmt = result
         .strip_prefix(prefix)
-        .unwrap_or_else(|| {
-            panic!(
+        .unwrap_or_else(|| panic!(
                 "formatted output does not have expected prefix: {:?}",
                 result
-            )
-        })
+            ))
         .strip_suffix(suffix)
-        .unwrap_or_else(|| {
-            panic!(
+        .unwrap_or_else(|| panic!(
                 "formatted output does not have expected suffix: {:?}",
                 result
-            )
-        })
+            ))
         .lines()
-        .fold(String::new(), |mut acc, line| {
-            let spaces = line.bytes().take(4).take_while(|&b| b == b' ').count();
-            acc.push_str(&line[spaces..]);
+        .enumerate()
+        .fold(String::new(), |mut acc, (i, line)| {
+            if !line.is_empty() {
+                acc.push_str(
+                    line.strip_prefix("    ")
+                        .unwrap_or_else(|| panic!("line {i} is not indented: {line}")),
+                );
+            }
             acc.push('\n');
             acc
         });
@@ -102,5 +103,8 @@ fn expect_formatted_equals(formatted: &str, expected: &str, name: &str) -> TestR
             diff::Result::Both(s, _) => println!("  {s}"),
         }
     }
-    Err(format!("\"{name}\" formatted does not match expected").into())
+    Err(
+        format!("\"{name}\" formatted does not match expected")
+            .into(),
+    )
 }

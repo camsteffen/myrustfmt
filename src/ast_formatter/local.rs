@@ -6,7 +6,9 @@ use rustc_ast::ast;
 
 impl AstFormatter {
     pub fn local(&self, local: &ast::Local) -> FormatResult {
-        self.with_attrs(&local.attrs, local.span, || self.local_after_attrs(local))
+        self.with_attrs(&local.attrs, local.span, || {
+            self.local_after_attrs(local)
+        })
     }
 
     fn local_after_attrs(&self, local: &ast::Local) -> FormatResult {
@@ -51,22 +53,18 @@ impl AstFormatter {
                     None => else_block()?,
                     Some(else_expr) => {
                         self.backtrack()
-                            .next(|| {
-                                self.with_width_limit_from_start(
-                                    // todo verify still on the same line
-                                    start,
-                                    RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
-                                    || {
-                                        self.with_single_line(|| {
-                                            self.out.space()?;
-                                            self.expr(else_expr)?;
-                                            self.out.space_token("}")?;
-                                            self.out.token(";")?;
-                                            Ok(())
-                                        })
-                                    },
-                                )
-                            })
+                            .next(|| self.with_width_limit_from_start(
+                                // todo verify still on the same line
+                                start,
+                                RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
+                                || self.with_single_line(|| {
+                                    self.out.space()?;
+                                    self.expr(else_expr)?;
+                                    self.out.space_token("}")?;
+                                    self.out.token(";")?;
+                                    Ok(())
+                                }),
+                            ))
                             .otherwise(else_block)?
                     }
                 }
@@ -94,14 +92,12 @@ impl AstFormatter {
                 Ok(())
             })
             // wrap and indent then single line
-            .next(|| {
-                self.indented(|| {
-                    self.out.newline_within_indent()?;
-                    self.with_single_line(|| self.expr(expr))?;
-                    self.tail(end)?;
-                    Ok(())
-                })
-            })
+            .next(|| self.indented(|| {
+                self.out.newline_within_indent()?;
+                self.with_single_line(|| self.expr(expr))?;
+                self.tail(end)?;
+                Ok(())
+            }))
             // normal
             .next(|| {
                 self.out.space()?;
@@ -110,13 +106,11 @@ impl AstFormatter {
                 Ok(())
             })
             // wrap and indent
-            .otherwise(|| {
-                self.indented(|| {
-                    self.out.newline_within_indent()?;
-                    self.expr(expr)?;
-                    self.tail(end)?;
-                    Ok(())
-                })
-            })
+            .otherwise(|| self.indented(|| {
+                self.out.newline_within_indent()?;
+                self.expr(expr)?;
+                self.tail(end)?;
+                Ok(())
+            }))
     }
 }

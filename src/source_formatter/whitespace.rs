@@ -6,9 +6,8 @@ use rustc_lexer::TokenKind;
 /// Answers the question: What whitespace to we expect to print, ignoring comments?
 #[derive(Clone, Copy)]
 pub enum WhitespaceMode {
-    Newline(NewlineKind),
-    Space,
-    Void,
+    Horizontal { space: bool },
+    Vertical(NewlineKind),
 }
 
 // todo force blank lines between items?
@@ -23,6 +22,8 @@ pub enum NewlineKind {
     Below,
     /// Newline in a place where extra blank lines should be trimmed away.
     Within,
+    /// Same as Within, but don't print a newline if there are no comments
+    IfComments,
 }
 
 impl NewlineKind {
@@ -31,19 +32,20 @@ impl NewlineKind {
             NewlineKind::Between => true,
             NewlineKind::Above => is_comments_before,
             NewlineKind::Below => is_comments_after,
-            NewlineKind::Within => is_comments_before && is_comments_after,
+            NewlineKind::Within | NewlineKind::IfComments => {
+                is_comments_before && is_comments_after
+            }
         }
     }
 }
 
-pub fn handle_whitespace(mode: WhitespaceMode, sf: &SourceFormatter) -> FormatResult {
+pub fn handle_whitespace(mode: WhitespaceMode, sf: &SourceFormatter) -> FormatResult<bool> {
     WhitespaceContext {
         sf,
         is_comments_before: false,
         whitespace_buffer: None,
         mode,
-        is_required_whitespace_out: false,
-        is_after_line_comment_out: false,
+        is_whitespace_mode_out: false,
     }
     .doit()
 }
@@ -51,15 +53,16 @@ pub fn handle_whitespace(mode: WhitespaceMode, sf: &SourceFormatter) -> FormatRe
 struct WhitespaceContext<'a> {
     sf: &'a SourceFormatter,
     mode: WhitespaceMode,
-    /// Some if any amount of whitespace is seen and not yet printed
+    /// Some when any amount of whitespace is seen and not yet printed
     whitespace_buffer: Option</*newline count*/ usize>,
-    is_after_line_comment_out: bool,
-    is_required_whitespace_out: bool,
+    /// In horizontal mode, true if any whitespace or comments are emitted.
+    /// In vertical mode, true if any newlines emitted.
+    is_whitespace_mode_out: bool,
     is_comments_before: bool,
 }
 
 impl WhitespaceContext<'_> {
-    fn doit(&mut self) -> FormatResult {
+    fn doit(&mut self) -> FormatResult<bool> {
         for token in rustc_lexer::tokenize(self.sf.source.remaining()) {
             match token.kind {
                 TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
@@ -69,11 +72,8 @@ impl WhitespaceContext<'_> {
                         .max_width
                         .with_replaced(None, || self.sf.copy(token.len as usize))?;
                     self.is_comments_before = true;
-                    self.is_after_line_comment_out =
-                        matches!(token.kind, TokenKind::LineComment { .. });
-                    if matches!(self.mode, WhitespaceMode::Space) {
-                        // comments count for a space in this universe
-                        self.is_required_whitespace_out = true;
+                    if matches!(self.mode, WhitespaceMode::Horizontal { .. }) {
+                        self.is_whitespace_mode_out = true;
                     }
                 }
                 TokenKind::Whitespace => {
@@ -88,15 +88,19 @@ impl WhitespaceContext<'_> {
 
         self.flush_whitespace(false)?;
 
-        if !self.is_required_whitespace_out {
+        let is_whitespace_required = match self.mode {
+            WhitespaceMode::Horizontal { space } => space,
+            WhitespaceMode::Vertical(NewlineKind::IfComments) => false,
+            WhitespaceMode::Vertical(_) => true,
+        };
+        if is_whitespace_required && !self.is_whitespace_mode_out {
             match self.mode {
-                WhitespaceMode::Newline(_) => self.sf.out.newline()?,
-                WhitespaceMode::Space => self.sf.out.token(" ")?,
-                WhitespaceMode::Void => {}
+                WhitespaceMode::Vertical(_) => self.sf.out.newline()?,
+                WhitespaceMode::Horizontal { .. } => self.sf.out.token(" ")?,
             }
         }
         self.sf.next_is_whitespace_or_comments.set(false);
-        Ok(())
+        Ok(self.is_whitespace_mode_out)
     }
 
     fn flush_whitespace(&mut self, is_comments_after: bool) -> FormatResult {
@@ -109,20 +113,22 @@ impl WhitespaceContext<'_> {
             Space,
         }
         let out = match (newlines, self.mode) {
-            (2.., WhitespaceMode::Newline(kind))
-                if kind.allow_blank_line(self.is_comments_before, is_comments_after) =>
-            {
-                Out::Newline { double: true }
+            (_, WhitespaceMode::Vertical(NewlineKind::IfComments)) if !is_by_comments => {
+                return Ok(());
             }
-            (1.., WhitespaceMode::Newline(_)) => Out::Newline { double: false },
+            (2.., WhitespaceMode::Vertical(kind)) => {
+                let double = kind.allow_blank_line(self.is_comments_before, is_comments_after);
+                Out::Newline { double }
+            }
+            (1.., WhitespaceMode::Vertical(_)) => Out::Newline { double: false },
             (1.., _) if is_by_comments => Out::Newline { double: false },
             _ if is_by_comments => Out::Space,
-            (_, WhitespaceMode::Space) => Out::Space,
+            (_, WhitespaceMode::Horizontal { space: true }) => Out::Space,
             _ => return Ok(()),
         };
         match out {
             Out::Newline { double } => {
-                // todo handle this upstream
+                // todo handle this condition upstream
                 let should_omit_newlines = self.sf.out.len() == 0;
                 if !should_omit_newlines {
                     self.sf.out.newline()?;
@@ -133,12 +139,12 @@ impl WhitespaceContext<'_> {
                         self.sf.out.indent()?;
                     }
                 }
-                self.is_required_whitespace_out = true;
+                self.is_whitespace_mode_out = true;
             }
             Out::Space => {
                 self.sf.out.token(" ")?;
-                if matches!(self.mode, WhitespaceMode::Space) {
-                    self.is_required_whitespace_out = true;
+                if matches!(self.mode, WhitespaceMode::Horizontal { .. }) {
+                    self.is_whitespace_mode_out = true;
                 }
             }
         }

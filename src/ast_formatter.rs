@@ -73,9 +73,10 @@ impl AstFormatter {
         });
         match result {
             Ok(()) => self.out.finish(),
-            Err(e) => self
-                .error_emitter
-                .fatal_format_error(e, self.out.source(), self.out.pos()),
+            Err(e) => {
+                self.error_emitter
+                    .fatal_format_error(e, self.out.source(), self.out.pos())
+            }
         }
     }
 

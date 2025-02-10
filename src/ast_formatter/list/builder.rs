@@ -168,8 +168,8 @@ where
 
     fn contents_default(&self, af: &AstFormatter) -> FormatResult {
         let mut backtrack = af.backtrack();
-        if !(ItemConfig::ITEMS_POSSIBLY_MUST_HAVE_OWN_LINE
-            && self.list.iter().any(ItemConfig::item_must_have_own_line))
+        if !(ItemConfig::ITEMS_MAY_REQUIRE_OWN_LINE
+            && self.list.iter().any(ItemConfig::item_requires_own_line))
         {
             backtrack = backtrack.next(|| self.contents_single_line(af));
         }

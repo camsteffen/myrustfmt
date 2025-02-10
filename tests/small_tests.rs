@@ -31,13 +31,31 @@ fn small_test(test: &Test) -> TestResult {
         TestKind::Breakpoint { before, after } => breakpoint_test(before, after, test.in_block)?,
         TestKind::NoChange { formatted } => {
             let formatted = formatted.trim();
-            format_max_width_expected(formatted, None, formatted, "formatted", test.in_block)?;
+            format_max_width_expected(
+                formatted,
+                None,
+                formatted,
+                "formatted",
+                test.in_block,
+            )?;
         }
         TestKind::BeforeAfter { before, after } => {
             let before = before.trim();
             let after = after.trim();
-            format_max_width_expected(before, None, after, "before -> after", test.in_block)?;
-            format_max_width_expected(after, None, after, "after (idempotency)", test.in_block)?;
+            format_max_width_expected(
+                before,
+                None,
+                after,
+                "before -> after",
+                test.in_block,
+            )?;
+            format_max_width_expected(
+                after,
+                None,
+                after,
+                "after (idempotency)",
+                test.in_block,
+            )?;
         }
     }
     Ok(())
@@ -63,15 +81,7 @@ enum TestKind {
     /// a max width that is just one character smaller than the width required for the "before"
     /// string. The result should equal the "after" string. Also, the "before" string is formatted
     /// with exactly a large enough max width to test that it is not changed.
-    Breakpoint {
-        before: String,
-        after: String,
-    },
-    NoChange {
-        formatted: String,
-    },
-    BeforeAfter {
-        before: String,
-        after: String,
-    },
+    Breakpoint { before: String, after: String },
+    NoChange { formatted: String },
+    BeforeAfter { before: String, after: String },
 }

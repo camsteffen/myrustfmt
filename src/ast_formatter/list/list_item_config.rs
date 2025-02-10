@@ -3,9 +3,9 @@ use std::marker::PhantomData;
 pub trait ListItemConfig: Copy {
     type Item;
 
-    const ITEMS_POSSIBLY_MUST_HAVE_OWN_LINE: bool = false;
+    const ITEMS_MAY_REQUIRE_OWN_LINE: bool = false;
 
-    fn item_must_have_own_line(_item: &Self::Item) -> bool {
+    fn item_requires_own_line(_item: &Self::Item) -> bool {
         false
     }
 }

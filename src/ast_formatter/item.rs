@@ -150,7 +150,8 @@ impl AstFormatter {
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         self.out.space()?;
-        list(Braces::CURLY, variants, |af, v, _lcx| af.variant(v)).format_separate_lines(self)?;
+        list(Braces::CURLY, variants, |af, v, _lcx| af.variant(v))
+            .format_separate_lines(self)?;
         Ok(())
     }
 
@@ -181,13 +182,11 @@ impl AstFormatter {
                     first_part()?;
                     Ok(false)
                 })
-                .otherwise(|| {
-                    self.indented(|| {
-                        self.out.newline_within_indent()?;
-                        first_part()?;
-                        Ok(true)
-                    })
-                })?
+                .otherwise(|| self.indented(|| {
+                    self.out.newline_within_indent()?;
+                    first_part()?;
+                    Ok(true)
+                }))?
         } else {
             self.out.space()?;
             first_part()?;
@@ -201,25 +200,27 @@ impl AstFormatter {
                     self.ty(&impl_.self_ty)?;
                     Ok(())
                 })
-                .otherwise(|| {
-                    self.indented_optional(!indented, || {
-                        self.out.newline_within_indent()?;
-                        self.out.token_space("for")?;
-                        self.ty(&impl_.self_ty)?;
-                        Ok(())
-                    })
-                })?;
+                .otherwise(|| self.indented_optional(!indented, || {
+                    self.out.newline_within_indent()?;
+                    self.out.token_space("for")?;
+                    self.ty(&impl_.self_ty)?;
+                    Ok(())
+                }))?;
         }
         self.where_clause(&impl_.generics.where_clause)?;
         if impl_.generics.where_clause.is_empty() {
             self.out.space()?;
         }
-        self.block_generic(&impl_.items, |item| self.assoc_item(item))?;
+        self.block_generic(&impl_.items, |item| {
+            self.assoc_item(item)
+        })?;
         Ok(())
     }
 
     fn assoc_item(&self, item: &ast::AssocItem) -> FormatResult {
-        self.item_generic(item, |kind| self.assoc_item_kind(kind, item))
+        self.item_generic(item, |kind| {
+            self.assoc_item_kind(kind, item)
+        })
     }
 
     fn assoc_item_kind(&self, kind: &ast::AssocItemKind, item: &ast::AssocItem) -> FormatResult {
@@ -271,7 +272,9 @@ impl AstFormatter {
         self.generic_params(&trait_.generics.params)?;
         self.generic_bounds_optional(&trait_.bounds)?;
         self.out.space()?;
-        self.block_generic(&trait_.items, |item| self.assoc_item(item))?;
+        self.block_generic(&trait_.items, |item| {
+            self.assoc_item(item)
+        })?;
         Ok(())
     }
 
@@ -279,9 +282,10 @@ impl AstFormatter {
         match variants {
             ast::VariantData::Struct { fields, .. } => {
                 self.out.space()?;
-                let list = list(Braces::CURLY, fields, |af, f, _lcx| af.field_def(f)).config(
-                    struct_field_list_config(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width),
-                );
+                let list = list(Braces::CURLY, fields, |af, f, _lcx| af.field_def(f))
+                    .config(struct_field_list_config(
+                        RUSTFMT_CONFIG_DEFAULTS.struct_variant_width,
+                    ));
                 if is_enum {
                     list.format(self)?;
                 } else {
@@ -328,9 +332,11 @@ impl AstFormatter {
             }
             ast::UseTreeKind::Nested { ref items, span: _ } => {
                 self.out.token("::")?;
-                list(Braces::CURLY_NO_PAD, items, |af, (use_tree, _), _lcx| {
-                    af.use_tree(use_tree)
-                })
+                list(
+                    Braces::CURLY_NO_PAD,
+                    items,
+                    |af, (use_tree, _), _lcx| af.use_tree(use_tree),
+                )
                 .config(UseTreeListConfig)
                 .item_config(UseTreeListItemConfig)
                 .tail(tail)
@@ -361,9 +367,9 @@ struct UseTreeListItemConfig;
 impl ListItemConfig for UseTreeListItemConfig {
     type Item = (ast::UseTree, ast::NodeId);
 
-    const ITEMS_POSSIBLY_MUST_HAVE_OWN_LINE: bool = true;
+    const ITEMS_MAY_REQUIRE_OWN_LINE: bool = true;
 
-    fn item_must_have_own_line((item, _): &Self::Item) -> bool {
+    fn item_requires_own_line((item, _): &Self::Item) -> bool {
         matches!(item.kind, ast::UseTreeKind::Nested { .. })
     }
 }

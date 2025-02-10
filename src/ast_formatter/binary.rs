@@ -26,8 +26,9 @@ impl AstFormatter {
                 Ok(())
             })
             .otherwise(|| {
-                self.with_single_line_opt(self.constraints().requires_single_line_chains(), || {
-                    self.indented(|| {
+                self.with_single_line_opt(
+                    self.constraints().requires_single_line_chains(),
+                    || self.indented(|| {
                         // todo write items on the same line while within an indentation width
                         //  (share code with postfix chains?)
                         for (op, expr) in chain {
@@ -37,8 +38,8 @@ impl AstFormatter {
                         }
                         self.tail(tail)?;
                         Ok(())
-                    })
-                })
+                    }),
+                )
             })
     }
 

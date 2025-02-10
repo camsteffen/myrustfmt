@@ -135,11 +135,11 @@ impl AstFormatter {
             ast::FnRetTy::Default(_) => (tail, Tail::none()),
             ast::FnRetTy::Ty(_) => (Tail::none(), tail),
         };
-        list(
-            Braces::PARENS,
-            &parenthesized_args.inputs,
-            |af, ty, _lcx| af.ty(ty),
-        )
+        list(Braces::PARENS, &parenthesized_args.inputs, |
+            af,
+            ty,
+            _lcx,
+        | af.ty(ty))
         .config(ParamListConfig {
             single_line_max_contents_width: None,
         })
@@ -187,7 +187,9 @@ impl AstFormatter {
     }
 
     fn param(&self, param: &ast::Param) -> FormatResult {
-        self.with_attrs(&param.attrs, param.span, || self.param_after_attrs(param))
+        self.with_attrs(&param.attrs, param.span, || {
+            self.param_after_attrs(param)
+        })
     }
 
     fn param_after_attrs(&self, param: &ast::Param) -> FormatResult {
