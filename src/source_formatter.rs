@@ -242,7 +242,7 @@ impl SourceFormatter {
         }
         Ok(())
     }
-    
+
     /// Handles whitespace and comments. This is useful when you need more fine-grained control of
     /// active constraints when formatting comments.
     pub fn no_space(&self) -> FormatResult {

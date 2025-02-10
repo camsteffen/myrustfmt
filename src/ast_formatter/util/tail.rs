@@ -2,12 +2,12 @@ use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 
 /// A Tail squeezes the code before it leftward to make room for itself.
-/// 
+///
 /// Used to dynamically specify code that should appear immediately after the primary output
 /// of a formatting function. For example, a Tail can be a `;` to be added at the end of an
 /// expression. This is to ensure that the code preceding the Tail is formatted in a way that leaves
 /// room for the Tail, without overflowing the max width, if possible.
-/// 
+///
 /// A Tail is unaware of its width by design, to avoid error-prone math.
 ///
 /// As a general rule, ONLY add a Tail argument to a function if it affects the formatting strategy.

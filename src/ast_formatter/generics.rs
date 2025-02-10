@@ -2,8 +2,8 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
 use crate::error::FormatResult;
 
-use rustc_ast::ast;
 use crate::ast_formatter::list::builder::list;
+use rustc_ast::ast;
 
 impl AstFormatter {
     pub fn generic_params(&self, params: &[ast::GenericParam]) -> FormatResult {

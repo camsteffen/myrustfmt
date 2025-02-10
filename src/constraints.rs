@@ -1,7 +1,7 @@
 use crate::config::Config;
-use std::cell::Cell;
 use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
+use std::cell::Cell;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MaxWidthForLine {
@@ -11,7 +11,7 @@ pub struct MaxWidthForLine {
 
 /// Specifies whether multiple lines may be used to format something, and may disallow certain
 /// multi-line formatting strategies.
-/// 
+///
 /// The MultiLineConstraint is NOT enforced by changing or short-circuiting the formatting strategy.
 /// It is ALWAYS enforced by trying to write a newline so that the ConstraintWriter raises a
 /// NewlineNotAllowed error. The IndentMiddle and SingleLineChains variants are enforced by
@@ -84,7 +84,11 @@ impl Constraints {
         self.multi_line.get() == MultiLineConstraint::SingleLine
     }
 
-    pub fn with_multi_line_constraint(&self, constraint: MultiLineConstraint, f: impl Fn() -> FormatResult) -> FormatResult {
+    pub fn with_multi_line_constraint(
+        &self,
+        constraint: MultiLineConstraint,
+        f: impl Fn() -> FormatResult,
+    ) -> FormatResult {
         if self.multi_line.get() >= constraint {
             f()
         } else {
@@ -95,7 +99,7 @@ impl Constraints {
     pub fn with_indent_middle(&self, f: impl Fn() -> FormatResult) -> FormatResult {
         self.with_multi_line_constraint(MultiLineConstraint::IndentMiddle, f)
     }
-    
+
     pub fn with_single_line_chains(&self, f: impl Fn() -> FormatResult) -> FormatResult {
         self.with_multi_line_constraint(MultiLineConstraint::SingleLineChains, f)
     }

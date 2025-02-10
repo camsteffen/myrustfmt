@@ -14,7 +14,9 @@ fn test() {
     }
 }"#;
     assert_eq!(
-        format_str_defaults(source).unwrap().expect_not_exceeded_max_width(),
+        format_str_defaults(source)
+            .unwrap()
+            .expect_not_exceeded_max_width(),
         r#"
 fn test() {
     if self
@@ -37,7 +39,9 @@ fn test() {
     self.fallback(|| { let x; })
 }"#;
     assert_eq!(
-        format_str_config(source, Config::default().max_width(22)).unwrap().expect_not_exceeded_max_width(),
+        format_str_config(source, Config::default().max_width(22))
+            .unwrap()
+            .expect_not_exceeded_max_width(),
         r#"
 fn test() {
     self.fallback(|| {
@@ -61,7 +65,9 @@ fn test() {
     });
 }"#;
     assert_eq!(
-        format_str_config(source, Config::default()).unwrap().expect_not_exceeded_max_width(),
+        format_str_config(source, Config::default())
+            .unwrap()
+            .expect_not_exceeded_max_width(),
         r#"
 fn test() {
     self.fallback(|| {
@@ -99,7 +105,8 @@ fn dot_chain_over_chain_width() {
         format_str_defaults(
             "fn test() { self.config.overflow_max_first_line_contents_width(affconfig()); }",
         )
-        .unwrap().expect_not_exceeded_max_width(),
+        .unwrap()
+        .expect_not_exceeded_max_width(),
         "
 fn test() {
     self.config
@@ -137,7 +144,8 @@ fn overflow_last_item() {
         format_str_defaults(
             "fn test() { chain.iter().try_for_each(|(op, expr)| -> FormatResult { let x; })?; }",
         )
-        .unwrap().expect_not_exceeded_max_width(),
+        .unwrap()
+        .expect_not_exceeded_max_width(),
         "
 fn test() {
     chain.iter().try_for_each(|(op, expr)| -> FormatResult {

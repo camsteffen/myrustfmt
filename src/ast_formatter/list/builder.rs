@@ -1,9 +1,9 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{Braces, ListItemConfig, ListRest};
 use crate::ast_formatter::list::list_config::{DefaultListConfig, ListConfig, ListWrapToFitConfig};
 use crate::ast_formatter::list::list_item_config::DefaultListItemConfig;
 use crate::ast_formatter::list::list_item_context::ListItemContext;
 use crate::ast_formatter::list::overflow::{ListOverflow, ListOverflowNo, ListOverflowYes};
+use crate::ast_formatter::list::{Braces, ListItemConfig, ListRest};
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 
@@ -53,12 +53,12 @@ pub struct ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfig, Overfl
 }
 
 impl<'a, 'ast, 'tail, Item, FormatItem, Config, ItemConfig, Overflow>
-ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfig, Overflow>
+    ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfig, Overflow>
 where
     Config: ListConfig,
-    ItemConfig: ListItemConfig<Item= Item>,
+    ItemConfig: ListItemConfig<Item = Item>,
     FormatItem: Fn(&AstFormatter, &Item, &ListItemContext) -> FormatResult,
-    Overflow: ListOverflow<Item= Item>,
+    Overflow: ListOverflow<Item = Item>,
 {
     pub fn config<ConfigNew: ListConfig>(
         self,
@@ -77,7 +77,7 @@ where
         }
     }
 
-    pub fn item_config<ItemConfigNew: ListItemConfig<Item= Item>>(
+    pub fn item_config<ItemConfigNew: ListItemConfig<Item = Item>>(
         self,
         item_config: ItemConfigNew,
     ) -> ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfigNew, Overflow> {
@@ -234,12 +234,12 @@ pub trait ListBuilderTrait {
 }
 
 impl<'a, 'ast, 'tail, Item, FormatItem, Config, ItemConfig, Overflow> ListBuilderTrait
-for ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfig, Overflow>
+    for ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfig, Overflow>
 where
     Config: ListConfig,
-    ItemConfig: ListItemConfig<Item= Item>,
+    ItemConfig: ListItemConfig<Item = Item>,
     FormatItem: Fn(&AstFormatter, &Item, &ListItemContext) -> FormatResult,
-    Overflow: ListOverflow<Item= Item>,
+    Overflow: ListOverflow<Item = Item>,
 {
     fn format(&self, af: &AstFormatter) -> FormatResult {
         self.format(af)
@@ -249,4 +249,3 @@ where
         self.format_single_line(af)
     }
 }
-

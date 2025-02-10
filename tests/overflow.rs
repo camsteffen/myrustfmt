@@ -12,7 +12,9 @@ fn test() {
     });
 }"#;
     assert_eq!(
-        format_str_config(source, Config::default()).unwrap().expect_not_exceeded_max_width(),
+        format_str_config(source, Config::default())
+            .unwrap()
+            .expect_not_exceeded_max_width(),
         r#"
 fn test() {
     asdfasddfasdf(asdfasdfasdfasdfasdfasasfasfasdfasdfafasdfasdfasdfadfa, || {
@@ -33,7 +35,9 @@ fn test() {
         .any(|(item, _)| aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa);
 }"#;
     assert_eq!(
-        format_str_config(source, Config::default()).unwrap().expect_not_exceeded_max_width(),
+        format_str_config(source, Config::default())
+            .unwrap()
+            .expect_not_exceeded_max_width(),
         r#"
 fn test() {
     let has_nested = items

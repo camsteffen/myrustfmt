@@ -85,7 +85,7 @@ impl ConstraintWriter {
             #[cfg(debug_assertions)]
             ref constraints,
             #[cfg(not(debug_assertions))]
-            constraints: _,
+                constraints: _,
             buffer: _,
             error_emitter: _,
             // exceeded_max_width should only be changed when there is no fallback

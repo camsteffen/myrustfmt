@@ -2,10 +2,10 @@ use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 
 use crate::ast_formatter::list::Braces;
+use crate::ast_formatter::list::builder::list;
 use crate::ast_formatter::util::tail::Tail;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
-use crate::ast_formatter::list::builder::list;
 
 impl AstFormatter {
     pub fn qpath(
@@ -68,11 +68,13 @@ impl AstFormatter {
 
     fn generic_args(&self, generic_args: &ast::GenericArgs, tail: &Tail) -> FormatResult {
         match generic_args {
-            ast::GenericArgs::AngleBracketed(args) => list(Braces::ANGLE, &args.args, |af, arg, _lcx| {
-                af.angle_bracketed_arg(arg)
-            })
-            .tail(tail)
-            .format(self),
+            ast::GenericArgs::AngleBracketed(args) => {
+                list(Braces::ANGLE, &args.args, |af, arg, _lcx| {
+                    af.angle_bracketed_arg(arg)
+                })
+                .tail(tail)
+                .format(self)
+            }
             // (A, B) -> C
             ast::GenericArgs::Parenthesized(parenthesized_args) => {
                 self.parenthesized_args(parenthesized_args, tail)
