@@ -51,10 +51,7 @@ impl AstFormatter {
         let constraints = Constraints::new(config.max_width);
         let error_emitter = Rc::new(ErrorEmitter::new(path));
         let out = SourceFormatter::new(source, constraints, Rc::clone(&error_emitter));
-        AstFormatter {
-            error_emitter,
-            out,
-        }
+        AstFormatter { error_emitter, out }
     }
 
     pub fn module(self, module: &AstModule) -> FormatModuleResult {

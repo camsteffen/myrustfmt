@@ -45,9 +45,11 @@ impl AstFormatter {
                 self.postfix_item(next)?;
                 return self.tail(tail);
             }
-            let next_is_single_line = self.constraints().requires_indent_middle();
+            let next_is_single_line = dbg!(self.constraints().requires_indent_middle());
             self.with_single_line_opt(next_is_single_line, || self.postfix_item(next))?;
             if self.out.line() != first_line {
+                // should be prevented by single-line constraint above
+                assert_eq!(self.constraints().requires_indent_middle(), false);
                 break true;
             }
             if self.out.last_line_len() > indent_margin {
@@ -55,9 +57,7 @@ impl AstFormatter {
             }
         };
 
-        if multi_line_root {
-            // should be prevented by single-line constraint in the loop above
-            assert_eq!(self.constraints().requires_single_line_chains(), false);
+        if dbg!(multi_line_root) {
             // each item on a separate line, no indent
             self.postfix_chain_separate_lines(chain_rest, tail)
         } else {

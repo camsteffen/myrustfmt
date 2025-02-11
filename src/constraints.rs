@@ -28,8 +28,8 @@ pub enum MultiLineConstraint {
     IndentMiddle,
     /// Same as IndentMiddle, but also disallow multi-line prefix chains and postfix chains
     SingleLineChains,
-    /// Same as SingleLineChains, but also disallow overflow in multi-item lists
-    NoOverflow,
+    /// Same as SingleLineChains, but also disallow multi-line lists or overflow in lists
+    SingleLineLists,
     /// No newline characters allowed (enforced by ConstraintWriter)
     SingleLine,
 }
@@ -81,14 +81,14 @@ impl Constraints {
     }
 
     pub fn requires_single_line(&self) -> bool {
-        self.multi_line.get() == MultiLineConstraint::SingleLine
+        self.multi_line.get() >= MultiLineConstraint::SingleLine
     }
 
-    pub fn with_multi_line_constraint(
+    pub fn with_multi_line_constraint<T>(
         &self,
         constraint: MultiLineConstraint,
-        f: impl Fn() -> FormatResult,
-    ) -> FormatResult {
+        f: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
         if self.multi_line.get() >= constraint {
             f()
         } else {

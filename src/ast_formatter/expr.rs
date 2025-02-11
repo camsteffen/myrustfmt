@@ -60,12 +60,14 @@ impl AstFormatter {
                         self.ty(ty)?;
                         Ok(())
                     })
-                    .otherwise(|| self.indented(|| {
-                        self.out.newline_within_indent()?;
-                        self.out.token_space("as")?;
-                        self.ty(ty)?;
-                        Ok(())
-                    }))?;
+                    .otherwise(|| {
+                        self.indented(|| {
+                            self.out.newline_within_indent()?;
+                            self.out.token_space("as")?;
+                            self.ty(ty)?;
+                            Ok(())
+                        })
+                    })?;
             }
             ast::ExprKind::Type(_, _) => todo!(),
             ast::ExprKind::Let(ref pat, ref init, ..) => {
@@ -128,12 +130,7 @@ impl AstFormatter {
                     ast::RangeLimits::Closed => "..=",
                     ast::RangeLimits::HalfOpen => "..",
                 };
-                self.range(
-                    start.as_deref(),
-                    sigil,
-                    end.as_deref(),
-                    take_tail(),
-                )?
+                self.range(start.as_deref(), sigil, end.as_deref(), take_tail())?
             }
             ast::ExprKind::Underscore => todo!(),
             ast::ExprKind::Path(ref qself, ref path) => self.qpath(qself, path, true)?,
@@ -202,29 +199,32 @@ impl AstFormatter {
         list: &[P<ast::Expr>],
     ) -> impl Fn(&AstFormatter, &P<ast::Expr>, &ListItemContext) -> FormatResult {
         let outer_multi_line = self.constraints().multi_line.get();
-        move |af, expr, lcx| af.skip_single_expr_blocks(expr, |expr| {
-            if outer_multi_line < MultiLineConstraint::NoOverflow
-                && matches!(lcx.strategy, ListStrategy::SingleLine)
-                && lcx.index == list.len() - 1
-            {
-                let multi_line_constraint = if list.len() > 1 {
-                    // todo need this? and do we need this variant at all?
-                    // MultiLineConstraint::NoOverflow
-                    MultiLineConstraint::SingleLineChains
-                } else {
-                    MultiLineConstraint::SingleLineChains
-                };
-                af.constraints()
-                    .multi_line
-                    .with_replaced(multi_line_constraint, || af.expr(expr))
-            } else if matches!(lcx.strategy, ListStrategy::SeparateLines) && list.len() > 1 {
-                af.backtrack()
-                    .next(|| af.constraints().with_indent_middle(|| af.expr(expr)))
-                    .otherwise(|| af.expr_add_block(expr))
-            } else {
-                af.expr(expr)
-            }
-        })
+        move |af, expr, lcx| {
+            af.skip_single_expr_blocks(expr, |expr| {
+                match lcx.strategy {
+                    ListStrategy::SingleLine
+                        if outer_multi_line < MultiLineConstraint::SingleLineLists
+                            && lcx.index == list.len() - 1 =>
+                    {
+                        let multi_line_constraint = if list.len() > 1 {
+                            // todo need this? and do we need this variant at all?
+                            MultiLineConstraint::SingleLineLists
+                            // MultiLineConstraint::SingleLineChains
+                        } else {
+                            MultiLineConstraint::SingleLineChains
+                        };
+                        af.constraints()
+                            .multi_line
+                            .with_replaced(dbg!(multi_line_constraint), || af.expr(expr))
+                    }
+                    ListStrategy::SeparateLines if list.len() > 1 => af
+                        .backtrack()
+                        .next(|| af.constraints().with_indent_middle(|| af.expr(expr)))
+                        .otherwise(|| af.expr_add_block(expr)),
+                    _ => af.expr(expr),
+                }
+            })
+        }
     }
 
     pub fn anon_const(&self, anon_const: &ast::AnonConst) -> FormatResult {
@@ -248,18 +248,19 @@ impl AstFormatter {
     ) -> FormatResult {
         if let Some(start) = start {
             let first_line = self.out.line();
-            self.expr_tail(start, &Tail::func(|af| {
-                af.out.token(sigil)?;
-                let Some(end) = end else {
-                    return af.tail(tail);
-                };
-                let is_single_line =
-                    af.out.constraints().requires_indent_middle() && af.out.line() != first_line;
-                af.with_single_line_opt(is_single_line, || {
-                    af.expr_tail(end, tail)
-                })?;
-                Ok(())
-            }))?;
+            self.expr_tail(
+                start,
+                &Tail::func(|af| {
+                    af.out.token(sigil)?;
+                    let Some(end) = end else {
+                        return af.tail(tail);
+                    };
+                    let is_single_line = af.out.constraints().requires_indent_middle()
+                        && af.out.line() != first_line;
+                    af.with_single_line_opt(is_single_line, || af.expr_tail(end, tail))?;
+                    Ok(())
+                }),
+            )?;
         } else {
             self.out.token(sigil)?;
             match end {
@@ -357,21 +358,23 @@ impl AstFormatter {
             multiline()?;
         } else if let Some((block_expr, else_expr)) = single_line_parts() {
             self.backtrack()
-                .next_single_line(|| self.with_width_limit_from_start(
-                    start_pos,
-                    RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
-                    || {
-                        self.out.space()?;
-                        self.expr(block_expr)?;
-                        self.out.space_token_space("}")?;
-                        self.out.token_space("else")?;
-                        self.out.token_space("{")?;
-                        self.expr(else_expr)?;
-                        self.out.space_token("}")?;
-                        self.tail(tail)?;
-                        Ok(())
-                    },
-                ))
+                .next_single_line(|| {
+                    self.with_width_limit_from_start(
+                        start_pos,
+                        RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
+                        || {
+                            self.out.space()?;
+                            self.expr(block_expr)?;
+                            self.out.space_token_space("}")?;
+                            self.out.token_space("else")?;
+                            self.out.token_space("{")?;
+                            self.expr(else_expr)?;
+                            self.out.space_token("}")?;
+                            self.tail(tail)?;
+                            Ok(())
+                        },
+                    )
+                })
                 .otherwise(multiline)?;
         } else {
             multiline()?;
@@ -380,34 +383,31 @@ impl AstFormatter {
     }
 
     pub fn token_expr_open_brace(&self, token: &str, expr: &ast::Expr) -> FormatResult<bool> {
-        self.with_single_line_opt(
-            self.constraints().requires_indent_middle(),
-            || {
-                let first_line = self.out.line();
-                self.out.token_space(token)?;
-                self.expr(expr)?;
-                let force_newline = self.out.line() != first_line
-                    && self.out.with_last_line(|line| {
-                        let after_indent = &line[self.out.constraints().indent.get() as usize..];
-                        after_indent
-                            .chars()
-                            .any(|c| !matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
-                    });
-                let newline_open_block = || {
-                    self.out.newline_within_indent()?;
-                    self.out.token("{")?;
-                    Ok(())
-                };
-                if force_newline {
-                    newline_open_block()?;
-                } else {
-                    self.backtrack()
-                        .next_single_line(|| self.out.space_token("{"))
-                        .otherwise(newline_open_block)?;
-                }
-                Ok(self.out.line() == first_line)
-            },
-        )
+        self.with_single_line_opt(self.constraints().requires_indent_middle(), || {
+            let first_line = self.out.line();
+            self.out.token_space(token)?;
+            self.expr(expr)?;
+            let force_newline = self.out.line() != first_line
+                && self.out.with_last_line(|line| {
+                    let after_indent = &line[self.out.constraints().indent.get() as usize..];
+                    after_indent
+                        .chars()
+                        .any(|c| !matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
+                });
+            let newline_open_block = || {
+                self.out.newline_within_indent()?;
+                self.out.token("{")?;
+                Ok(())
+            };
+            if force_newline {
+                newline_open_block()?;
+            } else {
+                self.backtrack()
+                    .next_single_line(|| self.out.space_token("{"))
+                    .otherwise(newline_open_block)?;
+            }
+            Ok(self.out.line() == first_line)
+        })
     }
 
     pub fn mac_call(&self, mac_call: &ast::MacCall) -> FormatResult {

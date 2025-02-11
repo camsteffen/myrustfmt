@@ -15,8 +15,11 @@ fn rustfmt_tests() {
 }
 
 fn rustfmt_tests_visit_path(path: &Path) {
-    let mut paths = Vec::from_iter(fs::read_dir(path).unwrap().map(|entry| entry.unwrap().path(
-    )));
+    let mut paths = Vec::from_iter(
+        fs::read_dir(path)
+            .unwrap()
+            .map(|entry| entry.unwrap().path()),
+    );
     paths.sort_unstable();
     for path in paths {
         if path.is_dir() {

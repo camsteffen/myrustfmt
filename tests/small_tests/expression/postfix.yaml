@@ -113,6 +113,13 @@
             gooooooey,
         },
     )
+- name: overflow method call with multiple args
+  type: no_change
+  in_block: true
+  formatted: |
+    aaaaaaaa.bbbbbbbb.ccccccc(xxxxxx, || {
+        x;
+    });
 - name: breakpoint on single line chain ending in method call with no args
   type: breakpoint
   in_block: true

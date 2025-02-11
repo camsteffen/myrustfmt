@@ -5,6 +5,7 @@ use crate::ast_formatter::list::list_item_context::ListItemContext;
 use crate::ast_formatter::list::overflow::{ListOverflow, ListOverflowNo, ListOverflowYes};
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListRest};
 use crate::ast_formatter::util::tail::Tail;
+use crate::constraints::MultiLineConstraint;
 use crate::error::FormatResult;
 
 /// Main entrypoint for formatting a list
@@ -139,7 +140,10 @@ where
     }
 
     pub fn format(&self, af: &AstFormatter) -> FormatResult {
-        self.do_format(af, Self::contents_default)
+        af.with_single_line_opt(
+            af.constraints().multi_line.get() == MultiLineConstraint::SingleLineLists,
+            || self.do_format(af, Self::contents_default),
+        )
     }
 
     pub fn format_single_line(&self, af: &AstFormatter) -> FormatResult {
