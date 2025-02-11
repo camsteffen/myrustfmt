@@ -158,8 +158,8 @@ fn format_module_file(
     config: Rc<Config>,
     on_format_module: &mut OnFormatModule,
 ) -> Result<Vec<Submodule>, ()> {
-    let result =
-        parse_module(CrateSource::File(path), relative).map_err(|ErrorGuaranteed { .. }| ())?;
+    let result = parse_module(CrateSource::File(path), relative)
+        .map_err(|ErrorGuaranteed { .. }| ())?;
     let ParseModuleResult {
         module,
         source,

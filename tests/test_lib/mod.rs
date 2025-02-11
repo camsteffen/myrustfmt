@@ -104,6 +104,7 @@ fn expect_formatted_equals(formatted: &str, expected: &str, name: &str) -> TestR
         }
     }
     Err(
-        format!("\"{name}\" formatted does not match expected").into(),
+        format!("\"{name}\" formatted does not match expected")
+            .into(),
     )
 }

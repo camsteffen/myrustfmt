@@ -121,7 +121,9 @@ impl AstFormatter {
         expr: &ast::Expr,
         format: impl FnOnce(&ast::Expr) -> FormatResult,
     ) -> FormatResult {
-        match plain_block(expr).and_then(|b| self.try_into_expr_only_block(b)) {
+        match plain_block(expr)
+            .and_then(|b| self.try_into_expr_only_block(b))
+        {
             None => format(expr),
             Some(ExprOnlyBlock(inner)) => {
                 self.out.skip_token("{")?;
