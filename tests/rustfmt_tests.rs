@@ -16,7 +16,9 @@ fn rustfmt_tests() {
 
 fn rustfmt_tests_visit_path(path: &Path) {
     let mut paths = Vec::from_iter(
-        fs::read_dir(path).unwrap().map(|entry| entry.unwrap().path()),
+        fs::read_dir(path)
+            .unwrap()
+            .map(|entry| entry.unwrap().path()),
     );
     paths.sort_unstable();
     for path in paths {
@@ -54,7 +56,8 @@ fn read_config_if_supported(file_name: &Path) -> Option<Config> {
 }
 
 fn read_config_values(file_name: &Path) -> Vec<(String, String)> {
-    let regex = regex::Regex::new(r"^\s*//\s*rustfmt-([^:]+):\s*(\S+)").unwrap();
+    let regex = regex::Regex::new(r"^\s*//\s*rustfmt-([^:]+):\s*(\S+)")
+        .unwrap();
 
     BufReader::new(fs::File::open(file_name).unwrap())
         .lines()

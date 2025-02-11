@@ -8,7 +8,7 @@ use rustc_ast::ast;
 use std::ops::ControlFlow;
 
 // In rustfmt, this is called chain_width, and is 60 by default
-const POSTFIX_CHAIN_MAX_WIDTH: u32 = 70;
+const POSTFIX_CHAIN_MAX_WIDTH: u32 = 60;
 /// Don't apply chain max width unless the chain item's distance from the start
 /// of the chain is at least this much.
 const POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH: u32 = 15;

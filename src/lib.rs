@@ -140,7 +140,9 @@ pub fn format_module_file_roots(
             let submodules =
                 format_module_file(&path, relative, Rc::clone(&config), &mut on_format_module)?;
             queue.extend(
-                submodules.into_iter().map(|submod| (submod.path, submod.relative)),
+                submodules
+                    .into_iter()
+                    .map(|submod| (submod.path, submod.relative)),
             );
         }
         if on_format_module.has_errors {
