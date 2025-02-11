@@ -2,9 +2,45 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::control_flow_expr_kind;
 use crate::error::FormatResult;
+use crate::util::whitespace_utils::is_whitespace;
 use rustc_ast::ast;
+use rustc_span::Pos;
+
+/// A block that contains only a single expression, no semicolon, and no comments.
+/// This may be written on one line.
+#[derive(Clone, Copy)]
+pub struct ExprOnlyBlock<'a>(pub &'a ast::Expr);
 
 impl AstFormatter {
+    pub fn block_expr(
+        &self,
+        label: Option<ast::Label>,
+        block: &ast::Block,
+        tail: &Tail,
+    ) -> FormatResult {
+        self.label(label)?;
+        self.out.token("{")?;
+        match self.try_into_expr_only_block(block) {
+            None => {
+                self.block_generic_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))?;
+                self.tail(tail)?;
+            }
+            Some(expr_only_block) => self
+                .backtrack()
+                .next_single_line(|| {
+                    self.expr_only_block_after_open_brace(expr_only_block)?;
+                    self.tail(tail)?;
+                    Ok(())
+                })
+                .otherwise(|| {
+                    self.block_generic_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))?;
+                    self.tail(tail)?;
+                    Ok(())
+                })?,
+        }
+        Ok(())
+    }
+
     pub fn block_separate_lines(&self, block: &ast::Block) -> FormatResult {
         self.out.token("{")?;
         self.block_separate_lines_after_open_brace(block)?;
@@ -12,9 +48,7 @@ impl AstFormatter {
     }
 
     pub fn block_separate_lines_after_open_brace(&self, block: &ast::Block) -> FormatResult {
-        self.block_generic_after_open_brace(&block.stmts, |stmt| {
-            self.stmt(stmt)
-        })
+        self.block_generic_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))
     }
 
     pub fn block_generic<T>(
@@ -74,5 +108,42 @@ impl AstFormatter {
                 })
             }
         }
+    }
+
+    /// `{ expr }` -> `expr`
+    ///
+    /// If a block contains only an expression, return the expression.
+    /// This may be used together with `plain_block`.
+    pub fn try_into_expr_only_block<'a>(&self, block: &'a ast::Block) -> Option<ExprOnlyBlock<'a>> {
+        let [stmt] = &block.stmts[..] else {
+            return None;
+        };
+        let ast::StmtKind::Expr(expr) = &stmt.kind else {
+            return None;
+        };
+        if !expr.attrs.is_empty() {
+            return None;
+        }
+        let source = self.out.source();
+        let before_expr = &source[block.span.lo().to_usize() + 1..expr.span.lo().to_usize()];
+        let after_expr = &source[expr.span.hi().to_usize()..block.span.hi().to_usize() - 1];
+        if !(is_whitespace(before_expr) && is_whitespace(after_expr)) {
+            // there are comments before or after the expression
+            return None;
+        }
+        Some(ExprOnlyBlock(expr))
+    }
+
+    pub fn expr_only_block(&self, expr_only_block: ExprOnlyBlock) -> FormatResult {
+        self.out.token("{")?;
+        self.expr_only_block_after_open_brace(expr_only_block)?;
+        Ok(())
+    }
+
+    pub fn expr_only_block_after_open_brace(&self, expr_only_block: ExprOnlyBlock) -> FormatResult {
+        self.out.space()?;
+        self.expr(expr_only_block.0)?;
+        self.out.space_token("}")?;
+        Ok(())
     }
 }
