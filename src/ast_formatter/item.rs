@@ -182,11 +182,13 @@ impl AstFormatter {
                     first_part()?;
                     Ok(false)
                 })
-                .otherwise(|| self.indented(|| {
-                    self.out.newline_within_indent()?;
-                    first_part()?;
-                    Ok(true)
-                }))?
+                .otherwise(|| {
+                    self.indented(|| {
+                        self.out.newline_within_indent()?;
+                        first_part()?;
+                        Ok(true)
+                    })
+                })?
         } else {
             self.out.space()?;
             first_part()?;
@@ -200,12 +202,14 @@ impl AstFormatter {
                     self.ty(&impl_.self_ty)?;
                     Ok(())
                 })
-                .otherwise(|| self.indented_optional(!indented, || {
-                    self.out.newline_within_indent()?;
-                    self.out.token_space("for")?;
-                    self.ty(&impl_.self_ty)?;
-                    Ok(())
-                }))?;
+                .otherwise(|| {
+                    self.indented_optional(!indented, || {
+                        self.out.newline_within_indent()?;
+                        self.out.token_space("for")?;
+                        self.ty(&impl_.self_ty)?;
+                        Ok(())
+                    })
+                })?;
         }
         self.where_clause(&impl_.generics.where_clause)?;
         if impl_.generics.where_clause.is_empty() {

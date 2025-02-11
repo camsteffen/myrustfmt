@@ -21,9 +21,10 @@ impl AstFormatter {
         // todo make my own attribute? or comment?
         self.attrs(attrs)?;
         if attrs.iter().any(is_rustfmt_skip) {
-            self.out.constraints().max_width.with_replaced(None, || {
-                self.out.copy_span(span)
-            })
+            self.out
+                .constraints()
+                .max_width
+                .with_replaced(None, || self.out.copy_span(span))
         } else {
             f()
         }

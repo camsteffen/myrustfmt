@@ -130,7 +130,12 @@ impl AstFormatter {
                     ast::RangeLimits::Closed => "..=",
                     ast::RangeLimits::HalfOpen => "..",
                 };
-                self.range(start.as_deref(), sigil, end.as_deref(), take_tail())?
+                self.range(
+                    start.as_deref(),
+                    sigil,
+                    end.as_deref(),
+                    take_tail(),
+                )?
             }
             ast::ExprKind::Underscore => todo!(),
             ast::ExprKind::Path(ref qself, ref path) => self.qpath(qself, path, true)?,
@@ -216,10 +221,11 @@ impl AstFormatter {
                         .multi_line
                         .with_replaced(multi_line_constraint, || af.expr(expr))
                 }
-                ListStrategy::SeparateLines if list.len() > 1 => af
-                    .backtrack()
-                    .next(|| af.constraints().with_indent_middle(|| af.expr(expr)))
-                    .otherwise(|| af.expr_add_block(expr)),
+                ListStrategy::SeparateLines if list.len() > 1 => {
+                    af.backtrack()
+                        .next(|| af.constraints().with_indent_middle(|| af.expr(expr)))
+                        .otherwise(|| af.expr_add_block(expr))
+                }
                 _ => af.expr(expr),
             })
         }
@@ -255,7 +261,9 @@ impl AstFormatter {
                     };
                     let is_single_line = af.out.constraints().requires_indent_middle()
                         && af.out.line() != first_line;
-                    af.with_single_line_opt(is_single_line, || af.expr_tail(end, tail))?;
+                    af.with_single_line_opt(is_single_line, || {
+                        af.expr_tail(end, tail)
+                    })?;
                     Ok(())
                 }),
             )?;
@@ -381,31 +389,34 @@ impl AstFormatter {
     }
 
     pub fn token_expr_open_brace(&self, token: &str, expr: &ast::Expr) -> FormatResult<bool> {
-        self.with_single_line_opt(self.constraints().requires_indent_middle(), || {
-            let first_line = self.out.line();
-            self.out.token_space(token)?;
-            self.expr(expr)?;
-            let force_newline = self.out.line() != first_line
-                && self.out.with_last_line(|line| {
-                    let after_indent = &line[self.out.constraints().indent.get() as usize..];
-                    after_indent
-                        .chars()
-                        .any(|c| !matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
-                });
-            let newline_open_block = || {
-                self.out.newline_within_indent()?;
-                self.out.token("{")?;
-                Ok(())
-            };
-            if force_newline {
-                newline_open_block()?;
-            } else {
-                self.backtrack()
-                    .next_single_line(|| self.out.space_token("{"))
-                    .otherwise(newline_open_block)?;
-            }
-            Ok(self.out.line() == first_line)
-        })
+        self.with_single_line_opt(
+            self.constraints().requires_indent_middle(),
+            || {
+                let first_line = self.out.line();
+                self.out.token_space(token)?;
+                self.expr(expr)?;
+                let force_newline = self.out.line() != first_line
+                    && self.out.with_last_line(|line| {
+                        let after_indent = &line[self.out.constraints().indent.get() as usize..];
+                        after_indent
+                            .chars()
+                            .any(|c| !matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
+                    });
+                let newline_open_block = || {
+                    self.out.newline_within_indent()?;
+                    self.out.token("{")?;
+                    Ok(())
+                };
+                if force_newline {
+                    newline_open_block()?;
+                } else {
+                    self.backtrack()
+                        .next_single_line(|| self.out.space_token("{"))
+                        .otherwise(newline_open_block)?;
+                }
+                Ok(self.out.line() == first_line)
+            },
+        )
     }
 
     pub fn mac_call(&self, mac_call: &ast::MacCall) -> FormatResult {

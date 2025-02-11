@@ -56,12 +56,16 @@ impl AstFormatter {
     pub fn with_width_limit_first_line<T>(&self, width_limit: u32, f: impl FnOnce() -> T) -> T {
         let line = self.out.line();
         let max_width = self.out.last_line_len() + width_limit;
-        if self.constraints().max_width.get().is_some_and(|mw| {
-            max_width >= mw
-        })
-            || self.constraints().max_width_for_line.get().is_some_and(
-                |m| m.line == line && m.max_width <= max_width,
-            )
+        if self
+            .constraints()
+            .max_width
+            .get()
+            .is_some_and(|mw| max_width >= mw)
+            || self
+                .constraints()
+                .max_width_for_line
+                .get()
+                .is_some_and(|m| m.line == line && m.max_width <= max_width)
         {
             return f();
         }
@@ -145,9 +149,12 @@ impl AstFormatter {
         f: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         let max_width = self.out.last_line_len() + width_limit;
-        if self.constraints().max_width.get().is_some_and(|m| {
-            m <= max_width
-        }) {
+        if self
+            .constraints()
+            .max_width
+            .get()
+            .is_some_and(|m| m <= max_width)
+        {
             f()
         } else {
             self.constraints()

@@ -28,7 +28,7 @@ pub enum MultiLineConstraint {
     IndentMiddle,
     /// Same as IndentMiddle, but also disallow multi-line prefix chains and postfix chains
     SingleLineChains,
-    /// Same as SingleLineChains, but also disallow multi-line lists or overflow in lists
+    /// Same as SingleLineChains, but also disallow multi-line lists and overflow in lists
     SingleLineLists,
     /// No newline characters allowed (enforced by ConstraintWriter)
     SingleLine,

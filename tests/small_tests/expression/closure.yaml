@@ -24,3 +24,16 @@
     let x = || match x {
         _ => {}
     };
+- name: body is call with closure
+  type: before_after
+  in_block: true
+  before: |
+    || foo(|| {
+        x;
+    })
+  after: |
+    || {
+        foo(|| {
+            x;
+        })
+    }

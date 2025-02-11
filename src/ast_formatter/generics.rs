@@ -32,10 +32,12 @@ impl AstFormatter {
                 self.ty(ty)?;
             }
             ast::GenericParamKind::Lifetime => {}
-            ast::GenericParamKind::Type { ref default } => if let Some(default) = default {
-                self.out.space_token_space("=")?;
-                self.ty(default)?;
-            },
+            ast::GenericParamKind::Type { ref default } => {
+                if let Some(default) = default {
+                    self.out.space_token_space("=")?;
+                    self.ty(default)?;
+                }
+            }
         }
         Ok(())
     }

@@ -5,6 +5,7 @@ use crate::error::FormatResult;
 
 use crate::ast_formatter::list::builder::list;
 use crate::ast_formatter::list::list_config::ParamListConfig;
+use crate::constraints::MultiLineConstraint;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
 use rustc_span::symbol::kw;
@@ -106,7 +107,9 @@ impl AstFormatter {
             self.backtrack()
                 .next(|| {
                     self.constraints()
-                        .with_single_line_chains(|| self.expr_tail(body, tail))
+                        .with_multi_line_constraint(MultiLineConstraint::SingleLineLists, || {
+                            self.expr_tail(body, tail)
+                        })
                 })
                 .otherwise(|| {
                     self.expr_add_block(body)?;
