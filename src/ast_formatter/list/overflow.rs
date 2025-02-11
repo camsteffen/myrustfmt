@@ -174,18 +174,21 @@ impl Overflow for ast::Expr {
             | ast::ExprKind::Call(..)
             | ast::ExprKind::MacCall(..)
             | ast::ExprKind::Struct(..)
-            | ast::ExprKind::Tup(..) => handler
-                .conditional_overflows(|is_only_list_item| is_only_list_item, || af.expr(expr)),
+            | ast::ExprKind::Tup(..) => {
+                handler
+                    .conditional_overflows(|is_only_list_item| is_only_list_item, || af.expr(expr))
+            }
             // | ast::ExprKind::MethodCall(..) if is_only_list_item => H::overflows(|| af.dot_chain(expr, Tail::NONE, true)),
             // prefix
-            ast::ExprKind::AddrOf(borrow_kind, mutability, ref target) => handler
-                .conditional_overflows(
+            ast::ExprKind::AddrOf(borrow_kind, mutability, ref target) => {
+                handler.conditional_overflows(
                     |is_only_list_item| Overflow::check_if_overflows(af, target, is_only_list_item),
                     || {
                         af.addr_of(borrow_kind, mutability)?;
                         Overflow::format(af, target)
                     },
-                ),
+                )
+            }
             ast::ExprKind::Cast(ref target, _) => handler.conditional_overflows(
                 |is_only_list_item| Overflow::check_if_overflows(af, target, is_only_list_item),
                 || todo!(),
@@ -214,9 +217,7 @@ impl Overflow for ast::MetaItemInner {
             ast::MetaItemInner::MetaItem(meta_item) => {
                 if matches!(meta_item.kind, ast::MetaItemKind::Word) {
                     H::overflows(|| af.meta_item(meta_item))
-                } else {
-                    H::no_overflow()
-                }
+                } else { H::no_overflow() }
             }
         }
     }

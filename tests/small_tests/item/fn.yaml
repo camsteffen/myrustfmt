@@ -1,0 +1,7 @@
+- name: where clause
+  type: no_change
+  formatted: |
+    fn test()
+    where
+        T: Copy,
+    {}

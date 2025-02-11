@@ -42,14 +42,18 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn where_clause(&self, where_clause: &ast::WhereClause) -> FormatResult {
+    pub fn where_clause(
+        &self,
+        where_clause: &ast::WhereClause,
+        is_before_body: bool,
+    ) -> FormatResult<bool> {
         if where_clause.is_empty() {
-            return Ok(());
+            return Ok(false);
         }
         self.out.newline_within_indent()?;
         self.out.token("where")?;
         self.indented(|| {
-            for pred in &where_clause.predicates {
+            for (i, pred) in where_clause.predicates.iter().enumerate() {
                 self.out.newline_within_indent()?;
                 match &pred.kind {
                     ast::WherePredicateKind::BoundPredicate(pred) => {
@@ -60,11 +64,15 @@ impl AstFormatter {
                     ast::WherePredicateKind::RegionPredicate(_) => todo!(),
                     ast::WherePredicateKind::EqPredicate(_) => todo!(),
                 }
-                self.out.token(",")?;
+                if is_before_body || i < where_clause.predicates.len() - 1 {
+                    self.out.token_maybe_missing(",")?;
+                }
             }
             Ok(())
         })?;
-        self.out.newline_within_indent()?;
-        Ok(())
+        if is_before_body {
+            self.out.newline_within_indent()?;
+        }
+        Ok(true)
     }
 }

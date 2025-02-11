@@ -211,8 +211,7 @@ impl AstFormatter {
                     })
                 })?;
         }
-        self.where_clause(&impl_.generics.where_clause)?;
-        if impl_.generics.where_clause.is_empty() {
+        if !self.where_clause(&impl_.generics.where_clause, true)? {
             self.out.space()?;
         }
         self.block_generic(&impl_.items, |item| {

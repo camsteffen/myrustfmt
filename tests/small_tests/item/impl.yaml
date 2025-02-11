@@ -1,0 +1,7 @@
+- name: impl with where clause
+  type: no_change
+  formatted: |
+    impl<T> X
+    where
+        T: Copy,
+    {}

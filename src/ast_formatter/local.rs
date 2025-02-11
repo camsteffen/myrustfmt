@@ -41,7 +41,7 @@ impl AstFormatter {
         };
         self.local_init(init, Tail::none())?;
         let else_block = || {
-            self.block_after_open_brace(else_)?;
+            self.block_separate_lines_after_open_brace(else_)?;
             self.out.token(";")?;
             Ok(())
         };
@@ -49,9 +49,9 @@ impl AstFormatter {
             .next(|| {
                 self.out.space_token_space("else")?;
                 self.out.token("{")?;
-                match self.expr_only_block(else_) {
+                match self.try_into_expr_only_block(else_) {
                     None => else_block()?,
-                    Some(else_expr) => {
+                    Some(else_expr_only_block) => {
                         self.backtrack()
                             .next(|| {
                                 self.with_width_limit_from_start(
@@ -60,9 +60,9 @@ impl AstFormatter {
                                     RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
                                     || {
                                         self.with_single_line(|| {
-                                            self.out.space()?;
-                                            self.expr(else_expr)?;
-                                            self.out.space_token("}")?;
+                                            self.expr_only_block_after_open_brace(
+                                                else_expr_only_block,
+                                            )?;
                                             self.out.token(";")?;
                                             Ok(())
                                         })

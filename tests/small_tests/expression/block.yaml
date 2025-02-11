@@ -1,0 +1,17 @@
+- name: empty
+  type: no_change
+  in_block: true
+  formatted: |
+    {}
+- name: single expression
+  type: no_change
+  in_block: true
+  formatted: |
+    { x }
+- name: with statement
+  type: no_change
+  in_block: true
+  formatted: |
+    {
+        x;
+    }

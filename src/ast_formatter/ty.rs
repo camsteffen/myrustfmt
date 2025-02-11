@@ -39,13 +39,15 @@ impl AstFormatter {
             ast::TyKind::PinnedRef(_lifetime, _mut_ty) => todo!(),
             ast::TyKind::BareFn(bare_fn_ty) => self.bare_fn_ty(bare_fn_ty)?,
             ast::TyKind::Never => self.out.token("!")?,
-            ast::TyKind::Tup(elements) => list(Braces::PARENS, elements, |af, ty, _lcx| af.ty(ty))
-                .config(TupleListConfig {
-                    len: elements.len(),
-                    single_line_max_contents_width: None,
-                })
-                .tail(take_tail())
-                .format(self)?,
+            ast::TyKind::Tup(elements) => {
+                list(Braces::PARENS, elements, |af, ty, _lcx| af.ty(ty))
+                    .config(TupleListConfig {
+                        len: elements.len(),
+                        single_line_max_contents_width: None,
+                    })
+                    .tail(take_tail())
+                    .format(self)?
+            }
             ast::TyKind::Path(qself, path) => self.qpath(qself, path, false)?,
             ast::TyKind::TraitObject(bounds, syntax) => {
                 match syntax {
@@ -101,7 +103,12 @@ impl AstFormatter {
     }
 
     pub fn generic_bounds(&self, bounds: &[ast::GenericBound]) -> FormatResult {
-        self.simple_infix_chain("+", bounds, |b| self.generic_bound(b), true)
+        self.simple_infix_chain(
+            "+",
+            bounds,
+            |b| self.generic_bound(b),
+            true,
+        )
     }
 
     fn generic_bound(&self, bound: &ast::GenericBound) -> FormatResult {

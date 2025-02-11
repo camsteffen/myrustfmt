@@ -9,6 +9,7 @@ use crate::ast_formatter::list::builder::{ListBuilderTrait, list};
 use crate::ast_formatter::list::list_config::{
     ArrayListConfig, CallParamListConfig, TupleListConfig, struct_field_list_config,
 };
+use crate::ast_formatter::util::expr_utils::ExprOnlyBlock;
 use crate::ast_utils::plain_block;
 use crate::ast_utils::postfix_expr_kind;
 use crate::constraints::MultiLineConstraint;
@@ -32,7 +33,10 @@ impl AstFormatter {
                     .tail(take_tail())
                     .format(self)?
             }
-            ast::ExprKind::ConstBlock(_) => todo!(),
+            ast::ExprKind::ConstBlock(ref anon_const) => {
+                self.out.token_space("const")?;
+                self.anon_const_tail(anon_const, take_tail())?;
+            }
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, take_tail())?,
             postfix_expr_kind!() => self.postfix_chain(expr, take_tail())?,
             ast::ExprKind::Tup(ref items) => {
@@ -95,22 +99,19 @@ impl AstFormatter {
                 self.out.space_token_space("in")?;
                 self.expr(iter)?;
                 self.out.space()?;
-                self.block(body)?;
+                self.block_separate_lines(body)?;
             }
             ast::ExprKind::Loop(ref block, label, _) => {
                 self.label(label)?;
                 self.out.token_space("loop")?;
-                self.block(block)?;
+                self.block_separate_lines(block)?;
             }
             ast::ExprKind::Match(ref scrutinee, ref arms, match_kind) => match match_kind {
                 ast::MatchKind::Postfix => todo!(),
                 ast::MatchKind::Prefix => self.match_(scrutinee, arms)?,
             },
             ast::ExprKind::Closure(ref closure) => self.closure(closure, take_tail())?,
-            ast::ExprKind::Block(ref block, label) => {
-                self.label(label)?;
-                self.block(block)?;
-            }
+            ast::ExprKind::Block(ref block, label) => self.block_expr(label, block, take_tail())?,
             ast::ExprKind::Gen(_, _, _, _) => todo!(),
             ast::ExprKind::TryBlock(_) => todo!(),
             ast::ExprKind::Assign(ref left, ref right, _) => {
@@ -215,9 +216,7 @@ impl AstFormatter {
                         // todo need this? and do we need this variant at all?
                         MultiLineConstraint::SingleLineLists
                         // MultiLineConstraint::SingleLineChains
-                    } else {
-                        MultiLineConstraint::SingleLineChains
-                    };
+                    } else { MultiLineConstraint::SingleLineChains };
                     af.constraints()
                         .multi_line
                         .with_replaced(multi_line_constraint, || af.expr(expr))
@@ -234,6 +233,44 @@ impl AstFormatter {
 
     pub fn anon_const(&self, anon_const: &ast::AnonConst) -> FormatResult {
         self.expr(&anon_const.value)
+    }
+
+    pub fn anon_const_tail(&self, anon_const: &ast::AnonConst, tail: &Tail) -> FormatResult {
+        self.expr_tail(&anon_const.value, tail)
+    }
+
+    fn block_expr(
+        &self,
+        label: Option<ast::Label>,
+        block: &ast::Block,
+        tail: &Tail,
+    ) -> FormatResult {
+        self.label(label)?;
+        self.out.token("{")?;
+        match self.try_into_expr_only_block(block) {
+            None => {
+                self.block_generic_after_open_brace(&block.stmts, |stmt| {
+                    self.stmt(stmt)
+                })?;
+                self.tail(tail)?;
+            }
+            Some(expr_only_block) => {
+                self.backtrack()
+                    .next_single_line(|| {
+                        self.expr_only_block_after_open_brace(expr_only_block)?;
+                        self.tail(tail)?;
+                        Ok(())
+                    })
+                    .otherwise(|| {
+                        self.block_generic_after_open_brace(&block.stmts, |stmt| {
+                            self.stmt(stmt)
+                        })?;
+                        self.tail(tail)?;
+                        Ok(())
+                    })?
+            }
+        }
+        Ok(())
     }
 
     fn label(&self, label: Option<ast::Label>) -> FormatResult {
@@ -340,7 +377,7 @@ impl AstFormatter {
         let is_single_line_cond = self.token_expr_open_brace("if", condition)?;
 
         let multiline = || {
-            self.block_after_open_brace(block)?;
+            self.block_separate_lines_after_open_brace(block)?;
             match else_ {
                 None => self.tail(tail)?,
                 Some(else_) => {
@@ -356,8 +393,8 @@ impl AstFormatter {
             let ast::ExprKind::Block(else_block, _) = &else_.kind else {
                 return None;
             };
-            let block_expr = self.expr_only_block(block)?;
-            let else_expr = self.expr_only_block(else_block)?;
+            let block_expr = self.try_into_expr_only_block(block)?;
+            let else_expr = self.try_into_expr_only_block(else_block)?;
             Some((block_expr, else_expr))
         };
 
@@ -370,13 +407,9 @@ impl AstFormatter {
                         start_pos,
                         RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
                         || {
-                            self.out.space()?;
-                            self.expr(block_expr)?;
-                            self.out.space_token_space("}")?;
-                            self.out.token_space("else")?;
-                            self.out.token_space("{")?;
-                            self.expr(else_expr)?;
-                            self.out.space_token("}")?;
+                            self.expr_only_block_after_open_brace(block_expr)?;
+                            self.out.space_token_space("else")?;
+                            self.expr_only_block(else_expr)?;
                             self.tail(tail)?;
                             Ok(())
                         },
@@ -454,13 +487,14 @@ impl AstFormatter {
 
     pub fn while_(&self, condition: &ast::Expr, block: &ast::Block) -> FormatResult {
         self.token_expr_open_brace("while", condition)?;
-        self.block_after_open_brace(block)?;
+        self.block_separate_lines_after_open_brace(block)?;
         Ok(())
     }
 
     // utils
 
     // todo test removing and adding blocks when there are comments
+    // todo should this ever be a single line block
     pub fn expr_add_block(&self, expr: &ast::Expr) -> FormatResult {
         self.out.token_insert("{")?;
         self.embraced_inside(|| self.expr(expr))?;
@@ -474,9 +508,11 @@ impl AstFormatter {
         expr: &ast::Expr,
         format: impl FnOnce(&ast::Expr) -> FormatResult,
     ) -> FormatResult {
-        match plain_block(expr).and_then(|b| self.expr_only_block(b)) {
+        match plain_block(expr)
+            .and_then(|b| self.try_into_expr_only_block(b))
+        {
             None => format(expr),
-            Some(inner) => {
+            Some(ExprOnlyBlock(inner)) => {
                 self.out.skip_token("{")?;
                 self.skip_single_expr_blocks(inner, format)?;
                 self.out.skip_token("}")?;

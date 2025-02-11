@@ -1,0 +1,26 @@
+- name: empty
+  type: no_change
+  in_block: true
+  formatted: |
+    const {}
+- name: single expression
+  type: no_change
+  in_block: true
+  formatted: |
+    const { x }
+- name: with statement
+  type: no_change
+  in_block: true
+  formatted: |
+    const {
+        x;
+    }
+- name: breakpoint to multi-line
+  type: breakpoint
+  in_block: true
+  before: |
+    const { x };
+  after: |
+    const {
+        x
+    };

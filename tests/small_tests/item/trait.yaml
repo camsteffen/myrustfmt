@@ -2,3 +2,21 @@
   type: no_change
   formatted: |
     trait X<T> {}
+- name: associated fn with where clause
+  type: no_change
+  formatted: |
+    trait X {
+        fn test<T, U>()
+        where
+            T: Copy,
+            U: Copy;
+    }
+- name: associated fn with where clause and body
+  type: no_change
+  formatted: |
+    trait X {
+        fn test<T, U>()
+        where
+            T: Copy,
+        {}
+    }

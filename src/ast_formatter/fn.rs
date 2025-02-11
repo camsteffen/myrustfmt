@@ -52,12 +52,12 @@ impl AstFormatter {
                 }
                 Ok(())
             })?;
-        self.where_clause(&generics.where_clause)?;
+        self.where_clause(&generics.where_clause, body.is_some())?;
         if let Some(body) = body {
             if is_block_after_decl {
-                self.block_after_open_brace(body)?;
+                self.block_separate_lines_after_open_brace(body)?;
             } else {
-                self.block(body)?;
+                self.block_separate_lines(body)?;
             }
         } else {
             self.out.token(";")?;

@@ -5,13 +5,13 @@ use crate::error::FormatResult;
 use rustc_ast::ast;
 
 impl AstFormatter {
-    pub fn block(&self, block: &ast::Block) -> FormatResult {
+    pub fn block_separate_lines(&self, block: &ast::Block) -> FormatResult {
         self.out.token("{")?;
-        self.block_after_open_brace(block)?;
+        self.block_separate_lines_after_open_brace(block)?;
         Ok(())
     }
 
-    pub fn block_after_open_brace(&self, block: &ast::Block) -> FormatResult {
+    pub fn block_separate_lines_after_open_brace(&self, block: &ast::Block) -> FormatResult {
         self.block_generic_after_open_brace(&block.stmts, |stmt| {
             self.stmt(stmt)
         })
@@ -52,9 +52,7 @@ impl AstFormatter {
             ast::StmtKind::Expr(expr) => {
                 let tail = if matches!(expr.kind, control_flow_expr_kind!()) {
                     &Tail::token_insert(";")
-                } else {
-                    Tail::none()
-                };
+                } else { Tail::none() };
                 self.expr_tail(expr, tail)
             }
             ast::StmtKind::Semi(expr) => self.expr_tail(expr, &Tail::token(";")),

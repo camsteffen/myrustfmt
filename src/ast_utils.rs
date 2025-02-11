@@ -1,15 +1,16 @@
 use rustc_ast::ast;
 use rustc_span::{Symbol, sym};
 
-macro_rules! block_like_expr_kind {
-    () => {
-        ast::ExprKind::Block(..)
-            | ast::ExprKind::ConstBlock(_)
-            | ast::ExprKind::Gen(..)
-            | ast::ExprKind::TryBlock(..)
-    };
-}
-pub(crate) use block_like_expr_kind;
+// todo needed?
+// macro_rules! block_like_expr_kind {
+//     () => {
+//         ast::ExprKind::Block(..)
+//             | ast::ExprKind::ConstBlock(_)
+//             | ast::ExprKind::Gen(..)
+//             | ast::ExprKind::TryBlock(..)
+//     };
+// }
+// pub(crate) use block_like_expr_kind;
 
 macro_rules! control_flow_expr_kind {
     () => {
@@ -97,10 +98,6 @@ pub fn arm_body_requires_block(expr: &ast::Expr) -> bool {
 pub fn is_rustfmt_skip(attr: &ast::Attribute) -> bool {
     static PATH: [Symbol; 2] = [sym::rustfmt, sym::skip];
     attr.path_matches(&PATH)
-}
-
-pub fn is_plain_block(expr: &ast::Expr) -> bool {
-    plain_block(expr).is_some()
 }
 
 // a block with no label, no `async`, no `unsafe`

@@ -63,7 +63,9 @@ impl SourceFormatter {
         let mut tokens = rustc_lexer::tokenize(self.source.remaining());
         loop {
             let next_char = self.source.remaining().chars().next();
-            if !next_char.is_some_and(|c| c == '/' || rustc_lexer::is_whitespace(c)) {
+            if !next_char
+                .is_some_and(|c| c == '/' || rustc_lexer::is_whitespace(c))
+            {
                 // save the tokenizer some work
                 break;
             }
@@ -99,18 +101,14 @@ impl SourceFormatter {
             return Ok(());
         }
         match wcx.mode {
-            WhitespaceMode::Horizontal { space } => {
-                if space {
-                    self.out.token(" ")?;
-                    wcx.is_whitespace_mode_out = true;
-                }
-            }
-            WhitespaceMode::Vertical(kind) => {
-                if !matches!(kind, NewlineKind::IfComments) {
-                    self.out.newline()?;
-                    wcx.is_whitespace_mode_out = true;
-                }
-            }
+            WhitespaceMode::Horizontal { space } => if space {
+                self.out.token(" ")?;
+                wcx.is_whitespace_mode_out = true;
+            },
+            WhitespaceMode::Vertical(kind) => if !matches!(kind, NewlineKind::IfComments) {
+                self.out.newline()?;
+                wcx.is_whitespace_mode_out = true;
+            },
         }
         Ok(())
     }
@@ -134,7 +132,8 @@ impl SourceFormatter {
                 Out::Nothing
             }
             (2.., WhitespaceMode::Vertical(kind)) => {
-                let double = kind.allow_blank_line(wcx.is_comments_before, is_comments_after);
+                let double = kind
+                    .allow_blank_line(wcx.is_comments_before, is_comments_after);
                 Out::Newline { double }
             }
             (1, WhitespaceMode::Vertical(_)) => Out::Newline { double: false },
