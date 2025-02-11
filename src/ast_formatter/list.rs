@@ -46,17 +46,25 @@ impl AstFormatter {
                     return Ok(());
                 };
                 for (index, item) in until_last.iter().enumerate() {
-                    format_item(self, item, &ListItemContext {
-                        index,
-                        strategy: ListStrategy::SingleLine,
-                    })?;
+                    format_item(
+                        self,
+                        item,
+                        &ListItemContext {
+                            index,
+                            strategy: ListStrategy::SingleLine,
+                        },
+                    )?;
                     self.out.token_maybe_missing(",")?;
                     self.out.space()?;
                 }
-                format_item(self, last, &ListItemContext {
-                    index: list.len() - 1,
-                    strategy: ListStrategy::SingleLine,
-                })?;
+                format_item(
+                    self,
+                    last,
+                    &ListItemContext {
+                        index: list.len() - 1,
+                        strategy: ListStrategy::SingleLine,
+                    },
+                )?;
                 if !matches!(rest, ListRest::None) || force_trailing_comma {
                     self.out.token(",")?
                 } else {
@@ -162,10 +170,14 @@ impl AstFormatter {
         tail: &Tail,
     ) -> FormatResult {
         let item_comma = |index, item| -> FormatResult {
-            format_item(self, item, &ListItemContext {
-                index,
-                strategy: ListStrategy::SeparateLines,
-            })?;
+            format_item(
+                self,
+                item,
+                &ListItemContext {
+                    index,
+                    strategy: ListStrategy::SeparateLines,
+                },
+            )?;
             self.out.token_maybe_missing(",")?;
             Ok(())
         };

@@ -40,9 +40,11 @@ impl SourceFormatter {
     }
 
     pub fn new_defaults(source: impl Into<String>) -> SourceFormatter {
-        Self::new(Rc::new(source.into()), Constraints::default(), Rc::new(
-            ErrorEmitter::new(None),
-        ))
+        Self::new(
+            Rc::new(source.into()),
+            Constraints::default(),
+            Rc::new(ErrorEmitter::new(None)),
+        )
     }
 
     pub fn finish(self) -> FormatModuleResult {

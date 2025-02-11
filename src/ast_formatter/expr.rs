@@ -200,29 +200,27 @@ impl AstFormatter {
     ) -> impl Fn(&AstFormatter, &P<ast::Expr>, &ListItemContext) -> FormatResult {
         let outer_multi_line = self.constraints().multi_line.get();
         move |af, expr, lcx| {
-            af.skip_single_expr_blocks(expr, |expr| {
-                match lcx.strategy {
-                    ListStrategy::SingleLine
-                        if outer_multi_line < MultiLineConstraint::SingleLineLists
-                            && lcx.index == list.len() - 1 =>
-                    {
-                        let multi_line_constraint = if list.len() > 1 {
-                            // todo need this? and do we need this variant at all?
-                            MultiLineConstraint::SingleLineLists
-                            // MultiLineConstraint::SingleLineChains
-                        } else {
-                            MultiLineConstraint::SingleLineChains
-                        };
-                        af.constraints()
-                            .multi_line
-                            .with_replaced(dbg!(multi_line_constraint), || af.expr(expr))
-                    }
-                    ListStrategy::SeparateLines if list.len() > 1 => af
-                        .backtrack()
-                        .next(|| af.constraints().with_indent_middle(|| af.expr(expr)))
-                        .otherwise(|| af.expr_add_block(expr)),
-                    _ => af.expr(expr),
+            af.skip_single_expr_blocks(expr, |expr| match lcx.strategy {
+                ListStrategy::SingleLine
+                    if outer_multi_line < MultiLineConstraint::SingleLineLists
+                        && lcx.index == list.len() - 1 =>
+                {
+                    let multi_line_constraint = if list.len() > 1 {
+                        // todo need this? and do we need this variant at all?
+                        MultiLineConstraint::SingleLineLists
+                        // MultiLineConstraint::SingleLineChains
+                    } else {
+                        MultiLineConstraint::SingleLineChains
+                    };
+                    af.constraints()
+                        .multi_line
+                        .with_replaced(dbg!(multi_line_constraint), || af.expr(expr))
                 }
+                ListStrategy::SeparateLines if list.len() > 1 => af
+                    .backtrack()
+                    .next(|| af.constraints().with_indent_middle(|| af.expr(expr)))
+                    .otherwise(|| af.expr_add_block(expr)),
+                _ => af.expr(expr),
             })
         }
     }
