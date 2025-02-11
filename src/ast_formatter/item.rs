@@ -62,11 +62,11 @@ impl AstFormatter {
                 self.out.token_space("mod")?;
                 self.ident(item.ident)?;
                 match mod_kind {
-                    ast::ModKind::Loaded(items, ast::Inline::Yes, _mod_spans) => {
+                    ast::ModKind::Loaded(items, ast::Inline::Yes, ..) => {
                         self.out.space()?;
                         self.block_generic(items, |item| self.item(item))?;
                     }
-                    ast::ModKind::Loaded(_, ast::Inline::No, _) | ast::ModKind::Unloaded => {
+                    ast::ModKind::Loaded(_, ast::Inline::No, _, ..) | ast::ModKind::Unloaded => {
                         self.out.token(";")?;
                     }
                 }

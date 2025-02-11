@@ -12,6 +12,7 @@ impl From<ast::PatFieldsRest> for ListRest<'static> {
         match rest {
             ast::PatFieldsRest::None => ListRest::None,
             ast::PatFieldsRest::Rest => ListRest::Rest,
+            ast::PatFieldsRest::Recovered(_) => todo!(),
         }
     }
 }

@@ -23,6 +23,8 @@ impl AstFormatter {
         let mut take_tail = || tail.take().unwrap();
 
         match pat.kind {
+            ast::PatKind::Expr(ref expr) => self.expr_tail(expr, take_tail())?,
+            ast::PatKind::Guard(ref _pat, ref _cond) => todo!(),
             ast::PatKind::Wild => self.out.token("_")?,
             ast::PatKind::Ident(ast::BindingMode(by_ref, mutbl), ident, ref pat) => {
                 self.mutability(mutbl)?;
@@ -70,7 +72,6 @@ impl AstFormatter {
                 self.mutability(mutability)?;
                 self.pat(pat)?;
             }
-            ast::PatKind::Lit(_) => todo!(),
             ast::PatKind::Range(ref start, ref end, ref end_kind) => {
                 let sigil = match end_kind.node {
                     ast::RangeEnd::Excluded => "..",

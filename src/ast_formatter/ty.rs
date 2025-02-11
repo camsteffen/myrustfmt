@@ -72,6 +72,7 @@ impl AstFormatter {
             ast::TyKind::MacCall(_mac_call) => todo!(),
             ast::TyKind::CVarArgs => todo!(),
             ast::TyKind::Pat(_ty, _pat) => todo!(),
+            ast::TyKind::UnsafeBinder(..) => todo!(),
             ast::TyKind::Dummy => todo!(),
             ast::TyKind::Err(_) => todo!(),
         }

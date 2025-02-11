@@ -89,11 +89,9 @@ impl AstFormatter {
 
         self.with_single_line(|| self.postfix_items(before_overflow))?;
 
-        let before_overflow_count = before_overflow.len() as u32;
         self.postfix_chain_overflow_last_unless_separate_lines_preferred(
             overflowable,
             tail,
-            before_overflow_count,
         )?;
         Ok(())
     }
@@ -102,7 +100,6 @@ impl AstFormatter {
         &self,
         overflowable: &PostfixItem<'_>,
         tail: &Tail,
-        before_overflow_count: u32,
     ) -> FormatResult {
         let first_line = self.out.line();
         let checkpoint = self.open_checkpoint();

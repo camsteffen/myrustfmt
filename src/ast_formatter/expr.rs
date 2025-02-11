@@ -190,6 +190,7 @@ impl AstFormatter {
             ast::ExprKind::Become(_) => todo!(),
             ast::ExprKind::IncludedBytes(_) => todo!(),
             ast::ExprKind::FormatArgs(_) => todo!(),
+            ast::ExprKind::UnsafeBinderCast(..) => todo!(),
             ast::ExprKind::Err(_) => todo!(),
             ast::ExprKind::Dummy => todo!(),
         }
