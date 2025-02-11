@@ -9,13 +9,11 @@ use crate::ast_formatter::list::builder::{ListBuilderTrait, list};
 use crate::ast_formatter::list::list_config::{
     ArrayListConfig, CallParamListConfig, TupleListConfig, struct_field_list_config,
 };
-use crate::ast_utils::plain_block;
 use crate::ast_utils::postfix_expr_kind;
 use crate::constraints::MultiLineConstraint;
 use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
-use crate::ast_formatter::block::ExprOnlyBlock;
 
 impl AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
@@ -131,7 +129,12 @@ impl AstFormatter {
                     ast::RangeLimits::Closed => "..=",
                     ast::RangeLimits::HalfOpen => "..",
                 };
-                self.range(start.as_deref(), sigil, end.as_deref(), take_tail())?
+                self.range(
+                    start.as_deref(),
+                    sigil,
+                    end.as_deref(),
+                    take_tail(),
+                )?
             }
             ast::ExprKind::Underscore => todo!(),
             ast::ExprKind::Path(ref qself, ref path) => self.qpath(qself, path, true)?,
@@ -218,10 +221,11 @@ impl AstFormatter {
                         .multi_line
                         .with_replaced(multi_line_constraint, || af.expr(expr))
                 }
-                ListStrategy::SeparateLines if list.len() > 1 => af
-                    .backtrack()
-                    .next(|| af.constraints().with_indent_middle(|| af.expr(expr)))
-                    .otherwise(|| af.expr_add_block(expr)),
+                ListStrategy::SeparateLines if list.len() > 1 => {
+                    af.backtrack()
+                        .next(|| af.constraints().with_indent_middle(|| af.expr(expr)))
+                        .otherwise(|| af.expr_add_block(expr))
+                }
                 _ => af.expr(expr),
             })
         }
@@ -261,7 +265,9 @@ impl AstFormatter {
                     };
                     let is_single_line = af.out.constraints().requires_indent_middle()
                         && af.out.line() != first_line;
-                    af.with_single_line_opt(is_single_line, || af.expr_tail(end, tail))?;
+                    af.with_single_line_opt(is_single_line, || {
+                        af.expr_tail(end, tail)
+                    })?;
                     Ok(())
                 }),
             )?;
@@ -395,31 +401,34 @@ impl AstFormatter {
     }
 
     pub fn token_expr_open_brace(&self, token: &str, expr: &ast::Expr) -> FormatResult<bool> {
-        self.with_single_line_opt(self.constraints().requires_indent_middle(), || {
-            let first_line = self.out.line();
-            self.out.token_space(token)?;
-            self.expr(expr)?;
-            let force_newline = self.out.line() != first_line
-                && self.out.with_last_line(|line| {
-                    let after_indent = &line[self.out.constraints().indent.get() as usize..];
-                    after_indent
-                        .chars()
-                        .any(|c| !matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
-                });
-            let newline_open_block = || {
-                self.out.newline_within_indent()?;
-                self.out.token("{")?;
-                Ok(())
-            };
-            if force_newline {
-                newline_open_block()?;
-            } else {
-                self.backtrack()
-                    .next_single_line(|| self.out.space_token("{"))
-                    .otherwise(newline_open_block)?;
-            }
-            Ok(self.out.line() == first_line)
-        })
+        self.with_single_line_opt(
+            self.constraints().requires_indent_middle(),
+            || {
+                let first_line = self.out.line();
+                self.out.token_space(token)?;
+                self.expr(expr)?;
+                let force_newline = self.out.line() != first_line
+                    && self.out.with_last_line(|line| {
+                        let after_indent = &line[self.out.constraints().indent.get() as usize..];
+                        after_indent
+                            .chars()
+                            .any(|c| !matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
+                    });
+                let newline_open_block = || {
+                    self.out.newline_within_indent()?;
+                    self.out.token("{")?;
+                    Ok(())
+                };
+                if force_newline {
+                    newline_open_block()?;
+                } else {
+                    self.backtrack()
+                        .next_single_line(|| self.out.space_token("{"))
+                        .otherwise(newline_open_block)?;
+                }
+                Ok(self.out.line() == first_line)
+            },
+        )
     }
 
     pub fn mac_call(&self, mac_call: &ast::MacCall) -> FormatResult {
@@ -458,33 +467,5 @@ impl AstFormatter {
         self.token_expr_open_brace("while", condition)?;
         self.block_separate_lines_after_open_brace(block)?;
         Ok(())
-    }
-
-    // utils
-
-    // todo test removing and adding blocks when there are comments
-    // todo should this ever be a single line block
-    pub fn expr_add_block(&self, expr: &ast::Expr) -> FormatResult {
-        self.out.token_insert("{")?;
-        self.embraced_inside(|| self.expr(expr))?;
-        self.out.token_insert("}")?;
-        Ok(())
-    }
-
-    /// `{{{ expr }}}` -> `expr`
-    pub fn skip_single_expr_blocks(
-        &self,
-        expr: &ast::Expr,
-        format: impl FnOnce(&ast::Expr) -> FormatResult,
-    ) -> FormatResult {
-        match plain_block(expr).and_then(|b| self.try_into_expr_only_block(b)) {
-            None => format(expr),
-            Some(ExprOnlyBlock(inner)) => {
-                self.out.skip_token("{")?;
-                self.skip_single_expr_blocks(inner, format)?;
-                self.out.skip_token("}")?;
-                Ok(())
-            }
-        }
     }
 }
