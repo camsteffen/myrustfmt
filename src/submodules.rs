@@ -71,7 +71,9 @@ impl Visitor<'_> for SubmoduleVisitor<'_> {
                     let submodule = if let Some(path) = path_from_attr {
                         let relative = None;
                         Submodule { path, relative }
-                    } else { self.find_external_module(item) };
+                    } else {
+                        self.find_external_module(item)
+                    };
                     self.submodules.push(submodule);
                 }
             }

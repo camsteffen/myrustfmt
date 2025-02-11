@@ -216,7 +216,9 @@ impl AstFormatter {
                         // todo need this? and do we need this variant at all?
                         MultiLineConstraint::SingleLineLists
                         // MultiLineConstraint::SingleLineChains
-                    } else { MultiLineConstraint::SingleLineChains };
+                    } else {
+                        MultiLineConstraint::SingleLineChains
+                    };
                     af.constraints()
                         .multi_line
                         .with_replaced(multi_line_constraint, || af.expr(expr))
@@ -366,28 +368,13 @@ impl AstFormatter {
         self.out.copy_span(delim_args.dspan.entire())
     }
 
-    fn if_(
+    fn if_<'a>(
         &self,
         condition: &ast::Expr,
-        block: &ast::Block,
-        else_: Option<&ast::Expr>,
+        block: &'a ast::Block,
+        else_: Option<&'a ast::Expr>,
         tail: &Tail,
     ) -> FormatResult {
-        let start_pos = self.out.last_line_len();
-        let is_single_line_cond = self.token_expr_open_brace("if", condition)?;
-
-        let multiline = || {
-            self.block_separate_lines_after_open_brace(block)?;
-            match else_ {
-                None => self.tail(tail)?,
-                Some(else_) => {
-                    self.out.space_token_space("else")?;
-                    self.expr_tail(else_, tail)?;
-                }
-            }
-            Ok(())
-        };
-
         let single_line_parts = || {
             let else_ = else_?;
             let ast::ExprKind::Block(else_block, _) = &else_.kind else {
@@ -397,6 +384,34 @@ impl AstFormatter {
             let else_expr = self.try_into_expr_only_block(else_block)?;
             Some((block_expr, else_expr))
         };
+
+        let multiline = || {
+            let (mut block, mut else_) = (block, else_);
+            loop {
+                self.block_separate_lines_after_open_brace(block)?;
+                match else_ {
+                    None => break self.tail(tail),
+                    Some(else_expr) => {
+                        self.out.space_token_space("else")?;
+                        match &else_expr.kind {
+                            ast::ExprKind::Block(block, _) => {
+                                self.block_separate_lines(block)?;
+                                self.tail(tail)?;
+                                break Ok(());
+                            }
+                            ast::ExprKind::If(condition, next_block, next_else) => {
+                                self.token_expr_open_brace("if", condition)?;
+                                (block, else_) = (next_block, next_else.as_deref());
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                }
+            }
+        };
+
+        let start_pos = self.out.last_line_len();
+        let is_single_line_cond = self.token_expr_open_brace("if", condition)?;
 
         if !is_single_line_cond {
             multiline()?;

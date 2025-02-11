@@ -89,10 +89,7 @@ impl AstFormatter {
 
         self.with_single_line(|| self.postfix_items(before_overflow))?;
 
-        self.postfix_chain_overflow_last_unless_separate_lines_preferred(
-            overflowable,
-            tail,
-        )?;
+        self.postfix_chain_overflow_last_unless_separate_lines_preferred(overflowable, tail)?;
         Ok(())
     }
 

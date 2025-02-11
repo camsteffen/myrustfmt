@@ -25,7 +25,9 @@ impl AstFormatter {
                 .constraints()
                 .max_width
                 .with_replaced(None, || self.out.copy_span(span))
-        } else { f() }
+        } else {
+            f()
+        }
     }
 
     fn attrs(&self, attrs: &[ast::Attribute]) -> FormatResult {

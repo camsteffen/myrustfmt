@@ -24,7 +24,9 @@ impl AstFormatter {
             let (as_path, rest) = path.segments.split_at(qself.position);
             self.path_segments(as_path, false)?;
             rest
-        } else { &path.segments };
+        } else {
+            &path.segments
+        };
         self.out.token(">")?;
         self.out.token("::")?;
         self.path_segments(rest, turbofish)?;

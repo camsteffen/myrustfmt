@@ -77,15 +77,15 @@ impl AstFormatter {
     }
 
     fn arm_body(&self, body: &ast::Expr) -> FormatResult {
-        if arm_body_requires_block(body) {
-            self.expr_add_block(body)?;
-        } else {
-            self.skip_single_expr_blocks(body, |body| {
-                if plain_block(body).is_some() {
-                    self.expr(body)
-                } else { self.arm_body_add_block_if_first_line_is_longer(body) }
-            })?;
-        }
+        self.skip_single_expr_blocks(body, |body| {
+            if arm_body_requires_block(body) {
+                self.expr_add_block(body)
+            } else if plain_block(body).is_some() {
+                self.expr(body)
+            } else {
+                self.arm_body_add_block_if_first_line_is_longer(body)
+            }
+        })?;
         self.out.skip_token_if_present(",")?;
         Ok(())
     }
@@ -161,7 +161,9 @@ impl AstFormatter {
         let (backtrack, should_add_block) = return_if_break!(result);
         if should_add_block {
             backtrack.otherwise(|| self.expr_add_block(body))
-        } else { self.arm_body_same_line(body, backtrack) }
+        } else {
+            self.arm_body_same_line(body, backtrack)
+        }
     }
 
     fn arm_body_same_line(&self, body: &ast::Expr, backtrack: Backtrack) -> FormatResult {

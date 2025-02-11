@@ -67,7 +67,9 @@ impl AstFormatter {
                 )?;
                 if !matches!(rest, ListRest::None) || force_trailing_comma {
                     self.out.token(",")?
-                } else { self.out.skip_token_if_present(",")? }
+                } else {
+                    self.out.skip_token_if_present(",")?
+                }
                 if !matches!(rest, ListRest::None) {
                     self.out.space()?;
                     self.list_rest(rest)?;

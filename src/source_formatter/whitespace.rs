@@ -101,14 +101,18 @@ impl SourceFormatter {
             return Ok(());
         }
         match wcx.mode {
-            WhitespaceMode::Horizontal { space } => if space {
-                self.out.token(" ")?;
-                wcx.is_whitespace_mode_out = true;
-            },
-            WhitespaceMode::Vertical(kind) => if !matches!(kind, NewlineKind::IfComments) {
-                self.out.newline()?;
-                wcx.is_whitespace_mode_out = true;
-            },
+            WhitespaceMode::Horizontal { space } => {
+                if space {
+                    self.out.token(" ")?;
+                    wcx.is_whitespace_mode_out = true;
+                }
+            }
+            WhitespaceMode::Vertical(kind) => {
+                if !matches!(kind, NewlineKind::IfComments) {
+                    self.out.newline()?;
+                    wcx.is_whitespace_mode_out = true;
+                }
+            }
         }
         Ok(())
     }

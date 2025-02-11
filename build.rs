@@ -33,7 +33,9 @@ fn commit_info() -> String {
 fn channel() -> String {
     if let Ok(channel) = env::var("CFG_RELEASE_CHANNEL") {
         channel
-    } else { "nightly".to_owned() }
+    } else {
+        "nightly".to_owned()
+    }
 }
 
 fn commit_hash() -> Option<String> {

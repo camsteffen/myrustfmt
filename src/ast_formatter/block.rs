@@ -52,7 +52,9 @@ impl AstFormatter {
             ast::StmtKind::Expr(expr) => {
                 let tail = if matches!(expr.kind, control_flow_expr_kind!()) {
                     &Tail::token_insert(";")
-                } else { Tail::none() };
+                } else {
+                    Tail::none()
+                };
                 self.expr_tail(expr, tail)
             }
             ast::StmtKind::Semi(expr) => self.expr_tail(expr, &Tail::token(";")),

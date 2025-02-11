@@ -65,6 +65,23 @@
             asdfasdf,
         ],
     }
+- name: arm body is if expression
+  type: before_after
+  in_block: true
+  before: |
+    match x {
+        _ => if y {
+            z;
+        }
+    }
+  after: |
+    match x {
+        _ => {
+            if y {
+                z;
+            }
+        }
+    }
 - name: arm body is long list that fits on one line iff wrapped in a block
   type: before_after
   in_block: true

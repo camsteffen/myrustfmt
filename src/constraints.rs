@@ -91,7 +91,9 @@ impl Constraints {
     ) -> FormatResult<T> {
         if self.multi_line.get() >= constraint {
             f()
-        } else { self.multi_line.with_replaced(constraint, f) }
+        } else {
+            self.multi_line.with_replaced(constraint, f)
+        }
     }
 
     pub fn with_indent_middle(&self, f: impl Fn() -> FormatResult) -> FormatResult {

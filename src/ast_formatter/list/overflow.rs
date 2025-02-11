@@ -217,7 +217,9 @@ impl Overflow for ast::MetaItemInner {
             ast::MetaItemInner::MetaItem(meta_item) => {
                 if matches!(meta_item.kind, ast::MetaItemKind::Word) {
                     H::overflows(|| af.meta_item(meta_item))
-                } else { H::no_overflow() }
+                } else {
+                    H::no_overflow()
+                }
             }
         }
     }

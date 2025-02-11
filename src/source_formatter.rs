@@ -245,7 +245,9 @@ impl SourceFormatter {
         self.handle_whitespace_and_comments_if_needed()?;
         if self.source.remaining().starts_with(token) {
             self.token_unchecked(token)
-        } else { self.token_insert(token) }
+        } else {
+            self.token_insert(token)
+        }
     }
 
     /** Copy a token from source */
