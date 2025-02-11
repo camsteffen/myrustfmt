@@ -66,3 +66,16 @@
           self.arm_body_add_block_if_first_line_is_longer(body)
       })?;
       
+      
+      // todo prefer not to overflow
+      list(Braces::PARENS, &parenthesized_args.inputs, |af, ty, _lcx| {
+          af.ty(ty)
+      })
+      
+      // todo next should not add block
+      self.backtrack()
+          .next(|| {
+              self.with_single_line(|| self.expr_tail(index, &Tail::token("]")))
+          })
+          .next(|| self.with_single_line(|| self.expr_tail(index, &Tail::token("]"))))
+          .otherwise(|| self.embraced_after_opening("]", || self.expr(index)))?;
