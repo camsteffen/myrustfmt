@@ -129,12 +129,7 @@ impl AstFormatter {
                     ast::RangeLimits::Closed => "..=",
                     ast::RangeLimits::HalfOpen => "..",
                 };
-                self.range(
-                    start.as_deref(),
-                    sigil,
-                    end.as_deref(),
-                    take_tail(),
-                )?
+                self.range(start.as_deref(), sigil, end.as_deref(), take_tail())?
             }
             ast::ExprKind::Underscore => todo!(),
             ast::ExprKind::Path(ref qself, ref path) => self.qpath(qself, path, true)?,
@@ -265,9 +260,7 @@ impl AstFormatter {
                     };
                     let is_single_line = af.out.constraints().requires_indent_middle()
                         && af.out.line() != first_line;
-                    af.with_single_line_opt(is_single_line, || {
-                        af.expr_tail(end, tail)
-                    })?;
+                    af.with_single_line_opt(is_single_line, || af.expr_tail(end, tail))?;
                     Ok(())
                 }),
             )?;
@@ -377,7 +370,9 @@ impl AstFormatter {
         let start_pos = self.out.last_line_len();
         let is_head_single_line = self.token_expr_open_brace("if", condition)?;
 
-        if let Some((block_expr, else_expr)) = is_head_single_line.then(single_line_parts).flatten()
+        if let Some((block_expr, else_expr)) = is_head_single_line
+            .then(single_line_parts)
+            .flatten()
         {
             self.backtrack()
                 .next_single_line(|| {

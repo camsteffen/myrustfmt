@@ -127,9 +127,7 @@ impl AstFormatter {
         expr: &ast::Expr,
         format: impl FnOnce(&ast::Expr) -> FormatResult,
     ) -> FormatResult {
-        match plain_block(expr)
-            .and_then(|b| self.try_into_expr_only_block(b))
-        {
+        match plain_block(expr).and_then(|b| self.try_into_expr_only_block(b)) {
             None => format(expr),
             Some(ExprOnlyBlock(inner)) => {
                 self.out.skip_token("{")?;
@@ -162,12 +160,8 @@ impl AstFormatter {
             return None;
         }
         let source = self.out.source();
-        let before_expr = &source[
-            block.span.lo().to_usize() + 1..expr.span.lo().to_usize()
-        ];
-        let after_expr = &source[
-            expr.span.hi().to_usize()..block.span.hi().to_usize() - 1
-        ];
+        let before_expr = &source[block.span.lo().to_usize() + 1..expr.span.lo().to_usize()];
+        let after_expr = &source[expr.span.hi().to_usize()..block.span.hi().to_usize() - 1];
         if !(is_whitespace(before_expr) && is_whitespace(after_expr)) {
             // there are comments before or after the expression
             return None;

@@ -12,16 +12,12 @@ use crate::util::cell_ext::CellExt;
 impl AstFormatter {
     pub fn match_(&self, scrutinee: &ast::Expr, arms: &[ast::Arm]) -> FormatResult {
         self.token_expr_open_brace("match", scrutinee)?;
-        self.block_generic_after_open_brace(arms, |arm| {
-            self.arm(arm)
-        })?;
+        self.block_generic_after_open_brace(arms, |arm| self.arm(arm))?;
         Ok(())
     }
 
     fn arm(&self, arm: &ast::Arm) -> FormatResult {
-        self.with_attrs(&arm.attrs, arm.span, || {
-            self.arm_after_attrs(arm)
-        })
+        self.with_attrs(&arm.attrs, arm.span, || self.arm_after_attrs(arm))
     }
 
     fn arm_after_attrs(&self, arm: &ast::Arm) -> FormatResult {

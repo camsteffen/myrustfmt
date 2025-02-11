@@ -97,10 +97,7 @@ impl Constraints {
     }
 
     pub fn with_indent_middle(&self, f: impl Fn() -> FormatResult) -> FormatResult {
-        self.with_multi_line_constraint(
-            MultiLineConstraint::IndentMiddle,
-            f,
-        )
+        self.with_multi_line_constraint(MultiLineConstraint::IndentMiddle, f)
     }
 
     pub fn with_single_line_chains(&self, f: impl Fn() -> FormatResult) -> FormatResult {

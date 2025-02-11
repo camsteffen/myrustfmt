@@ -184,8 +184,7 @@ where
                     matches!(self.rest, ListRest::None),
                     "rest cannot be used with wrap-to-fit"
                 );
-                backtrack = backtrack
-                    .next(|| self.contents_wrap_to_fit(af, max_element_width));
+                backtrack = backtrack.next(|| self.contents_wrap_to_fit(af, max_element_width));
             }
             ListWrapToFitConfig::No => {}
         }

@@ -4,9 +4,12 @@ use crate::ast_formatter::list::builder::ListBuilderTrait;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
 use crate::error::{ConstraintError, FormatError, FormatResult, FormatResultExt, return_if_break};
-use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use std::ops::ControlFlow;
+
+// In rustfmt, this is called chain_width, and is 60 by default
+const POSTFIX_CHAIN_MAX_WIDTH: u32 = 70;
+const POSTFIX_CHAIN_MAX_ITEM_OFFSET: u32 = 40;
 
 struct PostfixItem<'a> {
     /// The first item in the chain has the root expression, which is not a postfix expression.
@@ -19,16 +22,22 @@ struct PostfixItem<'a> {
 impl AstFormatter {
     pub fn postfix_chain(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
         let start_pos = self.out.last_line_len();
-        let width_limit = RUSTFMT_CONFIG_DEFAULTS.chain_width;
-        self.with_width_limit_from_start_first_line(start_pos, width_limit, || {
-            let chain = build_postfix_chain(expr);
-            self.postfix_chain_given_width_limit(&chain, tail)
-        })
+        let max_item_start = start_pos + POSTFIX_CHAIN_MAX_ITEM_OFFSET;
+        // todo should not apply to tail
+        self.with_width_limit_from_start_first_line(
+            start_pos,
+            POSTFIX_CHAIN_MAX_WIDTH,
+            || {
+                let chain = build_postfix_chain(expr);
+                self.postfix_chain_given_width_limit(&chain, max_item_start, tail)
+            },
+        )
     }
 
     fn postfix_chain_given_width_limit(
         &self,
         chain: &[PostfixItem<'_>],
+        max_item_start: u32,
         tail: &Tail,
     ) -> FormatResult {
         let first_line = self.out.line();
@@ -46,7 +55,9 @@ impl AstFormatter {
                 return self.tail(tail);
             }
             let next_is_single_line = self.constraints().requires_indent_middle();
-            self.with_single_line_opt(next_is_single_line, || self.postfix_item(next))?;
+            self.with_single_line_opt(next_is_single_line, || {
+                self.postfix_item(next)
+            })?;
             if self.out.line() != first_line {
                 // should be prevented by single-line constraint above
                 assert_eq!(self.constraints().requires_indent_middle(), false);
@@ -62,7 +73,13 @@ impl AstFormatter {
             self.postfix_chain_separate_lines(chain_rest, tail)
         } else {
             self.backtrack()
-                .next(|| self.postfix_chain_single_line_with_overflow(chain_rest, tail))
+                .next(|| {
+                    self.postfix_chain_single_line_with_overflow(
+                        chain_rest,
+                        max_item_start,
+                        tail,
+                    )
+                })
                 .otherwise(|| {
                     // see docs for MultiLineConstraint
                     self.with_single_line_opt(
@@ -76,20 +93,27 @@ impl AstFormatter {
     fn postfix_chain_single_line_with_overflow(
         &self,
         chain: &[PostfixItem<'_>],
+        max_item_start: u32,
         tail: &Tail,
     ) -> FormatResult {
         let last = chain.last().unwrap();
         if !matches!(last.root_or_dot_item.kind, ast::ExprKind::MethodCall(_)) {
             // this chain is not overflowable, so simply format it on one line
-            self.with_single_line(|| self.postfix_items(chain))?;
+            self.with_single_line(|| self.postfix_items(chain, max_item_start))?;
             self.tail(tail)?;
             return Ok(());
         }
         let (overflowable, before_overflow) = chain.split_last().unwrap();
 
-        self.with_single_line(|| self.postfix_items(before_overflow))?;
+        self.with_single_line(|| {
+            self.postfix_items(before_overflow, max_item_start)
+        })?;
 
-        self.postfix_chain_overflow_last_unless_separate_lines_preferred(overflowable, tail)?;
+        self.check_max_start(max_item_start)?;
+        self.postfix_chain_overflow_last_unless_separate_lines_preferred(
+            overflowable,
+            tail,
+        )?;
         Ok(())
     }
 
@@ -161,9 +185,24 @@ impl AstFormatter {
         Ok(())
     }
 
+    fn check_max_start(&self, max_start: u32) -> FormatResult {
+        self.out.no_space()?;
+        if self.out.last_line_len() > max_start {
+            Err(ConstraintError::Logical.into())
+        } else {
+            Ok(())
+        }
+    }
+
     fn postfix_item(&self, item: &PostfixItem<'_>) -> FormatResult {
         self.postfix_item_root(item.root_or_dot_item)?;
         self.postfix_tail(&item.tail)?;
+        Ok(())
+    }
+
+    fn postfix_item_with_max_start(&self, item: &PostfixItem<'_>, max_start: u32) -> FormatResult {
+        self.check_max_start(max_start)?;
+        self.postfix_item(item)?;
         Ok(())
     }
 
@@ -191,8 +230,10 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn postfix_items(&self, items: &[PostfixItem<'_>]) -> FormatResult {
-        items.iter().try_for_each(|item| self.postfix_item(item))
+    fn postfix_items(&self, items: &[PostfixItem<'_>], max_start: u32) -> FormatResult {
+        items
+            .iter()
+            .try_for_each(|item| self.postfix_item_with_max_start(item, max_start))
     }
 
     fn postfix_tail(&self, tail: &[&ast::Expr]) -> FormatResult {
@@ -201,7 +242,9 @@ impl AstFormatter {
                 ast::ExprKind::Index(_, ref index, _) => {
                     self.out.token("[")?;
                     self.backtrack()
-                        .next(|| self.with_single_line(|| self.expr_tail(index, &Tail::token("]"))))
+                        .next(|| {
+                            self.with_single_line(|| self.expr_tail(index, &Tail::token("]")))
+                        })
                         .otherwise(|| self.embraced_after_opening("]", || self.expr(index)))?;
                 }
                 ast::ExprKind::Try(..) => self.out.token("?")?,

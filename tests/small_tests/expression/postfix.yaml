@@ -102,3 +102,10 @@
     aaaaa
         .bbb
         .ccc()
+- name: two item chains at and above max item offset
+  type: no_change
+  in_block: true
+  formatted: |
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbb;
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        .bbb;

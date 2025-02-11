@@ -109,16 +109,12 @@ impl SourceFormatter {
     }
 
     pub fn newline(&self, kind: NewlineKind) -> FormatResult {
-        self.handle_whitespace_and_comments(
-            WhitespaceMode::Vertical(kind),
-        )?;
+        self.handle_whitespace_and_comments(WhitespaceMode::Vertical(kind))?;
         Ok(())
     }
 
     pub fn newline_indent(&self, kind: NewlineKind) -> FormatResult {
-        self.handle_whitespace_and_comments(
-            WhitespaceMode::Vertical(kind),
-        )?;
+        self.handle_whitespace_and_comments(WhitespaceMode::Vertical(kind))?;
         self.indent()?;
         Ok(())
     }
@@ -148,9 +144,9 @@ impl SourceFormatter {
     }
 
     pub fn newline_if_comments(&self) -> FormatResult<bool> {
-        self.handle_whitespace_and_comments(
-            WhitespaceMode::Vertical(NewlineKind::IfComments),
-        )
+        self.handle_whitespace_and_comments(WhitespaceMode::Vertical(
+            NewlineKind::IfComments,
+        ))
     }
 
     pub fn skip_token(&self, token: &str) -> FormatResult {
@@ -162,9 +158,9 @@ impl SourceFormatter {
     pub fn skip_token_if_present(&self, token: &str) -> FormatResult {
         // todo is this checkpoint avoidable?
         let checkpoint = self.checkpoint();
-        self.handle_whitespace_and_comments(
-            WhitespaceMode::Horizontal { space: false },
-        )?;
+        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal {
+            space: false,
+        })?;
         if self.source.remaining().starts_with(token) {
             self.source.advance(token.len());
         } else {
@@ -209,9 +205,9 @@ impl SourceFormatter {
     /** Writes a space and accounts for spaces and comments in source */
     // todo do newlines and comments sneak in when it should be single line?
     pub fn space(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(
-            WhitespaceMode::Horizontal { space: true },
-        )?;
+        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal {
+            space: true,
+        })?;
         Ok(())
     }
 
@@ -264,9 +260,9 @@ impl SourceFormatter {
     }
 
     fn handle_whitespace_and_comments_if_needed(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(
-            WhitespaceMode::Horizontal { space: false },
-        )?;
+        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal {
+            space: false,
+        })?;
         Ok(())
     }
 

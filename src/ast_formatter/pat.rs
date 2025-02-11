@@ -54,12 +54,7 @@ impl AstFormatter {
                     .format(self)?
             }
             ast::PatKind::Or(ref pats) => {
-                self.simple_infix_chain(
-                    "|",
-                    pats,
-                    |pat| self.pat(pat),
-                    false,
-                )?
+                self.simple_infix_chain("|", pats, |pat| self.pat(pat), false)?
             }
             ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false)?,
             ast::PatKind::Tuple(ref fields) => {
@@ -83,12 +78,7 @@ impl AstFormatter {
                     ast::RangeEnd::Included(ast::RangeSyntax::DotDotDot) => "...",
                     ast::RangeEnd::Included(ast::RangeSyntax::DotDotEq) => "..=",
                 };
-                self.range(
-                    start.as_deref(),
-                    sigil,
-                    end.as_deref(),
-                    take_tail(),
-                )?;
+                self.range(start.as_deref(), sigil, end.as_deref(), take_tail())?;
             }
             ast::PatKind::Slice(ref elements) => {
                 list(Braces::SQUARE, elements, |af, pat, _lcx| af.pat(pat))

@@ -214,16 +214,12 @@ impl AstFormatter {
         if !self.where_clause(&impl_.generics.where_clause, true)? {
             self.out.space()?;
         }
-        self.block_generic(&impl_.items, |item| {
-            self.assoc_item(item)
-        })?;
+        self.block_generic(&impl_.items, |item| self.assoc_item(item))?;
         Ok(())
     }
 
     fn assoc_item(&self, item: &ast::AssocItem) -> FormatResult {
-        self.item_generic(item, |kind| {
-            self.assoc_item_kind(kind, item)
-        })
+        self.item_generic(item, |kind| self.assoc_item_kind(kind, item))
     }
 
     fn assoc_item_kind(&self, kind: &ast::AssocItemKind, item: &ast::AssocItem) -> FormatResult {
@@ -275,9 +271,7 @@ impl AstFormatter {
         self.generic_params(&trait_.generics.params)?;
         self.generic_bounds_optional(&trait_.bounds)?;
         self.out.space()?;
-        self.block_generic(&trait_.items, |item| {
-            self.assoc_item(item)
-        })?;
+        self.block_generic(&trait_.items, |item| self.assoc_item(item))?;
         Ok(())
     }
 
@@ -335,11 +329,9 @@ impl AstFormatter {
             }
             ast::UseTreeKind::Nested { ref items, span: _ } => {
                 self.out.token("::")?;
-                list(
-                    Braces::CURLY_NO_PAD,
-                    items,
-                    |af, (use_tree, _), _lcx| af.use_tree(use_tree),
-                )
+                list(Braces::CURLY_NO_PAD, items, |af, (use_tree, _), _lcx| {
+                    af.use_tree(use_tree)
+                })
                 .config(UseTreeListConfig)
                 .item_config(UseTreeListItemConfig)
                 .tail(tail)

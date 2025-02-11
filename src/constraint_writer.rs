@@ -141,8 +141,7 @@ impl ConstraintWriter {
     }
 
     pub fn restore_lookahead(&self, lookahead: &ConstraintWriterLookahead) {
-        self.buffer
-            .with_taken(|b| b.push_str(&lookahead.buf_segment));
+        self.buffer.with_taken(|b| b.push_str(&lookahead.buf_segment));
         self.restore_self_checkpoint(&lookahead.checkpoint);
     }
 
@@ -175,10 +174,8 @@ impl ConstraintWriter {
 
     pub fn indent(&self) -> Result<(), WidthLimitExceededError> {
         self.buffer.with_taken(|b| {
-            b.extend(std::iter::repeat_n(
-                ' ',
-                self.constraints.indent.get() as usize,
-            ))
+            b.extend(std::iter::repeat_n(' ', self.constraints.indent.get()
+                as usize))
         });
         self.check_width_constraints()
     }
@@ -222,8 +219,7 @@ impl ConstraintWriter {
     }
 
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T {
-        self.buffer
-            .with_taken(|b| f(&b[self.last_line_start.get()..]))
+        self.buffer.with_taken(|b| f(&b[self.last_line_start.get()..]))
     }
 
     pub fn last_line_len(&self) -> usize {

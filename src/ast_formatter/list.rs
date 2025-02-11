@@ -143,9 +143,7 @@ impl AstFormatter {
                     item_next_line()?;
                     prev_must_have_own_line = !prev_must_have_own_line;
                 } else {
-                    self.backtrack()
-                        .next(item_same_line)
-                        .otherwise(item_next_line)?;
+                    self.backtrack().next(item_same_line).otherwise(item_next_line)?;
                 }
             }
             Ok(())

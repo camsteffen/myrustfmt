@@ -67,7 +67,9 @@ impl SourceReader {
     }
 
     fn next_token(&self) -> rustc_lexer::Token {
-        rustc_lexer::tokenize(self.remaining()).next().unwrap()
+        rustc_lexer::tokenize(self.remaining())
+            .next()
+            .unwrap()
     }
 
     // pub fn is_next_whitespace(&self) -> bool {
