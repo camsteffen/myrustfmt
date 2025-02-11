@@ -81,10 +81,7 @@ impl SourceFormatter {
                 }
                 TokenKind::Whitespace => {
                     let token_str = &self.source.remaining()[..token.len as usize];
-                    let newlines = token_str
-                        .bytes()
-                        .filter(|&b| b == b'\n')
-                        .count();
+                    let newlines = token_str.bytes().filter(|&b| b == b'\n').count();
                     wcx.whitespace_buffer = Some(newlines);
                     self.source.advance(token.len as usize);
                 }

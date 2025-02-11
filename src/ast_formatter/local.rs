@@ -6,9 +6,7 @@ use rustc_ast::ast;
 
 impl AstFormatter {
     pub fn local(&self, local: &ast::Local) -> FormatResult {
-        self.with_attrs(&local.attrs, local.span, || {
-            self.local_after_attrs(local)
-        })
+        self.with_attrs(&local.attrs, local.span, || self.local_after_attrs(local))
     }
 
     fn local_after_attrs(&self, local: &ast::Local) -> FormatResult {

@@ -42,13 +42,11 @@ impl AstFormatter {
                 param_list.format_separate_lines(self)?;
                 self.fn_ret_ty(&sig.decl.output)?;
                 if is_block_after_decl {
-                    self.backtrack()
-                        .next(|| self.out.space_token("{"))
-                        .otherwise(|| {
-                            self.out.newline_within_indent()?;
-                            self.out.token("{")?;
-                            Ok(())
-                        })?;
+                    self.backtrack().next(|| self.out.space_token("{")).otherwise(|| {
+                        self.out.newline_within_indent()?;
+                        self.out.token("{")?;
+                        Ok(())
+                    })?;
                 }
                 Ok(())
             })?;
@@ -188,9 +186,7 @@ impl AstFormatter {
     }
 
     fn param(&self, param: &ast::Param) -> FormatResult {
-        self.with_attrs(&param.attrs, param.span, || {
-            self.param_after_attrs(param)
-        })
+        self.with_attrs(&param.attrs, param.span, || self.param_after_attrs(param))
     }
 
     fn param_after_attrs(&self, param: &ast::Param) -> FormatResult {

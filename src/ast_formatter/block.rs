@@ -17,9 +17,7 @@ impl AstFormatter {
         self.out.token("{")?;
         match self.try_into_expr_only_block(block) {
             None => {
-                self.block_generic_after_open_brace(&block.stmts, |stmt| {
-                    self.stmt(stmt)
-                })?;
+                self.block_generic_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))?;
                 self.tail(tail)?;
             }
             Some(expr_only_block) => {
@@ -30,9 +28,7 @@ impl AstFormatter {
                         Ok(())
                     })
                     .otherwise(|| {
-                        self.block_generic_after_open_brace(&block.stmts, |stmt| {
-                            self.stmt(stmt)
-                        })?;
+                        self.block_generic_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))?;
                         self.tail(tail)?;
                         Ok(())
                     })?
@@ -48,9 +44,7 @@ impl AstFormatter {
     }
 
     pub fn block_separate_lines_after_open_brace(&self, block: &ast::Block) -> FormatResult {
-        self.block_generic_after_open_brace(&block.stmts, |stmt| {
-            self.stmt(stmt)
-        })
+        self.block_generic_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))
     }
 
     pub fn block_generic<T>(

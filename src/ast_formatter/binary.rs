@@ -26,22 +26,19 @@ impl AstFormatter {
                 Ok(())
             })
             .otherwise(|| {
-                self.with_single_line_opt(
-                    self.constraints().requires_single_line_chains(),
-                    || {
-                        self.indented(|| {
-                            // todo write items on the same line while within an indentation width
-                            //  (share code with postfix chains?)
-                            for (op, expr) in chain {
-                                self.out.newline_within_indent()?;
-                                self.out.token_space(op.as_str())?;
-                                self.expr(expr)?;
-                            }
-                            self.tail(tail)?;
-                            Ok(())
-                        })
-                    },
-                )
+                self.with_single_line_opt(self.constraints().requires_single_line_chains(), || {
+                    self.indented(|| {
+                        // todo write items on the same line while within an indentation width
+                        //  (share code with postfix chains?)
+                        for (op, expr) in chain {
+                            self.out.newline_within_indent()?;
+                            self.out.token_space(op.as_str())?;
+                            self.expr(expr)?;
+                        }
+                        self.tail(tail)?;
+                        Ok(())
+                    })
+                })
             })
     }
 

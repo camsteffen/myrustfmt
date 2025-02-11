@@ -2,7 +2,7 @@
   type: no_change
   in_block: true
   formatted: |
-      let Some(remaining) = width_limit
+      let Some(remaining) = width_limitwidthwidth_limit_limitwidth_limit
           .checked_sub(self.out.last_line_len() - line_start_pos)
       else {
           x;
@@ -35,29 +35,33 @@
                   .otherwise(newline_open_block)?;
           }
           Ok(self.out.line() == first_line)
-      })
+      });
     
-    
-      // idea: dots must be within the first 30 chars for the chain to be one line
-      self.asdfadfasdadfasdadfasadf.adadfasdaaasdfasdf(asdfasdfa, asdfasdfa, || {
-      })
-      
       // fix this cast wrapping
       b.extend(std::iter::repeat_n(' ', self.constraints.indent.get()
-          as usize))
+          as usize));
       
       // todo don't let closure arguments wrap
       fooo(bar, |
       arg,
       arg,
-      | expr;
+      | expr);
 
       // todo prefer breaking on the outer struct
       self.handle_whitespace_and_comments(WhitespaceMode::Vertical(
           NewlineKind::IfComments,
-      ))
+      ));
       
       // todo don't break this chain
       let newlines = token_str.bytes().filter(|&b| b == b'\n').count();
       rustc_lexer::tokenize(self.remaining()).next().unwrap();
       let initial_used_width = before.lines().map(|line| line.len() as u32).max().unwrap();
+      
+      // todo if after closure?
+      self.skip_single_expr_blocks(body, |body| if arm_body_requires_block(body) {
+          self.expr_add_block(body)
+      } else if plain_block(body).is_some() {
+          self.expr(body)
+      } else {
+          self.arm_body_add_block_if_first_line_is_longer(body)
+      })?;

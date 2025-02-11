@@ -128,11 +128,7 @@ impl AstFormatter {
         let Some(width_limit) = width_limit else {
             return f();
         };
-        self.with_width_limit_from_start_first_line(
-            line_start_pos,
-            width_limit,
-            f,
-        )
+        self.with_width_limit_from_start_first_line(line_start_pos, width_limit, f)
     }
 
     pub fn with_width_limit<T>(

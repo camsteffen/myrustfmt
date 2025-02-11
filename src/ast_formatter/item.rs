@@ -279,10 +279,9 @@ impl AstFormatter {
         match variants {
             ast::VariantData::Struct { fields, .. } => {
                 self.out.space()?;
-                let list = list(Braces::CURLY, fields, |af, f, _lcx| af.field_def(f))
-                    .config(struct_field_list_config(
-                        RUSTFMT_CONFIG_DEFAULTS.struct_variant_width,
-                    ));
+                let list = list(Braces::CURLY, fields, |af, f, _lcx| af.field_def(f)).config(
+                    struct_field_list_config(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width),
+                );
                 if is_enum {
                     list.format(self)?;
                 } else {

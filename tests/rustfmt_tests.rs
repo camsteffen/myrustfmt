@@ -34,11 +34,8 @@ fn rustfmt_test_file(test_source_path: &Path) {
         return;
     };
     println!("Testing {}", test_source_path.display());
-    let test_target_path = Path::new(TARGET_PATH).join(
-        test_source_path
-            .strip_prefix(SOURCE_PATH)
-            .unwrap(),
-    );
+    let test_target_path = Path::new(TARGET_PATH)
+        .join(test_source_path.strip_prefix(SOURCE_PATH).unwrap());
     let formatted = format_file(test_source_path, config).unwrap();
     let target_expected = fs::read_to_string(test_target_path).unwrap();
     assert_eq!(formatted, target_expected);
@@ -57,8 +54,7 @@ fn read_config_if_supported(file_name: &Path) -> Option<Config> {
 }
 
 fn read_config_values(file_name: &Path) -> Vec<(String, String)> {
-    let regex = regex::Regex::new(r"^\s*//\s*rustfmt-([^:]+):\s*(\S+)")
-        .unwrap();
+    let regex = regex::Regex::new(r"^\s*//\s*rustfmt-([^:]+):\s*(\S+)").unwrap();
 
     BufReader::new(fs::File::open(file_name).unwrap())
         .lines()

@@ -7,11 +7,7 @@ pub type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 pub fn breakpoint_test(before: &str, after: &str, in_block: bool) -> TestResult {
     let before = before.trim();
     let after = after.trim();
-    let initial_used_width = before
-        .lines()
-        .map(|line| line.len() as u32)
-        .max()
-        .unwrap();
+    let initial_used_width = before.lines().map(|line| line.len() as u32).max().unwrap();
     format_max_width_expected(
         before,
         Some(initial_used_width),
@@ -108,7 +104,6 @@ fn expect_formatted_equals(formatted: &str, expected: &str, name: &str) -> TestR
         }
     }
     Err(
-        format!("\"{name}\" formatted does not match expected")
-            .into(),
+        format!("\"{name}\" formatted does not match expected").into(),
     )
 }

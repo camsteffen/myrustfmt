@@ -73,14 +73,12 @@ impl AstFormatter {
     }
 
     fn arm_body(&self, body: &ast::Expr) -> FormatResult {
-        self.skip_single_expr_blocks(body, |body| {
-            if arm_body_requires_block(body) {
-                self.expr_add_block(body)
-            } else if plain_block(body).is_some() {
-                self.expr(body)
-            } else {
-                self.arm_body_add_block_if_first_line_is_longer(body)
-            }
+        self.skip_single_expr_blocks(body, |body| if arm_body_requires_block(body) {
+            self.expr_add_block(body)
+        } else if plain_block(body).is_some() {
+            self.expr(body)
+        } else {
+            self.arm_body_add_block_if_first_line_is_longer(body)
         })?;
         self.out.skip_token_if_present(",")?;
         Ok(())

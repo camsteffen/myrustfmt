@@ -101,9 +101,6 @@ impl Constraints {
     }
 
     pub fn with_single_line_chains(&self, f: impl Fn() -> FormatResult) -> FormatResult {
-        self.with_multi_line_constraint(
-            MultiLineConstraint::SingleLineChains,
-            f,
-        )
+        self.with_multi_line_constraint(MultiLineConstraint::SingleLineChains, f)
     }
 }
