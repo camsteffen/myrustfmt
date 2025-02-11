@@ -214,7 +214,7 @@ impl AstFormatter {
                     };
                     af.constraints()
                         .multi_line
-                        .with_replaced(dbg!(multi_line_constraint), || af.expr(expr))
+                        .with_replaced(multi_line_constraint, || af.expr(expr))
                 }
                 ListStrategy::SeparateLines if list.len() > 1 => af
                     .backtrack()

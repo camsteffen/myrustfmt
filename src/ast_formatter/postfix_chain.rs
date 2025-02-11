@@ -45,7 +45,7 @@ impl AstFormatter {
                 self.postfix_item(next)?;
                 return self.tail(tail);
             }
-            let next_is_single_line = dbg!(self.constraints().requires_indent_middle());
+            let next_is_single_line = self.constraints().requires_indent_middle();
             self.with_single_line_opt(next_is_single_line, || self.postfix_item(next))?;
             if self.out.line() != first_line {
                 // should be prevented by single-line constraint above
@@ -57,12 +57,12 @@ impl AstFormatter {
             }
         };
 
-        if dbg!(multi_line_root) {
+        if multi_line_root {
             // each item on a separate line, no indent
             self.postfix_chain_separate_lines(chain_rest, tail)
         } else {
             self.backtrack()
-                .next(|| self.postfix_chain_single_line_with_overflow(chain_rest, tail, true))
+                .next(|| self.postfix_chain_single_line_with_overflow(chain_rest, tail))
                 .otherwise(|| {
                     // see docs for MultiLineConstraint
                     self.with_single_line_opt(
@@ -77,8 +77,6 @@ impl AstFormatter {
         &self,
         chain: &[PostfixItem<'_>],
         tail: &Tail,
-        // todo factor out bool?
-        has_separate_lines_fallback: bool,
     ) -> FormatResult {
         let last = chain.last().unwrap();
         if !matches!(last.root_or_dot_item.kind, ast::ExprKind::MethodCall(_)) {
@@ -90,13 +88,6 @@ impl AstFormatter {
         let (overflowable, before_overflow) = chain.split_last().unwrap();
 
         self.with_single_line(|| self.postfix_items(before_overflow))?;
-
-        if !has_separate_lines_fallback {
-            // todo consider comparing line count with adding a block for multi_line constraint
-            self.postfix_overflowable(overflowable)?;
-            self.tail(tail)?;
-            return Ok(());
-        }
 
         let before_overflow_count = before_overflow.len() as u32;
         self.postfix_chain_overflow_last_unless_separate_lines_preferred(
@@ -123,6 +114,7 @@ impl AstFormatter {
                 // it all fits on one line
                 return ControlFlow::Break(Ok(()));
             }
+            // todo can we prove that the overflow is so long that a separate line won't be shorter?
             ControlFlow::Continue(self.out.line() - first_line + 1)
         });
         let (checkpoint, overflow_lookahead, overflow_height) = return_if_break!(result);
@@ -130,6 +122,7 @@ impl AstFormatter {
         // try writing the overflowable on the next line to measure its height in separate lines format
         // todo share logic with match arm
         // todo should we check if the wrap allows a *longer* first line, like match arm?
+        // todo account for having less width if the fallback will add a block
         let result = self.indented(|| {
             // N.B. this newline evades the first line width limit
             self.out.newline_within_indent()?;
@@ -141,11 +134,7 @@ impl AstFormatter {
         let result = match result {
             Err(FormatError::Constraint(_)) => todo!(), // is this possible?
             Err(e) => Err(e),
-            Ok(overflowable_separate_line_height) => {
-                // Each dot item leading up to the overflowable will occupy one line each since we
-                // were previously able to format them all on one line.
-                let separate_lines_height =
-                    before_overflow_count + overflowable_separate_line_height;
+            Ok(separate_lines_height) => {
                 if separate_lines_height <= overflow_height {
                     // fallback to separate lines strategy
                     Err(ConstraintError::Logical.into())

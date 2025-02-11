@@ -1,0 +1,17 @@
+- name: temp
+  type: no_change
+  in_block: true
+  formatted: |
+    if self
+        .constraints()
+        .max_width
+        .get()
+        .is_some_and(|mw| max_width >= mw)
+        || self
+            .constraints()
+            .max_width_for_line
+            .get()
+            .is_some_and(|m| m.line == line && m.max_width <= max_width)
+    {
+        return f();
+    } 

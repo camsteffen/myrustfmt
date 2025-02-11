@@ -65,24 +65,12 @@
         .asdf
         .asdfasdf(Thing { thing, thing })
   after: |
-    rooty.asdf.asdf.asdfasdf(Thing {
-        thing,
-        thing,
-    })
-- name: prefer overflow over multi-line chain if it is fewer lines
-  type: breakpoint
-  in_block: true
-  before: |
-    oneone.two.three.four.five(
-        foo,
-        foo,
-    )
-  after: |
-    oneone
-        .two
-        .three
-        .four
-        .five(foo, foo)
+    rooty
+        .asdf
+        .asdf
+        .asdfasdf(
+            Thing { thing, thing },
+        )
 - name: prefer separate lines chain over overflow when same number of lines, even when method call is multi-line
   type: breakpoint
   in_block: true
@@ -98,21 +86,6 @@
             foooooey,
             gooooooey,
         })
-- name: prefer overflow over separate lines chain when fewer lines, when method call is multi-line
-  type: breakpoint
-  in_block: true
-  before: |
-    oneone.two.three.four(Foo {
-        foooooey,
-        gooooooey,
-    })
-  after: |
-    oneone.two.three.four(
-        Foo {
-            foooooey,
-            gooooooey,
-        },
-    )
 - name: overflow method call with multiple args
   type: no_change
   in_block: true
