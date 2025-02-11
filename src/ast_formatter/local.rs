@@ -11,6 +11,7 @@ impl AstFormatter {
 
     fn local_after_attrs(&self, local: &ast::Local) -> FormatResult {
         let ast::Local { pat, kind, ty, .. } = local;
+        let first_line = self.out.line();
         let start = self.out.last_line_len();
         self.out.token_space("let")?;
         let Some((init, else_)) = kind.init_else_opt() else {
@@ -22,8 +23,6 @@ impl AstFormatter {
             // todo tail?
             self.out.token_space(":")?;
             self.ty_tail(ty, &Tail::token(";"))?;
-            // todo tail?
-            // self.out.token(";")?;
             return Ok(());
         };
         self.pat(pat)?;
@@ -32,7 +31,7 @@ impl AstFormatter {
             self.out.token_space(":")?;
             self.ty(ty)?;
         }
-        // "else else else" lol
+        // else else else lol
         let Some(else_) = else_ else {
             self.local_init(init, &Tail::token(";"))?;
             return Ok(());
@@ -43,42 +42,50 @@ impl AstFormatter {
             self.out.token(";")?;
             Ok(())
         };
-        self.backtrack()
-            .next(|| {
-                self.out.space_token_space("else")?;
-                self.out.token("{")?;
-                match self.try_into_expr_only_block(else_) {
-                    None => else_block()?,
-                    Some(else_expr_only_block) => {
-                        self.backtrack()
-                            .next(|| {
-                                self.with_width_limit_from_start(
-                                    // todo verify still on the same line
-                                    start,
-                                    RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
-                                    || {
-                                        self.with_single_line(|| {
+        let same_line_else = || -> FormatResult {
+            self.out.space_token_space("else")?;
+            self.out.token("{")?;
+            match self.try_into_expr_only_block(else_) {
+                None => else_block()?,
+                Some(else_expr_only_block) => {
+                    self.backtrack()
+                        .next(|| {
+                            self.with_width_limit_from_start(
+                                // todo verify still on the same line
+                                start,
+                                RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
+                                || {
+                                    self.with_single_line(|| {
+                                        {
                                             self.expr_only_block_after_open_brace(
                                                 else_expr_only_block,
                                             )?;
                                             self.out.token(";")?;
                                             Ok(())
-                                        })
-                                    },
-                                )
-                            })
-                            .otherwise(else_block)?
-                    }
+                                        }
+                                    })
+                                },
+                            )
+                        })
+                        .otherwise(else_block)?
                 }
-                Ok(())
-            })
-            .otherwise(|| {
-                self.out.newline_within_indent()?;
-                self.out.token_space("else")?;
-                self.out.token("{")?;
-                else_block()?;
-                Ok(())
-            })?;
+            }
+            Ok(())
+        };
+        let next_line_else = || -> FormatResult {
+            self.out.newline_within_indent()?;
+            self.out.token_space("else")?;
+            self.out.token("{")?;
+            else_block()?;
+            Ok(())
+        };
+        if self.out.line() == first_line || self.out.last_line_is_closers() {
+            self.backtrack()
+                .next(same_line_else)
+                .otherwise(next_line_else)?;
+        } else {
+            next_line_else()?;
+        }
         Ok(())
     }
 

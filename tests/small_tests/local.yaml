@@ -70,3 +70,31 @@
     else {
         return x;
     };
+- name: multi-line initializer with else on same line
+  type: no_change
+  in_block: true
+  formatted: |
+    let Some(_) = ({
+        x;
+    }) else {
+        return;
+    };
+- name: multi-line chain initializer with else on next line
+  type: before_after
+  in_block: true
+  before: |
+    let Some(_) = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        + aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa else { return };
+  after: |
+    let Some(_) = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        + aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    else {
+        return;
+    };
+- name: don't remove semicolon for single-line let-else
+  type: no_change
+  in_block: true
+  formatted: |
+    let Some(_) = x else {
+        return y;
+    };

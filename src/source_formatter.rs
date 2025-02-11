@@ -9,6 +9,7 @@ use crate::source_formatter::whitespace::{NewlineKind, WhitespaceMode};
 use crate::source_reader::SourceReader;
 use rustc_span::{BytePos, Pos, Span};
 use std::rc::Rc;
+use crate::util::chars::is_closer_char;
 
 mod whitespace;
 
@@ -285,6 +286,13 @@ impl SourceFormatter {
         self.out.token(&token)?;
         self.source.advance(token.len());
         Ok(())
+    }
+
+    pub fn last_line_is_closers(&self) -> bool {
+        self.with_last_line(|line| {
+            let after_indent = &line[self.constraints().indent.get() as usize..];
+            after_indent.chars().all(is_closer_char)
+        })
     }
 
     pub fn with_taken_buffer(&self, f: impl FnOnce(&mut String)) {

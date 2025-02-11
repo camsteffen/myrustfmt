@@ -165,11 +165,11 @@ impl AstFormatter {
                 self.out.token("(")?;
                 self.backtrack()
                     .next(|| {
-                        self.with_single_line(|| {
-                            self.expr(inner)?;
-                            self.out.token(")")?;
-                            Ok(())
-                        })?;
+                        self.constraints()
+                            .with_multi_line_constraint(MultiLineConstraint::SingleLineChains, || {
+                                self.expr(inner)
+                            })?;
+                        self.out.token(")")?;
                         self.tail(tail)?;
                         Ok(())
                     })
@@ -398,24 +398,17 @@ impl AstFormatter {
             let first_line = self.out.line();
             self.out.token_space(token)?;
             self.expr(expr)?;
-            let force_newline = self.out.line() != first_line
-                && self.out.with_last_line(|line| {
-                    let after_indent = &line[self.out.constraints().indent.get() as usize..];
-                    after_indent
-                        .chars()
-                        .any(|c| !matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
-                });
             let newline_open_block = || {
                 self.out.newline_within_indent()?;
                 self.out.token("{")?;
                 Ok(())
             };
-            if force_newline {
-                newline_open_block()?;
-            } else {
+            if self.out.line() == first_line || self.out.last_line_is_closers() {
                 self.backtrack()
                     .next_single_line(|| self.out.space_token("{"))
                     .otherwise(newline_open_block)?;
+            } else {
+                newline_open_block()?;
             }
             Ok(self.out.line() == first_line)
         })

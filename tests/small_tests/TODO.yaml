@@ -70,7 +70,7 @@
       // todo prefer not to overflow
       list(Braces::PARENS, &parenthesized_args.inputs, |af, ty, _lcx| {
           af.ty(ty)
-      })
+      });
       
       // todo next should not add block
       self.backtrack()
