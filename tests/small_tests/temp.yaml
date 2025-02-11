@@ -1,0 +1,43 @@
+- name: temp
+  type: no_change
+  in_block: true
+  formatted: |
+      let Some(remaining) = width_limit
+          .checked_sub(self.out.last_line_len() - line_start_pos)
+      else {
+          x;
+      };
+
+      // chains with two items should not enforce chain width
+      self.with_width_limit_from_start(line_start_pos, width_limit, f);
+
+      self.with_single_line_opt(self.constraints().requires_indent_middle(), || {
+          let first_line = self.out.line();
+          self.out.token_space(token)?;
+          self.expr(expr)?;
+          let force_newline = self.out.line() != first_line
+              && self.out.with_last_line(|line| {
+                  let after_indent = &line[self.out.constraints().indent.get() as usize..];
+                  after_indent
+                      .chars()
+                      .any(|c| !matches!(c, '(' | ')' | ']' | '}' | '?' | '>'))
+              });
+          let newline_open_block = || {
+              self.out.newline_within_indent()?;
+              self.out.token("{")?;
+              Ok(())
+          };
+          if force_newline {
+              newline_open_block()?;
+          } else {
+              self.backtrack()
+                  .next_single_line(|| self.out.space_token("{"))
+                  .otherwise(newline_open_block)?;
+          }
+          Ok(self.out.line() == first_line)
+      })
+    
+    
+      // idea: dots must be within the first 30 chars for the chain to be one line
+      self.asdfadfasdadfasdadfasadf.adadfasdaaasdfasdf(asdfasdfa, asdfasdfa, || {
+      })

@@ -6,13 +6,13 @@ use rustc_errors::DiagCtxt;
 use rustc_errors::ErrorGuaranteed;
 use rustc_errors::emitter::HumanEmitter;
 use rustc_errors::emitter::stderr_destination;
+use rustc_parse::parser::ExpTokenPair;
 use rustc_parse::parser::Parser;
 use rustc_session::parse::ParseSess;
 use rustc_span::FileName;
 use rustc_span::source_map::FilePathMapping;
 use rustc_span::source_map::SourceMap;
 use rustc_span::symbol::Ident;
-use rustc_parse::parser::ExpTokenPair;
 use std::sync::Arc;
 
 pub struct ParseModuleResult {
@@ -42,7 +42,7 @@ pub fn parse_module(
     let (attrs, items, spans) = parser
         .parse_mod(ExpTokenPair {
             tok: &rustc_ast::token::Eof,
-            token_type: rustc_parse::parser::token_type::TokenType::Eof
+            token_type: rustc_parse::parser::token_type::TokenType::Eof,
         })
         .map_err(|err| err.emit())?;
     let module = AstModule {
