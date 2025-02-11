@@ -214,11 +214,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn postfix_items(
-        &self,
-        items: &[PostfixItem<'_>],
-        start_pos: u32,
-    ) -> FormatResult {
+    fn postfix_items(&self, items: &[PostfixItem<'_>], start_pos: u32) -> FormatResult {
         items.iter().try_for_each(|item| {
             self.with_chain_item_max_width(start_pos, || self.postfix_item(item))
         })
