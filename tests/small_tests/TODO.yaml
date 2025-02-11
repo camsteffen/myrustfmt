@@ -65,3 +65,4 @@
       } else {
           self.arm_body_add_block_if_first_line_is_longer(body)
       })?;
+      

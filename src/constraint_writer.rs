@@ -225,4 +225,10 @@ impl ConstraintWriter {
     pub fn last_line_len(&self) -> usize {
         self.len() - self.last_line_start.get()
     }
+
+    // for debugging
+    // #[allow(unused)]
+    pub fn with_taken_buffer(&self, f: impl FnOnce(&mut String)) {
+        self.buffer.with_taken(f)
+    }
 }

@@ -286,6 +286,10 @@ impl SourceFormatter {
         self.source.advance(token.len());
         Ok(())
     }
+
+    pub fn with_taken_buffer(&self, f: impl FnOnce(&mut String)) {
+        self.out.with_taken_buffer(f)
+    }
 }
 
 #[cfg(test)]

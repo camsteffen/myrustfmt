@@ -22,8 +22,8 @@ impl AstFormatter {
 
     fn arm_after_attrs(&self, arm: &ast::Arm) -> FormatResult {
         let first_line = self.out.line();
-        self.pat(&arm.pat)?;
         if let Some(guard) = arm.guard.as_deref() {
+            self.pat(&arm.pat)?;
             if self.out.line() == first_line {
                 self.backtrack()
                     .next(|| self.arm_guard_same_line(arm, guard))
@@ -32,8 +32,14 @@ impl AstFormatter {
                 self.arm_guard_separate_line(arm, guard)?;
             }
         } else if let Some(body) = arm.body.as_deref() {
-            self.out.space_token_space("=>")?;
-            self.arm_body(body)?;
+            self.pat_tail(
+                &arm.pat,
+                &Tail::func(|af| {
+                    af.out.space_token_space("=>")?;
+                    af.arm_body(body)?;
+                    Ok(())
+                }),
+            )?;
         }
         Ok(())
     }
@@ -111,47 +117,45 @@ impl AstFormatter {
         }
         let extra_width = start - next_line_start;
 
-        let result = self
-            .backtrack()
-            .next_control_flow(|| {
-                // We're going to try formatting on the same line, but adding extra width to simulate
-                // wrapping with a block. Use the single-line constraint since we just want to see what
-                // fits on the first line.
-                let result = self.with_single_line(|| {
-                    self.constraints()
-                        .max_width
-                        .with_replaced(Some(max_width + extra_width), || self.expr(body))
-                });
-                let used_extra_width = self.out.last_line_len() > max_width;
-                match (used_extra_width, result) {
-                    (
-                        true,
-                        Ok(()) | Err(FormatError::Constraint(ConstraintError::NewlineNotAllowed)),
-                    ) => {
-                        // we used the extra width, so we need to add a block to make the first line fit
-                        ControlFlow::Continue(true)
-                    }
-                    (false, Err(FormatError::Constraint(ConstraintError::NewlineNotAllowed))) => {
-                        // we did not use the extra width, but it did not fit on one line,
-                        // so try to format normally without a block
-                        ControlFlow::Continue(false)
-                    }
-                    (false, Ok(())) => {
-                        // it fits on one line, but now we need a comma
-                        match self.out.token_insert(",") {
-                            // welp the comma didn't fit,
-                            // but the expression will fit on one line if we add a block
-                            Err(FormatError::Constraint(_)) => ControlFlow::Continue(true),
-                            // it all fits on one line!
-                            Ok(()) => ControlFlow::Break(Ok(())),
-                            // terminal error
-                            Err(e) => ControlFlow::Break(Err(e)),
-                        }
-                    }
-                    // terminal error
-                    (_, Err(e)) => ControlFlow::Break(Err(e)),
-                }
+        let result = self.backtrack().next_control_flow(|| {
+            // We're going to try formatting on the same line, but adding extra width to simulate
+            // wrapping with a block. Use the single-line constraint since we just want to see what
+            // fits on the first line.
+            let result = self.with_single_line(|| {
+                self.constraints()
+                    .max_width
+                    .with_replaced(Some(max_width + extra_width), || self.expr(body))
             });
+            let used_extra_width = self.out.last_line_len() > max_width;
+            match (used_extra_width, result) {
+                (
+                    true,
+                    Ok(()) | Err(FormatError::Constraint(ConstraintError::NewlineNotAllowed)),
+                ) => {
+                    // we used the extra width, so we need to add a block to make the first line fit
+                    ControlFlow::Continue(true)
+                }
+                (false, Err(FormatError::Constraint(ConstraintError::NewlineNotAllowed))) => {
+                    // we did not use the extra width, but it did not fit on one line,
+                    // so try to format normally without a block
+                    ControlFlow::Continue(false)
+                }
+                (false, Ok(())) => {
+                    // it fits on one line, but now we need a comma
+                    match self.out.token_insert(",") {
+                        // welp the comma didn't fit,
+                        // but the expression will fit on one line if we add a block
+                        Err(FormatError::Constraint(_)) => ControlFlow::Continue(true),
+                        // it all fits on one line!
+                        Ok(()) => ControlFlow::Break(Ok(())),
+                        // terminal error
+                        Err(e) => ControlFlow::Break(Err(e)),
+                    }
+                }
+                // terminal error
+                (_, Err(e)) => ControlFlow::Break(Err(e)),
+            }
+        });
         let (backtrack, should_add_block) = return_if_break!(result);
         if should_add_block {
             backtrack.otherwise(|| self.expr_add_block(body))
