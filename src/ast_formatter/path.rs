@@ -56,29 +56,42 @@ impl AstFormatter {
     ) -> FormatResult {
         self.ident(segment.ident)?;
         if let Some(generic_args) = segment.args.as_deref() {
-            if turbofish {
-                self.out.token("::")?;
-            }
-            self.generic_args(generic_args, tail)?;
+            self.generic_args(generic_args, turbofish, tail)?;
         } else {
             self.tail(tail)?;
         }
         Ok(())
     }
 
-    fn generic_args(&self, generic_args: &ast::GenericArgs, tail: &Tail) -> FormatResult {
+    fn generic_args(
+        &self,
+        generic_args: &ast::GenericArgs,
+        turbofish: bool,
+        tail: &Tail,
+    ) -> FormatResult {
         match generic_args {
+            ast::GenericArgs::AngleBracketed(args) if args.args.is_empty() => {
+                if turbofish {
+                    self.out.skip_token("::")?;
+                }
+                self.out.skip_token("<")?;
+                self.out.skip_token(">")?;
+            }
             ast::GenericArgs::AngleBracketed(args) => {
+                if turbofish {
+                    self.out.token("::")?;
+                }
                 list(Braces::ANGLE, &args.args, Self::angle_bracketed_arg)
                     .tail(tail)
-                    .format(self)
+                    .format(self)?
             }
             // (A, B) -> C
             ast::GenericArgs::Parenthesized(parenthesized_args) => {
-                self.parenthesized_args(parenthesized_args, tail)
+                self.parenthesized_args(parenthesized_args, tail)?
             }
             ast::GenericArgs::ParenthesizedElided(_span) => todo!(),
         }
+        Ok(())
     }
 
     fn angle_bracketed_arg(
@@ -102,7 +115,7 @@ impl AstFormatter {
     ) -> FormatResult {
         self.ident(constraint.ident)?;
         if let Some(generic_args) = &constraint.gen_args {
-            self.generic_args(generic_args, Tail::none())?;
+            self.generic_args(generic_args, false, Tail::none())?;
         }
         match &constraint.kind {
             ast::AssocItemConstraintKind::Bound { bounds } => self.generic_bounds(bounds, tail),

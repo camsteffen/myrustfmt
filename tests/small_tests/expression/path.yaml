@@ -1,0 +1,7 @@
+- name: empty turbofish
+  type: before_after
+  in_block: true
+  before: |
+    foo::<>;
+  after: |
+    foo;
