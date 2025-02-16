@@ -76,6 +76,7 @@ impl AstFormatter {
                 }
                 self.out.skip_token("<")?;
                 self.out.skip_token(">")?;
+                self.tail(tail)?;
             }
             ast::GenericArgs::AngleBracketed(args) => {
                 if turbofish {
@@ -87,6 +88,7 @@ impl AstFormatter {
             }
             // (A, B) -> C
             ast::GenericArgs::Parenthesized(parenthesized_args) => {
+                assert_eq!(turbofish, false);
                 self.parenthesized_args(parenthesized_args, tail)?
             }
             ast::GenericArgs::ParenthesizedElided(_span) => todo!(),

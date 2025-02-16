@@ -63,3 +63,15 @@
             x;
         })
     }
+- name: breakpoint on closure with args inside args list
+  type: breakpoint
+  in_block: true
+  before: |
+   foo(first_arg, |arg, arg| {
+       result
+   })
+  after: |
+    foo(
+        first_arg,
+        |arg, arg| result,
+    )

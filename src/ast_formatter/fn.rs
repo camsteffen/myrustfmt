@@ -23,8 +23,8 @@ impl AstFormatter {
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
-        let param_list = list(Braces::PARENS, &sig.decl.inputs, Self::param)
-            .config(ParamListConfig {
+        let param_list =
+            list(Braces::PARENS, &sig.decl.inputs, Self::param).config(ParamListConfig {
                 single_line_max_contents_width: None,
             });
         self.backtrack()
@@ -112,10 +112,10 @@ impl AstFormatter {
                 // add a block unless it fits on a single line
                 self.backtrack()
                     .next(|| {
-                        self.constraints()
-                            .with_multi_line_constraint(MultiLineConstraint::SingleLineLists, || {
-                                self.expr_tail(body, tail)
-                            })
+                        self.constraints().with_multi_line_constraint(
+                            MultiLineConstraint::SingleLineLists,
+                            || self.expr_tail(body, tail),
+                        )
                     })
                     .otherwise(|| {
                         self.expr_add_block(body)?;
@@ -147,12 +147,11 @@ impl AstFormatter {
             ast::FnRetTy::Default(_) => (tail, Tail::none()),
             ast::FnRetTy::Ty(_) => (Tail::none(), tail),
         };
-        list(Braces::PARENS, &parenthesized_args.inputs, |
-            af,
-            ty,
-            tail,
-            _lcx,
-        | af.ty_tail(ty, tail))
+        list(
+            Braces::PARENS,
+            &parenthesized_args.inputs,
+            |af, ty, tail, _lcx| af.ty_tail(ty, tail),
+        )
         .config(ParamListConfig {
             single_line_max_contents_width: None,
         })
@@ -183,22 +182,28 @@ impl AstFormatter {
     }
 
     fn fn_decl(&self, fn_decl: &ast::FnDecl, braces: &'static Braces, tail: &Tail) -> FormatResult {
+        let do_single_line = || {
+            self.with_single_line(|| {
+                list(braces, &fn_decl.inputs, Self::param).format_single_line(self)?;
+                self.fn_ret_ty(&fn_decl.output)?;
+                Ok(())
+            })?;
+            self.tail(tail)?;
+            Ok(())
+        };
+        if self.out.constraints().multi_line.get() >= MultiLineConstraint::SingleLineLists {
+            return do_single_line();
+        }
         // args and return type all on one line
         self.backtrack()
-            .next(|| {
-                self.with_single_line(|| {
-                    list(braces, &fn_decl.inputs, Self::param)
-                        .format_single_line(self)?;
-                    self.fn_ret_ty(&fn_decl.output)?;
-                    Ok(())
-                })?;
-                self.tail(tail)?;
-                Ok(())
-            })
+            .next(do_single_line)
             // args on separate lines
             .otherwise(|| {
-                list(braces, &fn_decl.inputs, Self::param)
-                    .format_separate_lines(self)?;
+                self.constraints()
+                    .with_multi_line_constraint_to_single_line(
+                        MultiLineConstraint::SingleLineLists,
+                        || list(braces, &fn_decl.inputs, Self::param).format_separate_lines(self),
+                    )?;
                 self.fn_ret_ty(&fn_decl.output)?;
                 self.tail(tail)?;
                 Ok(())
