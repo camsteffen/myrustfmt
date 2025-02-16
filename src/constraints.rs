@@ -23,16 +23,16 @@ pub struct MaxWidthForLine {
 // todo name variants by what they *allow* ?
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum MultiLineConstraint {
-    /// No constraint
-    MultiLine,
-    /// All lines between the first and last lines must be indented away from the margin
-    IndentMiddle,
-    /// Same as IndentMiddle, but also disallow formats where the last line is indented
-    NoHangingIndent,
-    /// Same as NoHangingIndent, but also disallow multi-line lists and overflow in lists
-    SingleLineLists,
     /// No newline characters allowed (enforced by ConstraintWriter)
     SingleLine,
+    /// Same as NoHangingIndent, but also disallow multi-line lists and overflow in lists
+    SingleLineLists,
+    /// Same as IndentMiddle, but also disallow formats where the last line is indented
+    NoHangingIndent,
+    /// All lines between the first and last lines must be indented away from the margin
+    IndentMiddle,
+    /// No constraint
+    MultiLine,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -74,15 +74,15 @@ impl Constraints {
     }
 
     pub fn requires_indent_middle(&self) -> bool {
-        self.multi_line.get() >= MultiLineConstraint::IndentMiddle
+        self.multi_line.get() <= MultiLineConstraint::IndentMiddle
     }
 
     pub fn requires_no_hanging_indent(&self) -> bool {
-        self.multi_line.get() >= MultiLineConstraint::NoHangingIndent
+        self.multi_line.get() <= MultiLineConstraint::NoHangingIndent
     }
 
     pub fn requires_single_line(&self) -> bool {
-        self.multi_line.get() >= MultiLineConstraint::SingleLine
+        self.multi_line.get() <= MultiLineConstraint::SingleLine
     }
 
     pub fn with_multi_line_constraint<T>(
@@ -90,7 +90,7 @@ impl Constraints {
         constraint: MultiLineConstraint,
         f: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        if self.multi_line.get() >= constraint {
+        if self.multi_line.get() <= constraint {
             f()
         } else {
             self.multi_line.with_replaced(constraint, f)
@@ -113,7 +113,7 @@ impl Constraints {
         constraint: MultiLineConstraint,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        if self.multi_line.get() < constraint {
+        if self.multi_line.get() > constraint {
             scope()
         } else {
             self.multi_line

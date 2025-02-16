@@ -191,7 +191,7 @@ impl AstFormatter {
             self.tail(tail)?;
             Ok(())
         };
-        if self.out.constraints().multi_line.get() >= MultiLineConstraint::SingleLineLists {
+        if self.out.constraints().multi_line.get() <= MultiLineConstraint::SingleLineLists {
             return do_single_line();
         }
         // args and return type all on one line

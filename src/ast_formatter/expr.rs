@@ -214,7 +214,7 @@ impl AstFormatter {
                 match lcx.strategy {
                     // overflow last item
                     ListStrategy::SingleLine
-                        if outer_multi_line < MultiLineConstraint::SingleLineLists
+                        if outer_multi_line > MultiLineConstraint::SingleLineLists
                             && lcx.index == lcx.len - 1 =>
                     {
                         // override the multi-line constraint to be less strict than SingleLine
