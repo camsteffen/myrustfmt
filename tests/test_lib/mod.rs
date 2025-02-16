@@ -28,7 +28,7 @@ pub fn breakpoint_test(before: &str, after: &str, in_block: bool) -> TestResult 
 fn format_in_block(stmt: &str, max_width: Option<u32>) -> String {
     let (prefix, indent, suffix) = ("fn test() {\n", "    ", "}\n");
     let stmt = String::from_iter(stmt.lines().map(|s| format!("{indent}{s}\n")));
-    let crate_source = format!("{prefix}{stmt}{suffix}");
+    let module_source = format!("{prefix}{stmt}{suffix}");
     let mut config = Config::default();
     if let Some(max_width) = max_width {
         let max_width = max_width + indent.len() as u32;
@@ -38,10 +38,10 @@ fn format_in_block(stmt: &str, max_width: Option<u32>) -> String {
         }
         config = config.max_width(max_width);
     }
-    let result = format_str_config(&crate_source, config)
+    let result = format_str_config(&module_source, config)
         .unwrap()
         .expect_not_exceeded_max_width();
-    let mut formatted_stmt = result
+    let lines = result
         .strip_prefix(prefix)
         .unwrap_or_else(|| panic!(
                 "formatted output does not have expected prefix: {:?}",
@@ -52,20 +52,17 @@ fn format_in_block(stmt: &str, max_width: Option<u32>) -> String {
                 "formatted output does not have expected suffix: {:?}",
                 result
             ))
-        .lines()
-        .enumerate()
-        .fold(String::new(), |mut acc, (i, line)| {
-            if !line.is_empty() {
-                acc.push_str(
-                    line.strip_prefix("    ")
-                        .unwrap_or_else(|| panic!("line {i} is not indented: {line}")),
-                );
-            }
-            acc.push('\n');
-            acc
-        });
-    formatted_stmt.pop().unwrap();
-    formatted_stmt
+        .lines();
+    let mut out = String::new();
+    for (i, line) in lines.enumerate() {
+        if !line.is_empty() {
+            out.push_str(line.strip_prefix("    ").unwrap_or_else(|| {
+                panic!("line {i} is not indented\nLine: {line}\nOutput:\n{result}")
+            }));
+        }
+        out.push('\n');
+    }
+    out
 }
 
 pub fn format_max_width_expected(
@@ -82,13 +79,12 @@ pub fn format_max_width_expected(
         if let Some(max_width) = max_width {
             config = config.max_width(max_width)
         }
-        let mut formatted = format_str_config(source, config)
+        format_str_config(source, config)
             .unwrap()
-            .expect_not_exceeded_max_width();
-        formatted.pop();
-        formatted
+            .expect_not_exceeded_max_width()
     };
-    expect_formatted_equals(&formatted, expected, name)?;
+    let expected = format!("{expected}\n");
+    expect_formatted_equals(&formatted, &expected, name)?;
     Ok(())
 }
 

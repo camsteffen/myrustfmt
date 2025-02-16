@@ -5,3 +5,14 @@
     where
         T: Copy,
     {}
+- name: self argument only
+  type: no_change
+  formatted: |
+    fn test(self) {}
+    fn test(&self);
+    fn test(&mut self);
+    fn test(self: &Foo);
+- name: non self argument
+  type: no_change
+  formatted: |
+    fn test(more: &Foo) {}

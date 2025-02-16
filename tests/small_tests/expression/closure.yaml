@@ -1,3 +1,29 @@
+- name: breakpoint on single line closure with args
+  type: breakpoint
+  in_block: true
+  before: |
+    |arg, arg| result;
+  after: |
+    |arg, arg| {
+        result
+    };
+- name: breakpoint on single expr block and args
+  type: breakpoint
+  in_block: true
+  before: |
+    |arg, arg| {
+        result
+    };
+  after: |
+    |
+        arg,
+        arg,
+    | result;
+- name: return type and small expression
+  type: no_change
+  in_block: true
+  formatted: |
+    || -> Foo { x }
 - name: closure with multi-line chain
   type: before_after
   in_block: true

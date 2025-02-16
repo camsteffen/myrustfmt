@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::Braces;
+use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 
@@ -23,12 +23,10 @@ impl AstFormatter {
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
-        let param_list = list(Braces::PARENS, &sig.decl.inputs, |af, param, _lcx| {
-            af.param(param)
-        })
-        .config(ParamListConfig {
-            single_line_max_contents_width: None,
-        });
+        let param_list = list(Braces::PARENS, &sig.decl.inputs, Self::param)
+            .config(ParamListConfig {
+                single_line_max_contents_width: None,
+            });
         self.backtrack()
             .next_single_line(|| {
                 param_list.format_single_line(self)?;
@@ -90,33 +88,44 @@ impl AstFormatter {
         if let Some(coroutine_kind) = coroutine_kind {
             self.coroutine_kind(coroutine_kind)?;
         }
-        self.fn_decl(fn_decl, Braces::PIPE)?;
-        self.out.space()?;
-        self.closure_body(body, tail)?;
+        self.fn_decl(
+            fn_decl,
+            Braces::PIPE,
+            &Tail::func(|af| {
+                af.out.space()?;
+                let can_remove_block = matches!(fn_decl.output, ast::FnRetTy::Default(_));
+                af.closure_body(body, can_remove_block, tail)?;
+                Ok(())
+            }),
+        )?;
         Ok(())
     }
 
-    fn closure_body(&self, body: &ast::Expr, tail: &Tail) -> FormatResult {
-        self.skip_single_expr_blocks(body, |body| {
-            // todo consider allowing `match`, `loop`, `if`, `for`, `while` if the header fits on one line
-            //   should we preserve the block in such cases?
-            //   actually, does indent-middle or SingleLineChains make sense here?
-            //   and if/for/while should enforce single line headers
+    fn closure_body(&self, body: &ast::Expr, can_remove_block: bool, tail: &Tail) -> FormatResult {
+        if can_remove_block {
+            self.skip_single_expr_blocks_tail(body, tail, |body, tail| {
+                // todo consider allowing `match`, `loop`, `if`, `for`, `while` if the header fits on one line
+                //   should we preserve the block in such cases?
+                //   actually, does indent-middle or SingleLineChains make sense here?
+                //   and if/for/while should enforce single line headers
 
-            // add a block unless it fits on a single line
-            self.backtrack()
-                .next(|| {
-                    self.constraints()
-                        .with_multi_line_constraint(MultiLineConstraint::SingleLineLists, || {
-                            self.expr_tail(body, tail)
-                        })
-                })
-                .otherwise(|| {
-                    self.expr_add_block(body)?;
-                    self.tail(tail)?;
-                    Ok(())
-                })
-        })
+                // add a block unless it fits on a single line
+                self.backtrack()
+                    .next(|| {
+                        self.constraints()
+                            .with_multi_line_constraint(MultiLineConstraint::SingleLineLists, || {
+                                self.expr_tail(body, tail)
+                            })
+                    })
+                    .otherwise(|| {
+                        self.expr_add_block(body)?;
+                        self.tail(tail)?;
+                        Ok(())
+                    })
+            })
+        } else {
+            self.expr_tail(body, tail)
+        }
     }
 
     pub fn bare_fn_ty(&self, bare_fn_ty: &ast::BareFnTy) -> FormatResult {
@@ -125,7 +134,7 @@ impl AstFormatter {
         // self.extern_(&bare_fn_ty.ext)?;
         // self.generic_params(&bare_fn_ty.generic_params)?;
         self.out.token("fn")?;
-        self.fn_decl(&bare_fn_ty.decl, Braces::PARENS)?;
+        self.fn_decl(&bare_fn_ty.decl, Braces::PARENS, Tail::none())?;
         Ok(())
     }
 
@@ -138,9 +147,12 @@ impl AstFormatter {
             ast::FnRetTy::Default(_) => (tail, Tail::none()),
             ast::FnRetTy::Ty(_) => (Tail::none(), tail),
         };
-        list(Braces::PARENS, &parenthesized_args.inputs, |af, ty, _lcx| {
-            af.ty(ty)
-        })
+        list(Braces::PARENS, &parenthesized_args.inputs, |
+            af,
+            ty,
+            tail,
+            _lcx,
+        | af.ty_tail(ty, tail))
         .config(ParamListConfig {
             single_line_max_contents_width: None,
         })
@@ -170,56 +182,74 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn fn_decl(&self, fn_decl: &ast::FnDecl, braces: &'static Braces) -> FormatResult {
-        let param_list = list(braces, &fn_decl.inputs, |af, param, _lcx| af.param(param));
+    fn fn_decl(&self, fn_decl: &ast::FnDecl, braces: &'static Braces, tail: &Tail) -> FormatResult {
         // args and return type all on one line
         self.backtrack()
-            .next_single_line(|| {
-                param_list.format_single_line(self)?;
-                self.fn_ret_ty(&fn_decl.output)?;
+            .next(|| {
+                self.with_single_line(|| {
+                    list(braces, &fn_decl.inputs, Self::param)
+                        .format_single_line(self)?;
+                    self.fn_ret_ty(&fn_decl.output)?;
+                    Ok(())
+                })?;
+                self.tail(tail)?;
                 Ok(())
             })
             // args on separate lines
             .otherwise(|| {
-                param_list.format_separate_lines(self)?;
+                list(braces, &fn_decl.inputs, Self::param)
+                    .format_separate_lines(self)?;
                 self.fn_ret_ty(&fn_decl.output)?;
+                self.tail(tail)?;
                 Ok(())
             })
     }
 
-    fn param(&self, param: &ast::Param) -> FormatResult {
-        self.with_attrs(&param.attrs, param.span, || self.param_after_attrs(param))
+    fn param(&self, param: &ast::Param, tail: &Tail, _lcx: ListItemContext) -> FormatResult {
+        self.with_attrs_tail(&param.attrs, param.span, tail, || {
+            self.param_after_attrs(param, tail)
+        })
     }
 
-    fn param_after_attrs(&self, param: &ast::Param) -> FormatResult {
+    fn param_after_attrs(&self, param: &ast::Param, tail: &Tail) -> FormatResult {
+        let colon_ty = |af: &Self| {
+            af.out.token_space(":")?;
+            af.ty_tail(&param.ty, tail)?;
+            Ok(())
+        };
         if let ast::PatKind::Ident(BindingMode(_, mutbl), ident, _) = param.pat.kind {
             match ident.name {
-                kw::Empty => return self.ty(&param.ty),
+                // kw::Empty => return self.ty_tail(&param.ty, tail),
+                kw::Empty => panic!(),
                 kw::SelfLower => {
                     match param.ty.kind {
                         ast::TyKind::ImplicitSelf => {
                             self.mutability(mutbl)?;
-                            self.ty(&param.ty)?;
+                            self.ty_tail(&param.ty, tail)?;
                             return Ok(());
                         }
-                        ast::TyKind::Ref(..) | ast::TyKind::PinnedRef(..) => {
-                            return self.ty(&param.ty);
+                        ast::TyKind::Ref(_, ref mut_ty) | ast::TyKind::PinnedRef(_, ref mut_ty)
+                            if mut_ty.ty.kind.is_implicit_self() =>
+                        {
+                            return self.ty_tail(&param.ty, tail);
                         }
                         _ => {
                             self.mutability(mutbl)?;
                             self.out.token("self")?;
+                            colon_ty(self)?;
+                            return Ok(());
                         }
                     };
                 }
-                _ => self.pat(&param.pat)?,
+                _ => {}
             }
+        }
+        let tail = if matches!(param.ty.kind, ast::TyKind::Infer) {
+            tail
         } else {
-            self.pat(&param.pat)?;
-        }
-        if !matches!(param.ty.kind, ast::TyKind::Infer) {
-            self.out.token_space(":")?;
-            self.ty(&param.ty)?;
-        }
+            &Tail::func(colon_ty)
+        };
+        self.pat_tail(&param.pat, tail)?;
         Ok(())
     }
 

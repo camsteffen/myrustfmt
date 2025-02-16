@@ -6,7 +6,7 @@ use crate::ast_formatter::list::builder::list;
 use crate::ast_formatter::list::list_config::{
     ListConfig, ListWrapToFitConfig, ParamListConfig, struct_field_list_config,
 };
-use crate::ast_formatter::list::{Braces, ListItemConfig};
+use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext};
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -42,7 +42,7 @@ impl AstFormatter {
             }
             ast::ItemKind::Use(use_tree) => {
                 self.out.token_space("use")?;
-                self.use_tree_tail(use_tree, &Tail::token(";"))?;
+                self.use_tree(use_tree, &Tail::token(";"))?;
             }
             ast::ItemKind::Static(static_item) => {
                 self.out.token_space("static")?;
@@ -66,7 +66,8 @@ impl AstFormatter {
                         self.out.space()?;
                         self.block_generic(items, |item| self.item(item))?;
                     }
-                    ast::ModKind::Loaded(_, ast::Inline::No, _, ..) | ast::ModKind::Unloaded => {
+                    ast::ModKind::Loaded(_, ast::Inline::No, _, ..)
+                    | ast::ModKind::Unloaded => {
                         self.out.token(";")?;
                     }
                 }
@@ -150,12 +151,12 @@ impl AstFormatter {
         self.ident(item.ident)?;
         self.generic_params(&generics.params)?;
         self.out.space()?;
-        list(Braces::CURLY, variants, |af, v, _lcx| af.variant(v))
+        list(Braces::CURLY, variants, Self::variant)
             .format_separate_lines(self)?;
         Ok(())
     }
 
-    fn variant(&self, variant: &ast::Variant) -> FormatResult {
+    fn variant(&self, variant: &ast::Variant, tail: &Tail, _lcx: ListItemContext) -> FormatResult {
         self.with_attrs(&variant.attrs, variant.span, || {
             self.vis(&variant.vis)?;
             self.ident(variant.ident)?;
@@ -163,6 +164,7 @@ impl AstFormatter {
             if let Some(_discriminant) = &variant.disr_expr {
                 todo!()
             }
+            self.tail(tail)?;
             Ok(())
         })
     }
@@ -279,10 +281,9 @@ impl AstFormatter {
         match variants {
             ast::VariantData::Struct { fields, .. } => {
                 self.out.space()?;
-                let list = list(Braces::CURLY, fields, |af, f, _lcx| af.field_def(f))
-                    .config(struct_field_list_config(
-                        RUSTFMT_CONFIG_DEFAULTS.struct_variant_width,
-                    ));
+                let list = list(Braces::CURLY, fields, Self::field_def).config(
+                    struct_field_list_config(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width),
+                );
                 if is_enum {
                     list.format(self)?;
                 } else {
@@ -291,7 +292,7 @@ impl AstFormatter {
                 Ok(())
             }
             ast::VariantData::Tuple(fields, _) => {
-                list(Braces::PARENS, fields, |af, f, _lcx| af.field_def(f))
+                list(Braces::PARENS, fields, Self::field_def)
                     .config(ParamListConfig {
                         single_line_max_contents_width: None,
                     })
@@ -301,23 +302,19 @@ impl AstFormatter {
         }
     }
 
-    fn field_def(&self, field: &ast::FieldDef) -> FormatResult {
-        self.with_attrs(&field.attrs, field.span, || {
+    fn field_def(&self, field: &ast::FieldDef, tail: &Tail, _lcx: ListItemContext) -> FormatResult {
+        self.with_attrs_tail(&field.attrs, field.span, tail, || {
             self.vis(&field.vis)?;
             if let Some(ident) = field.ident {
                 self.ident(ident)?;
                 self.out.token_space(":")?;
             }
-            self.ty(&field.ty)?;
+            self.ty_tail(&field.ty, tail)?;
             Ok(())
         })
     }
 
-    fn use_tree(&self, use_tree: &ast::UseTree) -> FormatResult {
-        self.use_tree_tail(use_tree, Tail::none())
-    }
-
-    fn use_tree_tail(&self, use_tree: &ast::UseTree, tail: &Tail) -> FormatResult {
+    fn use_tree(&self, use_tree: &ast::UseTree, tail: &Tail) -> FormatResult {
         self.path(&use_tree.prefix, false)?;
         match use_tree.kind {
             ast::UseTreeKind::Simple(rename) => {
@@ -329,9 +326,12 @@ impl AstFormatter {
             }
             ast::UseTreeKind::Nested { ref items, span: _ } => {
                 self.out.token("::")?;
-                list(Braces::CURLY_NO_PAD, items, |af, (use_tree, _), _lcx| {
-                    af.use_tree(use_tree)
-                })
+                list(Braces::CURLY_NO_PAD, items, |
+                    af,
+                    (use_tree, _),
+                    tail,
+                    _lcx,
+                | af.use_tree(use_tree, tail))
                 .config(UseTreeListConfig)
                 .item_config(UseTreeListItemConfig)
                 .tail(tail)

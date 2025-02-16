@@ -1,4 +1,5 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 
 impl AstFormatter {
@@ -8,6 +9,7 @@ impl AstFormatter {
         items: &[T],
         format_item: impl Fn(&T) -> FormatResult,
         should_indent: bool,
+        tail: &Tail,
     ) -> FormatResult {
         let (first, rest) = items.split_first().unwrap();
         self.backtrack()
@@ -17,6 +19,7 @@ impl AstFormatter {
                     self.out.space_token_space(token)?;
                     format_item(item)?;
                 }
+                self.tail(tail)?;
                 Ok(())
             })
             .otherwise(|| {
@@ -27,6 +30,7 @@ impl AstFormatter {
                         self.out.token_space(token)?;
                         format_item(item)?;
                     }
+                    self.tail(tail)?;
                     Ok(())
                 })?;
                 Ok(())

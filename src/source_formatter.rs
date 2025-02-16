@@ -5,11 +5,11 @@ use crate::constraint_writer::{
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::ErrorEmitter;
-use crate::source_formatter::whitespace::{NewlineKind, WhitespaceMode};
+use crate::source_formatter::whitespace::{NewlineKind, NewlineMin, WhitespaceMode};
 use crate::source_reader::SourceReader;
+use crate::util::chars::is_closer_char;
 use rustc_span::{BytePos, Pos, Span};
 use std::rc::Rc;
-use crate::util::chars::is_closer_char;
 
 mod whitespace;
 
@@ -110,12 +110,15 @@ impl SourceFormatter {
     }
 
     pub fn newline(&self, kind: NewlineKind) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Vertical(kind))?;
+        self.handle_whitespace_and_comments(WhitespaceMode::Vertical {
+            kind,
+            min: NewlineMin::One,
+        })?;
         Ok(())
     }
 
     pub fn newline_indent(&self, kind: NewlineKind) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Vertical(kind))?;
+        self.newline(kind)?;
         self.indent()?;
         Ok(())
     }
@@ -144,31 +147,46 @@ impl SourceFormatter {
         self.newline_indent(NewlineKind::Within)
     }
 
+    pub fn newline_above_if_comments(&self) -> FormatResult<bool> {
+        self.handle_whitespace_and_comments(WhitespaceMode::Vertical {
+            kind: NewlineKind::Above,
+            min: NewlineMin::Zero,
+        })
+    }
+
     pub fn newline_if_comments(&self) -> FormatResult<bool> {
-        self.handle_whitespace_and_comments(WhitespaceMode::Vertical(NewlineKind::IfComments))
+        self.handle_whitespace_and_comments(WhitespaceMode::Vertical {
+            kind: NewlineKind::Within,
+            min: NewlineMin::Zero,
+        })
     }
 
     pub fn skip_token(&self, token: &str) -> FormatResult {
-        self.handle_whitespace_and_comments_if_needed()?;
+        self.horizontal_whitespace_only()?;
         self.source.eat(token)?;
         Ok(())
     }
 
-    pub fn skip_token_if_present(&self, token: &str) -> FormatResult {
+    pub fn skip_token_if_present(&self, token: &str) -> FormatResult<bool> {
         // todo is this checkpoint avoidable?
         let checkpoint = self.checkpoint();
-        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal { space: false })?;
+        let ws_result = self.handle_whitespace_and_comments(WhitespaceMode::Horizontal {
+            error_on_newline: true,
+            space: false,
+        });
         if self.source.remaining().starts_with(token) {
+            ws_result?;
             self.source.advance(token.len());
+            Ok(true)
         } else {
             self.restore_checkpoint(&checkpoint);
+            Ok(false)
         }
-        Ok(())
     }
 
     /** Writes a space and accounts for spaces and comments in source */
     pub fn copy_next_token(&self) -> FormatResult {
-        self.handle_whitespace_and_comments_if_needed()?;
+        self.horizontal_whitespace_only()?;
         let token = self.source.eat_next_token();
         self.out.token(&token)?;
         Ok(())
@@ -186,7 +204,7 @@ impl SourceFormatter {
      * N.B. a token is indivisible (e.g. "::<" is two tokens since you can write it as "::  <")
      */
     pub fn token(&self, token: &str) -> FormatResult {
-        self.handle_whitespace_and_comments_if_needed()?;
+        self.horizontal_whitespace_only()?;
         self.source.eat(token)?;
         self.out.token(&token)?;
         Ok(())
@@ -201,14 +219,17 @@ impl SourceFormatter {
     /** Writes a space and accounts for spaces and comments in source */
     // todo do newlines and comments sneak in when it should be single line?
     pub fn space(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal { space: true })?;
+        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal {
+            error_on_newline: true,
+            space: true,
+        })?;
         Ok(())
     }
 
     /// Handles whitespace and comments. This is useful when you need more fine-grained control of
     /// active constraints when formatting comments.
     pub fn no_space(&self) -> FormatResult {
-        self.handle_whitespace_and_comments_if_needed()
+        self.horizontal_whitespace_only()
     }
 
     pub fn token_space(&self, token: &str) -> FormatResult {
@@ -232,17 +253,14 @@ impl SourceFormatter {
 
     /** Write a token that may be next in source, or otherwise is missing from source */
     pub fn token_maybe_missing(&self, token: &str) -> FormatResult {
-        self.handle_whitespace_and_comments_if_needed()?;
-        if self.source.remaining().starts_with(token) {
-            self.token_unchecked(token)
-        } else {
-            self.token_insert(token)
-        }
+        self.skip_token_if_present(token)?;
+        self.token_insert(token)?;
+        Ok(())
     }
 
     /** Copy a token from source */
     pub fn token_from_source(&self, span: Span) -> FormatResult {
-        self.handle_whitespace_and_comments_if_needed()?;
+        self.horizontal_whitespace_only()?;
         self.source.expect_pos(span.lo())?;
         let token = self.source.get_span(span);
         self.token_unchecked(token)?;
@@ -253,8 +271,12 @@ impl SourceFormatter {
         self.out.with_last_line(f)
     }
 
-    fn handle_whitespace_and_comments_if_needed(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal { space: false })?;
+    // todo reconcile with horizontal_whitespace_only
+    fn horizontal_whitespace_only(&self) -> FormatResult {
+        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal {
+            error_on_newline: true,
+            space: false,
+        })?;
         Ok(())
     }
 
@@ -271,7 +293,7 @@ impl SourceFormatter {
     }
 
     pub fn copy_span(&self, span: Span) -> FormatResult {
-        self.handle_whitespace_and_comments_if_needed()?;
+        self.horizontal_whitespace_only()?;
         self.source.expect_pos(span.lo())?;
         self.copy(span.hi().to_usize() - span.lo().to_usize())?;
         Ok(())

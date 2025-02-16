@@ -97,9 +97,8 @@ impl AstFormatter {
                             self.out.token(";")?;
                             Ok(())
                         }
-                        ast::MacStmtStyle::Braces | ast::MacStmtStyle::NoBraces => {
-                            self.mac_call(&mac_call_stmt.mac)
-                        }
+                        ast::MacStmtStyle::Braces
+                        | ast::MacStmtStyle::NoBraces => self.mac_call(&mac_call_stmt.mac),
                     }
                 })
             }
@@ -121,14 +120,35 @@ impl AstFormatter {
         expr: &ast::Expr,
         format: impl FnOnce(&ast::Expr) -> FormatResult,
     ) -> FormatResult {
+        self.skip_single_expr_blocks_tail(expr, Tail::none(), |e, tail| {
+            format(e)?;
+            self.tail(tail)?;
+            Ok(())
+        })
+    }
+
+    /// `{{{ expr }}}` -> `expr`
+    pub fn skip_single_expr_blocks_tail(
+        &self,
+        expr: &ast::Expr,
+        tail: &Tail,
+        format: impl FnOnce(&ast::Expr, &Tail) -> FormatResult,
+    ) -> FormatResult {
         match plain_block(expr)
             .and_then(|b| self.try_into_expr_only_block(b))
         {
-            None => format(expr),
+            None => format(expr, tail),
             Some(ExprOnlyBlock(inner)) => {
                 self.out.skip_token("{")?;
-                self.skip_single_expr_blocks(inner, format)?;
-                self.out.skip_token("}")?;
+                self.skip_single_expr_blocks_tail(
+                    inner,
+                    &Tail::func(|af| {
+                        af.out.skip_token("}")?;
+                        self.tail(tail)?;
+                        Ok(())
+                    }),
+                    format,
+                )?;
                 Ok(())
             }
         }

@@ -2,7 +2,7 @@ use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::Braces;
+use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::builder::list;
 use crate::ast_formatter::list::list_config::{ParamListConfig, struct_field_list_config};
@@ -46,7 +46,7 @@ impl AstFormatter {
             }
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 self.qpath(qself, path, false)?;
-                list(Braces::PARENS, fields, |af, pat, _lcx| af.pat(pat))
+                list(Braces::PARENS, fields, Self::pat_list_item)
                     .config(ParamListConfig {
                         single_line_max_contents_width: None,
                     })
@@ -54,11 +54,11 @@ impl AstFormatter {
                     .format(self)?
             }
             ast::PatKind::Or(ref pats) => {
-                self.simple_infix_chain("|", pats, |pat| self.pat(pat), false)?
+                self.simple_infix_chain("|", pats, |pat| self.pat(pat), false, take_tail())?
             }
             ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false)?,
             ast::PatKind::Tuple(ref fields) => {
-                list(Braces::PARENS, fields, |af, pat, _lcx| af.pat(pat))
+                list(Braces::PARENS, fields, Self::pat_list_item)
                     .config(ParamListConfig {
                         single_line_max_contents_width: None,
                     })
@@ -81,7 +81,7 @@ impl AstFormatter {
                 self.range(start.as_deref(), sigil, end.as_deref(), take_tail())?;
             }
             ast::PatKind::Slice(ref elements) => {
-                list(Braces::SQUARE, elements, |af, pat, _lcx| af.pat(pat))
+                list(Braces::SQUARE, elements, Self::pat_list_item)
                     .tail(take_tail())
                     .format(self)?
             }
@@ -99,34 +99,41 @@ impl AstFormatter {
         Ok(())
     }
 
+    fn pat_list_item(&self, pat: &P<ast::Pat>, tail: &Tail, _lcx: ListItemContext) -> FormatResult {
+        self.pat_tail(pat, tail)
+    }
+
     fn struct_pat(
         &self,
         qself: &Option<P<ast::QSelf>>,
         path: &ast::Path,
         fields: &[ast::PatField],
         rest: ast::PatFieldsRest,
-        end: &Tail,
+        tail: &Tail,
     ) -> FormatResult {
         self.qpath(qself, path, false)?;
         self.out.space()?;
-        list(Braces::CURLY, fields, |af, f, _lcx| af.pat_field(f))
+        list(Braces::CURLY, fields, Self::pat_field)
             .config(struct_field_list_config(
                 RUSTFMT_CONFIG_DEFAULTS.struct_lit_width,
             ))
             .rest(ListRest::from(rest))
-            .tail(end)
+            .tail(tail)
             .format(self)
     }
 
-    fn pat_field(&self, pat_field: &ast::PatField) -> FormatResult {
-        self.with_attrs(&pat_field.attrs, pat_field.span, || {
-            if pat_field.is_shorthand {
-                self.pat(&pat_field.pat)?;
-            } else {
+    fn pat_field(
+        &self,
+        pat_field: &ast::PatField,
+        tail: &Tail,
+        _lcx: ListItemContext,
+    ) -> FormatResult {
+        self.with_attrs_tail(&pat_field.attrs, pat_field.span, tail, || {
+            if !pat_field.is_shorthand {
                 self.ident(pat_field.ident)?;
                 self.out.token_space(":")?;
-                self.pat(&pat_field.pat)?;
             }
+            self.pat_tail(&pat_field.pat, tail)?;
             Ok(())
         })
     }

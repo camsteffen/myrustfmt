@@ -44,14 +44,6 @@ impl AstFormatter {
             .with_multi_line_constraint(MultiLineConstraint::SingleLine, f)
     }
 
-    pub fn with_single_line_opt<T>(
-        &self,
-        apply: bool,
-        f: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        if apply { self.with_single_line(f) } else { f() }
-    }
-
     /** Enforces a max number of characters until a newline is printed */
     pub fn with_width_limit_first_line<T>(&self, width_limit: u32, f: impl FnOnce() -> T) -> T {
         let line = self.out.line();
@@ -98,18 +90,6 @@ impl AstFormatter {
         self.with_width_limit(remaining, f)
     }
 
-    pub fn with_width_limit_from_start_opt<T>(
-        &self,
-        line_start_pos: u32,
-        width_limit: Option<u32>,
-        f: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        let Some(width_limit) = width_limit else {
-            return f();
-        };
-        self.with_width_limit_from_start(line_start_pos, width_limit, f)
-    }
-
     pub fn with_width_limit_from_start_first_line<T>(
         &self,
         line_start_pos: u32,
@@ -153,24 +133,5 @@ impl AstFormatter {
                 .max_width
                 .with_replaced(Some(max_width), f)
         }
-    }
-
-    pub fn with_width_limit_opt(
-        &self,
-        width_limit: Option<u32>,
-        f: impl FnOnce() -> FormatResult,
-    ) -> FormatResult {
-        match width_limit {
-            None => f(),
-            Some(width_limit) => self.with_width_limit(width_limit, f),
-        }
-    }
-
-    pub fn with_single_line_and_width_limit(
-        &self,
-        width_limit: u32,
-        f: impl FnOnce() -> FormatResult,
-    ) -> FormatResult {
-        self.with_single_line(|| self.with_width_limit(width_limit, f))
     }
 }

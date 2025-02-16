@@ -170,7 +170,7 @@ impl AstFormatter {
         backtrack
             .next(|| {
                 self.constraints()
-                    .with_single_line_chains(|| self.expr_tail(body, &Tail::token_insert(",")))
+                    .with_no_hanging_indent(|| self.expr_tail(body, &Tail::token_insert(",")))
             })
             .otherwise(|| self.expr_add_block(body))
     }

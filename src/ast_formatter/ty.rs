@@ -40,13 +40,15 @@ impl AstFormatter {
             ast::TyKind::BareFn(bare_fn_ty) => self.bare_fn_ty(bare_fn_ty)?,
             ast::TyKind::Never => self.out.token("!")?,
             ast::TyKind::Tup(elements) => {
-                list(Braces::PARENS, elements, |af, ty, _lcx| af.ty(ty))
-                    .config(TupleListConfig {
-                        len: elements.len(),
-                        single_line_max_contents_width: None,
-                    })
-                    .tail(take_tail())
-                    .format(self)?
+                list(Braces::PARENS, elements, |af, ty, tail, _lcx| {
+                    af.ty_tail(ty, tail)
+                })
+                .config(TupleListConfig {
+                    len: elements.len(),
+                    single_line_max_contents_width: None,
+                })
+                .tail(take_tail())
+                .format(self)?
             }
             ast::TyKind::Path(qself, path) => self.qpath(qself, path, false)?,
             ast::TyKind::TraitObject(bounds, syntax) => {
@@ -57,11 +59,11 @@ impl AstFormatter {
                     ast::TraitObjectSyntax::DynStar => todo!(),
                     ast::TraitObjectSyntax::None => todo!(),
                 }
-                self.generic_bounds(bounds)?;
+                self.generic_bounds(bounds, take_tail())?;
             }
             ast::TyKind::ImplTrait(_, bounds) => {
                 self.out.token_space("impl")?;
-                self.generic_bounds(bounds)?;
+                self.generic_bounds(bounds, take_tail())?;
             }
             ast::TyKind::Paren(ty) => {
                 self.out.token("(")?;
@@ -97,13 +99,13 @@ impl AstFormatter {
     pub fn generic_bounds_optional(&self, bounds: &[ast::GenericBound]) -> FormatResult {
         if !bounds.is_empty() {
             self.out.token_space(":")?;
-            self.generic_bounds(bounds)?;
+            self.generic_bounds(bounds, Tail::none())?;
         }
         Ok(())
     }
 
-    pub fn generic_bounds(&self, bounds: &[ast::GenericBound]) -> FormatResult {
-        self.simple_infix_chain("+", bounds, |b| self.generic_bound(b), true)
+    pub fn generic_bounds(&self, bounds: &[ast::GenericBound], tail: &Tail) -> FormatResult {
+        self.simple_infix_chain("+", bounds, |b| self.generic_bound(b), true, tail)
     }
 
     fn generic_bound(&self, bound: &ast::GenericBound) -> FormatResult {
@@ -114,11 +116,15 @@ impl AstFormatter {
         }
     }
 
-    pub fn generic_arg(&self, arg: &ast::GenericArg) -> FormatResult {
+    pub fn generic_arg(&self, arg: &ast::GenericArg, tail: &Tail) -> FormatResult {
         match &arg {
-            ast::GenericArg::Const(anon_const) => self.anon_const(anon_const),
-            ast::GenericArg::Lifetime(lifetime) => self.lifetime(lifetime),
-            ast::GenericArg::Type(ty) => self.ty(ty),
+            ast::GenericArg::Const(anon_const) => self.anon_const_tail(anon_const, tail),
+            ast::GenericArg::Lifetime(lifetime) => {
+                self.lifetime(lifetime)?;
+                self.tail(tail)?;
+                Ok(())
+            }
+            ast::GenericArg::Type(ty) => self.ty_tail(ty, tail),
         }
     }
 

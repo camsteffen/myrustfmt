@@ -16,6 +16,7 @@ impl AstFormatter {
     }
 
     pub fn strlit(&self, strlit: &ast::StrLit) -> FormatResult {
+        // todo check for newlines
         self.out.token_from_source(strlit.span)
     }
 

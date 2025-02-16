@@ -262,7 +262,6 @@
         }
     }
 - name: arm breakpoint on tuple pattern
-  focus: true
   type: breakpoint
   in_block: true
   before: |

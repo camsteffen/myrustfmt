@@ -6,6 +6,7 @@ use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiv
 use crate::error::{ConstraintError, FormatError, FormatResult, FormatResultExt, return_if_break};
 use rustc_ast::ast;
 use std::ops::ControlFlow;
+use crate::constraints::MultiLineConstraint;
 
 // In rustfmt, this is called chain_width, and is 60 by default
 const POSTFIX_CHAIN_MAX_WIDTH: u32 = 60;
@@ -49,8 +50,10 @@ impl AstFormatter {
                 self.postfix_item(next)?;
                 return self.tail(tail);
             }
-            let next_is_single_line = self.constraints().requires_indent_middle();
-            self.with_single_line_opt(next_is_single_line, || self.postfix_item(next))?;
+            self.constraints()
+                .with_multi_line_constraint_to_single_line(MultiLineConstraint::IndentMiddle, || {
+                    self.postfix_item(next)
+                })?;
             if self.out.line() != first_line {
                 // should be prevented by single-line constraint above
                 assert_eq!(self.constraints().requires_indent_middle(), false);
@@ -70,10 +73,15 @@ impl AstFormatter {
                     self.postfix_chain_single_line_with_overflow(chain_rest, start_pos, tail)
                 })
                 .otherwise(|| {
-                    // see docs for MultiLineConstraint
-                    self.with_single_line_opt(self.constraints().requires_single_line_chains(), || {
-                        self.indented(|| self.postfix_chain_separate_lines(chain_rest, tail))
-                    })
+                    self.constraints()
+                        .with_multi_line_constraint_to_single_line(
+                            MultiLineConstraint::NoHangingIndent,
+                            || {
+                                self.indented(
+                                    || self.postfix_chain_separate_lines(chain_rest, tail),
+                                )
+                            },
+                        )
                 })
         }
     }

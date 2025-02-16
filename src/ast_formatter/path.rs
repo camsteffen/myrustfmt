@@ -1,8 +1,8 @@
 use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 
-use crate::ast_formatter::list::Braces;
 use crate::ast_formatter::list::builder::list;
+use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::util::tail::Tail;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
@@ -69,11 +69,9 @@ impl AstFormatter {
     fn generic_args(&self, generic_args: &ast::GenericArgs, tail: &Tail) -> FormatResult {
         match generic_args {
             ast::GenericArgs::AngleBracketed(args) => {
-                list(Braces::ANGLE, &args.args, |af, arg, _lcx| {
-                    af.angle_bracketed_arg(arg)
-                })
-                .tail(tail)
-                .format(self)
+                list(Braces::ANGLE, &args.args, Self::angle_bracketed_arg)
+                    .tail(tail)
+                    .format(self)
             }
             // (A, B) -> C
             ast::GenericArgs::Parenthesized(parenthesized_args) => {
@@ -83,27 +81,36 @@ impl AstFormatter {
         }
     }
 
-    fn angle_bracketed_arg(&self, arg: &ast::AngleBracketedArg) -> FormatResult {
+    fn angle_bracketed_arg(
+        &self,
+        arg: &ast::AngleBracketedArg,
+        tail: &Tail,
+        _lcx: ListItemContext,
+    ) -> FormatResult {
         match arg {
-            ast::AngleBracketedArg::Arg(arg) => self.generic_arg(arg),
+            ast::AngleBracketedArg::Arg(arg) => self.generic_arg(arg, tail),
             ast::AngleBracketedArg::Constraint(constraint) => {
-                self.assoc_item_constraint(constraint)
+                self.assoc_item_constraint(constraint, tail)
             }
         }
     }
 
-    fn assoc_item_constraint(&self, constraint: &ast::AssocItemConstraint) -> FormatResult {
+    fn assoc_item_constraint(
+        &self,
+        constraint: &ast::AssocItemConstraint,
+        tail: &Tail,
+    ) -> FormatResult {
         self.ident(constraint.ident)?;
         if let Some(generic_args) = &constraint.gen_args {
             self.generic_args(generic_args, Tail::none())?;
         }
         match &constraint.kind {
-            ast::AssocItemConstraintKind::Bound { bounds } => self.generic_bounds(bounds),
+            ast::AssocItemConstraintKind::Bound { bounds } => self.generic_bounds(bounds, tail),
             ast::AssocItemConstraintKind::Equality { term } => {
                 self.out.space_token_space("=")?;
                 match term {
-                    ast::Term::Const(anon_const) => self.anon_const(anon_const),
-                    ast::Term::Ty(ty) => self.ty(ty),
+                    ast::Term::Const(anon_const) => self.anon_const_tail(anon_const, tail),
+                    ast::Term::Ty(ty) => self.ty_tail(ty, tail),
                 }
             }
         }

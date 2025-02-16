@@ -4,6 +4,21 @@ use std::fmt::{Display, Formatter};
 use std::ops::ControlFlow;
 use std::path::Path;
 
+#[allow(unused)]
+macro_rules! debug_err {
+    ($af:expr, $result:expr) => {{
+        let result = $result;
+        if result.is_err() {
+            $af.out.with_taken_buffer(|b| {
+                dbg!(b);
+            });
+        }
+        result
+    }};
+}
+#[allow(unused)]
+pub(crate) use debug_err;
+
 pub type FormatResult<T = ()> = Result<T, FormatError>;
 
 pub type FormatControlFlow<C> = ControlFlow<FormatResult, C>;
@@ -96,16 +111,16 @@ impl FormatError {
                 }
                 Ok(())
             };
-            match self {
-                FormatError::Constraint(ConstraintError::Logical) => {
-                    write!(f, "unhandled logical constraint error")?
-                }
-                FormatError::Constraint(ConstraintError::WidthLimitExceeded) => {
-                    write!(f, "width limit exceeded")?
-                }
-                FormatError::Constraint(ConstraintError::NewlineNotAllowed) => {
-                    // todo
-                    write!(f, "width limit exceeded")?
+            let backtrace = match self {
+                FormatError::Constraint(e) => {
+                    match e {
+                        ConstraintError::Logical => {
+                            write!(f, "unhandled logical constraint error")?
+                        }
+                        ConstraintError::NewlineNotAllowed => write!(f, "newline not allowed")?,
+                        ConstraintError::WidthLimitExceeded => write!(f, "width limit exceeded")?,
+                    }
+                    None
                 }
                 FormatError::Parse(parse_error) => {
                     match parse_error.kind {
@@ -130,8 +145,14 @@ impl FormatError {
                             write!(f, "unsupported syntax")?;
                         }
                     }
-                    write!(f, "\n{}", parse_error.backtrace)?;
+                    Some(&parse_error.backtrace)
                 }
+            };
+            if cfg!(debug_assertions) {
+                write!(f, "\nSource:\n{}", source)?;
+            }
+            if let Some(backtrace) = backtrace {
+                write!(f, "\n{}", backtrace)?;
             }
             Ok(())
         })

@@ -13,22 +13,23 @@ pub struct MaxWidthForLine {
 /// multi-line formatting strategies.
 ///
 /// The MultiLineConstraint is NOT enforced by changing or short-circuiting the formatting strategy.
-/// It is ALWAYS enforced by trying to write a newline so that the ConstraintWriter raises a
-/// NewlineNotAllowed error. The IndentMiddle and SingleLineChains variants are enforced by
+/// Instead, it is enforced by trying to write a newline so that the ConstraintWriter raises a
+/// NewlineNotAllowed error. The variants in between MultiLine and SingleLine are enforced by
 /// "downgrading" to SingleLines at the moment when a newline would definitely violate the
 /// higher-level constraint. This makes the implementation simpler by reducing code paths. But more
 /// importantly, it allows us to observe formatted output leading up to a newline (error), and know
 /// that that code would be no different if no multi-line constraint were applied.
 // todo closures?
+// todo name variants by what they *allow* ?
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum MultiLineConstraint {
     /// No constraint
     MultiLine,
     /// All lines between the first and last lines must be indented away from the margin
     IndentMiddle,
-    /// Same as IndentMiddle, but also disallow multi-line prefix chains and postfix chains
-    SingleLineChains,
-    /// Same as SingleLineChains, but also disallow multi-line lists and overflow in lists
+    /// Same as IndentMiddle, but also disallow formats where the last line is indented
+    NoHangingIndent,
+    /// Same as NoHangingIndent, but also disallow multi-line lists and overflow in lists
     SingleLineLists,
     /// No newline characters allowed (enforced by ConstraintWriter)
     SingleLine,
@@ -76,8 +77,8 @@ impl Constraints {
         self.multi_line.get() >= MultiLineConstraint::IndentMiddle
     }
 
-    pub fn requires_single_line_chains(&self) -> bool {
-        self.multi_line.get() >= MultiLineConstraint::SingleLineChains
+    pub fn requires_no_hanging_indent(&self) -> bool {
+        self.multi_line.get() >= MultiLineConstraint::NoHangingIndent
     }
 
     pub fn requires_single_line(&self) -> bool {
@@ -96,11 +97,27 @@ impl Constraints {
         }
     }
 
-    pub fn with_indent_middle(&self, f: impl Fn() -> FormatResult) -> FormatResult {
-        self.with_multi_line_constraint(MultiLineConstraint::IndentMiddle, f)
+    pub fn with_indent_middle(&self, scope: impl Fn() -> FormatResult) -> FormatResult {
+        self.with_multi_line_constraint(MultiLineConstraint::IndentMiddle, scope)
     }
 
-    pub fn with_single_line_chains(&self, f: impl Fn() -> FormatResult) -> FormatResult {
-        self.with_multi_line_constraint(MultiLineConstraint::SingleLineChains, f)
+    pub fn with_no_hanging_indent(&self, scope: impl Fn() -> FormatResult) -> FormatResult {
+        self.with_multi_line_constraint(MultiLineConstraint::NoHangingIndent, scope)
+    }
+
+    /// If the given MultiLineConstraint is currently applied (or stricter), then the SingleLine
+    /// constraint is applied for the given function.
+    // todo rename to classify_newlines or single_line_satisfies ?
+    pub fn with_multi_line_constraint_to_single_line<T>(
+        &self,
+        constraint: MultiLineConstraint,
+        scope: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
+        if self.multi_line.get() < constraint {
+            scope()
+        } else {
+            self.multi_line
+                .with_replaced(MultiLineConstraint::SingleLine, scope)
+        }
     }
 }

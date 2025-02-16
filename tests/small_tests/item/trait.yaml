@@ -20,3 +20,9 @@
             T: Copy,
         {}
     }
+- name: empty generics
+  type: before_after
+  before: |
+    trait Trait<> {}
+  after: |
+    trait Trait {}

@@ -3,7 +3,6 @@ pub mod builder;
 pub mod list_config;
 mod list_item_config;
 mod list_item_context;
-mod overflow;
 mod rest;
 
 pub use braces::Braces;
@@ -14,18 +13,16 @@ pub use rest::ListRest;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
-use overflow::ListOverflow;
 
 impl AstFormatter {
     /* [item, item, item] */
-    fn list_contents_single_line<Item, Overflow: ListOverflow<Item = Item>>(
+    fn list_contents_single_line(
         &self,
-        list: &[Item],
-        format_item: impl Fn(&AstFormatter, &Item, &ListItemContext) -> FormatResult,
+        len: usize,
+        format_item: impl Fn(/*index: */ usize) -> FormatResult,
         rest: ListRest<'_>,
         close_brace: &str,
         tail: &Tail,
-        _overflow: Overflow,
         force_trailing_comma: bool,
         pad: bool,
         max_width: Option<u32>,
@@ -39,36 +36,23 @@ impl AstFormatter {
         self.with_single_line(|| {
             do_pad()?;
             self.with_width_limit_first_line_opt(max_width, || {
-                let Some((last, until_last)) = list.split_last() else {
+                if len == 0 {
                     if !matches!(rest, ListRest::None) {
                         self.list_rest(rest)?;
                     }
                     return Ok(());
                 };
-                for (index, item) in until_last.iter().enumerate() {
-                    format_item(
-                        self,
-                        item,
-                        &ListItemContext {
-                            index,
-                            strategy: ListStrategy::SingleLine,
-                        },
-                    )?;
+                let (until_last, last) = (0..(len - 1), len - 1);
+                for index in until_last {
+                    format_item(index)?;
                     self.out.token_maybe_missing(",")?;
                     self.out.space()?;
                 }
-                format_item(
-                    self,
-                    last,
-                    &ListItemContext {
-                        index: list.len() - 1,
-                        strategy: ListStrategy::SingleLine,
-                    },
-                )?;
+                format_item(last)?;
                 if !matches!(rest, ListRest::None) || force_trailing_comma {
-                    self.out.token(",")?
+                    self.out.token(",")?;
                 } else {
-                    self.out.skip_token_if_present(",")?
+                    self.out.skip_token_if_present(",")?;
                 }
                 if !matches!(rest, ListRest::None) {
                     self.out.space()?;
@@ -91,41 +75,29 @@ impl AstFormatter {
     ]
     */
     // todo how does this behave with comments between items - forcing newlines?
-    fn list_contents_wrap_to_fit<T, ItemConfig>(
+    fn list_contents_wrap_to_fit(
         &self,
-        list: &[T],
+        len: usize,
         close_brace: &str,
         tail: &Tail,
-        format_item: impl Fn(&AstFormatter, &T, &ListItemContext) -> FormatResult,
-        _item_config: ItemConfig,
+        format_item: impl Fn(/*index: */ usize) -> FormatResult,
+        item_requires_own_line: impl Fn(/*index: */ usize) -> bool,
         max_element_width: Option<u32>,
-    ) -> FormatResult
-    where
-        ItemConfig: ListItemConfig<Item = T>,
-    {
-        let format_item = |index, item| {
-            let lcx = ListItemContext {
-                index,
-                strategy: ListStrategy::WrapToFit,
-            };
-            match max_element_width {
-                Some(max_width) => {
-                    self.with_single_line_and_width_limit(max_width, || {
-                        format_item(self, item, &lcx)
-                    })
-                }
-                None => format_item(self, item, &lcx),
+    ) -> FormatResult {
+        let format_item = |index| match max_element_width {
+            Some(max_width) => {
+                self.with_single_line(|| self.with_width_limit(max_width, || format_item(index)))
             }
+            None => format_item(index),
         };
         self.embraced_after_opening(close_brace, || {
-            let (first, rest) = list.split_first().unwrap();
-            format_item(0, first)?;
+            let (first, rest) = (0, 1..len);
+            format_item(first)?;
             self.out.token_maybe_missing(",")?;
             let mut prev_must_have_own_line = false;
-            for (i, item) in rest.iter().enumerate() {
-                let index = i + 1;
+            for index in rest {
                 let item_comma = || -> FormatResult {
-                    format_item(index, item)?;
+                    format_item(index)?;
                     self.out.token_maybe_missing(",")?;
                     Ok(())
                 };
@@ -139,7 +111,7 @@ impl AstFormatter {
                     item_comma()?;
                     Ok(())
                 };
-                if prev_must_have_own_line || ItemConfig::item_requires_own_line(item) {
+                if prev_must_have_own_line || item_requires_own_line(index) {
                     item_next_line()?;
                     prev_must_have_own_line = !prev_must_have_own_line;
                 } else {
@@ -161,40 +133,30 @@ impl AstFormatter {
         item,
     ]
     */
-    fn list_contents_separate_lines<T>(
+    fn list_contents_separate_lines(
         &self,
-        list: &[T],
-        format_item: impl Fn(&AstFormatter, &T, &ListItemContext) -> FormatResult,
+        len: usize,
+        format_item: impl Fn(/*index: */ usize, &Tail) -> FormatResult,
         rest: ListRest<'_>,
         close_brace: &str,
         tail: &Tail,
     ) -> FormatResult {
-        let item_comma = |index, item| -> FormatResult {
-            format_item(
-                self,
-                item,
-                &ListItemContext {
-                    index,
-                    strategy: ListStrategy::SeparateLines,
-                },
-            )?;
-            self.out.token_maybe_missing(",")?;
-            Ok(())
-        };
+        let item_comma =
+            |index| -> FormatResult { format_item(index, &Tail::token_maybe_missing(",")) };
         self.embraced_after_opening(close_brace, || {
             match rest {
                 ListRest::None => {
-                    let (last, until_last) = list.split_last().unwrap();
-                    for (i, item) in until_last.iter().enumerate() {
-                        item_comma(i, item)?;
+                    let (until_last, last) = (0..len - 1, len - 1);
+                    for index in until_last {
+                        item_comma(index)?;
                         // todo should this be "between"?
                         self.out.newline_within_indent()?;
                     }
-                    item_comma(list.len() - 1, last)?;
+                    item_comma(last)?;
                 }
                 _ => {
-                    for (i, item) in list.iter().enumerate() {
-                        item_comma(i, item)?;
+                    for index in 0..len {
+                        item_comma(index)?;
                         self.out.newline_within_indent()?;
                     }
                     self.list_rest(rest)?;

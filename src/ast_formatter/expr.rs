@@ -25,9 +25,8 @@ impl AstFormatter {
         let mut take_tail = || tail.take().unwrap();
         match expr.kind {
             ast::ExprKind::Array(ref items) => {
-                list(Braces::SQUARE, items, self.expr_list_item_fn(items))
+                list(Braces::SQUARE, items, self.expr_list_item())
                     .config(ArrayListConfig)
-                    .overflow()
                     .tail(take_tail())
                     .format(self)?
             }
@@ -38,7 +37,7 @@ impl AstFormatter {
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, take_tail())?,
             postfix_expr_kind!() => self.postfix_chain(expr, take_tail())?,
             ast::ExprKind::Tup(ref items) => {
-                list(Braces::PARENS, items, self.expr_list_item_fn(items))
+                list(Braces::PARENS, items, self.expr_list_item())
                     .config(TupleListConfig {
                         len: items.len(),
                         single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
@@ -55,20 +54,29 @@ impl AstFormatter {
             }
             ast::ExprKind::Lit(_) => self.out.copy_span(expr.span)?,
             ast::ExprKind::Cast(ref target, ref ty) => {
+                let tail = take_tail();
                 self.expr(target)?;
                 self.backtrack()
                     .next(|| {
                         self.out.space_token_space("as")?;
                         self.ty(ty)?;
+                        self.tail(tail)?;
                         Ok(())
                     })
                     .otherwise(|| {
-                        self.indented(|| {
-                            self.out.newline_within_indent()?;
-                            self.out.token_space("as")?;
-                            self.ty(ty)?;
-                            Ok(())
-                        })
+                        self.constraints()
+                            .with_multi_line_constraint_to_single_line(
+                                MultiLineConstraint::NoHangingIndent,
+                                || {
+                                    self.indented(|| {
+                                        self.out.newline_within_indent()?;
+                                        self.out.token_space("as")?;
+                                        self.ty(ty)?;
+                                        self.tail(tail)?;
+                                        Ok(())
+                                    })
+                                },
+                            )
                     })?;
             }
             ast::ExprKind::Type(_, _) => todo!(),
@@ -122,7 +130,7 @@ impl AstFormatter {
                 self.out.space()?;
                 self.out.copy_span(op.span)?;
                 self.out.space()?;
-                self.expr(right)?;
+                self.expr_tail(right, take_tail())?;
             }
             ast::ExprKind::Range(ref start, ref end, limits) => {
                 let sigil = match limits {
@@ -166,7 +174,7 @@ impl AstFormatter {
                 self.backtrack()
                     .next(|| {
                         self.constraints()
-                            .with_multi_line_constraint(MultiLineConstraint::SingleLineChains, || {
+                            .with_multi_line_constraint(MultiLineConstraint::NoHangingIndent, || {
                                 self.expr(inner)
                             })?;
                         self.out.token(")")?;
@@ -194,35 +202,50 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn expr_list_item_fn(
+    pub fn expr_list_item(
         &self,
-        list: &[P<ast::Expr>],
-    ) -> impl Fn(&AstFormatter, &P<ast::Expr>, &ListItemContext) -> FormatResult {
+    ) -> impl Fn(&AstFormatter, &P<ast::Expr>, &Tail, ListItemContext) -> FormatResult {
+        // todo kinda hacky
         let outer_multi_line = self.constraints().multi_line.get();
-        move |af, expr, lcx| {
-            af.skip_single_expr_blocks(expr, |expr| match lcx.strategy {
-                ListStrategy::SingleLine
-                    if outer_multi_line < MultiLineConstraint::SingleLineLists
-                        && lcx.index == list.len() - 1 =>
-                {
-                    let multi_line_constraint = if list.len() > 1 {
-                        // todo need this? and do we need this variant at all?
-                        MultiLineConstraint::SingleLineLists
-                        // MultiLineConstraint::SingleLineChains
-                    } else {
-                        MultiLineConstraint::SingleLineChains
-                    };
-                    af.constraints()
-                        .multi_line
-                        .with_replaced(multi_line_constraint, || af.expr(expr))
+
+        move |af, expr, tail, lcx| {
+            af.skip_single_expr_blocks_tail(expr, tail, |expr, tail| {
+                let format = || af.expr_tail(expr, tail);
+                match lcx.strategy {
+                    // overflow last item
+                    ListStrategy::SingleLine
+                        if outer_multi_line < MultiLineConstraint::SingleLineLists
+                            && lcx.index == lcx.len - 1 =>
+                    {
+                        // override the multi-line constraint to be less strict than SingleLine
+                        let multi_line_constraint = if lcx.len > 1 {
+                            // don't overflow nested lists in a list with multiple items
+                            MultiLineConstraint::SingleLineLists
+                        } else {
+                            MultiLineConstraint::NoHangingIndent
+                        };
+                        af.constraints()
+                            .multi_line
+                            .with_replaced(multi_line_constraint, format)?;
+                        Ok(())
+                    }
+                    // on separate lines, enforce IndentMiddle by adding a block
+                    ListStrategy::SeparateLines if lcx.len > 1 => {
+                        af.backtrack()
+                            .next(|| af.constraints().with_indent_middle(format))
+                            .otherwise(|| {
+                                af.expr_add_block(expr)?;
+                                af.tail(tail)?;
+                                Ok(())
+                            })
+                    }
+                    _ => format(),
                 }
-                ListStrategy::SeparateLines if list.len() > 1 => {
-                    af.backtrack()
-                        .next(|| af.constraints().with_indent_middle(|| af.expr(expr)))
-                        .otherwise(|| af.expr_add_block(expr))
-                }
-                _ => af.expr(expr),
-            })
+            })?;
+            // todo I wish this were more symmetrical with Tail being passed in
+            //   maybe introduce a more specific Tail type for list comma
+            self.out.skip_token_if_present(",")?;
+            Ok(())
         }
     }
 
@@ -258,9 +281,15 @@ impl AstFormatter {
                     let Some(end) = end else {
                         return af.tail(tail);
                     };
-                    let is_single_line = af.out.constraints().requires_indent_middle()
-                        && af.out.line() != first_line;
-                    af.with_single_line_opt(is_single_line, || af.expr_tail(end, tail))?;
+                    if af.out.line() == first_line {
+                        af.expr_tail(end, tail)?;
+                    } else {
+                        self.constraints()
+                            .with_multi_line_constraint_to_single_line(
+                                MultiLineConstraint::IndentMiddle,
+                                || af.expr_tail(end, tail),
+                            )?;
+                    }
                     Ok(())
                 }),
             )?;
@@ -311,10 +340,9 @@ impl AstFormatter {
         args: &'ast [P<ast::Expr>],
         tail: &'tail Tail<'_>,
     ) -> impl ListBuilderTrait + 'out {
-        list(Braces::PARENS, args, self.expr_list_item_fn(args))
+        list(Braces::PARENS, args, self.expr_list_item())
             .config(CallParamListConfig)
             .omit_open_brace()
-            .overflow()
             .tail(tail)
     }
 
@@ -394,24 +422,25 @@ impl AstFormatter {
     }
 
     pub fn token_expr_open_brace(&self, token: &str, expr: &ast::Expr) -> FormatResult<bool> {
-        self.with_single_line_opt(self.constraints().requires_indent_middle(), || {
-            let first_line = self.out.line();
-            self.out.token_space(token)?;
-            self.expr(expr)?;
-            let newline_open_block = || {
-                self.out.newline_within_indent()?;
-                self.out.token("{")?;
-                Ok(())
-            };
-            if self.out.line() == first_line || self.out.last_line_is_closers() {
-                self.backtrack()
-                    .next_single_line(|| self.out.space_token("{"))
-                    .otherwise(newline_open_block)?;
-            } else {
-                newline_open_block()?;
-            }
-            Ok(self.out.line() == first_line)
-        })
+        self.constraints()
+            .with_multi_line_constraint_to_single_line(MultiLineConstraint::IndentMiddle, || {
+                let first_line = self.out.line();
+                self.out.token_space(token)?;
+                self.expr(expr)?;
+                let newline_open_block = || {
+                    self.out.newline_within_indent()?;
+                    self.out.token("{")?;
+                    Ok(())
+                };
+                if self.out.line() == first_line || self.out.last_line_is_closers() {
+                    self.backtrack()
+                        .next_single_line(|| self.out.space_token("{"))
+                        .otherwise(newline_open_block)?;
+                } else {
+                    newline_open_block()?;
+                }
+                Ok(self.out.line() == first_line)
+            })
     }
 
     pub fn mac_call(&self, mac_call: &ast::MacCall) -> FormatResult {
@@ -435,12 +464,19 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn expr_field(&self, field: &ast::ExprField, _lcx: &ListItemContext) -> FormatResult {
-        self.with_attrs(&field.attrs, field.span, || {
+    fn expr_field(
+        &self,
+        field: &ast::ExprField,
+        tail: &Tail,
+        _lcx: ListItemContext,
+    ) -> FormatResult {
+        self.with_attrs_tail(&field.attrs, field.span, tail, || {
             self.ident(field.ident)?;
-            if !field.is_shorthand {
+            if field.is_shorthand {
+                self.tail(tail)?;
+            } else {
                 self.out.token_space(":")?;
-                self.expr(&field.expr)?;
+                self.expr_tail(&field.expr, tail)?;
             }
             Ok(())
         })

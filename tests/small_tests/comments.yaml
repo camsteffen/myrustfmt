@@ -1,3 +1,11 @@
+- name: line comment at beginning and end of module
+  type: no_change
+  formatted: |
+    // begin
+    
+    mod test;
+    
+    // end
 - name: line comment after block opening and closing brace
   type: before_after
   in_block: true

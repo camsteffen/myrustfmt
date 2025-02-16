@@ -8,13 +8,24 @@ use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_span::Span;
+use crate::ast_formatter::util::tail::Tail;
 
 impl AstFormatter {
-    // todo test usages
     pub fn with_attrs(
         &self,
         attrs: &[ast::Attribute],
         span: Span,
+        f: impl FnOnce() -> FormatResult,
+    ) -> FormatResult {
+        self.with_attrs_tail(attrs, span, Tail::none(), f)
+    }
+
+    // todo test usages
+    pub fn with_attrs_tail(
+        &self,
+        attrs: &[ast::Attribute],
+        span: Span,
+        tail: &Tail,
         f: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
         // todo skip attributes as well?
@@ -24,10 +35,12 @@ impl AstFormatter {
             self.out
                 .constraints()
                 .max_width
-                .with_replaced(None, || self.out.copy_span(span))
+                .with_replaced(None, || self.out.copy_span(span))?;
+            self.tail(tail)?;
         } else {
-            f()
+            f()?;
         }
+        Ok(())
     }
 
     fn attrs(&self, attrs: &[ast::Attribute]) -> FormatResult {
@@ -71,18 +84,19 @@ impl AstFormatter {
         match &meta.kind {
             ast::MetaItemKind::Word => {}
             ast::MetaItemKind::List(items) => {
-                list(Braces::PARENS, items, |af, item, _lcx| match item {
-                    ast::MetaItemInner::MetaItem(item) => af.meta_item(item),
-                    ast::MetaItemInner::Lit(lit) => af.meta_item_lit(lit),
+                list(Braces::PARENS, items, |af, item, tail, _lcx| {
+                    match item {
+                        ast::MetaItemInner::MetaItem(item) => af.meta_item(item)?,
+                        ast::MetaItemInner::Lit(lit) => af.meta_item_lit(lit)?,
+                    }
+                    af.tail(tail)?;
+                    Ok(())
                 })
-                .config(
-                    ParamListConfig {
-                        single_line_max_contents_width: Some(
-                            RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width,
-                        ),
-                    },
-                )
-                .overflow()
+                .config(ParamListConfig {
+                    single_line_max_contents_width: Some(
+                        RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width,
+                    ),
+                })
                 .format(self)?
             }
             ast::MetaItemKind::NameValue(lit) => {

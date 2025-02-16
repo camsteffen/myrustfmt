@@ -71,9 +71,13 @@
         return x;
     };
 - name: multi-line initializer with else on same line
-  type: no_change
+  type: before_after
   in_block: true
-  formatted: |
+  before: |
+    let Some(_) = ({
+        x;
+    }) else { return };
+  after: |
     let Some(_) = ({
         x;
     }) else {

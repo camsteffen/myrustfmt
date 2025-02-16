@@ -27,7 +27,7 @@ impl ErrorEmitter {
         // todo don't panic?
         panic!(
             "This is a bug :(\n{}",
-            e.display(source, pos, self.path.as_deref(),)
+            e.display(source, pos, self.path.as_deref())
         )
     }
 }

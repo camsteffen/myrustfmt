@@ -42,6 +42,22 @@
           aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa, aaaaaaaaaa,
           aaaaaaaaaa, aaaaaaaaaa,
       ]
+- name: breakpoint on multi-line list item
+  type: breakpoint
+  in_block: true
+  before: |
+    [
+        aaaaaaaa,
+        (aaaaaaaaaaa, aaaaaaaaaaa),
+    ]
+  after: |
+    [
+        aaaaaaaa,
+        (
+            aaaaaaaaaaa,
+            aaaaaaaaaaa,
+        ),
+    ]
 - name: single-item list has a chain with multiline root
   type: before_after
   in_block: true

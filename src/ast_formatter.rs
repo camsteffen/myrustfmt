@@ -5,6 +5,7 @@ use crate::error_emitter::ErrorEmitter;
 use crate::source_formatter::SourceFormatter;
 use std::path::PathBuf;
 use std::rc::Rc;
+use crate::error::FormatResult;
 
 mod attr;
 mod backtrack;
@@ -32,6 +33,7 @@ pub struct AstFormatter {
 }
 
 // todo rename?
+#[derive(Debug)]
 pub struct FormatModuleResult {
     pub formatted: String,
     pub exceeded_max_width: bool,
@@ -40,7 +42,7 @@ pub struct FormatModuleResult {
 impl FormatModuleResult {
     pub fn expect_not_exceeded_max_width(self) -> String {
         if self.exceeded_max_width {
-            panic!("Exceeded max width");
+            panic!("Exceeded max width. Formatted:\n{}", self.formatted);
         }
         self.formatted
     }
@@ -55,17 +57,21 @@ impl AstFormatter {
     }
 
     pub fn module(self, module: &AstModule) -> FormatModuleResult {
-        let result = self.with_attrs(&module.attrs, module.spans.inner_span, || {
-            if let [until_last @ .., last] = &module.items[..] {
-                for item in until_last {
-                    self.item(item)?;
-                    self.out.newline_between_indent()?;
+        let result = (|| -> FormatResult {
+            self.out.newline_above_if_comments()?;
+            self.with_attrs(&module.attrs, module.spans.inner_span, || {
+                if let [until_last @ .., last] = &module.items[..] {
+                    for item in until_last {
+                        self.item(item)?;
+                        self.out.newline_between_indent()?;
+                    }
+                    self.item(last)?;
+                    self.out.newline_below()?;
                 }
-                self.item(last)?;
-                self.out.newline_below()?;
-            }
+                Ok(())
+            })?;
             Ok(())
-        });
+        })();
         match result {
             Ok(()) => self.out.finish(),
             Err(e) => {
