@@ -5,7 +5,7 @@ use crate::constraint_writer::{
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::ErrorEmitter;
-use crate::source_formatter::whitespace::{NewlineKind, NewlineMin, WhitespaceMode};
+use crate::source_formatter::whitespace::{VerticalWhitespaceMode, WhitespaceMode};
 use crate::source_reader::SourceReader;
 use crate::util::chars::is_closer_char;
 use rustc_span::{BytePos, Pos, Span};
@@ -109,55 +109,52 @@ impl SourceFormatter {
         &self.source.source
     }
 
-    pub fn newline(&self, kind: NewlineKind) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Vertical {
-            kind,
-            min: NewlineMin::One,
-        })?;
+    pub fn newline(&self, mode: VerticalWhitespaceMode) -> FormatResult {
+        self.handle_whitespace_and_comments(WhitespaceMode::Vertical(mode))?;
         Ok(())
     }
 
-    pub fn newline_indent(&self, kind: NewlineKind) -> FormatResult {
+    pub fn newline_indent(&self, kind: VerticalWhitespaceMode) -> FormatResult {
         self.newline(kind)?;
         self.indent()?;
         Ok(())
     }
 
     pub fn newline_between(&self) -> FormatResult {
-        self.newline(NewlineKind::Between)
+        self.newline(VerticalWhitespaceMode::Between)
     }
 
     pub fn newline_between_indent(&self) -> FormatResult {
-        self.newline_indent(NewlineKind::Between)
+        self.newline_indent(VerticalWhitespaceMode::Between)
     }
 
     pub fn newline_above(&self) -> FormatResult {
-        self.newline(NewlineKind::Above)
+        self.newline(VerticalWhitespaceMode::Above)
     }
 
     pub fn newline_below(&self) -> FormatResult {
-        self.newline(NewlineKind::Below)
+        self.newline(VerticalWhitespaceMode::Below)
     }
 
     pub fn newline_within(&self) -> FormatResult {
-        self.newline(NewlineKind::Within)
+        self.newline(VerticalWhitespaceMode::Within)
     }
 
     pub fn newline_within_indent(&self) -> FormatResult {
-        self.newline_indent(NewlineKind::Within)
+        self.newline_indent(VerticalWhitespaceMode::Within)
     }
 
-    pub fn newline_above_if_comments(&self) -> FormatResult<bool> {
-        self.handle_whitespace_and_comments(WhitespaceMode::Vertical {
-            kind: NewlineKind::Above,
-            min: NewlineMin::Zero,
+    pub fn newline_above_if_comments(&self) -> FormatResult {
+        self.handle_whitespace_and_comments(WhitespaceMode::VerticalIfComments {
+            vertical_mode: VerticalWhitespaceMode::Above,
+            space_if_horizontal: false,
         })
     }
 
-    pub fn newline_if_comments(&self) -> FormatResult<bool> {
-        self.handle_whitespace_and_comments(WhitespaceMode::Vertical {
-            kind: NewlineKind::Within,
-            min: NewlineMin::Zero,
+    pub fn newline_if_comments(&self) -> FormatResult {
+        self.handle_whitespace_and_comments(WhitespaceMode::VerticalIfComments {
+            vertical_mode: VerticalWhitespaceMode::Within,
+            space_if_horizontal: false,
         })
     }
 
@@ -170,10 +167,8 @@ impl SourceFormatter {
     pub fn skip_token_if_present(&self, token: &str) -> FormatResult<bool> {
         // todo is this checkpoint avoidable?
         let checkpoint = self.checkpoint();
-        let ws_result = self.handle_whitespace_and_comments(WhitespaceMode::Horizontal {
-            error_on_newline: true,
-            space: false,
-        });
+        let ws_result =
+            self.handle_whitespace_and_comments(WhitespaceMode::Horizontal { space: false });
         if self.source.remaining().starts_with(token) {
             ws_result?;
             self.source.advance(token.len());
@@ -219,9 +214,14 @@ impl SourceFormatter {
     /** Writes a space and accounts for spaces and comments in source */
     // todo do newlines and comments sneak in when it should be single line?
     pub fn space(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal {
-            error_on_newline: true,
-            space: true,
+        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal { space: true })?;
+        Ok(())
+    }
+
+    pub fn space_or_newline(&self) -> FormatResult {
+        self.handle_whitespace_and_comments(WhitespaceMode::VerticalIfComments {
+            vertical_mode: VerticalWhitespaceMode::Within,
+            space_if_horizontal: true,
         })?;
         Ok(())
     }
@@ -273,10 +273,7 @@ impl SourceFormatter {
 
     // todo reconcile with horizontal_whitespace_only
     fn horizontal_whitespace_only(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal {
-            error_on_newline: true,
-            space: false,
-        })?;
+        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal { space: false })?;
         Ok(())
     }
 

@@ -5,7 +5,9 @@ impl AstFormatter {
     // todo "embraced" is a weird name?
     /// Writes a closing brace. Allows for indented comments between braces.
     pub fn embraced_empty_after_opening(&self, closing_brace: &str) -> FormatResult {
-        if self.indented(|| self.out.newline_if_comments())? {
+        let first_line = self.out.line();
+        self.indented(|| self.out.newline_if_comments())?;
+        if self.out.line() != first_line {
             self.out.indent()?;
         }
         self.out.token(closing_brace)?;

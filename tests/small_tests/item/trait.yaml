@@ -26,3 +26,21 @@
     trait Trait<> {}
   after: |
     trait Trait {}
+- name: type with bounds
+  type: no_change
+  formatted: |
+    trait X {
+        type Type: Foo = Bar;
+    }
+- name: bounds and where clause
+  type: no_change
+  formatted: |
+    trait Trait<T>: Foo
+    where
+        T: Bar,
+    {}
+- name: line comment after trait name
+  type: no_change
+  formatted: |
+    trait X // comment
+    {}

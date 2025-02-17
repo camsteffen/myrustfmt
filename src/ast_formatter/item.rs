@@ -238,6 +238,7 @@ impl AstFormatter {
     fn ty_alias(&self, ty_alias: &ast::TyAlias, ident: Ident) -> FormatResult {
         self.out.token_space("type")?;
         self.ident(ident)?;
+        self.generic_bounds_optional(&ty_alias.bounds)?;
         if let Some(ty) = &ty_alias.ty {
             self.out.space_token_space("=")?;
             self.ty(ty)?;
@@ -272,7 +273,9 @@ impl AstFormatter {
         self.ident(item.ident)?;
         self.generic_params(&trait_.generics.params)?;
         self.generic_bounds_optional(&trait_.bounds)?;
-        self.out.space()?;
+        if !self.where_clause(&trait_.generics.where_clause, true)? {
+            self.out.space_or_newline()?;
+        }
         self.block_generic(&trait_.items, |item| self.assoc_item(item))?;
         Ok(())
     }
@@ -326,12 +329,11 @@ impl AstFormatter {
             }
             ast::UseTreeKind::Nested { ref items, span: _ } => {
                 self.out.token("::")?;
-                list(Braces::CURLY_NO_PAD, items, |
-                    af,
-                    (use_tree, _),
-                    tail,
-                    _lcx,
-                | af.use_tree(use_tree, tail))
+                list(
+                    Braces::CURLY_NO_PAD,
+                    items,
+                    |af, (use_tree, _), tail, _lcx| af.use_tree(use_tree, tail),
+                )
                 .config(UseTreeListConfig)
                 .item_config(UseTreeListItemConfig)
                 .tail(tail)

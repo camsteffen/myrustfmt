@@ -4,64 +4,109 @@ use crate::util::cell_ext::CellExt;
 use rustc_lexer::Token;
 use rustc_lexer::TokenKind;
 
-/// What whitespace do we want to print, and how to respond to comments
-#[derive(Clone, Copy)]
+/// A generic mode of whitespace that knows to respond to the presence of comments
+#[derive(Clone, Copy, Debug)]
 pub enum WhitespaceMode {
-    Horizontal {
-        /// Whether to simply stop with Ok or return an error
-        // todo dis always true??
-        error_on_newline: bool,
-        /// True if we want to print a space, otherwise we're just allowing for comments
-        space: bool,
+    Horizontal { space: bool },
+    Vertical(VerticalWhitespaceMode),
+    VerticalIfComments {
+        space_if_horizontal: bool,
+        vertical_mode: VerticalWhitespaceMode,
     },
-    Vertical { kind: NewlineKind, min: NewlineMin },
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum NewlineMin {
-    Zero,
-    One,
-    // todo force blank lines between items?
-    // Two,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum NewlineKind {
+pub enum VerticalWhitespaceMode {
     /// Newline between items where a blank line is allowed. (e.g. between statements)
     Between,
-    /// Newline at the beginning of a braced section. A blank line is allowed only below comments.
+    /// Newline at the beginning of a section, where a blank line is allowed only after comments.
     Above,
-    /// Newline at the end of a braced section. A blank line is allowed only above comments.
+    /// Newline at the end of a section, where a blank line is allowed only before comments.
     Below,
-    /// Newline in a place where extra blank lines should be trimmed away.
+    /// Newline in a place where blank lines should be removed.
     Within,
 }
 
-impl NewlineKind {
+#[derive(Debug)]
+enum WhitespaceTokenStrategy {
+    Horizontal {
+        error_if_newlines: bool,
+        space: bool,
+    },
+    VerticalIfNewlines {
+        space_if_horizontal: bool,
+        allow_blank_line: bool,
+    },
+    Vertical { allow_blank_line: bool },
+}
+
+impl WhitespaceMode {
+    fn whitespace_token_strategy(
+        self,
+        is_comments_before: bool,
+        is_comments_after: bool,
+    ) -> WhitespaceTokenStrategy {
+        let is_by_comments = is_comments_before || is_comments_after;
+        match self {
+            WhitespaceMode::Horizontal { space } => WhitespaceTokenStrategy::Horizontal {
+                error_if_newlines: is_comments_before,
+                space: space || is_by_comments,
+            },
+            WhitespaceMode::Vertical(mode) => {
+                let allow_blank_line = mode.allow_blank_line(is_comments_before, is_comments_after);
+                if is_comments_after {
+                    WhitespaceTokenStrategy::VerticalIfNewlines {
+                        allow_blank_line,
+                        space_if_horizontal: true,
+                    }
+                } else {
+                    WhitespaceTokenStrategy::Vertical { allow_blank_line }
+                }
+            }
+            WhitespaceMode::VerticalIfComments {
+                space_if_horizontal,
+                vertical_mode,
+            } => {
+                if is_by_comments {
+                    WhitespaceTokenStrategy::VerticalIfNewlines {
+                        allow_blank_line: vertical_mode
+                            .allow_blank_line(is_comments_before, is_comments_after),
+                        space_if_horizontal: space_if_horizontal || is_by_comments,
+                    }
+                } else {
+                    WhitespaceTokenStrategy::Horizontal {
+                        error_if_newlines: false,
+                        space: space_if_horizontal,
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl VerticalWhitespaceMode {
     pub fn allow_blank_line(self, is_comments_before: bool, is_comments_after: bool) -> bool {
         match self {
-            NewlineKind::Between => true,
-            NewlineKind::Above => is_comments_before,
-            NewlineKind::Below => is_comments_after,
-            NewlineKind::Within => is_comments_before && is_comments_after,
+            VerticalWhitespaceMode::Between => true,
+            VerticalWhitespaceMode::Above => is_comments_before,
+            VerticalWhitespaceMode::Below => is_comments_after,
+            VerticalWhitespaceMode::Within => is_comments_before && is_comments_after,
         }
     }
 }
 
 struct WhitespaceContext {
     is_comments_before: bool,
-    /// In horizontal mode, true if any whitespace or comments are emitted.
-    /// In vertical mode, true if any newlines emitted.
-    is_whitespace_mode_out: bool,
+    is_required_whitespace_emitted: bool,
     mode: WhitespaceMode,
 }
 
 impl SourceFormatter {
     // todo optimize no-op case?
-    pub fn handle_whitespace_and_comments(&self, mode: WhitespaceMode) -> FormatResult<bool> {
+    pub fn handle_whitespace_and_comments(&self, mode: WhitespaceMode) -> FormatResult {
         let wcx = &mut WhitespaceContext {
             is_comments_before: false,
-            is_whitespace_mode_out: false,
+            is_required_whitespace_emitted: false,
             mode,
         };
         let mut tokens = tokenize_whitespace_and_comments(self.source.remaining())
@@ -69,13 +114,7 @@ impl SourceFormatter {
         while let Some(token) = tokens.next() {
             match token.kind {
                 TokenKind::LineComment { .. }
-                    if matches!(
-                        wcx.mode,
-                        WhitespaceMode::Horizontal {
-                            error_on_newline: true,
-                            ..
-                        }
-                    ) =>
+                    if matches!(wcx.mode, WhitespaceMode::Horizontal { .. }) =>
                 {
                     return Err(ConstraintError::NewlineNotAllowed.into());
                 }
@@ -86,82 +125,46 @@ impl SourceFormatter {
                         .with_replaced(None, || self.copy(token.len as usize))?;
                     wcx.is_comments_before = true;
                     if matches!(wcx.mode, WhitespaceMode::Horizontal { .. }) {
-                        wcx.is_whitespace_mode_out = true;
+                        wcx.is_required_whitespace_emitted = true;
                     }
+                    // todo instead check that remaining string is empty?
                     if matches!(token.kind, TokenKind::LineComment { .. })
                         && tokens.peek().is_none()
                     {
                         // end of file newline
                         self.out.newline()?;
+                        wcx.is_required_whitespace_emitted = true;
                     }
                 }
                 TokenKind::Whitespace => {
-                    let mut take_whitespace = |wcx, len, newlines| -> FormatResult {
-                        let is_comments_after = tokens.peek().is_some_and(|token| matches!(
-                                token.kind,
-                                TokenKind::BlockComment { .. } | TokenKind::LineComment { .. }
-                            ));
-                        self.flush_whitespace(wcx, len, newlines, is_comments_after)?;
-                        Ok(())
-                    };
                     let token_str = &self.source.remaining()[..token.len as usize];
-                    match wcx.mode {
-                        WhitespaceMode::Horizontal {
-                            error_on_newline,
-                            ..
-                        }
-                            if wcx.is_comments_before =>
-                        {
-                            // todo avoid tokenizing the whole whitespace token?
-                            match token_str.find('\n') {
-                                None => take_whitespace(wcx, token.len as usize, 0)?,
-                                Some(newline_pos) => {
-                                    if error_on_newline {
-                                        // todo eat whitespace before the newline?
-                                        return Err(ConstraintError::NewlineNotAllowed.into());
-                                    }
-                                    if newline_pos > 0 {
-                                        take_whitespace(wcx, newline_pos, 0)?;
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                        _ => {
-                            let newlines = token_str.bytes().filter(|&b| b == b'\n').count();
-                            take_whitespace(wcx, token.len as usize, newlines)?;
-                        }
-                    }
+                    let is_comments_after = tokens.peek().is_some();
+                    self.flush_whitespace(wcx, token_str, is_comments_after)?;
+                    self.source.advance(token_str.len());
                 }
                 _ => unreachable!(),
             }
         }
         self.ensure_required_whitespace(wcx)?;
 
-        Ok(wcx.is_whitespace_mode_out)
+        Ok(())
     }
 
     fn ensure_required_whitespace(&self, wcx: &mut WhitespaceContext) -> FormatResult {
-        if wcx.is_whitespace_mode_out {
-            return Ok(());
-        }
-        match wcx.mode {
-            WhitespaceMode::Horizontal {
-                error_on_newline: _,
-                space,
-            } => {
-                if space {
-                    self.out.token(" ")?;
-                    wcx.is_whitespace_mode_out = true;
+        if !wcx.is_required_whitespace_emitted {
+            match wcx.mode {
+                WhitespaceMode::Horizontal { space }
+                | WhitespaceMode::VerticalIfComments {
+                    space_if_horizontal: space,
+                    ..
+                } => {
+                    if space {
+                        self.out.token(" ")?;
+                    }
                 }
+                WhitespaceMode::Vertical(_) => self.out.newline()?,
             }
-            WhitespaceMode::Vertical { min, .. } => match min {
-                NewlineMin::Zero => {}
-                NewlineMin::One => {
-                    self.out.newline()?;
-                    wcx.is_whitespace_mode_out = true;
-                }
-            },
+            wcx.is_required_whitespace_emitted = true;
         }
         Ok(())
     }
@@ -169,43 +172,47 @@ impl SourceFormatter {
     fn flush_whitespace(
         &self,
         wcx: &mut WhitespaceContext,
-        len: usize,
-        newlines: usize,
+        token_str: &str,
         is_comments_after: bool,
     ) -> FormatResult {
-        self.source.advance(len);
-        let is_by_comments = wcx.is_comments_before || is_comments_after;
+        let strategy =
+            wcx.mode.whitespace_token_strategy(wcx.is_comments_before, is_comments_after);
         enum Out {
             Nothing,
             Newline { double: bool },
             Space,
         }
-        let out = match wcx.mode {
-            WhitespaceMode::Vertical { kind, min } => match newlines {
-                _ if !is_by_comments && matches!(min, NewlineMin::Zero) => Out::Nothing,
-                0 => {
-                    if is_by_comments {
-                        Out::Space
-                    } else {
-                        Out::Nothing
-                    }
-                }
-                1 => Out::Newline { double: false },
-                2.. => {
-                    let double = kind.allow_blank_line(wcx.is_comments_before, is_comments_after);
-                    Out::Newline { double }
-                }
-            },
-            WhitespaceMode::Horizontal {
-                error_on_newline: _,
+        let out = match strategy {
+            WhitespaceTokenStrategy::Horizontal {
+                error_if_newlines,
                 space,
             } => {
-                assert!(!wcx.is_comments_before || newlines == 0);
-                if space || is_by_comments {
+                if error_if_newlines {
+                    if let Some(newline_pos) = token_str.find('\n') {
+                        self.source.advance(newline_pos);
+                        return Err(ConstraintError::NewlineNotAllowed.into());
+                    }
+                }
+                if space { Out::Space } else { Out::Nothing }
+            }
+            WhitespaceTokenStrategy::VerticalIfNewlines {
+                allow_blank_line,
+                space_if_horizontal,
+            } => {
+                let mut newlines = token_str.matches('\n');
+                if newlines.next().is_some() {
+                    Out::Newline {
+                        double: allow_blank_line && newlines.next().is_some(),
+                    }
+                } else if space_if_horizontal {
                     Out::Space
                 } else {
                     Out::Nothing
                 }
+            }
+            WhitespaceTokenStrategy::Vertical { allow_blank_line } => {
+                let double = allow_blank_line && token_str.matches('\n').nth(1).is_some();
+                Out::Newline { double }
             }
         };
         match out {
@@ -221,12 +228,16 @@ impl SourceFormatter {
                         self.out.indent()?;
                     }
                 }
-                wcx.is_whitespace_mode_out = true;
+                wcx.is_required_whitespace_emitted = true;
             }
             Out::Space => {
                 self.out.token(" ")?;
-                if matches!(wcx.mode, WhitespaceMode::Horizontal { .. }) {
-                    wcx.is_whitespace_mode_out = true;
+                match wcx.mode {
+                    WhitespaceMode::Horizontal { .. }
+                    | WhitespaceMode::VerticalIfComments { .. } => {
+                        wcx.is_required_whitespace_emitted = true;
+                    }
+                    WhitespaceMode::Vertical(_) => {}
                 }
             }
             Out::Nothing => {}
