@@ -352,8 +352,8 @@ impl AstFormatter {
                     self.use_tree(
                         item,
                         &Tail::func(|af| {
-                            self.out.skip_token("}")?;
-                            self.tail(tail)?;
+                            af.out.skip_token("}")?;
+                            af.tail(tail)?;
                             Ok(())
                         }),
                     )?;
@@ -393,8 +393,6 @@ impl ListConfig for UseTreeListConfig {
 struct UseTreeListItemConfig;
 impl ListItemConfig for UseTreeListItemConfig {
     type Item = (ast::UseTree, ast::NodeId);
-
-    const ITEMS_MAY_REQUIRE_OWN_LINE: bool = true;
 
     fn item_requires_own_line((item, _): &Self::Item) -> bool {
         matches!(item.kind, ast::UseTreeKind::Nested { .. })

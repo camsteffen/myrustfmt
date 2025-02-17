@@ -3,8 +3,6 @@ use std::marker::PhantomData;
 pub trait ListItemConfig: Copy {
     type Item;
 
-    const ITEMS_MAY_REQUIRE_OWN_LINE: bool = false;
-
     fn item_requires_own_line(_item: &Self::Item) -> bool {
         false
     }

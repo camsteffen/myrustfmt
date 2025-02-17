@@ -1,33 +1,14 @@
-
-- name: temp
-  type: breakpoint
-  in_block: true
-  before: |
-    fooo(
-        bar,
-        |arg, arg| expr,
-    );
-  after: |
-    fooo(
-        bar,
-        |arg, arg| {
-            expr
-        },
-    );
 - name: temp
   type: no_change
   in_block: true
   formatted: |
-      // todo don't let closure arguments wrap
-      fooo(bar, |
-      arg,
-      arg,
-      | expr);
-
       // todo prefer breaking on the outer struct
       self.handle_whitespace_and_comments(WhitespaceMode::Vertical(
           NewlineKind::IfComments,
       ));
+      self.handle_whitespace_and_comments(
+          WhitespaceMode::Vertical(NewlineKind::IfComments),
+      );
       
       // todo don't break this chain
       let newlines = token_str.bytes().filter(|&b| b == b'\n').count();

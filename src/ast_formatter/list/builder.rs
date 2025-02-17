@@ -175,8 +175,7 @@ where
     }
 
     fn contents_default(&self, af: &AstFormatter) -> FormatResult {
-        let any_items_require_own_line = ItemConfig::ITEMS_MAY_REQUIRE_OWN_LINE
-            && self.list.iter().any(ItemConfig::item_requires_own_line);
+        let any_items_require_own_line = self.list.iter().any(ItemConfig::item_requires_own_line);
         af.backtrack()
             .next_if(!any_items_require_own_line, || {
                 self.contents_single_line(af)

@@ -28,16 +28,19 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
 fn small_test(test: &Test) -> TestResult {
     eprintln!("Test: {}", &test.name);
     match &test.kind {
-        TestKind::Breakpoint { before, after } => breakpoint_test(before, after, test.in_block)?,
+        TestKind::Breakpoint { before, after } => {
+            assert!(test.max_width.is_none());
+            breakpoint_test(before, after, test.in_block)?
+        },
         TestKind::NoChange { formatted } => {
             let formatted = formatted.trim();
-            format_max_width_expected(formatted, None, formatted, "formatted", test.in_block)?;
+            format_max_width_expected(formatted, test.max_width, formatted, "formatted", test.in_block)?;
         }
         TestKind::BeforeAfter { before, after } => {
             let before = before.trim();
             let after = after.trim();
-            format_max_width_expected(before, None, after, "before -> after", test.in_block)?;
-            format_max_width_expected(after, None, after, "after (idempotency)", test.in_block)?;
+            format_max_width_expected(before, test.max_width, after, "before -> after", test.in_block)?;
+            format_max_width_expected(after, test.max_width, after, "after (idempotency)", test.in_block)?;
         }
     }
     Ok(())
@@ -52,6 +55,7 @@ struct Test {
     kind: TestKind,
     #[serde(default)]
     in_block: bool,
+    max_width: Option<u32>,
 }
 
 #[derive(Deserialize)]

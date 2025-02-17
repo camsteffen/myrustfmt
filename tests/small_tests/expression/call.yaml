@@ -18,3 +18,10 @@
         aaaaaaaaaa,
         aaaaaaaaaa,
     )
+- name: prefer not to overflow if same height
+  type: no_change
+  in_block: true
+  formatted: |
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+        bbbbbbbbbbbbbbbbbbbbbbbb(ccccccccccccccccccccccc),
+    );

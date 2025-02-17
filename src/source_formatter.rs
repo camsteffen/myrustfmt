@@ -152,6 +152,17 @@ impl SourceFormatter {
     }
 
     pub fn newline_if_comments(&self) -> FormatResult {
+        #[cfg(any())]
+        fn test(self) {
+            enum NewlineKind {
+                IfComments,
+            }
+            {
+                self.handle_whitespace_and_comments(WhitespaceMode::Vertical(
+                    NewlineKind::IfComments,
+                ));
+            }
+        }
         self.handle_whitespace_and_comments(WhitespaceMode::Flexible {
             vertical_mode: VerticalWhitespaceMode::Within,
             space_if_horizontal: false,
