@@ -101,24 +101,21 @@ impl AstFormatter {
                     self.out.token_maybe_missing(",")?;
                     Ok(())
                 };
-                let item_same_line = || {
-                    self.out.space()?;
-                    item_comma()?;
-                    Ok(())
-                };
-                let item_next_line = || {
-                    self.out.newline_within_indent()?;
-                    item_comma()?;
-                    Ok(())
-                };
-                if prev_must_have_own_line || item_requires_own_line(index) {
-                    item_next_line()?;
+                let is_own_line = prev_must_have_own_line || item_requires_own_line(index);
+                if is_own_line {
                     prev_must_have_own_line = !prev_must_have_own_line;
-                } else {
-                    self.backtrack()
-                        .next(item_same_line)
-                        .otherwise(item_next_line)?;
                 }
+                self.backtrack()
+                    .next_if(!is_own_line, || {
+                        self.out.space()?;
+                        item_comma()?;
+                        Ok(())
+                    })
+                    .otherwise(|| {
+                        self.out.newline_within_indent()?;
+                        item_comma()?;
+                        Ok(())
+                    })?;
             }
             Ok(())
         })?;

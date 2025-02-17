@@ -370,54 +370,54 @@ impl AstFormatter {
             Some((block_expr, else_expr))
         };
 
-        let multiline = || {
-            let (mut block, mut else_) = (block, else_);
-            loop {
-                self.block_separate_lines_after_open_brace(block)?;
-                match else_ {
-                    None => break self.tail(tail),
-                    Some(else_expr) => {
-                        self.out.space_token_space("else")?;
-                        match &else_expr.kind {
-                            ast::ExprKind::Block(block, _) => {
-                                self.block_separate_lines(block)?;
-                                self.tail(tail)?;
-                                break Ok(());
-                            }
-                            ast::ExprKind::If(condition, next_block, next_else) => {
-                                self.token_expr_open_brace("if", condition)?;
-                                (block, else_) = (next_block, next_else.as_deref());
-                            }
-                            _ => unreachable!(),
-                        }
-                    }
-                }
-            }
-        };
-
         let start_pos = self.out.last_line_len();
         let is_head_single_line = self.token_expr_open_brace("if", condition)?;
 
-        if let Some((block_expr, else_expr)) = is_head_single_line.then(single_line_parts).flatten()
-        {
-            self.backtrack()
-                .next_single_line(|| {
-                    self.with_width_limit_from_start(
-                        start_pos,
-                        RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
-                        || {
-                            self.expr_only_block_after_open_brace(block_expr)?;
+        self.backtrack()
+            .next_opt(
+                is_head_single_line
+                    .then(single_line_parts)
+                    .flatten()
+                    .map(|(block_expr, else_expr)| move || {
+                        self.with_single_line(|| {
+                            self.with_width_limit_from_start(
+                                start_pos,
+                                RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
+                                || {
+                                    self.expr_only_block_after_open_brace(block_expr)?;
+                                    self.out.space_token_space("else")?;
+                                    self.expr_only_block(else_expr)?;
+                                    self.tail(tail)?;
+                                    Ok(())
+                                },
+                            )
+                        })
+                    }),
+            )
+            .otherwise(|| {
+                let (mut block, mut else_) = (block, else_);
+                loop {
+                    self.block_separate_lines_after_open_brace(block)?;
+                    match else_ {
+                        None => break self.tail(tail),
+                        Some(else_expr) => {
                             self.out.space_token_space("else")?;
-                            self.expr_only_block(else_expr)?;
-                            self.tail(tail)?;
-                            Ok(())
-                        },
-                    )
-                })
-                .otherwise(multiline)?;
-        } else {
-            multiline()?;
-        }
+                            match &else_expr.kind {
+                                ast::ExprKind::Block(block, _) => {
+                                    self.block_separate_lines(block)?;
+                                    self.tail(tail)?;
+                                    break Ok(());
+                                }
+                                ast::ExprKind::If(condition, next_block, next_else) => {
+                                    self.token_expr_open_brace("if", condition)?;
+                                    (block, else_) = (next_block, next_else.as_deref());
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                    }
+                }
+            })?;
         Ok(())
     }
 
@@ -427,18 +427,16 @@ impl AstFormatter {
                 let first_line = self.out.line();
                 self.out.token_space(token)?;
                 self.expr(expr)?;
-                let newline_open_block = || {
-                    self.out.newline_within_indent()?;
-                    self.out.token("{")?;
-                    Ok(())
-                };
-                if self.out.line() == first_line || self.out.last_line_is_closers() {
-                    self.backtrack()
-                        .next_single_line(|| self.out.space_token("{"))
-                        .otherwise(newline_open_block)?;
-                } else {
-                    newline_open_block()?;
-                }
+                self.backtrack()
+                    .next_if(
+                        self.out.line() == first_line || self.out.last_line_is_closers(),
+                        || self.with_single_line(|| self.out.space_token("{")),
+                    )
+                    .otherwise(|| {
+                        self.out.newline_within_indent()?;
+                        self.out.token("{")?;
+                        Ok(())
+                    })?;
                 Ok(self.out.line() == first_line)
             })
     }

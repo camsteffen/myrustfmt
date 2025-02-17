@@ -24,13 +24,11 @@ impl AstFormatter {
         let first_line = self.out.line();
         if let Some(guard) = arm.guard.as_deref() {
             self.pat(&arm.pat)?;
-            if self.out.line() == first_line {
-                self.backtrack()
-                    .next(|| self.arm_guard_same_line(arm, guard))
-                    .otherwise(|| self.arm_guard_separate_line(arm, guard))?;
-            } else {
-                self.arm_guard_separate_line(arm, guard)?;
-            }
+            self.backtrack()
+                .next_if(self.out.line() == first_line, || {
+                    self.arm_guard_same_line(arm, guard)
+                })
+                .otherwise(|| self.arm_guard_separate_line(arm, guard))?;
         } else if let Some(body) = arm.body.as_deref() {
             self.pat_tail(
                 &arm.pat,

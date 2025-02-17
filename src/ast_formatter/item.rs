@@ -8,7 +8,7 @@ use crate::ast_formatter::list::list_config::{
 };
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext};
 use crate::ast_formatter::util::tail::Tail;
-use crate::error::{FormatResult, impl_format};
+use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 impl AstFormatter {
@@ -66,8 +66,7 @@ impl AstFormatter {
                         self.out.space()?;
                         self.block_generic(items, |item| self.item(item))?;
                     }
-                    ast::ModKind::Loaded(_, ast::Inline::No, _, ..)
-                    | ast::ModKind::Unloaded => {
+                    ast::ModKind::Loaded(_, ast::Inline::No, _, ..) | ast::ModKind::Unloaded => {
                         self.out.token(";")?;
                     }
                 }
@@ -147,8 +146,7 @@ impl AstFormatter {
     ) -> FormatResult {
         self.token_ident_generic_params("enum", item.ident, generics)?;
         self.out.space()?;
-        list(Braces::CURLY, variants, Self::variant)
-            .format_separate_lines(self)?;
+        list(Braces::CURLY, variants, Self::variant).format_separate_lines(self)?;
         Ok(())
     }
 
@@ -311,13 +309,11 @@ impl AstFormatter {
                 }
                 Ok(())
             }
-            ast::VariantData::Tuple(fields, _) => {
-                list(Braces::PARENS, fields, Self::field_def)
-                    .config(ParamListConfig {
-                        single_line_max_contents_width: None,
-                    })
-                    .format(self)
-            }
+            ast::VariantData::Tuple(fields, _) => list(Braces::PARENS, fields, Self::field_def)
+                .config(ParamListConfig {
+                    single_line_max_contents_width: None,
+                })
+                .format(self),
             ast::VariantData::Unit(_) => Ok(()),
         }
     }

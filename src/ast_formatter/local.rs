@@ -78,13 +78,12 @@ impl AstFormatter {
             else_separate_lines()?;
             Ok(())
         };
-        if is_single_line_init || self.out.last_line_is_closers() {
-            self.backtrack()
-                .next(same_line_else)
-                .otherwise(next_line_else)?;
-        } else {
-            next_line_else()?;
-        }
+        self.backtrack()
+            .next_if(
+                is_single_line_init || self.out.last_line_is_closers(),
+                same_line_else,
+            )
+            .otherwise(next_line_else)?;
         Ok(())
     }
 

@@ -8,7 +8,7 @@ impl AstFormatter {
     pub fn backtrack<T>(&self) -> Backtrack<T> {
         Backtrack {
             af: &self,
-            state: BacktrackState::Continue(self.open_checkpoint()),
+            state: BacktrackState::Init,
         }
     }
 }
@@ -24,23 +24,41 @@ pub struct Backtrack<'a, T = ()> {
     state: BacktrackState<T>,
 }
 
-type BacktrackState<T> = ControlFlow<FormatResult<T>, Checkpoint>;
+enum BacktrackState<T> {
+    Init,
+    Incomplete(Checkpoint),
+    Done(FormatResult<T>),
+}
 
 impl<T> Backtrack<'_, T> {
     /// Provides the next formatting strategy, but not the final one.
     pub fn next(mut self, strategy: impl FnOnce() -> FormatResult<T>) -> Self {
-        if let BacktrackState::Continue(checkpoint) = &self.state {
+        if let BacktrackState::Init = self.state {
+            self.state = BacktrackState::Incomplete(self.af.open_checkpoint());
+        }
+        if let BacktrackState::Incomplete(checkpoint) = &self.state {
             match strategy() {
                 // restore the checkpoint before continuing to the next formatting strategy
                 Err(FormatError::Constraint(_)) => self.af.restore_checkpoint(checkpoint),
                 // if Ok or an unrecoverable error, we're finished
-                result => match std::mem::replace(&mut self.state, BacktrackState::Break(result)) {
-                    BacktrackState::Continue(checkpoint) => self.af.close_checkpoint(checkpoint),
+                result => match std::mem::replace(&mut self.state, BacktrackState::Done(result)) {
+                    BacktrackState::Incomplete(checkpoint) => self.af.close_checkpoint(checkpoint),
                     _ => unreachable!(),
                 },
             }
         }
         self
+    }
+
+    pub fn next_if(self, condition: bool, strategy: impl Fn() -> FormatResult<T>) -> Self {
+        if condition { self.next(strategy) } else { self }
+    }
+
+    pub fn next_opt(self, strategy: Option<impl Fn() -> FormatResult<T>>) -> Self {
+        match strategy {
+            None => self,
+            Some(strategy) => self.next(strategy),
+        }
     }
 
     pub fn next_single_line(self, strategy: impl FnOnce() -> FormatResult<T>) -> Self {
@@ -52,29 +70,29 @@ impl<T> Backtrack<'_, T> {
     /// This is a required terminal operation.
     pub fn otherwise(self, final_attempt: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         match self.state {
-            BacktrackState::Break(result) => result,
-            BacktrackState::Continue(checkpoint) => {
+            BacktrackState::Init => final_attempt(),
+            BacktrackState::Incomplete(checkpoint) => {
                 self.af.close_checkpoint(checkpoint);
                 final_attempt()
             }
+            BacktrackState::Done(result) => result,
         }
-    }
-
-    pub fn into_inner(self) -> BacktrackState<T> {
-        self.state
     }
 
     /// Provides the next formatting strategy with explicit control of whether to break with a
     /// result or continue with subsequent strategies.
     pub fn next_control_flow<C>(
-        self,
+        mut self,
         strategy: impl FnOnce() -> ControlFlow<FormatResult<T>, C>,
     ) -> ControlFlow<FormatResult<T>, (Self, C)> {
+        if let BacktrackState::Init = self.state {
+            self.state = BacktrackState::Incomplete(self.af.open_checkpoint());
+        }
         match self.state {
-            BacktrackState::Break(result) => ControlFlow::Break(result),
-            BacktrackState::Continue(ref checkpoint) => match strategy() {
+            BacktrackState::Init => unreachable!(),
+            BacktrackState::Incomplete(ref checkpoint) => match strategy() {
                 ControlFlow::Break(result) => {
-                    let BacktrackState::Continue(checkpoint) = self.state else {
+                    let BacktrackState::Incomplete(checkpoint) = self.state else {
                         unreachable!();
                     };
                     self.af.close_checkpoint(checkpoint);
@@ -85,6 +103,7 @@ impl<T> Backtrack<'_, T> {
                     ControlFlow::Continue((self, value))
                 }
             },
+            BacktrackState::Done(result) => ControlFlow::Break(result),
         }
     }
 }

@@ -175,24 +175,23 @@ where
     }
 
     fn contents_default(&self, af: &AstFormatter) -> FormatResult {
-        let mut backtrack = af.backtrack();
-        if !(
-            ItemConfig::ITEMS_MAY_REQUIRE_OWN_LINE
-                && self.list.iter().any(ItemConfig::item_requires_own_line)
-        ) {
-            backtrack = backtrack.next(|| self.contents_single_line(af));
-        }
-        match Config::wrap_to_fit() {
-            ListWrapToFitConfig::Yes { max_element_width } => {
-                assert!(
-                    matches!(self.rest, ListRest::None),
-                    "rest cannot be used with wrap-to-fit"
-                );
-                backtrack = backtrack.next(|| self.contents_wrap_to_fit(af, max_element_width));
-            }
-            ListWrapToFitConfig::No => {}
-        }
-        backtrack.otherwise(|| self.contents_separate_lines(af))
+        let any_items_require_own_line = ItemConfig::ITEMS_MAY_REQUIRE_OWN_LINE
+            && self.list.iter().any(ItemConfig::item_requires_own_line);
+        af.backtrack()
+            .next_if(!any_items_require_own_line, || {
+                self.contents_single_line(af)
+            })
+            .next_opt(match Config::wrap_to_fit() {
+                ListWrapToFitConfig::Yes { max_element_width } => {
+                    assert!(
+                        matches!(self.rest, ListRest::None),
+                        "rest cannot be used with wrap-to-fit"
+                    );
+                    Some(move || self.contents_wrap_to_fit(af, max_element_width))
+                }
+                ListWrapToFitConfig::No => None,
+            })
+            .otherwise(|| self.contents_separate_lines(af))
     }
 
     fn contents_single_line(&self, af: &AstFormatter) -> FormatResult {
