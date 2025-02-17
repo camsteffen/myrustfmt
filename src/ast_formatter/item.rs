@@ -273,6 +273,7 @@ impl AstFormatter {
         self.ident(item.ident)?;
         self.generic_params(&trait_.generics.params)?;
         self.generic_bounds_optional(&trait_.bounds)?;
+        // todo share this code with other constructs
         if !self.where_clause(&trait_.generics.where_clause, true)? {
             self.out.space_or_newline()?;
         }

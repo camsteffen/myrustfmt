@@ -104,6 +104,7 @@ struct WhitespaceContext {
 impl SourceFormatter {
     // todo optimize no-op case?
     pub fn handle_whitespace_and_comments(&self, mode: WhitespaceMode) -> FormatResult {
+        let is_horizontal = matches!(mode, WhitespaceMode::Horizontal { .. });
         let wcx = &mut WhitespaceContext {
             is_comments_before: false,
             is_required_whitespace_emitted: false,
@@ -113,9 +114,7 @@ impl SourceFormatter {
             .peekable();
         while let Some(token) = tokens.next() {
             match token.kind {
-                TokenKind::LineComment { .. }
-                    if matches!(wcx.mode, WhitespaceMode::Horizontal { .. }) =>
-                {
+                TokenKind::LineComment { .. } if is_horizontal => {
                     return Err(ConstraintError::NewlineNotAllowed.into());
                 }
                 TokenKind::BlockComment { .. }
@@ -124,10 +123,10 @@ impl SourceFormatter {
                         .max_width
                         .with_replaced(None, || self.copy(token.len as usize))?;
                     wcx.is_comments_before = true;
-                    if matches!(wcx.mode, WhitespaceMode::Horizontal { .. }) {
+                    if is_horizontal {
+                        // todo also if vertical and multi-line comment?
                         wcx.is_required_whitespace_emitted = true;
                     }
-                    // todo instead check that remaining string is empty?
                     if matches!(token.kind, TokenKind::LineComment { .. })
                         && tokens.peek().is_none()
                     {
@@ -177,12 +176,12 @@ impl SourceFormatter {
     ) -> FormatResult {
         let strategy =
             wcx.mode.whitespace_token_strategy(wcx.is_comments_before, is_comments_after);
-        enum Out {
+        enum Emit {
             Nothing,
-            Newline { double: bool },
             Space,
+            Newline { double: bool },
         }
-        let out = match strategy {
+        let emit = match strategy {
             WhitespaceTokenStrategy::Horizontal {
                 error_if_newlines,
                 space,
@@ -193,7 +192,7 @@ impl SourceFormatter {
                         return Err(ConstraintError::NewlineNotAllowed.into());
                     }
                 }
-                if space { Out::Space } else { Out::Nothing }
+                if space { Emit::Space } else { Emit::Nothing }
             }
             WhitespaceTokenStrategy::VerticalIfNewlines {
                 allow_blank_line,
@@ -201,36 +200,22 @@ impl SourceFormatter {
             } => {
                 let mut newlines = token_str.matches('\n');
                 if newlines.next().is_some() {
-                    Out::Newline {
-                        double: allow_blank_line && newlines.next().is_some(),
-                    }
+                    let double = allow_blank_line && newlines.next().is_some();
+                    Emit::Newline { double }
                 } else if space_if_horizontal {
-                    Out::Space
+                    Emit::Space
                 } else {
-                    Out::Nothing
+                    Emit::Nothing
                 }
             }
             WhitespaceTokenStrategy::Vertical { allow_blank_line } => {
                 let double = allow_blank_line && token_str.matches('\n').nth(1).is_some();
-                Out::Newline { double }
+                Emit::Newline { double }
             }
         };
-        match out {
-            Out::Newline { double } => {
-                // todo handle this condition upstream
-                let should_omit_newlines = self.out.len() == 0;
-                if !should_omit_newlines {
-                    self.out.newline()?;
-                    if double {
-                        self.out.newline()?;
-                    }
-                    if is_comments_after {
-                        self.out.indent()?;
-                    }
-                }
-                wcx.is_required_whitespace_emitted = true;
-            }
-            Out::Space => {
+        match emit {
+            Emit::Nothing => {}
+            Emit::Space => {
                 self.out.token(" ")?;
                 match wcx.mode {
                     WhitespaceMode::Horizontal { .. }
@@ -240,7 +225,16 @@ impl SourceFormatter {
                     WhitespaceMode::Vertical(_) => {}
                 }
             }
-            Out::Nothing => {}
+            Emit::Newline { double } => {
+                self.out.newline()?;
+                if double {
+                    self.out.newline()?;
+                }
+                if is_comments_after {
+                    self.out.indent()?;
+                }
+                wcx.is_required_whitespace_emitted = true;
+            }
         }
         Ok(())
     }
