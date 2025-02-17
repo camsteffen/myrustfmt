@@ -96,12 +96,27 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn generic_bounds_optional(&self, bounds: &[ast::GenericBound]) -> FormatResult {
-        if !bounds.is_empty() {
-            self.out.token_space(":")?;
-            self.generic_bounds(bounds, Tail::none())?;
+    pub fn generic_bounds_optional(&self, bounds: &[ast::GenericBound]) -> FormatResult<bool> {
+        if bounds.is_empty() {
+            return Ok(false);
         }
-        Ok(())
+        self.out.token(":")?;
+        self.backtrack()
+            .next(|| {
+                self.out.space()?;
+                // todo single line?
+                self.generic_bounds(bounds, Tail::none())?;
+                Ok(false)
+            })
+            .otherwise(|| {
+                self.indented(|| {
+                    self.out.newline_within_indent()?;
+                    self.generic_bounds(bounds, Tail::none())?;
+                    Ok(())
+                })?;
+                self.out.newline_within_indent()?;
+                Ok(true)
+            })
     }
 
     pub fn generic_bounds(&self, bounds: &[ast::GenericBound], tail: &Tail) -> FormatResult {

@@ -19,9 +19,7 @@ impl AstFormatter {
             ..
         } = fn_;
         self.fn_header(&sig.header)?;
-        self.out.token_space("fn")?;
-        self.ident(item.ident)?;
-        self.generic_params(&generics.params)?;
+        self.token_ident_generic_params("fn", item.ident, &generics)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
         let param_list = list(Braces::PARENS, &sig.decl.inputs, Self::param)
             .config(ParamListConfig {

@@ -44,3 +44,25 @@
   formatted: |
     trait X // comment
     {}
+- name: breakpoint on body
+  type: breakpoint
+  before: |
+    trait Trait {}
+  after: |
+    trait Trait
+    {}
+- name: breakpoint on bounds
+  type: breakpoint
+  before: |
+    trait Trait<T>: Foo
+    {}
+  after: |
+    trait Trait<T>:
+        Foo
+    {}
+- name: associated type with generics
+  type: no_change
+  formatted: |
+    trait Trait {
+        type Type<T>;
+    }

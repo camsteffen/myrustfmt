@@ -218,6 +218,7 @@ impl SourceFormatter {
         Ok(())
     }
 
+    // todo maybe this is always worse than backtrack
     pub fn space_or_newline(&self) -> FormatResult {
         self.handle_whitespace_and_comments(WhitespaceMode::Flexible {
             vertical_mode: VerticalWhitespaceMode::Within,

@@ -8,7 +8,7 @@ use crate::ast_formatter::list::list_config::{
 };
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext};
 use crate::ast_formatter::util::tail::Tail;
-use crate::error::FormatResult;
+use crate::error::{FormatResult, impl_format};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 impl AstFormatter {
@@ -75,9 +75,7 @@ impl AstFormatter {
             ast::ItemKind::ForeignMod(_) => todo!(),
             ast::ItemKind::GlobalAsm(_) => todo!(),
             ast::ItemKind::TyAlias(ty_alias) => {
-                self.out.token_space("type")?;
-                self.ident(item.ident)?;
-                self.generic_params(&ty_alias.generics.params)?;
+                self.token_ident_generic_params("type", item.ident, &ty_alias.generics)?;
                 if let Some(ty) = &ty_alias.ty {
                     self.out.space_token_space("=")?;
                     self.ty(ty)?;
@@ -147,9 +145,7 @@ impl AstFormatter {
         generics: &ast::Generics,
         item: &ast::Item,
     ) -> FormatResult {
-        self.out.token_space("enum")?;
-        self.ident(item.ident)?;
-        self.generic_params(&generics.params)?;
+        self.token_ident_generic_params("enum", item.ident, generics)?;
         self.out.space()?;
         list(Braces::CURLY, variants, Self::variant)
             .format_separate_lines(self)?;
@@ -236,8 +232,7 @@ impl AstFormatter {
     }
 
     fn ty_alias(&self, ty_alias: &ast::TyAlias, ident: Ident) -> FormatResult {
-        self.out.token_space("type")?;
-        self.ident(ident)?;
+        self.token_ident_generic_params("type", ident, &ty_alias.generics)?;
         self.generic_bounds_optional(&ty_alias.bounds)?;
         if let Some(ty) = &ty_alias.ty {
             self.out.space_token_space("=")?;
@@ -253,9 +248,7 @@ impl AstFormatter {
         generics: &ast::Generics,
         item: &ast::Item,
     ) -> FormatResult {
-        self.out.token_space("struct")?;
-        self.ident(item.ident)?;
-        self.generic_params(&generics.params)?;
+        self.token_ident_generic_params("struct", item.ident, generics)?;
         if !matches!(variants, ast::VariantData::Unit(_)) {
             self.variant_data(variants, false)?;
         }
@@ -268,16 +261,39 @@ impl AstFormatter {
         Ok(())
     }
 
+    pub fn token_ident_generic_params(
+        &self,
+        token: &str,
+        ident: Ident,
+        generics: &ast::Generics,
+    ) -> FormatResult {
+        self.out.token_space(token)?;
+        self.ident(ident)?;
+        self.generic_params(&generics.params)?;
+        Ok(())
+    }
+
     fn trait_(&self, trait_: &ast::Trait, item: &ast::Item) -> FormatResult {
-        self.out.token_space("trait")?;
-        self.ident(item.ident)?;
-        self.generic_params(&trait_.generics.params)?;
-        self.generic_bounds_optional(&trait_.bounds)?;
+        self.token_ident_generic_params("trait", item.ident, &trait_.generics)?;
+        let wrapped_bounds = self.generic_bounds_optional(&trait_.bounds)?;
         // todo share this code with other constructs
-        if !self.where_clause(&trait_.generics.where_clause, true)? {
-            self.out.space_or_newline()?;
+        let has_where = self.where_clause(&trait_.generics.where_clause, true)?;
+        let body = || self.block_generic(&trait_.items, |item| self.assoc_item(item));
+        if wrapped_bounds || has_where {
+            body()?;
+        } else {
+            self.backtrack()
+                .next(|| {
+                    self.out.space()?;
+                    body()?;
+                    Ok(())
+                })
+                .otherwise(|| {
+                    self.out.newline_within_indent()?;
+                    body()?;
+                    Ok(())
+                })?;
         }
-        self.block_generic(&trait_.items, |item| self.assoc_item(item))?;
         Ok(())
     }
 

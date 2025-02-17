@@ -29,10 +29,7 @@ pub enum VerticalWhitespaceMode {
 
 #[derive(Debug)]
 enum WhitespaceTokenStrategy {
-    Horizontal {
-        error_on_newline: bool,
-        space: bool,
-    },
+    Horizontal { error_on_newline: bool, space: bool },
     Vertical { allow_blank_line: bool },
     Flexible {
         space_if_horizontal: bool,

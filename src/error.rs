@@ -19,6 +19,11 @@ macro_rules! debug_err {
 #[allow(unused)]
 pub(crate) use debug_err;
 
+macro_rules! impl_format {
+    () => (impl Fn() -> FormatResult);
+}
+pub(crate) use impl_format;
+
 pub type FormatResult<T = ()> = Result<T, FormatError>;
 
 pub type FormatControlFlow<C> = ControlFlow<FormatResult, C>;
