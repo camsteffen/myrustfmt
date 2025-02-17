@@ -196,6 +196,10 @@ impl SourceFormatter {
                 }
                 Emit::Space
             }
+            WhitespaceTokenStrategy::Vertical { allow_blank_line } => {
+                let double = allow_blank_line && token_str.matches('\n').nth(1).is_some();
+                Emit::Newline { double }
+            }
             WhitespaceTokenStrategy::VerticalIfNewlines {
                 allow_blank_line,
                 space_if_horizontal,
@@ -209,10 +213,6 @@ impl SourceFormatter {
                 } else {
                     return Ok(())
                 }
-            }
-            WhitespaceTokenStrategy::Vertical { allow_blank_line } => {
-                let double = allow_blank_line && token_str.matches('\n').nth(1).is_some();
-                Emit::Newline { double }
             }
         };
         match emit {
