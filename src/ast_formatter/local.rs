@@ -87,7 +87,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn local_init(&self, expr: &ast::Expr, end: &Tail) -> FormatResult {
+    fn local_init(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
         self.out.space_token("=")?;
         // todo do all these cases apply with else clause?
         // single line
@@ -98,7 +98,7 @@ impl AstFormatter {
                     self.expr(expr)?;
                     Ok(())
                 })?;
-                self.tail(end)?;
+                self.tail(tail)?;
                 Ok(())
             })
             // todo use lookahead to avoid re-formatting
@@ -107,7 +107,7 @@ impl AstFormatter {
                 self.indented(|| {
                     self.out.newline_within_indent()?;
                     self.with_single_line(|| self.expr(expr))?;
-                    self.tail(end)?;
+                    self.tail(tail)?;
                     Ok(())
                 })
             })
@@ -115,7 +115,7 @@ impl AstFormatter {
             .next(|| {
                 self.out.space()?;
                 self.expr(expr)?;
-                self.tail(end)?;
+                self.tail(tail)?;
                 Ok(())
             })
             // wrap and indent
@@ -123,7 +123,7 @@ impl AstFormatter {
                 self.indented(|| {
                     self.out.newline_within_indent()?;
                     self.expr(expr)?;
-                    self.tail(end)?;
+                    self.tail(tail)?;
                     Ok(())
                 })
             })

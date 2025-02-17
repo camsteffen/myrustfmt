@@ -143,13 +143,12 @@ impl AstFormatter {
         self.embraced_after_opening(close_brace, || {
             match rest {
                 ListRest::None => {
-                    let (until_last, last) = (0..len - 1, len - 1);
-                    for index in until_last {
+                    for index in 0..len - 1 {
                         item_comma(index)?;
                         // todo should this be "between"?
                         self.out.newline_within_indent()?;
                     }
-                    item_comma(last)?;
+                    item_comma(len - 1)?;
                 }
                 _ => {
                     for index in 0..len {
