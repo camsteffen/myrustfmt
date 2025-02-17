@@ -13,12 +13,15 @@ impl AstFormatter {
     ) -> FormatResult {
         let (first, rest) = items.split_first().unwrap();
         self.backtrack()
-            .next_single_line(|| {
-                format_item(first)?;
-                for item in rest {
-                    self.out.space_token_space(token)?;
-                    format_item(item)?;
-                }
+            .next(|| {
+                self.with_single_line(|| {
+                    format_item(first)?;
+                    for item in rest {
+                        self.out.space_token_space(token)?;
+                        format_item(item)?;
+                    }
+                    Ok(())
+                })?;
                 self.tail(tail)?;
                 Ok(())
             })

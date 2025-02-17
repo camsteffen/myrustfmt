@@ -65,8 +65,7 @@ impl SourceFormatter {
             let token_str = &self.source.remaining()[..len];
             let has_next = tokens.peek().is_some();
             let result = match token.kind {
-                TokenKind::BlockComment { .. }
-                | TokenKind::LineComment { .. } => {
+                TokenKind::BlockComment { .. } | TokenKind::LineComment { .. } => {
                     seen_comments = true;
                     let is_line_comment = matches!(token.kind, TokenKind::LineComment { .. });
                     self.comment_token(mode, len, is_line_comment, has_next)?

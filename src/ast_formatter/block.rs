@@ -22,8 +22,10 @@ impl AstFormatter {
             }
             Some(expr_only_block) => {
                 self.backtrack()
-                    .next_single_line(|| {
-                        self.expr_only_block_after_open_brace(expr_only_block)?;
+                    .next(|| {
+                        self.with_single_line(|| {
+                            self.expr_only_block_after_open_brace(expr_only_block)
+                        })?;
                         self.tail(tail)?;
                         Ok(())
                     })
@@ -97,8 +99,9 @@ impl AstFormatter {
                             self.out.token(";")?;
                             Ok(())
                         }
-                        ast::MacStmtStyle::Braces
-                        | ast::MacStmtStyle::NoBraces => self.mac_call(&mac_call_stmt.mac),
+                        ast::MacStmtStyle::Braces | ast::MacStmtStyle::NoBraces => {
+                            self.mac_call(&mac_call_stmt.mac)
+                        }
                     }
                 })
             }

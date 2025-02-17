@@ -18,11 +18,14 @@ impl AstFormatter {
         let (first, chain) = self.collect_binary_chain(left, right, op);
         self.expr(first)?;
         self.backtrack()
-            .next_single_line(|| {
-                for (op, expr) in &chain {
-                    self.out.space_token_space(op.as_str())?;
-                    self.expr(expr)?;
-                }
+            .next(|| {
+                self.with_single_line(|| {
+                    for (op, expr) in &chain {
+                        self.out.space_token_space(op.as_str())?;
+                        self.expr(expr)?;
+                    }
+                    Ok(())
+                })?;
                 self.tail(tail)?;
                 Ok(())
             })

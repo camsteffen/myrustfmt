@@ -26,13 +26,15 @@ impl AstFormatter {
                 single_line_max_contents_width: None,
             });
         self.backtrack()
-            .next_single_line(|| {
-                param_list.format_single_line(self)?;
-                self.fn_ret_ty(&sig.decl.output)?;
-                if is_block_after_decl {
-                    self.out.space_token("{")?;
-                }
-                Ok(())
+            .next(|| {
+                self.with_single_line(|| {
+                    param_list.format_single_line(self)?;
+                    self.fn_ret_ty(&sig.decl.output)?;
+                    if is_block_after_decl {
+                        self.out.space_token("{")?;
+                    }
+                    Ok(())
+                })
             })
             .otherwise(|| {
                 param_list.format_separate_lines(self)?;

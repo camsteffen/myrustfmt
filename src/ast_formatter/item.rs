@@ -146,7 +146,8 @@ impl AstFormatter {
     ) -> FormatResult {
         self.token_ident_generic_params("enum", item.ident, generics)?;
         self.out.space()?;
-        list(Braces::CURLY, variants, Self::variant).format_separate_lines(self)?;
+        list(Braces::CURLY, variants, Self::variant)
+            .format_separate_lines(self)?;
         Ok(())
     }
 
@@ -173,10 +174,12 @@ impl AstFormatter {
         };
         let indented = if self.out.line() == first_line {
             self.backtrack()
-                .next_single_line(|| {
-                    self.out.space()?;
-                    first_part()?;
-                    Ok(false)
+                .next(|| {
+                    self.with_single_line(|| {
+                        self.out.space()?;
+                        first_part()?;
+                        Ok(false)
+                    })
                 })
                 .otherwise(|| {
                     self.indented(|| {
@@ -309,11 +312,13 @@ impl AstFormatter {
                 }
                 Ok(())
             }
-            ast::VariantData::Tuple(fields, _) => list(Braces::PARENS, fields, Self::field_def)
-                .config(ParamListConfig {
-                    single_line_max_contents_width: None,
-                })
-                .format(self),
+            ast::VariantData::Tuple(fields, _) => {
+                list(Braces::PARENS, fields, Self::field_def)
+                    .config(ParamListConfig {
+                        single_line_max_contents_width: None,
+                    })
+                    .format(self)
+            }
             ast::VariantData::Unit(_) => Ok(()),
         }
     }

@@ -135,9 +135,7 @@ impl SubmoduleVisitor<'_> {
                 self.psess.dcx().span_err(ident.span, msg);
                 todo!();
             }
-            ModError::ParserError(_)
-            | ModError::CircularInclusion(_)
-            | ModError::ModInBlock(_) => {
+            ModError::ParserError(_) | ModError::CircularInclusion(_) | ModError::ModInBlock(_) => {
                 // todo the function never returns these errors, but is there a better way?
                 unreachable!()
             }

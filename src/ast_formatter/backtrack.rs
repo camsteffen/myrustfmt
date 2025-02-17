@@ -14,10 +14,13 @@ impl AstFormatter {
 }
 
 /// Executes a series of formatting strategies to find one that succeeds with the given constraints.
+///
 /// Each strategy is chained by calling `next` with a formatting function, and the final strategy
 /// is chained with `otherwise`. If a strategy fails with a constraint error, it will restore a
 /// checkpoint before running the next strategy. If a strategy succeeds, it will hold the result
 /// until the end, and all subsequent strategies will be ignored.
+///
+/// A checkpoint is created lazily to optimize for when only one strategy is given.
 #[must_use]
 pub struct Backtrack<'a, T = ()> {
     af: &'a AstFormatter,
@@ -59,11 +62,6 @@ impl<T> Backtrack<'_, T> {
             None => self,
             Some(strategy) => self.next(strategy),
         }
-    }
-
-    pub fn next_single_line(self, strategy: impl FnOnce() -> FormatResult<T>) -> Self {
-        let af = self.af;
-        self.next(|| af.with_single_line(strategy))
     }
 
     /// Provides the final formatting strategy and returns the result of the backtracking chain.

@@ -92,9 +92,12 @@ impl AstFormatter {
         // todo do all these cases apply with else clause?
         // single line
         self.backtrack()
-            .next_single_line(|| {
-                self.out.space()?;
-                self.expr(expr)?;
+            .next(|| {
+                self.with_single_line(|| {
+                    self.out.space()?;
+                    self.expr(expr)?;
+                    Ok(())
+                })?;
                 self.tail(end)?;
                 Ok(())
             })
