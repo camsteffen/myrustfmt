@@ -177,7 +177,6 @@ impl SourceFormatter {
         let strategy =
             wcx.mode.whitespace_token_strategy(wcx.is_comments_before, is_comments_after);
         enum Emit {
-            Nothing,
             Space,
             Newline { double: bool },
         }
@@ -192,7 +191,10 @@ impl SourceFormatter {
                         return Err(ConstraintError::NewlineNotAllowed.into());
                     }
                 }
-                if space { Emit::Space } else { Emit::Nothing }
+                if !space {
+                    return Ok(())
+                }
+                Emit::Space
             }
             WhitespaceTokenStrategy::VerticalIfNewlines {
                 allow_blank_line,
@@ -205,7 +207,7 @@ impl SourceFormatter {
                 } else if space_if_horizontal {
                     Emit::Space
                 } else {
-                    Emit::Nothing
+                    return Ok(())
                 }
             }
             WhitespaceTokenStrategy::Vertical { allow_blank_line } => {
@@ -214,7 +216,6 @@ impl SourceFormatter {
             }
         };
         match emit {
-            Emit::Nothing => {}
             Emit::Space => {
                 self.out.token(" ")?;
                 match wcx.mode {
