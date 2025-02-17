@@ -145,14 +145,14 @@ impl SourceFormatter {
     }
 
     pub fn newline_above_if_comments(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::VerticalIfComments {
+        self.handle_whitespace_and_comments(WhitespaceMode::Flexible {
             vertical_mode: VerticalWhitespaceMode::Above,
             space_if_horizontal: false,
         })
     }
 
     pub fn newline_if_comments(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::VerticalIfComments {
+        self.handle_whitespace_and_comments(WhitespaceMode::Flexible {
             vertical_mode: VerticalWhitespaceMode::Within,
             space_if_horizontal: false,
         })
@@ -219,7 +219,7 @@ impl SourceFormatter {
     }
 
     pub fn space_or_newline(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::VerticalIfComments {
+        self.handle_whitespace_and_comments(WhitespaceMode::Flexible {
             vertical_mode: VerticalWhitespaceMode::Within,
             space_if_horizontal: true,
         })?;

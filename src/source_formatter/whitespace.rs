@@ -9,7 +9,7 @@ use rustc_lexer::TokenKind;
 pub enum WhitespaceMode {
     Horizontal { space: bool },
     Vertical(VerticalWhitespaceMode),
-    VerticalIfComments {
+    Flexible {
         space_if_horizontal: bool,
         vertical_mode: VerticalWhitespaceMode,
     },
@@ -17,71 +17,33 @@ pub enum WhitespaceMode {
 
 #[derive(Clone, Copy, Debug)]
 pub enum VerticalWhitespaceMode {
-    /// Newline between items where a blank line is allowed. (e.g. between statements)
+    /// "between items" where a blank line is allowed. (e.g. between statements)
     Between,
-    /// Newline at the beginning of a section, where a blank line is allowed only after comments.
+    /// "above" a section, where a blank line is allowed only after comments.
     Above,
-    /// Newline at the end of a section, where a blank line is allowed only before comments.
+    /// "below" a section, where a blank line is allowed only before comments.
     Below,
-    /// Newline in a place where blank lines should be removed.
+    /// "within" a construct, where blank lines should be removed.
     Within,
 }
 
 #[derive(Debug)]
 enum WhitespaceTokenStrategy {
     Horizontal {
-        error_if_newlines: bool,
+        error_on_newline: bool,
         space: bool,
     },
-    VerticalIfNewlines {
+    Vertical { allow_blank_line: bool },
+    Flexible {
         space_if_horizontal: bool,
         allow_blank_line: bool,
     },
-    Vertical { allow_blank_line: bool },
 }
 
-impl WhitespaceMode {
-    fn whitespace_token_strategy(
-        self,
-        is_comments_before: bool,
-        is_comments_after: bool,
-    ) -> WhitespaceTokenStrategy {
-        let is_by_comments = is_comments_before || is_comments_after;
-        match self {
-            WhitespaceMode::Horizontal { space } => WhitespaceTokenStrategy::Horizontal {
-                error_if_newlines: is_comments_before,
-                space: space || is_by_comments,
-            },
-            WhitespaceMode::Vertical(mode) => {
-                let allow_blank_line = mode.allow_blank_line(is_comments_before, is_comments_after);
-                if is_comments_after {
-                    WhitespaceTokenStrategy::VerticalIfNewlines {
-                        allow_blank_line,
-                        space_if_horizontal: true,
-                    }
-                } else {
-                    WhitespaceTokenStrategy::Vertical { allow_blank_line }
-                }
-            }
-            WhitespaceMode::VerticalIfComments {
-                space_if_horizontal,
-                vertical_mode,
-            } => {
-                if is_by_comments {
-                    WhitespaceTokenStrategy::VerticalIfNewlines {
-                        allow_blank_line: vertical_mode
-                            .allow_blank_line(is_comments_before, is_comments_after),
-                        space_if_horizontal: space_if_horizontal || is_by_comments,
-                    }
-                } else {
-                    WhitespaceTokenStrategy::Horizontal {
-                        error_if_newlines: false,
-                        space: space_if_horizontal,
-                    }
-                }
-            }
-        }
-    }
+#[derive(Clone, Copy, Debug)]
+enum WhitespaceOut {
+    Space,
+    Newline { double: bool },
 }
 
 impl VerticalWhitespaceMode {
@@ -95,138 +57,146 @@ impl VerticalWhitespaceMode {
     }
 }
 
-struct WhitespaceContext {
-    is_comments_before: bool,
-    is_required_whitespace_emitted: bool,
-    mode: WhitespaceMode,
-}
-
 impl SourceFormatter {
-    // todo optimize no-op case?
     pub fn handle_whitespace_and_comments(&self, mode: WhitespaceMode) -> FormatResult {
-        let is_horizontal = matches!(mode, WhitespaceMode::Horizontal { .. });
-        let wcx = &mut WhitespaceContext {
-            is_comments_before: false,
-            is_required_whitespace_emitted: false,
-            mode,
-        };
+        let mut is_required_whitespace_emitted = false;
+        let mut seen_comments = false;
         let mut tokens = tokenize_whitespace_and_comments(self.source.remaining())
             .peekable();
         while let Some(token) = tokens.next() {
-            match token.kind {
-                TokenKind::LineComment { .. } if is_horizontal => {
-                    return Err(ConstraintError::NewlineNotAllowed.into());
-                }
+            let len = token.len as usize;
+            let token_str = &self.source.remaining()[..len];
+            let has_next = tokens.peek().is_some();
+            let result = match token.kind {
                 TokenKind::BlockComment { .. }
                 | TokenKind::LineComment { .. } => {
-                    self.constraints()
-                        .max_width
-                        .with_replaced(None, || self.copy(token.len as usize))?;
-                    wcx.is_comments_before = true;
-                    if is_horizontal {
-                        // todo also if vertical and multi-line comment?
-                        wcx.is_required_whitespace_emitted = true;
-                    }
-                    if matches!(token.kind, TokenKind::LineComment { .. })
-                        && tokens.peek().is_none()
-                    {
-                        // end of file newline
-                        self.out.newline()?;
-                        wcx.is_required_whitespace_emitted = true;
-                    }
+                    seen_comments = true;
+                    let is_line_comment = matches!(token.kind, TokenKind::LineComment { .. });
+                    self.comment_token(mode, len, is_line_comment, has_next)?
                 }
                 TokenKind::Whitespace => {
-                    let token_str = &self.source.remaining()[..token.len as usize];
-                    let is_comments_after = tokens.peek().is_some();
-                    self.flush_whitespace(wcx, token_str, is_comments_after)?;
-                    self.source.advance(token_str.len());
+                    self.whitespace_token(mode, token_str, seen_comments, has_next)?
                 }
                 _ => unreachable!(),
-            }
+            };
+            is_required_whitespace_emitted |= result;
         }
-        self.ensure_required_whitespace(wcx)?;
-
+        if !is_required_whitespace_emitted {
+            self.emit_required_whitespace(mode)?;
+        }
         Ok(())
     }
 
-    fn ensure_required_whitespace(&self, wcx: &mut WhitespaceContext) -> FormatResult {
-        if !wcx.is_required_whitespace_emitted {
-            match wcx.mode {
-                WhitespaceMode::Horizontal { space }
-                | WhitespaceMode::VerticalIfComments {
-                    space_if_horizontal: space,
-                    ..
-                } => {
-                    if space {
-                        self.out.token(" ")?;
-                    }
+    fn emit_required_whitespace(&self, mode: WhitespaceMode) -> FormatResult {
+        match mode {
+            WhitespaceMode::Horizontal { space }
+            | WhitespaceMode::Flexible {
+                space_if_horizontal: space,
+                ..
+            } => {
+                if space {
+                    self.out.token(" ")?;
                 }
-                WhitespaceMode::Vertical(_) => self.out.newline()?,
             }
-            wcx.is_required_whitespace_emitted = true;
+            WhitespaceMode::Vertical(_) => self.out.newline()?,
         }
         Ok(())
     }
 
-    fn flush_whitespace(
+    fn comment_token(
         &self,
-        wcx: &mut WhitespaceContext,
-        token_str: &str,
-        is_comments_after: bool,
-    ) -> FormatResult {
-        let strategy =
-            wcx.mode.whitespace_token_strategy(wcx.is_comments_before, is_comments_after);
-        enum Emit {
-            Space,
-            Newline { double: bool },
+        mode: WhitespaceMode,
+        len: usize,
+        is_line_comment: bool,
+        has_next: bool,
+    ) -> FormatResult<bool> {
+        let is_horizontal = matches!(mode, WhitespaceMode::Horizontal { .. });
+        if is_horizontal && is_line_comment {
+            return Err(ConstraintError::NewlineNotAllowed.into());
         }
-        let emit = match strategy {
+        self.constraints()
+            .max_width
+            .with_replaced(None, || self.copy(len))?;
+        let mut emitted_required = false;
+        if is_horizontal {
+            // todo also if vertical and multi-line comment?
+            emitted_required = true;
+        }
+        if is_line_comment && !has_next {
+            // end of file newline
+            self.out.newline()?;
+            emitted_required = true;
+        }
+        Ok(emitted_required)
+    }
+
+    fn whitespace_token(
+        &self,
+        mode: WhitespaceMode,
+        token_str: &str,
+        is_comments_before: bool,
+        is_comments_after: bool,
+    ) -> FormatResult<bool> {
+        let out =
+            self.determine_whitespace_out(mode, token_str, is_comments_before, is_comments_after)?;
+        if let Some(out) = out {
+            self.emit_whitespace(out, is_comments_after)?;
+        }
+        let fulfills_mode = out.is_some_and(|out| whitespace_fulfills_mode(mode, out));
+        self.source.advance(token_str.len());
+        Ok(fulfills_mode)
+    }
+
+    fn determine_whitespace_out(
+        &self,
+        mode: WhitespaceMode,
+        token_str: &str,
+        is_comments_before: bool,
+        is_comments_after: bool,
+    ) -> FormatResult<Option<WhitespaceOut>> {
+        let strategy = whitespace_token_strategy(mode, is_comments_before, is_comments_after);
+        let out = match strategy {
             WhitespaceTokenStrategy::Horizontal {
-                error_if_newlines,
+                error_on_newline,
                 space,
             } => {
-                if error_if_newlines {
+                if error_on_newline {
                     if let Some(newline_pos) = token_str.find('\n') {
                         self.source.advance(newline_pos);
                         return Err(ConstraintError::NewlineNotAllowed.into());
                     }
                 }
                 if !space {
-                    return Ok(())
+                    return Ok(None);
                 }
-                Emit::Space
+                WhitespaceOut::Space
             }
             WhitespaceTokenStrategy::Vertical { allow_blank_line } => {
                 let double = allow_blank_line && token_str.matches('\n').nth(1).is_some();
-                Emit::Newline { double }
+                WhitespaceOut::Newline { double }
             }
-            WhitespaceTokenStrategy::VerticalIfNewlines {
+            WhitespaceTokenStrategy::Flexible {
                 allow_blank_line,
                 space_if_horizontal,
             } => {
                 let mut newlines = token_str.matches('\n');
                 if newlines.next().is_some() {
                     let double = allow_blank_line && newlines.next().is_some();
-                    Emit::Newline { double }
+                    WhitespaceOut::Newline { double }
                 } else if space_if_horizontal {
-                    Emit::Space
+                    WhitespaceOut::Space
                 } else {
-                    return Ok(())
+                    return Ok(None);
                 }
             }
         };
-        match emit {
-            Emit::Space => {
-                self.out.token(" ")?;
-                match wcx.mode {
-                    WhitespaceMode::Horizontal { .. }
-                    | WhitespaceMode::VerticalIfComments { .. } => {
-                        wcx.is_required_whitespace_emitted = true;
-                    }
-                    WhitespaceMode::Vertical(_) => {}
-                }
-            }
-            Emit::Newline { double } => {
+        Ok(Some(out))
+    }
+
+    fn emit_whitespace(&self, whitespace: WhitespaceOut, is_comments_after: bool) -> FormatResult {
+        match whitespace {
+            WhitespaceOut::Space => self.out.token(" ")?,
+            WhitespaceOut::Newline { double } => {
                 self.out.newline()?;
                 if double {
                     self.out.newline()?;
@@ -234,7 +204,6 @@ impl SourceFormatter {
                 if is_comments_after {
                     self.out.indent()?;
                 }
-                wcx.is_required_whitespace_emitted = true;
             }
         }
         Ok(())
@@ -245,8 +214,8 @@ fn tokenize_whitespace_and_comments(source: &str) -> impl Iterator<Item = Token>
     let mut tokens = rustc_lexer::tokenize(source);
     let mut remaining = source;
     std::iter::from_fn(move || {
-        let next_char = remaining.chars().next()?;
-        if !(next_char == '/' || rustc_lexer::is_whitespace(next_char)) {
+        let next_char = remaining.chars().next();
+        if !next_char.is_some_and(|c| c == '/' || rustc_lexer::is_whitespace(c)) {
             // save the tokenizer some work
             return None;
         }
@@ -261,4 +230,58 @@ fn tokenize_whitespace_and_comments(source: &str) -> impl Iterator<Item = Token>
             _ => None,
         }
     })
+}
+
+fn whitespace_fulfills_mode(mode: WhitespaceMode, out: WhitespaceOut) -> bool {
+    match out {
+        WhitespaceOut::Space => match mode {
+            WhitespaceMode::Horizontal { .. } | WhitespaceMode::Flexible { .. } => true,
+            WhitespaceMode::Vertical(_) => false,
+        },
+        WhitespaceOut::Newline { .. } => true,
+    }
+}
+
+/// Decides how to handle a whitespace token,
+/// knowing whether there are comments before and/or after it
+fn whitespace_token_strategy(
+    mode: WhitespaceMode,
+    is_comments_before: bool,
+    is_comments_after: bool,
+) -> WhitespaceTokenStrategy {
+    let is_by_comments = is_comments_before || is_comments_after;
+    match mode {
+        WhitespaceMode::Horizontal { space } => WhitespaceTokenStrategy::Horizontal {
+            error_on_newline: is_comments_before,
+            space: space || is_by_comments,
+        },
+        WhitespaceMode::Vertical(mode) => {
+            let allow_blank_line = mode.allow_blank_line(is_comments_before, is_comments_after);
+            if is_comments_after {
+                WhitespaceTokenStrategy::Flexible {
+                    allow_blank_line,
+                    space_if_horizontal: true,
+                }
+            } else {
+                WhitespaceTokenStrategy::Vertical { allow_blank_line }
+            }
+        }
+        WhitespaceMode::Flexible {
+            space_if_horizontal,
+            vertical_mode,
+        } => {
+            if is_by_comments {
+                WhitespaceTokenStrategy::Flexible {
+                    allow_blank_line: vertical_mode
+                        .allow_blank_line(is_comments_before, is_comments_after),
+                    space_if_horizontal: space_if_horizontal || is_by_comments,
+                }
+            } else {
+                WhitespaceTokenStrategy::Horizontal {
+                    error_on_newline: false,
+                    space: space_if_horizontal,
+                }
+            }
+        }
+    }
 }
