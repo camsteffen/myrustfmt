@@ -75,3 +75,16 @@
         first_arg,
         |arg, arg| result,
     )
+- name: breakpoint on closure with args as single argument to call
+  type: breakpoint
+  in_block: true
+  before: |
+    foooo(|arg, arg| {
+        expr
+    });
+  after: |
+    foooo(
+        |arg, arg| {
+            expr
+        },
+    );

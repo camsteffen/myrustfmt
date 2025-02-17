@@ -29,7 +29,8 @@ pub enum MultiLineConstraint {
     SingleLineLists,
     /// Same as IndentMiddle, but also disallow formats where the last line is indented
     NoHangingIndent,
-    /// All lines between the first and last lines must be indented away from the margin
+    /// All lines between the first and last lines must be indented away from the margin.
+    /// Expressions ending in curly braces must fit the header before the curly braces in one line.
     IndentMiddle,
     /// No constraint
     MultiLine,

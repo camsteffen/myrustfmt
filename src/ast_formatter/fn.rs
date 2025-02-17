@@ -190,7 +190,7 @@ impl AstFormatter {
             self.tail(tail)?;
             Ok(())
         };
-        if self.out.constraints().multi_line.get() <= MultiLineConstraint::SingleLineLists {
+        if self.out.constraints().multi_line.get() <= MultiLineConstraint::IndentMiddle {
             return do_single_line();
         }
         // args and return type all on one line
@@ -198,14 +198,8 @@ impl AstFormatter {
             .next(do_single_line)
             // args on separate lines
             .otherwise(|| {
-                self.constraints()
-                    .with_multi_line_constraint_to_single_line(
-                        MultiLineConstraint::SingleLineLists,
-                        || {
-                            list(braces, &fn_decl.inputs, Self::param)
-                                .format_separate_lines(self)
-                        },
-                    )?;
+                list(braces, &fn_decl.inputs, Self::param)
+                    .format_separate_lines(self)?;
                 self.fn_ret_ty(&fn_decl.output)?;
                 self.tail(tail)?;
                 Ok(())
