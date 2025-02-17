@@ -1,12 +1,14 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
-use crate::ast_formatter::list::builder::ListBuilderTrait;
+use crate::ast_formatter::list::Braces;
+use crate::ast_formatter::list::builder::list;
+use crate::ast_formatter::list::list_config::CallParamListConfig;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
+use crate::constraints::MultiLineConstraint;
 use crate::error::{ConstraintError, FormatError, FormatResult, FormatResultExt, return_if_break};
 use rustc_ast::ast;
 use std::ops::ControlFlow;
-use crate::constraints::MultiLineConstraint;
 
 // In rustfmt, this is called chain_width, and is 60 by default
 const POSTFIX_CHAIN_MAX_WIDTH: u32 = 60;
@@ -213,7 +215,9 @@ impl AstFormatter {
                 self.path_segment(&method_call.seg, true, &Tail::token("("))?;
                 // todo this is consistent with rustfmt, but would it be better to force args to be
                 //   on the same line, just allowing overflow of the last arg?
-                self.call_args_after_open_paren(&method_call.args, Tail::none())
+                list(Braces::PARENS, &method_call.args, self.expr_list_item())
+                    .config(CallParamListConfig)
+                    .omit_open_brace()
                     .format(self)?;
             }
             // root expression

@@ -5,7 +5,7 @@ use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 use crate::ast_formatter::list::ListRest;
-use crate::ast_formatter::list::builder::{ListBuilderTrait, list};
+use crate::ast_formatter::list::builder::list;
 use crate::ast_formatter::list::list_config::{
     ArrayListConfig, CallParamListConfig, TupleListConfig, struct_field_list_config,
 };
@@ -319,7 +319,12 @@ impl AstFormatter {
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
         let first_line = self.out.line();
         self.expr_tail(func, &Tail::token("("))?;
-        let args = || self.call_args_after_open_paren(args, tail);
+        let args = || {
+            list(Braces::PARENS, args, self.expr_list_item())
+                .config(CallParamListConfig)
+                .omit_open_brace()
+                .tail(tail)
+        };
         if self.out.constraints().requires_indent_middle() && self.out.line() != first_line {
             // single line and no overflow
             // this avoids code like
@@ -333,17 +338,6 @@ impl AstFormatter {
             args().format(self)?;
         }
         Ok(())
-    }
-
-    pub fn call_args_after_open_paren<'ast: 'out, 'tail: 'out, 'this: 'out, 'out>(
-        &'this self,
-        args: &'ast [P<ast::Expr>],
-        tail: &'tail Tail<'_>,
-    ) -> impl ListBuilderTrait + 'out {
-        list(Braces::PARENS, args, self.expr_list_item())
-            .config(CallParamListConfig)
-            .omit_open_brace()
-            .tail(tail)
     }
 
     fn delim_args(&self, delim_args: &ast::DelimArgs) -> FormatResult {

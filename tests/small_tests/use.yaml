@@ -1,0 +1,6 @@
+- name: remove braces from singleton list
+  type: before_after
+  before: |
+    use foo::{ bar };
+  after: |
+    use foo::bar;

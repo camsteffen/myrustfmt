@@ -347,15 +347,27 @@ impl AstFormatter {
             }
             ast::UseTreeKind::Nested { ref items, span: _ } => {
                 self.out.token("::")?;
-                list(
-                    Braces::CURLY_NO_PAD,
-                    items,
-                    |af, (use_tree, _), tail, _lcx| af.use_tree(use_tree, tail),
-                )
-                .config(UseTreeListConfig)
-                .item_config(UseTreeListItemConfig)
-                .tail(tail)
-                .format(self)?;
+                if let [(item, _)] = &items[..] {
+                    self.out.skip_token("{")?;
+                    self.use_tree(
+                        item,
+                        &Tail::func(|af| {
+                            self.out.skip_token("}")?;
+                            self.tail(tail)?;
+                            Ok(())
+                        }),
+                    )?;
+                } else {
+                    list(
+                        Braces::CURLY_NO_PAD,
+                        items,
+                        |af, (use_tree, _), tail, _lcx| af.use_tree(use_tree, tail),
+                    )
+                    .config(UseTreeListConfig)
+                    .item_config(UseTreeListItemConfig)
+                    .tail(tail)
+                    .format(self)?;
+                }
             }
             ast::UseTreeKind::Glob => {
                 self.out.token("::")?;

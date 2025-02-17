@@ -271,32 +271,3 @@ where
         )
     }
 }
-
-/// convenience for `-> impl ListBuilderTrait`, otherwise ListBuilder is preferred
-pub trait ListBuilderTrait {
-    fn format(&self, af: &AstFormatter) -> FormatResult;
-
-    fn format_single_line(&self, af: &AstFormatter) -> FormatResult;
-}
-
-impl<'a, 'ast, 'tail, Item, FormatItem, Config, ItemConfig> ListBuilderTrait for ListBuilder<
-    'ast,
-    'tail,
-    Item,
-    FormatItem,
-    Config,
-    ItemConfig,
->
-where
-    Config: ListConfig,
-    ItemConfig: ListItemConfig<Item = Item>,
-    FormatItem: FormatListItem<Item>,
-{
-    fn format(&self, af: &AstFormatter) -> FormatResult {
-        self.format(af)
-    }
-
-    fn format_single_line(&self, af: &AstFormatter) -> FormatResult {
-        self.format_single_line(af)
-    }
-}
