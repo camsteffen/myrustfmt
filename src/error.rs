@@ -1,7 +1,6 @@
 use crate::util::line_col::line_col;
 use std::backtrace::Backtrace;
 use std::fmt::{Display, Formatter};
-use std::ops::ControlFlow;
 use std::path::Path;
 
 #[allow(unused)]
@@ -20,8 +19,6 @@ macro_rules! debug_err {
 pub(crate) use debug_err;
 
 pub type FormatResult<T = ()> = Result<T, FormatError>;
-
-pub type FormatControlFlow<C> = ControlFlow<FormatResult, C>;
 
 pub trait FormatResultExt<T> {
     fn constraint_err_only(self) -> Result<Result<T, ConstraintError>, ParseError>;

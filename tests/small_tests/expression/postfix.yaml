@@ -65,12 +65,9 @@
         .asdf
         .asdfasdf(Thing { thing, thing })
   after: |
-    rooty
-        .asdf
-        .asdf
-        .asdfasdf(
-            Thing { thing, thing },
-        )
+    rooty.asdf.asdf.asdfasdf(
+        Thing { thing, thing },
+    )
 - name: prefer separate lines chain over overflow when same number of lines, even when method call is multi-line
   type: breakpoint
   in_block: true

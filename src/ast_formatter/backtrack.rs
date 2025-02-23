@@ -1,7 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::checkpoint::Checkpoint;
 use crate::error::{FormatError, FormatResult};
-use std::ops::ControlFlow;
 
 impl AstFormatter {
     // todo should backtrack be specific to a constraint? unless_too_wide(..).otherwise(..)
@@ -28,7 +27,7 @@ impl AstFormatter {
 /// until the end, and all subsequent strategies will be ignored.
 ///
 /// A checkpoint is created lazily to optimize for when only one strategy is given.
-/// 
+///
 /// Backtrack is a higher abstraction than using Checkpoint directly, and should be preferred for
 /// simple cases since it ensures that the Checkpoint is dropped at the right time.
 #[must_use]

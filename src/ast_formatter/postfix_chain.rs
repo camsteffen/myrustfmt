@@ -142,7 +142,7 @@ impl AstFormatter {
             Ok(self.out.line() - first_line + 1)
         });
 
-        let result = match result {
+        match result {
             Err(FormatError::Constraint(_)) => todo!(), // is this possible?
             Err(e) => Err(e),
             Ok(separate_lines_height) => {
@@ -155,9 +155,7 @@ impl AstFormatter {
                     Ok(())
                 }
             }
-        };
-
-        result
+        }
         // todo perhaps there is a concept of "fallback cost" that can be passed down
         //   - if you err out, there will be a cost of increased indent and added lines
     }

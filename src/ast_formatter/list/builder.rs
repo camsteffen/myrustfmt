@@ -5,7 +5,16 @@ use crate::ast_formatter::list::list_item_context::ListItemContext;
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListRest, ListStrategy};
 use crate::ast_formatter::util::tail::Tail;
 use crate::constraints::MultiLineConstraint;
-use crate::error::FormatResult;
+use crate::error::{FormatResult, FormatResultExt};
+
+macro_rules! return_if_ok {
+    ($expr:expr) => {
+        match $expr {
+            Ok(value) => return Ok(value),
+            Err(e) => e,
+        }
+    };
+}
 
 pub trait FormatListItem<Item> {
     fn format(
@@ -176,21 +185,62 @@ where
 
     fn contents_default(&self, af: &AstFormatter) -> FormatResult {
         let any_items_require_own_line = self.list.iter().any(ItemConfig::item_requires_own_line);
-        af.backtrack()
-            .next_if(!any_items_require_own_line, || {
-                self.contents_single_line(af)
-            })
-            .next_opt(match Config::wrap_to_fit() {
-                ListWrapToFitConfig::Yes { max_element_width } => {
-                    assert!(
-                        matches!(self.rest, ListRest::None),
-                        "rest cannot be used with wrap-to-fit"
-                    );
-                    Some(move || self.contents_wrap_to_fit(af, max_element_width))
+        if any_items_require_own_line {
+            return af.backtrack()
+                .next_opt(self.contents_wrap_to_fit_fn_opt(af))
+                .otherwise(|| self.contents_separate_lines(af));
+        }
+        let checkpoint = af.open_checkpoint();
+        let first_line = af.out.line();
+        let result = self.contents_single_line(af).constraint_err_only()?;
+        let (lookahead, overflow_height) = match result {
+            Ok(()) => {
+                if af.out.line() == first_line {
+                    // it fits on one line
+                    return Ok(())
                 }
-                ListWrapToFitConfig::No => None,
-            })
-            .otherwise(|| self.contents_separate_lines(af))
+                let overflow_height = af.out.line() - first_line + 1;
+                let lookahead = af.capture_lookahead(&checkpoint);
+                (lookahead, overflow_height)
+            }
+            Err(_) => {
+                af.restore_checkpoint(&checkpoint);
+                return af.backtrack_from_checkpoint(checkpoint)
+                    .next_opt(self.contents_wrap_to_fit_fn_opt(af))
+                    .otherwise(|| self.contents_separate_lines(af));
+            }
+        };
+        if let Some(f) = self.contents_wrap_to_fit_fn_opt(af) {
+            return_if_ok!(f().constraint_err_only()?);
+            af.restore_checkpoint(&checkpoint);
+        }
+        match self.contents_separate_lines(af).constraint_err_only()? {
+            Err(_) => {
+                af.restore_checkpoint(&checkpoint);
+                af.restore_lookahead(&lookahead);
+            }
+            Ok(()) => {
+                let separate_lines_height = af.out.line() - first_line + 1;
+                if overflow_height < separate_lines_height {
+                    af.restore_checkpoint(&checkpoint);
+                    af.restore_lookahead(&lookahead);
+                }
+            }
+        }
+        Ok(())
+    }
+    
+    fn contents_wrap_to_fit_fn_opt(&self, af: &AstFormatter) -> Option<impl Fn() -> FormatResult> {
+        match Config::wrap_to_fit() {
+            ListWrapToFitConfig::Yes { max_element_width } => {
+                assert!(
+                    matches!(self.rest, ListRest::None),
+                    "rest cannot be used with wrap-to-fit"
+                );
+                Some(move || self.contents_wrap_to_fit(af, max_element_width))
+            }
+            ListWrapToFitConfig::No => None,
+        } 
     }
 
     fn contents_single_line(&self, af: &AstFormatter) -> FormatResult {
