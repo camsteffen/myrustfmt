@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
 use std::cell::Cell;
+use std::rc::Rc;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MaxWidthForLine {
@@ -36,12 +37,26 @@ pub enum MultiLineConstraint {
     MultiLine,
 }
 
+/// An empty Rc used to count the number of open checkpoints.
+///
+/// The existence of an open checkpoint means that constraint errors are recoverable by restoring
+/// the checkpoint and attempting another formatting strategy. Care must be taken to drop
+/// checkpoints _before_ the final (non-recoverable) formatting strategy.
+/// 
+/// Using an Rc does make the implementation a bit precarious, but it seems less error-prone than
+/// having to manually decrement the count at many early return sites.
+#[derive(Clone, Debug, Default)]
+pub struct CheckpointCounter(Rc<()>);
+
+impl CheckpointCounter {
+    pub fn count(&self) -> usize {
+        Rc::strong_count(&self.0) - 1
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Constraints {
-    /// The presence of an open checkpoint indicates that an alternate formatting strategy is
-    /// available upstream in case the current code path fails with a constraint error.
-    pub open_checkpoint_count: Cell<u32>,
-    /// I mean, this is kinda the whole point
+    /// Things would be much simpler without this
     // todo no Option
     pub max_width: Cell<Option<u32>>,
     /// Used to set the max width for the current line, so it no longer applies after a newline
@@ -62,16 +77,11 @@ impl Default for Constraints {
 impl Constraints {
     pub fn new(max_width: u32) -> Constraints {
         Constraints {
-            open_checkpoint_count: Cell::new(0),
             indent: Cell::new(0),
             max_width: Cell::new(Some(max_width)),
             max_width_for_line: Cell::new(None),
             multi_line: Cell::new(MultiLineConstraint::MultiLine),
         }
-    }
-
-    pub fn has_open_checkpoints(&self) -> bool {
-        self.open_checkpoint_count.get() > 0
     }
 
     pub fn requires_indent_middle(&self) -> bool {

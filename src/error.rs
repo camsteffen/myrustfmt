@@ -24,28 +24,18 @@ pub type FormatResult<T = ()> = Result<T, FormatError>;
 pub type FormatControlFlow<C> = ControlFlow<FormatResult, C>;
 
 pub trait FormatResultExt<T> {
-    fn break_err(self) -> FormatControlFlow<T>;
+    fn constraint_err_only(self) -> Result<Result<T, ConstraintError>, ParseError>;
 }
 
 impl<T> FormatResultExt<T> for FormatResult<T> {
-    fn break_err(self) -> FormatControlFlow<T> {
+    fn constraint_err_only(self) -> Result<Result<T, ConstraintError>, ParseError> {
         match self {
-            Ok(value) => ControlFlow::Continue(value),
-            Err(e) => ControlFlow::Break(Err(e)),
+            Err(FormatError::Parse(e)) => Err(e),
+            Err(FormatError::Constraint(e)) => Ok(Err(e)),
+            Ok(value) => Ok(Ok(value)),
         }
     }
 }
-
-macro_rules! return_if_break {
-    ($control_flow:expr) => {{
-        use std::ops::ControlFlow;
-        match $control_flow {
-            ControlFlow::Break(value) => return value,
-            ControlFlow::Continue(value) => value,
-        }
-    }};
-}
-pub(crate) use return_if_break;
 
 #[derive(Debug)]
 pub enum FormatError {

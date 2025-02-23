@@ -1,11 +1,15 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::{Constraints, MaxWidthForLine, MultiLineConstraint};
+use crate::constraints::{CheckpointCounter, Constraints, MaxWidthForLine, MultiLineConstraint};
 use crate::error::{FormatResult, WidthLimitExceededError};
 use crate::util::cell_ext::CellExt;
 
 pub const INDENT_WIDTH: u32 = 4;
 
 impl AstFormatter {
+    pub(super) fn checkpoint_counter(&self) -> &CheckpointCounter {
+        self.out.checkpoint_counter()
+    }
+
     pub(super) fn constraints(&self) -> &Constraints {
         self.out.constraints()
     }
@@ -37,7 +41,7 @@ impl AstFormatter {
 
     pub fn with_single_line<T>(&self, f: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         assert!(
-            self.constraints().has_open_checkpoints(),
+            self.checkpoint_counter().count() > 0,
             "single line constraint applied with no fallback"
         );
         self.constraints()

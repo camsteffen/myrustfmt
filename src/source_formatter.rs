@@ -2,7 +2,7 @@ use crate::ast_formatter::FormatModuleResult;
 use crate::constraint_writer::{
     ConstraintWriter, ConstraintWriterCheckpoint, ConstraintWriterLookahead,
 };
-use crate::constraints::Constraints;
+use crate::constraints::{CheckpointCounter, Constraints};
 use crate::error::FormatResult;
 use crate::error_emitter::ErrorEmitter;
 use crate::source_formatter::whitespace::{VerticalWhitespaceMode, WhitespaceMode};
@@ -51,6 +51,10 @@ impl SourceFormatter {
     pub fn finish(self) -> FormatModuleResult {
         self.source.finish();
         self.out.finish()
+    }
+
+    pub fn checkpoint_counter(&self) -> &CheckpointCounter {
+        self.out.checkpoint_counter()
     }
 
     pub fn constraints(&self) -> &Constraints {

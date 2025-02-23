@@ -6,9 +6,8 @@ use crate::ast_formatter::list::list_config::CallParamListConfig;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
 use crate::constraints::MultiLineConstraint;
-use crate::error::{ConstraintError, FormatError, FormatResult, FormatResultExt, return_if_break};
+use crate::error::{ConstraintError, FormatError, FormatResult};
 use rustc_ast::ast;
-use std::ops::ControlFlow;
 
 // In rustfmt, this is called chain_width, and is 60 by default
 const POSTFIX_CHAIN_MAX_WIDTH: u32 = 60;
@@ -122,18 +121,15 @@ impl AstFormatter {
         let first_line = self.out.line();
         let checkpoint = self.open_checkpoint();
 
-        let result = self.maybe_lookahead(checkpoint, || {
-            self.with_chain_item_max_width(start_pos, || self.postfix_overflowable(overflowable))
-                .break_err()?;
-            self.tail(tail).break_err()?;
-            if self.out.line() == first_line {
-                // it all fits on one line
-                return ControlFlow::Break(Ok(()));
-            }
-            // todo can we prove that the overflow is so long that a separate line won't be shorter?
-            ControlFlow::Continue(self.out.line() - first_line + 1)
-        });
-        let (checkpoint, overflow_lookahead, overflow_height) = return_if_break!(result);
+        self.with_chain_item_max_width(start_pos, || self.postfix_overflowable(overflowable))?;
+        self.tail(tail)?;
+        if self.out.line() == first_line {
+            // it all fits on one line
+            return Ok(());
+        }
+        // todo can we prove that the overflow is so long that a separate line won't be shorter?
+        let overflow_height = self.out.line() - first_line + 1;
+        let overflow_lookahead = self.capture_lookahead(&checkpoint);
 
         // try writing the overflowable on the next line to measure its height in separate lines format
         // todo share logic with match arm
@@ -161,7 +157,6 @@ impl AstFormatter {
             }
         };
 
-        self.close_checkpoint(checkpoint);
         result
         // todo perhaps there is a concept of "fallback cost" that can be passed down
         //   - if you err out, there will be a cost of increased indent and added lines

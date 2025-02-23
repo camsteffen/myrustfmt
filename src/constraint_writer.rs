@@ -1,5 +1,5 @@
 use crate::ast_formatter::FormatModuleResult;
-use crate::constraints::Constraints;
+use crate::constraints::{CheckpointCounter, Constraints};
 use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededError};
 use crate::error_emitter::ErrorEmitter;
 use crate::util::cell_ext::CellExt;
@@ -7,6 +7,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 pub struct ConstraintWriter {
+    checkpoint_counter: CheckpointCounter,
     constraints: Constraints,
     buffer: Cell<String>,
     error_emitter: Rc<ErrorEmitter>,
@@ -24,11 +25,13 @@ pub struct ConstraintWriterCheckpoint {
 
 // todo rename
 pub struct ConstraintWriterSelfCheckpoint {
-    #[cfg(debug_assertions)]
-    constraints: Constraints,
     line: u32,
     last_line_start: usize,
     last_width_exceeded_line: Option<u32>,
+    #[cfg(debug_assertions)]
+    checkpoint_count: usize,
+    #[cfg(debug_assertions)]
+    constraints: Constraints,
 }
 
 pub struct ConstraintWriterLookahead {
@@ -44,6 +47,7 @@ pub struct ConstraintWriterResult {
 impl ConstraintWriter {
     pub fn new(constraints: Constraints, error_emitter: Rc<ErrorEmitter>) -> ConstraintWriter {
         ConstraintWriter {
+            checkpoint_counter: CheckpointCounter::default(),
             constraints,
             buffer: Cell::new(String::new()),
             error_emitter,
@@ -59,6 +63,10 @@ impl ConstraintWriter {
             formatted: self.buffer.into_inner(),
             exceeded_max_width: self.exceeded_max_width.get(),
         }
+    }
+
+    pub fn checkpoint_counter(&self) -> &CheckpointCounter {
+        &self.checkpoint_counter
     }
 
     pub fn constraints(&self) -> &Constraints {
@@ -83,6 +91,8 @@ impl ConstraintWriter {
     pub fn self_checkpoint(&self) -> ConstraintWriterSelfCheckpoint {
         let Self {
             #[cfg(debug_assertions)]
+            ref checkpoint_counter,
+            #[cfg(debug_assertions)]
             ref constraints,
             #[cfg(not(debug_assertions))]
             constraints: _,
@@ -94,12 +104,17 @@ impl ConstraintWriter {
             ref last_width_exceeded_line,
             ref line,
         } = *self;
+        let constraints = constraints.clone();
+        // N.B. record the count after cloning constraints
+        let checkpoint_count = checkpoint_counter.count();
         ConstraintWriterSelfCheckpoint {
-            #[cfg(debug_assertions)]
-            constraints: constraints.clone(),
             line: line.get(),
             last_line_start: last_line_start.get(),
             last_width_exceeded_line: last_width_exceeded_line.get(),
+            #[cfg(debug_assertions)]
+            checkpoint_count,
+            #[cfg(debug_assertions)]
+            constraints,
         }
     }
 
@@ -114,14 +129,17 @@ impl ConstraintWriter {
 
     pub fn restore_self_checkpoint(&self, checkpoint: &ConstraintWriterSelfCheckpoint) {
         let ConstraintWriterSelfCheckpoint {
-            #[cfg(debug_assertions)]
-            ref constraints,
             last_line_start,
             last_width_exceeded_line,
             line,
+            #[cfg(debug_assertions)]
+            checkpoint_count,
+            #[cfg(debug_assertions)]
+            ref constraints,
         } = *checkpoint;
         #[cfg(debug_assertions)]
         assert_eq!(&self.constraints, constraints);
+        assert_eq!(self.checkpoint_counter.count(), checkpoint_count);
         self.last_line_start.set(last_line_start);
         self.last_width_exceeded_line.set(last_width_exceeded_line);
         self.line.set(line);
@@ -186,7 +204,7 @@ impl ConstraintWriter {
         match self.remaining_width() {
             None | Some(Ok(_)) => Ok(()),
             Some(Err(WidthLimitExceededError { .. })) => {
-                if self.constraints.has_open_checkpoints() {
+                if self.checkpoint_counter.count() > 0 {
                     Err(WidthLimitExceededError)
                 } else {
                     let line = self.line.get();
