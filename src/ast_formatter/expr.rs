@@ -8,7 +8,7 @@ use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::builder::{list, FormatListItem, ListBuilder};
 use crate::ast_formatter::list::list_config::{ArrayListConfig, TupleListConfig, ListConfig};
 use crate::ast_utils::postfix_expr_kind;
-use crate::constraints::MultiLineConstraint;
+use crate::constraints::MultiLineShape;
 use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
@@ -62,18 +62,15 @@ impl AstFormatter {
                     })
                     .otherwise(|| {
                         self.constraints()
-                            .with_multi_line_constraint_to_single_line(
-                                MultiLineConstraint::NoHangingIndent,
-                                || {
-                                    self.indented(|| {
-                                        self.out.newline_within_indent()?;
-                                        self.out.token_space("as")?;
-                                        self.ty(ty)?;
-                                        self.tail(tail)?;
-                                        Ok(())
-                                    })
-                                },
-                            )
+                            .with_single_line_unless(MultiLineShape::HangingIndent, || {
+                                self.indented(|| {
+                                    self.out.newline_within_indent()?;
+                                    self.out.token_space("as")?;
+                                    self.ty(ty)?;
+                                    self.tail(tail)?;
+                                    Ok(())
+                                })
+                            })
                     })?;
             }
             ast::ExprKind::Type(_, _) => todo!(),
@@ -171,7 +168,7 @@ impl AstFormatter {
                 self.backtrack()
                     .next(|| {
                         self.constraints()
-                            .with_multi_line_constraint(MultiLineConstraint::NoHangingIndent, || {
+                            .with_multi_line_shape(MultiLineShape::VerticalList, || {
                                 self.expr(inner)
                             })?;
                         self.out.token(")")?;
@@ -235,19 +232,17 @@ impl AstFormatter {
                 match lcx.strategy {
                     // overflow last item
                     ListStrategy::SingleLine
-                        if outer_multi_line > MultiLineConstraint::SingleLineLists
+                        if outer_multi_line >= MultiLineShape::VerticalList
                             && lcx.index == lcx.len - 1 =>
                     {
-                        // override the multi-line constraint to be less strict than SingleLine
-                        let multi_line_constraint = if lcx.len > 1 {
+                        // override the multi-line shape to be less strict than SingleLine
+                        let shape = if lcx.len > 1 {
                             // don't overflow nested lists in a list with multiple items
-                            MultiLineConstraint::SingleLineLists
+                            MultiLineShape::BlockIndent
                         } else {
-                            MultiLineConstraint::NoHangingIndent
+                            MultiLineShape::VerticalList
                         };
-                        af.constraints()
-                            .multi_line
-                            .with_replaced(multi_line_constraint, format)?;
+                        af.constraints().multi_line.with_replaced(shape, format)?;
                         Ok(())
                     }
                     // on separate lines, enforce IndentMiddle by adding a block
@@ -306,10 +301,9 @@ impl AstFormatter {
                         af.expr_tail(end, tail)?;
                     } else {
                         self.constraints()
-                            .with_multi_line_constraint_to_single_line(
-                                MultiLineConstraint::IndentMiddle,
-                                || af.expr_tail(end, tail),
-                            )?;
+                            .with_single_line_unless(MultiLineShape::DisjointIndent, || {
+                                af.expr_tail(end, tail)
+                            })?;
                     }
                     Ok(())
                 }),
@@ -340,19 +334,11 @@ impl AstFormatter {
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
         let first_line = self.out.line();
         self.expr_tail(func, &Tail::token("("))?;
-        // single-line constraint here may avoid code like
-        // (
-        //    multiline_function_expr
-        // )(
-        //    multi_line_args,
-        // )
         let is_multi_line_func = self.out.line() != first_line;
-        self.constraints()
-            .with_opt_multi_line_constraint_to_single_line(
-                is_multi_line_func
-                    .then_some(MultiLineConstraint::IndentMiddle),
-                || self.call_args_after_open_paren(args, tail),
-            )?;
+        self.constraints().with_single_line_unless_opt(
+            is_multi_line_func.then_some(MultiLineShape::DisjointIndent),
+            || self.call_args_after_open_paren(args, tail),
+        )?;
         Ok(())
     }
 
@@ -416,11 +402,10 @@ impl AstFormatter {
         let multi_line = || {
             // todo this is failing earlier than "indent middle" is really violated;
             //   do we need to revise the guidelines in MultiLineConstraint docs?
-            self.constraints()
-                .with_opt_multi_line_constraint_to_single_line(
-                    else_.is_some().then_some(MultiLineConstraint::IndentMiddle),
-                    || self.block_separate_lines_after_open_brace(block),
-                )?;
+            self.constraints().with_single_line_unless_opt(
+                else_.is_some().then_some(MultiLineShape::DisjointIndent),
+                || self.block_separate_lines_after_open_brace(block),
+            )?;
             let mut else_ = else_;
             loop {
                 let Some(else_expr) = else_ else { break };
@@ -447,7 +432,7 @@ impl AstFormatter {
 
     pub fn token_expr_open_brace(&self, token: &str, expr: &ast::Expr) -> FormatResult<bool> {
         self.constraints()
-            .with_multi_line_constraint_to_single_line(MultiLineConstraint::IndentMiddle, || {
+            .with_single_line_unless(MultiLineShape::DisjointIndent, || {
                 let first_line = self.out.line();
                 self.out.token_space(token)?;
                 self.expr(expr)?;

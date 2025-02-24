@@ -5,7 +5,7 @@ use crate::error::FormatResult;
 use rustc_ast::ast;
 use rustc_ast::util::parser::AssocOp;
 use rustc_span::source_map::Spanned;
-use crate::constraints::MultiLineConstraint;
+use crate::constraints::MultiLineShape;
 
 impl AstFormatter {
     pub fn binary(
@@ -31,22 +31,19 @@ impl AstFormatter {
             })
             .otherwise(|| {
                 self.constraints()
-                    .with_multi_line_constraint_to_single_line(
-                        MultiLineConstraint::NoHangingIndent,
-                        || {
-                            self.indented(|| {
-                                // todo write items on the same line while within an indentation width
-                                //  (share code with postfix chains?)
-                                for (op, expr) in chain {
-                                    self.out.newline_within_indent()?;
-                                    self.out.token_space(op.as_str())?;
-                                    self.expr(expr)?;
-                                }
-                                self.tail(tail)?;
-                                Ok(())
-                            })
-                        },
-                    )
+                    .with_single_line_unless(MultiLineShape::HangingIndent, || {
+                        self.indented(|| {
+                            // todo write items on the same line while within an indentation width
+                            //  (share code with postfix chains?)
+                            for (op, expr) in chain {
+                                self.out.newline_within_indent()?;
+                                self.out.token_space(op.as_str())?;
+                                self.expr(expr)?;
+                            }
+                            self.tail(tail)?;
+                            Ok(())
+                        })
+                    })
             })
     }
 

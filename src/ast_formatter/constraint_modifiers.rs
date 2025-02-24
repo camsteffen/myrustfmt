@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::{CheckpointCounter, Constraints, MaxWidthForLine, MultiLineConstraint};
+use crate::constraints::{CheckpointCounter, Constraints, MaxWidthForLine, MultiLineShape};
 use crate::error::{FormatResult, WidthLimitExceededError};
 use crate::util::cell_ext::CellExt;
 
@@ -19,11 +19,11 @@ impl AstFormatter {
         self.constraints()
             .indent
             .with_replaced(indent, || match self.constraints().multi_line.get() {
-                MultiLineConstraint::SingleLine | MultiLineConstraint::MultiLine => f(),
+                MultiLineShape::SingleLine | MultiLineShape::DisjointIndent => f(),
                 _ => {
                     self.constraints()
                         .multi_line
-                        .with_replaced(MultiLineConstraint::MultiLine, f)
+                        .with_replaced(MultiLineShape::DisjointIndent, f)
                 }
             })
     }
@@ -45,7 +45,7 @@ impl AstFormatter {
             "single line constraint applied with no fallback"
         );
         self.constraints()
-            .with_multi_line_constraint(MultiLineConstraint::SingleLine, f)
+            .with_multi_line_shape(MultiLineShape::SingleLine, f)
     }
 
     /** Enforces a max number of characters until a newline is printed */

@@ -4,7 +4,7 @@ use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 
 use crate::ast_formatter::list::builder::list;
-use crate::constraints::MultiLineConstraint;
+use crate::constraints::MultiLineShape;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
 use rustc_span::symbol::kw;
@@ -109,7 +109,7 @@ impl AstFormatter {
                 self.backtrack()
                     .next(|| {
                         self.constraints()
-                            .with_multi_line_constraint(MultiLineConstraint::SingleLineLists, || {
+                            .with_multi_line_shape(MultiLineShape::BlockIndent, || {
                                 self.expr_tail(body, tail)
                             })
                     })
@@ -185,7 +185,7 @@ impl AstFormatter {
             self.tail(tail)?;
             Ok(())
         };
-        if self.out.constraints().multi_line.get() <= MultiLineConstraint::IndentMiddle {
+        if self.out.constraints().multi_line.get() <= MultiLineShape::HangingIndent {
             return do_single_line();
         }
         // args and return type all on one line

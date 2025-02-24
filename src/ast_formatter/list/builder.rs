@@ -5,7 +5,7 @@ use crate::ast_formatter::list::list_item_config::DefaultListItemConfig;
 use crate::ast_formatter::list::list_item_context::ListItemContext;
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListRest, ListStrategy};
 use crate::ast_formatter::util::tail::Tail;
-use crate::constraints::MultiLineConstraint;
+use crate::constraints::MultiLineShape;
 use crate::error::{FormatResult, FormatResultExt};
 
 macro_rules! return_if_ok {
@@ -167,7 +167,7 @@ where
 
     pub fn format(&self, af: &AstFormatter) -> FormatResult {
         af.constraints()
-            .with_multi_line_constraint_to_single_line(MultiLineConstraint::SingleLineLists, || {
+            .with_single_line_unless(MultiLineShape::VerticalList, || {
                 self.do_format(af, Self::contents_default)
             })
     }

@@ -2,8 +2,8 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
-use crate::constraints::MultiLineConstraint;
-use crate::error::{ConstraintError, FormatError, FormatResult};
+use crate::constraints::MultiLineShape;
+use crate::error::{ConstraintError, FormatResult, FormatResultExt};
 use rustc_ast::ast;
 
 // In rustfmt, this is called chain_width, and is 60 by default
@@ -47,13 +47,11 @@ impl AstFormatter {
                 self.postfix_item(next)?;
                 return self.tail(tail);
             }
-            self.constraints()
-                .with_multi_line_constraint_to_single_line(MultiLineConstraint::IndentMiddle, || {
-                    self.postfix_item(next)
-                })?;
+            self.constraints().with_single_line_unless(
+                MultiLineShape::DisjointIndent,
+                || self.postfix_item(next),
+            )?;
             if self.out.line() != first_line {
-                // should be prevented by single-line constraint above
-                assert_eq!(self.constraints().requires_indent_middle(), false);
                 break true;
             }
             if self.out.last_line_len() > indent_margin {
@@ -69,14 +67,9 @@ impl AstFormatter {
                 .next(|| self.postfix_chain_single_line_with_overflow(chain_rest, start_pos, tail))
                 .otherwise(|| {
                     self.constraints()
-                        .with_multi_line_constraint_to_single_line(
-                            MultiLineConstraint::NoHangingIndent,
-                            || {
-                                self.indented(|| {
-                                    self.postfix_chain_separate_lines(chain_rest, tail)
-                                })
-                            },
-                        )
+                        .with_single_line_unless(MultiLineShape::HangingIndent, || {
+                            self.indented(|| self.postfix_chain_separate_lines(chain_rest, tail))
+                        })
                 })
         }
     }
@@ -129,16 +122,22 @@ impl AstFormatter {
         // todo share logic with match arm
         // todo should we check if the wrap allows a *longer* first line, like match arm?
         // todo account for having less width if the fallback will add a block
-        let result = self.indented(|| {
-            self.out.newline_within_indent()?;
-            self.postfix_item(overflowable)?;
-            self.tail(tail)?;
-            Ok(self.out.line() - first_line + 1)
-        });
+        let result = self
+            .indented(|| {
+                self.out.newline_within_indent()?;
+                self.postfix_item(overflowable)?;
+                let height = self.out.line() - first_line + 1;
+                self.tail(tail)?;
+                Ok(height)
+            })
+            .constraint_err_only()?;
 
         match result {
-            Err(FormatError::Constraint(_)) => todo!(), // is this possible?
-            Err(e) => Err(e),
+            Err(_) => {
+                self.restore_checkpoint(&checkpoint);
+                self.restore_lookahead(&overflow_lookahead);
+                Ok(())
+            }
             Ok(separate_lines_height) => {
                 if separate_lines_height <= overflow_height {
                     // fallback to separate lines strategy

@@ -5,6 +5,7 @@ use crate::ast_formatter::backtrack::Backtrack;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
+use crate::constraints::MultiLineShape;
 use crate::error::{ConstraintError, FormatResult, FormatResultExt};
 use crate::util::cell_ext::CellExt;
 
@@ -168,7 +169,10 @@ impl AstFormatter {
         backtrack
             .next(|| {
                 self.constraints()
-                    .with_no_hanging_indent(|| self.expr_tail(body, &Tail::token_insert(",")))
+                    .multi_line
+                    .with_replaced(MultiLineShape::VerticalList, || {
+                        self.expr_tail(body, &Tail::token_insert(","))
+                    })
             })
             .otherwise(|| self.expr_add_block(body))
     }

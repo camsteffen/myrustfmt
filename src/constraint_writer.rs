@@ -1,5 +1,5 @@
 use crate::ast_formatter::FormatModuleResult;
-use crate::constraints::{CheckpointCounter, Constraints};
+use crate::constraints::{CheckpointCounter, Constraints, MultiLineShape};
 use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededError};
 use crate::error_emitter::ErrorEmitter;
 use crate::util::cell_ext::CellExt;
@@ -181,7 +181,7 @@ impl ConstraintWriter {
     }
 
     pub fn newline(&self) -> Result<(), NewlineNotAllowedError> {
-        if self.constraints.requires_single_line() {
+        if matches!(self.constraints.multi_line.get(), MultiLineShape::SingleLine) {
             return Err(NewlineNotAllowedError);
         }
         self.buffer.with_taken(|b| b.push('\n'));

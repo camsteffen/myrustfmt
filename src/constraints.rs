@@ -10,31 +10,32 @@ pub struct MaxWidthForLine {
     pub max_width: u32,
 }
 
-/// Specifies whether multiple lines may be used to format something, and may disallow certain
-/// multi-line formatting strategies.
+/// Specifies what kind of multi-line shapes are allowed, if any.
 ///
-/// The MultiLineConstraint is NOT enforced by changing or short-circuiting the formatting strategy.
-/// Instead, it is enforced by trying to write a newline so that the ConstraintWriter raises a
-/// NewlineNotAllowed error. The variants in between MultiLine and SingleLine are enforced by
-/// "downgrading" to SingleLines at the moment when a newline would definitely violate the
-/// higher-level constraint. This makes the implementation simpler by reducing code paths. But more
-/// importantly, it allows us to observe formatted output leading up to a newline (error), and know
-/// that that code would be no different if no multi-line constraint were applied.
-// todo closures?
-// todo name variants by what they *allow* ?
+/// The MultiLineConstraint is enforced in two ways:
+///   1. The SingleLine variant causes an error to be raised upon attempting to write a newline
+///      character.
+///   2. Other variants are "downgraded" to the SingleLine variant at times when it is known that
+///      any newline character would violate the original constraint.
+/// 
+/// At least the first line of output leading up to a newline must be written to the buffer before
+/// raising an error. This makes the implementation simpler by reducing code paths. But more
+/// importantly, it allows us to observe the first line of formatted output and know that it would
+/// be the same if no constraint were applied.
+// todo using SingleLine to measure the width of the first line should ignore trailing line comments
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub enum MultiLineConstraint {
-    /// No newline characters allowed (enforced by ConstraintWriter)
+pub enum MultiLineShape {
+    /// No newline characters allowed
     SingleLine,
-    /// Same as NoHangingIndent, but also disallow multi-line lists and overflow in lists
-    SingleLineLists,
-    /// Same as IndentMiddle, but also disallow formats where the last line is indented
-    NoHangingIndent,
-    /// All lines between the first and last lines must be indented away from the margin.
-    /// Expressions ending in curly braces must fit the header before the curly braces in one line.
-    IndentMiddle,
-    /// No constraint
-    MultiLine,
+    /// Allows constructs with curly braces spanning from the first line to the last line
+    BlockIndent,
+    /// Allows multi-line lists and lists where the last item overflows
+    VerticalList,
+    /// Allows wrap-indent after the first line, like in long chains
+    HangingIndent,
+    /// Allows constructs that are indented in multiple places, such as an if-else expression.
+    /// (This is really a non-constraint, but is named to clarify the difference from other modes.)
+    DisjointIndent,
 }
 
 /// An empty Rc used to count the number of open checkpoints.
@@ -65,7 +66,7 @@ pub struct Constraints {
     // todo is this a constraint?
     /// The number of spaces for the current level of indentation
     pub indent: Cell<u32>,
-    pub multi_line: Cell<MultiLineConstraint>,
+    pub multi_line: Cell<MultiLineShape>,
 }
 
 impl Default for Constraints {
@@ -80,25 +81,13 @@ impl Constraints {
             indent: Cell::new(0),
             max_width: Cell::new(Some(max_width)),
             max_width_for_line: Cell::new(None),
-            multi_line: Cell::new(MultiLineConstraint::MultiLine),
+            multi_line: Cell::new(MultiLineShape::DisjointIndent),
         }
     }
 
-    pub fn requires_indent_middle(&self) -> bool {
-        self.multi_line.get() <= MultiLineConstraint::IndentMiddle
-    }
-
-    pub fn requires_no_hanging_indent(&self) -> bool {
-        self.multi_line.get() <= MultiLineConstraint::NoHangingIndent
-    }
-
-    pub fn requires_single_line(&self) -> bool {
-        self.multi_line.get() <= MultiLineConstraint::SingleLine
-    }
-
-    pub fn with_multi_line_constraint<T>(
+    pub fn with_multi_line_shape<T>(
         &self,
-        constraint: MultiLineConstraint,
+        constraint: MultiLineShape,
         f: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         if self.multi_line.get() <= constraint {
@@ -109,38 +98,35 @@ impl Constraints {
     }
 
     pub fn with_indent_middle(&self, scope: impl Fn() -> FormatResult) -> FormatResult {
-        self.with_multi_line_constraint(MultiLineConstraint::IndentMiddle, scope)
+        self.with_multi_line_shape(MultiLineShape::HangingIndent, scope)
     }
 
     pub fn with_no_hanging_indent(&self, scope: impl Fn() -> FormatResult) -> FormatResult {
-        self.with_multi_line_constraint(MultiLineConstraint::NoHangingIndent, scope)
+        self.with_multi_line_shape(MultiLineShape::VerticalList, scope)
     }
 
-    /// If the given MultiLineConstraint is currently applied (or stricter), then the SingleLine
-    /// constraint is applied for the given function.
-    // todo rename to classify_newlines or single_line_satisfies ?
-    pub fn with_multi_line_constraint_to_single_line<T>(
+    /// Unless the given MultiLineConstraint is applicable, enforce a single-line constraint
+    pub fn with_single_line_unless<T>(
         &self,
-        constraint: MultiLineConstraint,
+        shape: MultiLineShape,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        if self.multi_line.get() > constraint {
+        if self.multi_line.get() >= shape {
             scope()
         } else {
             self.multi_line
-                .with_replaced(MultiLineConstraint::SingleLine, scope)
+                .with_replaced(MultiLineShape::SingleLine, scope)
         }
     }
 
-    pub fn with_opt_multi_line_constraint_to_single_line<T>(
+    pub fn with_single_line_unless_opt<T>(
         &self,
-        constraint: Option<MultiLineConstraint>,
+        shape: Option<MultiLineShape>,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        if let Some(constraint) = constraint {
-            self.with_multi_line_constraint_to_single_line(constraint, scope)
-        } else {
-            scope()
-        }
+        let Some(shape) = shape else {
+            return scope();
+        };
+        self.with_single_line_unless(shape, scope)
     }
 }
