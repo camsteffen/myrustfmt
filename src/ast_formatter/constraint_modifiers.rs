@@ -15,8 +15,8 @@ impl AstFormatter {
     }
 
     pub fn indented<T>(&self, f: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        let indent = self.constraints().indent.get() + INDENT_WIDTH;
-        self.constraints()
+        let indent = self.out.indent.get() + INDENT_WIDTH;
+        self.out
             .indent
             .with_replaced(indent, || match self.constraints().multi_line.get() {
                 MultiLineShape::SingleLine | MultiLineShape::DisjointIndent => f(),

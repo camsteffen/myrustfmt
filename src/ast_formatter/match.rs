@@ -110,7 +110,7 @@ impl AstFormatter {
 
         let start = self.out.last_line_len();
         // the starting position if we wrapped to the next line and indented
-        let next_line_start = self.constraints().indent.get() + INDENT_WIDTH;
+        let next_line_start = self.out.indent.get() + INDENT_WIDTH;
         if start <= next_line_start {
             // adding a block wouldn't afford us more width so no need to experiment to see if it
             // would be fewer lines

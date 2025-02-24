@@ -63,9 +63,6 @@ pub struct Constraints {
     /// Used to set the max width for the current line, so it no longer applies after a newline
     /// character is printed
     pub max_width_for_line: Cell<Option<MaxWidthForLine>>,
-    // todo is this a constraint?
-    /// The number of spaces for the current level of indentation
-    pub indent: Cell<u32>,
     pub multi_line: Cell<MultiLineShape>,
 }
 
@@ -78,7 +75,6 @@ impl Default for Constraints {
 impl Constraints {
     pub fn new(max_width: u32) -> Constraints {
         Constraints {
-            indent: Cell::new(0),
             max_width: Cell::new(Some(max_width)),
             max_width_for_line: Cell::new(None),
             multi_line: Cell::new(MultiLineShape::DisjointIndent),

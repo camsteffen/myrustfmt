@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::panic::Location;
 use crate::ast_formatter::FormatModuleResult;
 use crate::constraint_writer::{
@@ -27,6 +28,8 @@ pub struct SourceFormatterLookahead {
 pub struct SourceFormatter {
     source: SourceReader,
     out: ConstraintWriter,
+    /// The number of spaces for the current level of indentation
+    pub indent: Cell<u32>,
 }
 
 impl SourceFormatter {
@@ -39,6 +42,7 @@ impl SourceFormatter {
         SourceFormatter {
             source: SourceReader::new(source),
             out: ConstraintWriter::new(constraints, error_emitter, capacity),
+            indent: Cell::new(0),
         }
     }
 
@@ -122,7 +126,7 @@ impl SourceFormatter {
 
     pub fn newline_indent(&self, kind: VerticalWhitespaceMode) -> FormatResult {
         self.newline(kind)?;
-        self.indent()?;
+        self.indent();
         Ok(())
     }
 
@@ -295,9 +299,8 @@ impl SourceFormatter {
         Ok(())
     }
 
-    pub fn indent(&self) -> FormatResult {
-        self.out.indent()?;
-        Ok(())
+    pub fn indent(&self) {
+        self.out.spaces(self.indent.get() as usize);
     }
 
     fn copy(&self, len: usize) -> FormatResult {
@@ -327,7 +330,7 @@ impl SourceFormatter {
 
     pub fn last_line_is_closers(&self) -> bool {
         self.with_last_line(|line| {
-            let after_indent = &line[self.constraints().indent.get() as usize..];
+            let after_indent = &line[self.indent.get() as usize..];
             after_indent.chars().all(is_closer_char)
         })
     }

@@ -37,7 +37,7 @@ impl AstFormatter {
         let mut chain_rest = chain;
 
         // items that start within the first indent-width on the first line
-        let indent_margin = self.out.constraints().indent.get() + INDENT_WIDTH;
+        let indent_margin = self.out.indent.get() + INDENT_WIDTH;
         let multi_line_root = loop {
             let Some((next, chain_rest_next)) = chain_rest.split_first() else {
                 return self.tail(tail);

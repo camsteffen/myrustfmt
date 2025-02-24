@@ -70,7 +70,7 @@ impl AstFormatter {
                         ast::AttrStyle::Inner => self.out.newline_between()?,
                         ast::AttrStyle::Outer => self.out.newline_within()?,
                     }
-                    self.out.indent()?;
+                    self.out.indent();
                     Ok(())
                 }
             },

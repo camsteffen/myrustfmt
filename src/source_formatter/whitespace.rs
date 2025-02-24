@@ -198,7 +198,7 @@ impl SourceFormatter {
                     self.out.newline()?;
                 }
                 if is_comments_after {
-                    self.out.indent()?;
+                    self.indent();
                 }
             }
         }

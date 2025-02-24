@@ -8,7 +8,7 @@ impl AstFormatter {
         let first_line = self.out.line();
         self.indented(|| self.out.newline_if_comments())?;
         if self.out.line() != first_line {
-            self.out.indent()?;
+            self.out.indent();
         }
         self.out.token(closing_brace)?;
         Ok(())
@@ -28,12 +28,12 @@ impl AstFormatter {
     pub fn embraced_inside(&self, contents: impl FnOnce() -> FormatResult) -> FormatResult {
         self.indented(|| {
             self.out.newline_above()?;
-            self.out.indent()?;
+            self.out.indent();
             contents()?;
             self.out.newline_below()?;
             Ok(())
         })?;
-        self.out.indent()?;
+        self.out.indent();
         Ok(())
     }
 }

@@ -194,13 +194,8 @@ impl ConstraintWriter {
         Ok(())
     }
 
-    pub fn indent(&self) -> Result<(), WidthLimitExceededError> {
-        self.buffer.with_taken(|b| {
-            b.extend(
-                std::iter::repeat_n(' ', self.constraints.indent.get() as usize),
-            )
-        });
-        self.check_width_constraints()
+    pub fn spaces(&self, count: usize) {
+        self.buffer.with_taken(|b| b.extend(std::iter::repeat_n(' ', count)));
     }
 
     pub fn check_width_constraints(&self) -> Result<(), WidthLimitExceededError> {
