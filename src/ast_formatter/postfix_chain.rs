@@ -70,9 +70,9 @@ impl AstFormatter {
             self.postfix_chain_separate_lines(chain_rest, tail)
         } else {
             self.backtrack()
-                .next(|| {
-                    self.postfix_chain_single_line_with_overflow(chain_rest, start_pos, tail)
-                })
+                .next(
+                    || self.postfix_chain_single_line_with_overflow(chain_rest, start_pos, tail),
+                )
                 .otherwise(|| {
                     self.constraints()
                         .with_multi_line_constraint_to_single_line(
@@ -220,9 +220,9 @@ impl AstFormatter {
     }
 
     fn postfix_items(&self, items: &[PostfixItem<'_>], start_pos: u32) -> FormatResult {
-        items.iter().try_for_each(|item| {
-            self.with_chain_item_max_width(start_pos, || self.postfix_item(item))
-        })
+        items.iter().try_for_each(
+            |item| self.with_chain_item_max_width(start_pos, || self.postfix_item(item)),
+        )
     }
 
     fn postfix_tail(&self, tail: &[&ast::Expr]) -> FormatResult {
@@ -231,9 +231,9 @@ impl AstFormatter {
                 ast::ExprKind::Index(_, ref index, _) => {
                     self.out.token("[")?;
                     self.backtrack()
-                        .next(|| {
-                            self.with_single_line(|| self.expr_tail(index, &Tail::token("]")))
-                        })
+                        .next(
+                            || self.with_single_line(|| self.expr_tail(index, &Tail::token("]"))),
+                        )
                         .otherwise(|| self.embraced_after_opening("]", || self.expr(index)))?;
                 }
                 ast::ExprKind::Try(..) => self.out.token("?")?,

@@ -35,18 +35,18 @@ impl SourceReader {
 
     pub fn expect_pos(&self, pos: BytePos) -> ParseResult {
         if pos != self.pos.get() {
-            return Err(ParseError::new(ParseErrorKind::ExpectedPosition(
-                pos.to_usize(),
-            )));
+            return Err(
+                ParseError::new(ParseErrorKind::ExpectedPosition(pos.to_usize())),
+            );
         }
         Ok(())
     }
 
     pub fn eat(&self, token: &str) -> Result<(), ParseError> {
         if !self.try_eat(token) {
-            return Err(ParseError::new(ParseErrorKind::ExpectedToken(
-                token.to_string(),
-            )));
+            return Err(
+                ParseError::new(ParseErrorKind::ExpectedToken(token.to_string())),
+            );
         }
         Ok(())
     }

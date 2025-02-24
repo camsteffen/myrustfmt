@@ -192,10 +192,9 @@ impl ConstraintWriter {
 
     pub fn indent(&self) -> Result<(), WidthLimitExceededError> {
         self.buffer.with_taken(|b| {
-            b.extend(std::iter::repeat_n(
-                ' ',
-                self.constraints.indent.get() as usize,
-            ))
+            b.extend(
+                std::iter::repeat_n(' ', self.constraints.indent.get() as usize),
+            )
         });
         self.check_width_constraints()
     }
@@ -211,9 +210,9 @@ impl ConstraintWriter {
                     if self.last_width_exceeded_line.get() != Some(line) {
                         self.exceeded_max_width.set(true);
                         self.last_width_exceeded_line.set(Some(line));
-                        self.with_last_line(|line_str| {
-                            self.error_emitter.emit_width_exceeded(line, line_str)
-                        });
+                        self.with_last_line(
+                            |line_str| self.error_emitter.emit_width_exceeded(line, line_str),
+                        );
                     }
                     Ok(())
                 }

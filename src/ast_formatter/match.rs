@@ -109,14 +109,16 @@ impl AstFormatter {
         // the starting position if we wrapped to the next line and indented
         let next_line_start = self.constraints().indent.get() + INDENT_WIDTH;
         if start <= next_line_start {
-            // wrap-indent wouldn't afford us more width so just continue normally
+            // adding a block wouldn't afford us more width so no need to experiment to see if it
+            // would be fewer lines
+            // todo is this even possible?
             return self.arm_body_same_line(body, self.backtrack());
         }
         let extra_width = start - next_line_start;
 
         let checkpoint = self.open_checkpoint();
-        // We're going to try formatting on the same line, but adding extra width to simulate
-        // wrapping with a block. Use the single-line constraint since we just want to see what
+        // We're going to try formatting on the same line, but adding the extra width we would have
+        // if wrapping with a block. Use the single-line constraint since we just want to see what
         // fits on the first line.
         let result = self
             .with_single_line(|| {

@@ -447,9 +447,9 @@ impl AstFormatter {
         // todo indent middle and multi-line qpath?
         list(Braces::CURLY, &struct_.fields, Self::expr_field)
             // todo not wide enough?
-            .config(struct_field_list_config(
-                RUSTFMT_CONFIG_DEFAULTS.struct_lit_width,
-            ))
+            .config(
+                struct_field_list_config(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
+            )
             .rest(ListRest::from(&struct_.rest))
             .tail(tail)
             .format(self)?;

@@ -279,3 +279,17 @@
             x;
         }
     }
+- name: prefer adding a block over breaking arm pattern
+  focus: true
+  type: breakpoint
+  in_block: true
+  before: |
+    match x {
+        Foooooo(bar) => foooooo,
+    }
+  after: |
+    match x {
+        Foooooo(bar) => {
+            foooooo
+        }
+    }

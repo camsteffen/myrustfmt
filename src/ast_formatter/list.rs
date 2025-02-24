@@ -22,7 +22,6 @@ impl AstFormatter {
         format_item: impl Fn(/*index: */ usize) -> FormatResult,
         rest: ListRest<'_>,
         close_brace: &str,
-        tail: &Tail,
         force_trailing_comma: bool,
         pad: bool,
         max_width: Option<u32>,
@@ -63,9 +62,7 @@ impl AstFormatter {
             do_pad()?;
             self.out.token(close_brace)?;
             Ok(())
-        })?;
-        self.tail(tail)?;
-        Ok(())
+        })
     }
 
     /*

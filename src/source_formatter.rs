@@ -162,9 +162,9 @@ impl SourceFormatter {
                 IfComments,
             }
             {
-                self.handle_whitespace_and_comments(WhitespaceMode::Vertical(
-                    NewlineKind::IfComments,
-                ));
+                self.handle_whitespace_and_comments(
+                    WhitespaceMode::Vertical(NewlineKind::IfComments),
+                );
             }
         }
         self.handle_whitespace_and_comments(WhitespaceMode::Flexible {

@@ -1,4 +1,5 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::backtrack::Backtrack;
 use crate::ast_formatter::list::list_config::{DefaultListConfig, ListConfig, ListWrapToFitConfig};
 use crate::ast_formatter::list::list_item_config::DefaultListItemConfig;
 use crate::ast_formatter::list::list_item_context::ListItemContext;
@@ -160,7 +161,9 @@ where
     }
 
     pub fn format_single_line(&self, af: &AstFormatter) -> FormatResult {
-        self.do_format(af, Self::contents_single_line)
+        self.do_format(af, Self::contents_single_line)?;
+        af.tail(self.tail)?;
+        Ok(())
     }
 
     pub fn format_separate_lines(&self, af: &AstFormatter) -> FormatResult {
@@ -183,12 +186,16 @@ where
         contents(self, af)
     }
 
+    // todo better name
     fn contents_default(&self, af: &AstFormatter) -> FormatResult {
+        let after_same_line = |backtrack: Backtrack| {
+            backtrack
+                .next_opt(self.contents_wrap_to_fit_fn_opt(af))
+                .otherwise(|| self.contents_separate_lines(af))
+        };
         let any_items_require_own_line = self.list.iter().any(ItemConfig::item_requires_own_line);
         if any_items_require_own_line {
-            return af.backtrack()
-                .next_opt(self.contents_wrap_to_fit_fn_opt(af))
-                .otherwise(|| self.contents_separate_lines(af));
+            return after_same_line(af.backtrack());
         }
         let checkpoint = af.open_checkpoint();
         let first_line = af.out.line();
@@ -197,17 +204,26 @@ where
             Ok(()) => {
                 if af.out.line() == first_line {
                     // it fits on one line
-                    return Ok(())
+                    return_if_ok!(af.tail(self.tail).constraint_err_only()?);
+                    af.restore_checkpoint(&checkpoint);
+                    return after_same_line(af.backtrack_from_checkpoint(checkpoint));
                 }
+                // todo don't lookahead if there isn't any width gained by wrapping
                 let overflow_height = af.out.line() - first_line + 1;
-                let lookahead = af.capture_lookahead(&checkpoint);
-                (lookahead, overflow_height)
+                match af.tail(self.tail).constraint_err_only()? {
+                    Ok(()) => {
+                        let lookahead = af.capture_lookahead(&checkpoint);
+                        (lookahead, overflow_height)
+                    }
+                    Err(_) => {
+                        af.restore_checkpoint(&checkpoint);
+                        return after_same_line(af.backtrack_from_checkpoint(checkpoint));
+                    }
+                }
             }
             Err(_) => {
                 af.restore_checkpoint(&checkpoint);
-                return af.backtrack_from_checkpoint(checkpoint)
-                    .next_opt(self.contents_wrap_to_fit_fn_opt(af))
-                    .otherwise(|| self.contents_separate_lines(af));
+                return after_same_line(af.backtrack_from_checkpoint(checkpoint));
             }
         };
         if let Some(f) = self.contents_wrap_to_fit_fn_opt(af) {
@@ -229,7 +245,7 @@ where
         }
         Ok(())
     }
-    
+
     fn contents_wrap_to_fit_fn_opt(&self, af: &AstFormatter) -> Option<impl Fn() -> FormatResult> {
         match Config::wrap_to_fit() {
             ListWrapToFitConfig::Yes { max_element_width } => {
@@ -240,7 +256,7 @@ where
                 Some(move || self.contents_wrap_to_fit(af, max_element_width))
             }
             ListWrapToFitConfig::No => None,
-        } 
+        }
     }
 
     fn contents_single_line(&self, af: &AstFormatter) -> FormatResult {
@@ -262,7 +278,6 @@ where
             },
             self.rest,
             self.braces.end,
-            self.tail,
             self.config.force_trailing_comma(),
             self.braces.pad,
             self.config.single_line_max_contents_width(),

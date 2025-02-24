@@ -114,9 +114,9 @@ impl AstFormatter {
         self.qpath(qself, path, false)?;
         self.out.space()?;
         list(Braces::CURLY, fields, Self::pat_field)
-            .config(struct_field_list_config(
-                RUSTFMT_CONFIG_DEFAULTS.struct_lit_width,
-            ))
+            .config(
+                struct_field_list_config(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
+            )
             .rest(ListRest::from(rest))
             .tail(tail)
             .format(self)
