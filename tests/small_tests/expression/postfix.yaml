@@ -99,3 +99,15 @@
     aaaaa
         .bbb
         .ccc()
+- name: method call with only closure may exceed 60 chars
+  type: no_change
+  in_block: true
+  formatted: |
+    asdf.asdfasdf.asdf(|| (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaaaaaa));
+- name: method call with args before the closure may not exceed 60 chars
+  type: no_change
+  in_block: true
+  formatted: |
+    asdf.asdfasdf.asdf(x, || {
+        (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaaaaaa)
+    });

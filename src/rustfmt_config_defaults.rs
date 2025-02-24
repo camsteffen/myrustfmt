@@ -1,3 +1,5 @@
+// todo delete or what?
+#[allow(dead_code)]
 pub struct RustfmtConfig {
     pub array_width: u32,
     pub attr_fn_like_width: u32,

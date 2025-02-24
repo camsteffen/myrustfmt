@@ -1,12 +1,10 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
-use crate::ast_formatter::list::Braces;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
 use crate::constraints::MultiLineConstraint;
 use crate::error::{ConstraintError, FormatError, FormatResult};
 use rustc_ast::ast;
-use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 // In rustfmt, this is called chain_width, and is 60 by default
 const POSTFIX_CHAIN_MAX_WIDTH: u32 = 60;
@@ -68,9 +66,7 @@ impl AstFormatter {
             self.postfix_chain_separate_lines(chain_rest, tail)
         } else {
             self.backtrack()
-                .next(|| {
-                    self.postfix_chain_single_line_with_overflow(chain_rest, start_pos, tail)
-                })
+                .next(|| self.postfix_chain_single_line_with_overflow(chain_rest, start_pos, tail))
                 .otherwise(|| {
                     self.constraints()
                         .with_multi_line_constraint_to_single_line(
@@ -206,10 +202,7 @@ impl AstFormatter {
                 self.path_segment(&method_call.seg, true, &Tail::token("("))?;
                 // todo this is consistent with rustfmt, but would it be better to force args to be
                 //   on the same line, just allowing overflow of the last arg?
-                self.expr_list(Braces::PARENS, &method_call.args)
-                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
-                    .omit_open_brace()
-                    .format(self)?;
+                self.call_args_after_open_paren(&method_call.args, Tail::none())?;
             }
             // root expression
             _ => self.expr(item)?,
@@ -229,9 +222,7 @@ impl AstFormatter {
                 ast::ExprKind::Index(_, ref index, _) => {
                     self.out.token("[")?;
                     self.backtrack()
-                        .next(|| {
-                            self.with_single_line(|| self.expr_tail(index, &Tail::token("]")))
-                        })
+                        .next(|| self.with_single_line(|| self.expr_tail(index, &Tail::token("]"))))
                         .otherwise(|| self.embraced_after_opening("]", || self.expr(index)))?;
                 }
                 ast::ExprKind::Try(..) => self.out.token("?")?,

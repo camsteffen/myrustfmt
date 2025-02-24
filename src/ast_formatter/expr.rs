@@ -351,15 +351,21 @@ impl AstFormatter {
             .with_opt_multi_line_constraint_to_single_line(
                 is_multi_line_func
                     .then_some(MultiLineConstraint::IndentMiddle),
-                || {
-                    self.expr_list(Braces::PARENS, args)
-                        .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
-                        .omit_open_brace()
-                        .tail(tail)
-                        .format(self)
-                },
+                || self.call_args_after_open_paren(args, tail),
             )?;
         Ok(())
+    }
+
+    pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
+        let mut list = self.expr_list(Braces::PARENS, args);
+        let width_limit_applies = match args {
+            [arg] => !matches!(arg.kind, ast::ExprKind::Closure(_)),
+            _ => true,
+        };
+        if width_limit_applies {
+            list = list.single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
+        }
+        list.omit_open_brace().tail(tail).format(self)
     }
 
     fn delim_args(&self, delim_args: &ast::DelimArgs) -> FormatResult {
@@ -376,65 +382,67 @@ impl AstFormatter {
         else_: Option<&'a ast::Expr>,
         tail: &Tail,
     ) -> FormatResult {
-        let single_line_parts = || {
+        let start_pos = self.out.last_line_len();
+        let is_head_single_line = self.token_expr_open_brace("if", condition)?;
+
+        let single_line = (|| {
+            if !is_head_single_line {
+                return None;
+            }
             let else_ = else_?;
             let ast::ExprKind::Block(else_block, _) = &else_.kind else {
                 return None;
             };
             let block_expr = self.try_into_expr_only_block(block)?;
             let else_expr = self.try_into_expr_only_block(else_block)?;
-            Some((block_expr, else_expr))
+
+            Some(move || {
+                self.with_single_line(|| {
+                    self.with_width_limit_from_start(
+                        start_pos,
+                        RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
+                        || {
+                            self.expr_only_block_after_open_brace(block_expr)?;
+                            self.out.space_token_space("else")?;
+                            self.expr_only_block(else_expr)?;
+                            self.tail(tail)?;
+                            Ok(())
+                        },
+                    )
+                })
+            })
+        })();
+
+        let multi_line = || {
+            // todo this is failing earlier than "indent middle" is really violated;
+            //   do we need to revise the guidelines in MultiLineConstraint docs?
+            self.constraints()
+                .with_opt_multi_line_constraint_to_single_line(
+                    else_.is_some().then_some(MultiLineConstraint::IndentMiddle),
+                    || self.block_separate_lines_after_open_brace(block),
+                )?;
+            let mut else_ = else_;
+            loop {
+                let Some(else_expr) = else_ else { break };
+                self.out.space_token_space("else")?;
+                match &else_expr.kind {
+                    ast::ExprKind::Block(block, _) => {
+                        self.block_separate_lines(block)?;
+                        break;
+                    }
+                    ast::ExprKind::If(condition, next_block, next_else) => {
+                        self.token_expr_open_brace("if", condition)?;
+                        self.block_separate_lines_after_open_brace(next_block)?;
+                        else_ = next_else.as_deref();
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            self.tail(tail)?;
+            Ok(())
         };
 
-        let start_pos = self.out.last_line_len();
-        let is_head_single_line = self.token_expr_open_brace("if", condition)?;
-
-        self.backtrack()
-            .next_opt(
-                is_head_single_line
-                    .then(single_line_parts)
-                    .flatten()
-                    .map(|(block_expr, else_expr)| move || {
-                        self.with_single_line(|| {
-                            self.with_width_limit_from_start(
-                                start_pos,
-                                RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
-                                || {
-                                    self.expr_only_block_after_open_brace(block_expr)?;
-                                    self.out.space_token_space("else")?;
-                                    self.expr_only_block(else_expr)?;
-                                    self.tail(tail)?;
-                                    Ok(())
-                                },
-                            )
-                        })
-                    }),
-            )
-            .otherwise(|| {
-                let (mut block, mut else_) = (block, else_);
-                loop {
-                    self.block_separate_lines_after_open_brace(block)?;
-                    match else_ {
-                        None => break self.tail(tail),
-                        Some(else_expr) => {
-                            self.out.space_token_space("else")?;
-                            match &else_expr.kind {
-                                ast::ExprKind::Block(block, _) => {
-                                    self.block_separate_lines(block)?;
-                                    self.tail(tail)?;
-                                    break Ok(());
-                                }
-                                ast::ExprKind::If(condition, next_block, next_else) => {
-                                    self.token_expr_open_brace("if", condition)?;
-                                    (block, else_) = (next_block, next_else.as_deref());
-                                }
-                                _ => unreachable!(),
-                            }
-                        }
-                    }
-                }
-            })?;
-        Ok(())
+        self.backtrack().next_opt(single_line).otherwise(multi_line)
     }
 
     pub fn token_expr_open_brace(&self, token: &str, expr: &ast::Expr) -> FormatResult<bool> {

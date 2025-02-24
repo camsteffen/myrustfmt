@@ -2,9 +2,9 @@ use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::builder::list;
+use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;

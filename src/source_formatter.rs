@@ -339,7 +339,7 @@ impl SourceFormatter {
     pub fn debug_buffer(&self) {
         let location = Location::caller();
         self.with_taken_buffer(|b| {
-            eprintln!("[{location}] buffer:\n{b}");
+            eprintln!("[{location}] buffer:\n{b}\n\n");
         });
     }
 }

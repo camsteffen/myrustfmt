@@ -50,6 +50,23 @@
     let x = || match x {
         _ => {}
     };
+- name: if/else in closure requires block
+  type: before_after
+  in_block: true
+  before: |
+    || if condition {
+        some_value
+    } else {
+        some_other_value
+    };
+  after: |
+    || {
+        if condition {
+            some_value
+        } else {
+            some_other_value
+        }
+    };
 - name: body is call with closure
   type: before_after
   in_block: true

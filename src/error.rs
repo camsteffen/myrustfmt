@@ -2,24 +2,15 @@ use crate::util::line_col::line_col;
 use std::backtrace::Backtrace;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
-
-#[allow(unused)]
-macro_rules! debug_err {
-    ($af:expr, $result:expr) => {{
-        let result = $result;
-        if result.is_err() {
-            $af.out.debug_buffer();
-        }
-        result
-    }};
-}
-#[allow(unused)]
-pub(crate) use debug_err;
+use crate::source_formatter::SourceFormatter;
 
 pub type FormatResult<T = ()> = Result<T, FormatError>;
 
 pub trait FormatResultExt<T> {
     fn constraint_err_only(self) -> Result<Result<T, ConstraintError>, ParseError>;
+
+    #[allow(unused)]
+    fn debug_err(self, sf: &SourceFormatter) -> Self;
 }
 
 impl<T> FormatResultExt<T> for FormatResult<T> {
@@ -29,6 +20,14 @@ impl<T> FormatResultExt<T> for FormatResult<T> {
             Err(FormatError::Constraint(e)) => Ok(Err(e)),
             Ok(value) => Ok(Ok(value)),
         }
+    }
+
+    #[track_caller]
+    fn debug_err(self, sf: &SourceFormatter) -> Self {
+        if self.is_err() {
+            sf.debug_buffer();
+        }
+        self
     }
 }
 

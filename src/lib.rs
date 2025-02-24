@@ -13,6 +13,7 @@ extern crate rustc_parse;
 extern crate rustc_session;
 extern crate rustc_span;
 extern crate thin_vec;
+extern crate core;
 
 pub mod ast_formatter;
 mod ast_module;
