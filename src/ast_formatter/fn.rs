@@ -4,7 +4,6 @@ use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 
 use crate::ast_formatter::list::builder::list;
-use crate::ast_formatter::list::list_config::ParamListConfig;
 use crate::constraints::MultiLineConstraint;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
@@ -21,10 +20,7 @@ impl AstFormatter {
         self.fn_header(&sig.header)?;
         self.token_ident_generic_params("fn", item.ident, &generics)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
-        let param_list = list(Braces::PARENS, &sig.decl.inputs, Self::param)
-            .config(ParamListConfig {
-                single_line_max_contents_width: None,
-            });
+        let param_list = list(Braces::PARENS, &sig.decl.inputs, Self::param);
         self.backtrack()
             .next(|| {
                 self.with_single_line(|| {
@@ -152,9 +148,6 @@ impl AstFormatter {
             &parenthesized_args.inputs,
             |af, ty, tail, _lcx| af.ty_tail(ty, tail),
         )
-        .config(ParamListConfig {
-            single_line_max_contents_width: None,
-        })
         .tail(list_tail)
         .format(self)?;
         self.fn_ret_ty(&parenthesized_args.output)?;

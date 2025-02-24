@@ -36,7 +36,7 @@ impl AstFormatter {
             do_pad()?;
             self.with_width_limit_first_line_opt(max_width, || {
                 if len == 0 {
-                    if !matches!(rest, ListRest::None) {
+                    if !rest.is_none() {
                         self.list_rest(rest)?;
                     }
                     return Ok(());
@@ -48,12 +48,12 @@ impl AstFormatter {
                     self.out.space()?;
                 }
                 format_item(last)?;
-                if !matches!(rest, ListRest::None) || force_trailing_comma {
+                if !rest.is_none() || force_trailing_comma {
                     self.out.token(",")?;
                 } else {
                     self.out.skip_token_if_present(",")?;
                 }
-                if !matches!(rest, ListRest::None) {
+                if !rest.is_none() {
                     self.out.space()?;
                     self.list_rest(rest)?;
                 }

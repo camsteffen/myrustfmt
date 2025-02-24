@@ -70,6 +70,7 @@ pub fn list<'ast, 'tail, Item>(
         config: DefaultListConfig,
         item_config: DefaultListItemConfig::default(),
         omit_open_brace: false,
+        single_line_max_contents_width: None,
     }
 }
 
@@ -85,6 +86,7 @@ pub struct ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfig> {
     config: Config,
     item_config: ItemConfig,
     omit_open_brace: bool,
+    single_line_max_contents_width: Option<u32>,
 }
 
 impl<'a, 'ast, 'tail, Item, FormatItem, Config, ItemConfig>
@@ -107,6 +109,7 @@ where
             config,
             item_config: self.item_config,
             omit_open_brace: self.omit_open_brace,
+            single_line_max_contents_width: self.single_line_max_contents_width,
         }
     }
 
@@ -123,6 +126,7 @@ where
             config: self.config,
             item_config,
             omit_open_brace: self.omit_open_brace,
+            single_line_max_contents_width: self.single_line_max_contents_width,
         }
     }
 
@@ -143,12 +147,20 @@ where
             config: self.config,
             item_config: self.item_config,
             omit_open_brace: self.omit_open_brace,
+            single_line_max_contents_width: self.single_line_max_contents_width,
         }
     }
 
     pub fn omit_open_brace(self) -> Self {
         ListBuilder {
             omit_open_brace: true,
+            ..self
+        }
+    }
+
+    pub fn single_line_max_contents_width(self, width: u32) -> Self {
+        ListBuilder {
+            single_line_max_contents_width: Some(width),
             ..self
         }
     }
@@ -178,7 +190,7 @@ where
         if !self.omit_open_brace {
             af.out.token(self.braces.start)?;
         }
-        if self.list.is_empty() && matches!(self.rest, ListRest::None) {
+        if self.list.is_empty() && self.rest.is_none() {
             af.embraced_empty_after_opening(self.braces.end)?;
             af.tail(self.tail)?;
             return Ok(());
@@ -202,8 +214,11 @@ where
         let result = self.contents_single_line(af).constraint_err_only()?;
         let (lookahead, overflow_height) = match result {
             Ok(()) => {
-                if af.out.line() == first_line {
-                    // it fits on one line
+                if (
+                    self.rest.is_none()
+                        && ItemConfig::last_item_prefers_overflow(self.list.last().unwrap())
+                ) || af.out.line() == first_line
+                {
                     return_if_ok!(af.tail(self.tail).constraint_err_only()?);
                     af.restore_checkpoint(&checkpoint);
                     return after_same_line(af.backtrack_from_checkpoint(checkpoint));
@@ -250,7 +265,7 @@ where
         match Config::wrap_to_fit() {
             ListWrapToFitConfig::Yes { max_element_width } => {
                 assert!(
-                    matches!(self.rest, ListRest::None),
+                    self.rest.is_none(),
                     "rest cannot be used with wrap-to-fit"
                 );
                 Some(move || self.contents_wrap_to_fit(af, max_element_width))
@@ -280,7 +295,7 @@ where
             self.braces.end,
             self.config.force_trailing_comma(),
             self.braces.pad,
-            self.config.single_line_max_contents_width(),
+            self.single_line_max_contents_width,
         )
     }
 

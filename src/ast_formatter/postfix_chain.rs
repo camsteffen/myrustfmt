@@ -1,20 +1,18 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::list::Braces;
-use crate::ast_formatter::list::builder::list;
-use crate::ast_formatter::list::list_config::CallParamListConfig;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
 use crate::constraints::MultiLineConstraint;
 use crate::error::{ConstraintError, FormatError, FormatResult};
 use rustc_ast::ast;
+use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 // In rustfmt, this is called chain_width, and is 60 by default
 const POSTFIX_CHAIN_MAX_WIDTH: u32 = 60;
 /// Don't apply chain max width unless the chain item's distance from the start
 /// of the chain is at least this much.
 const POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH: u32 = 15;
-// const POSTFIX_CHAIN_MAX_ITEM_OFFSET: u32 = 40;
 
 struct PostfixItem<'a> {
     /// The first item in the chain has the root expression, which is not a postfix expression.
@@ -70,9 +68,9 @@ impl AstFormatter {
             self.postfix_chain_separate_lines(chain_rest, tail)
         } else {
             self.backtrack()
-                .next(
-                    || self.postfix_chain_single_line_with_overflow(chain_rest, start_pos, tail),
-                )
+                .next(|| {
+                    self.postfix_chain_single_line_with_overflow(chain_rest, start_pos, tail)
+                })
                 .otherwise(|| {
                     self.constraints()
                         .with_multi_line_constraint_to_single_line(
@@ -208,8 +206,8 @@ impl AstFormatter {
                 self.path_segment(&method_call.seg, true, &Tail::token("("))?;
                 // todo this is consistent with rustfmt, but would it be better to force args to be
                 //   on the same line, just allowing overflow of the last arg?
-                list(Braces::PARENS, &method_call.args, self.expr_list_item())
-                    .config(CallParamListConfig)
+                self.expr_list(Braces::PARENS, &method_call.args)
+                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
                     .omit_open_brace()
                     .format(self)?;
             }
@@ -220,9 +218,9 @@ impl AstFormatter {
     }
 
     fn postfix_items(&self, items: &[PostfixItem<'_>], start_pos: u32) -> FormatResult {
-        items.iter().try_for_each(
-            |item| self.with_chain_item_max_width(start_pos, || self.postfix_item(item)),
-        )
+        items.iter().try_for_each(|item| {
+            self.with_chain_item_max_width(start_pos, || self.postfix_item(item))
+        })
     }
 
     fn postfix_tail(&self, tail: &[&ast::Expr]) -> FormatResult {
@@ -231,9 +229,9 @@ impl AstFormatter {
                 ast::ExprKind::Index(_, ref index, _) => {
                     self.out.token("[")?;
                     self.backtrack()
-                        .next(
-                            || self.with_single_line(|| self.expr_tail(index, &Tail::token("]"))),
-                        )
+                        .next(|| {
+                            self.with_single_line(|| self.expr_tail(index, &Tail::token("]")))
+                        })
                         .otherwise(|| self.embraced_after_opening("]", || self.expr(index)))?;
                 }
                 ast::ExprKind::Try(..) => self.out.token("?")?,

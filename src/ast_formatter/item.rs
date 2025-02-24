@@ -3,9 +3,7 @@ use rustc_span::symbol::Ident;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::builder::list;
-use crate::ast_formatter::list::list_config::{
-    ListConfig, ListWrapToFitConfig, ParamListConfig, struct_field_list_config,
-};
+use crate::ast_formatter::list::list_config::{ListConfig, ListWrapToFitConfig};
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext};
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
@@ -302,9 +300,8 @@ impl AstFormatter {
         match variants {
             ast::VariantData::Struct { fields, .. } => {
                 self.out.space()?;
-                let list = list(Braces::CURLY, fields, Self::field_def).config(
-                    struct_field_list_config(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width),
-                );
+                let list = list(Braces::CURLY, fields, Self::field_def)
+                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width);
                 if is_enum {
                     list.format(self)?;
                 } else {
@@ -313,11 +310,7 @@ impl AstFormatter {
                 Ok(())
             }
             ast::VariantData::Tuple(fields, _) => {
-                list(Braces::PARENS, fields, Self::field_def)
-                    .config(ParamListConfig {
-                        single_line_max_contents_width: None,
-                    })
-                    .format(self)
+                list(Braces::PARENS, fields, Self::field_def).format(self)
             }
             ast::VariantData::Unit(_) => Ok(()),
         }
@@ -389,7 +382,6 @@ impl ListConfig for UseTreeListConfig {
     }
 }
 
-#[derive(Clone, Copy)]
 struct UseTreeListItemConfig;
 impl ListItemConfig for UseTreeListItemConfig {
     type Item = (ast::UseTree, ast::NodeId);

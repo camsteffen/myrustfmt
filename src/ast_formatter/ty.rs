@@ -45,7 +45,6 @@ impl AstFormatter {
                 })
                 .config(TupleListConfig {
                     len: elements.len(),
-                    single_line_max_contents_width: None,
                 })
                 .tail(take_tail())
                 .format(self)?

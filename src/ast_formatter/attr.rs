@@ -1,7 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
 use crate::ast_formatter::list::builder::list;
-use crate::ast_formatter::list::list_config::ParamListConfig;
 use crate::ast_utils::is_rustfmt_skip;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -92,11 +91,7 @@ impl AstFormatter {
                     af.tail(tail)?;
                     Ok(())
                 })
-                .config(ParamListConfig {
-                    single_line_max_contents_width: Some(
-                        RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width,
-                    ),
-                })
+                .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width)
                 .format(self)?
             }
             ast::MetaItemKind::NameValue(lit) => {

@@ -7,6 +7,12 @@ pub enum ListRest<'a> {
     Base(&'a ast::Expr),
 }
 
+impl ListRest<'_> {
+    pub fn is_none(self) -> bool {
+        matches!(self, ListRest::None)
+    }
+}
+
 impl From<ast::PatFieldsRest> for ListRest<'static> {
     fn from(rest: ast::PatFieldsRest) -> Self {
         match rest {

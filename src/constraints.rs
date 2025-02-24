@@ -131,4 +131,16 @@ impl Constraints {
                 .with_replaced(MultiLineConstraint::SingleLine, scope)
         }
     }
+
+    pub fn with_opt_multi_line_constraint_to_single_line<T>(
+        &self,
+        constraint: Option<MultiLineConstraint>,
+        scope: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
+        if let Some(constraint) = constraint {
+            self.with_multi_line_constraint_to_single_line(constraint, scope)
+        } else {
+            scope()
+        }
+    }
 }

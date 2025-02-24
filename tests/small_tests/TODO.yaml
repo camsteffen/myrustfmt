@@ -3,7 +3,7 @@
   in_block: true
   formatted: |
     // dont wrap the closure?
-    self.with_single_line(
+    self.with_single_linewith_single_linewith_single_linewith_single_line(
         || self.expr_only_block_after_open_brace(expr_only_block),
     )?;
     

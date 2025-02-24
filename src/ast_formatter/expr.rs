@@ -1,14 +1,12 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{Braces, ListItemContext, ListStrategy};
+use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext, ListStrategy};
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 use crate::ast_formatter::list::ListRest;
-use crate::ast_formatter::list::builder::list;
-use crate::ast_formatter::list::list_config::{
-    ArrayListConfig, CallParamListConfig, TupleListConfig, struct_field_list_config,
-};
+use crate::ast_formatter::list::builder::{list, FormatListItem, ListBuilder};
+use crate::ast_formatter::list::list_config::{ArrayListConfig, TupleListConfig, ListConfig};
 use crate::ast_utils::postfix_expr_kind;
 use crate::constraints::MultiLineConstraint;
 use crate::util::cell_ext::CellExt;
@@ -25,8 +23,9 @@ impl AstFormatter {
         let mut take_tail = || tail.take().unwrap();
         match expr.kind {
             ast::ExprKind::Array(ref items) => {
-                list(Braces::SQUARE, items, self.expr_list_item())
+                self.expr_list(Braces::SQUARE, items)
                     .config(ArrayListConfig)
+                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.array_width)
                     .tail(take_tail())
                     .format(self)?
             }
@@ -37,11 +36,9 @@ impl AstFormatter {
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, take_tail())?,
             postfix_expr_kind!() => self.postfix_chain(expr, take_tail())?,
             ast::ExprKind::Tup(ref items) => {
-                list(Braces::PARENS, items, self.expr_list_item())
-                    .config(TupleListConfig {
-                        len: items.len(),
-                        single_line_max_contents_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
-                    })
+                self.expr_list(Braces::PARENS, items)
+                    .config(TupleListConfig { len: items.len() })
+                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
                     .tail(take_tail())
                     .format(self)?
             }
@@ -202,6 +199,30 @@ impl AstFormatter {
         Ok(())
     }
 
+    pub fn expr_list<'ast>(
+        &self,
+        braces: &'static Braces,
+        expr_list: &'ast [P<ast::Expr>],
+    ) -> ListBuilder<
+        'ast,
+        '_,
+        P<ast::Expr>,
+        impl FormatListItem<P<ast::Expr>>,
+        impl ListConfig,
+        impl ListItemConfig<Item = P<ast::Expr>>,
+    > {
+        struct ExprListItemConfig;
+        impl ListItemConfig for ExprListItemConfig {
+            type Item = P<ast::Expr>;
+
+            fn last_item_prefers_overflow(expr: &Self::Item) -> bool {
+                matches!(expr.kind, ast::ExprKind::Closure(_))
+            }
+        }
+        list(braces, expr_list, self.expr_list_item())
+            .item_config(ExprListItemConfig)
+    }
+
     pub fn expr_list_item(
         &self,
     ) -> impl Fn(&AstFormatter, &P<ast::Expr>, &Tail, ListItemContext) -> FormatResult {
@@ -319,24 +340,25 @@ impl AstFormatter {
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
         let first_line = self.out.line();
         self.expr_tail(func, &Tail::token("("))?;
-        let args = || {
-            list(Braces::PARENS, args, self.expr_list_item())
-                .config(CallParamListConfig)
-                .omit_open_brace()
-                .tail(tail)
-        };
-        if self.out.constraints().requires_indent_middle() && self.out.line() != first_line {
-            // single line and no overflow
-            // this avoids code like
-            // (
-            //    multiline_function_expr
-            // )(
-            //    multi_line_args,
-            // )
-            self.with_single_line(|| args().format_single_line(self))?;
-        } else {
-            args().format(self)?;
-        }
+        // single-line constraint here may avoid code like
+        // (
+        //    multiline_function_expr
+        // )(
+        //    multi_line_args,
+        // )
+        let is_multi_line_func = self.out.line() != first_line;
+        self.constraints()
+            .with_opt_multi_line_constraint_to_single_line(
+                is_multi_line_func
+                    .then_some(MultiLineConstraint::IndentMiddle),
+                || {
+                    self.expr_list(Braces::PARENS, args)
+                        .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
+                        .omit_open_brace()
+                        .tail(tail)
+                        .format(self)
+                },
+            )?;
         Ok(())
     }
 
@@ -447,9 +469,7 @@ impl AstFormatter {
         // todo indent middle and multi-line qpath?
         list(Braces::CURLY, &struct_.fields, Self::expr_field)
             // todo not wide enough?
-            .config(
-                struct_field_list_config(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
-            )
+            .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
             .rest(ListRest::from(&struct_.rest))
             .tail(tail)
             .format(self)?;

@@ -5,7 +5,6 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::builder::list;
-use crate::ast_formatter::list::list_config::{ParamListConfig, struct_field_list_config};
 use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -47,9 +46,6 @@ impl AstFormatter {
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 self.qpath(qself, path, false)?;
                 list(Braces::PARENS, fields, Self::pat_list_item)
-                    .config(ParamListConfig {
-                        single_line_max_contents_width: None,
-                    })
                     .tail(take_tail())
                     .format(self)?
             }
@@ -59,9 +55,6 @@ impl AstFormatter {
             ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false)?,
             ast::PatKind::Tuple(ref fields) => {
                 list(Braces::PARENS, fields, Self::pat_list_item)
-                    .config(ParamListConfig {
-                        single_line_max_contents_width: None,
-                    })
                     .tail(take_tail())
                     .format(self)?
             }
@@ -114,9 +107,7 @@ impl AstFormatter {
         self.qpath(qself, path, false)?;
         self.out.space()?;
         list(Braces::CURLY, fields, Self::pat_field)
-            .config(
-                struct_field_list_config(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
-            )
+            .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
             .rest(ListRest::from(rest))
             .tail(tail)
             .format(self)

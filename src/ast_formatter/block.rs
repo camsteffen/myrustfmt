@@ -23,9 +23,9 @@ impl AstFormatter {
             Some(expr_only_block) => {
                 self.backtrack()
                     .next(|| {
-                        self.with_single_line(
-                            || self.expr_only_block_after_open_brace(expr_only_block),
-                        )?;
+                        self.with_single_line(|| {
+                            self.expr_only_block_after_open_brace(expr_only_block)
+                        })?;
                         self.tail(tail)?;
                         Ok(())
                     })

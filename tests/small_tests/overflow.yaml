@@ -11,3 +11,14 @@
         Constraints::default(),
         Rc::new(ErrorEmitter::new(None)),
     )
+- name: prefer to overflow closure instead of wrapping
+  type: breakpoint
+  in_block: true
+  before: |
+    fooooooooooo(|| {
+        x
+    })
+  after: |
+    fooooooooooo(
+        || x,
+    )

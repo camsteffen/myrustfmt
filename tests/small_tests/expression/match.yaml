@@ -280,7 +280,6 @@
         }
     }
 - name: prefer adding a block over breaking arm pattern
-  focus: true
   type: breakpoint
   in_block: true
   before: |

@@ -210,9 +210,9 @@ impl ConstraintWriter {
                     if self.last_width_exceeded_line.get() != Some(line) {
                         self.exceeded_max_width.set(true);
                         self.last_width_exceeded_line.set(Some(line));
-                        self.with_last_line(
-                            |line_str| self.error_emitter.emit_width_exceeded(line, line_str),
-                        );
+                        self.with_last_line(|line_str| {
+                            self.error_emitter.emit_width_exceeded(line, line_str)
+                        });
                     }
                     Ok(())
                 }

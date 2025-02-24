@@ -57,9 +57,9 @@ fn format_in_block(stmt: &str, max_width: Option<u32>) -> String {
     let mut out = String::new();
     for (i, line) in lines.enumerate() {
         if !line.is_empty() {
-            out.push_str(line.strip_prefix("    ").unwrap_or_else(
-                || panic!("line {i} is not indented\nLine: {line}\nOutput:\n{result}"),
-            ));
+            out.push_str(line.strip_prefix("    ").unwrap_or_else(|| {
+                panic!("line {i} is not indented\nLine: {line}\nOutput:\n{result}")
+            }));
         }
         out.push('\n');
     }
