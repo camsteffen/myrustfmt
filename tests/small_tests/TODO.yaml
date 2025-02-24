@@ -1,11 +1,3 @@
-- name: temp
-  type: no_change
-  in_block: true
-  formatted: |
-    // todo next should not add block
-    self.backtrack()
-        .next(|| aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)
-        .next();
 - name: another todo
   type: no_change
   formatted: |

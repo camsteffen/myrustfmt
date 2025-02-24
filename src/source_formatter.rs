@@ -35,9 +35,10 @@ impl SourceFormatter {
         constraints: Constraints,
         error_emitter: Rc<ErrorEmitter>,
     ) -> SourceFormatter {
+        let capacity = source.len() * 2;
         SourceFormatter {
             source: SourceReader::new(source),
-            out: ConstraintWriter::new(constraints, error_emitter),
+            out: ConstraintWriter::new(constraints, error_emitter, capacity),
         }
     }
 

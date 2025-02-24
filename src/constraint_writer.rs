@@ -45,11 +45,15 @@ pub struct ConstraintWriterResult {
 }
 
 impl ConstraintWriter {
-    pub fn new(constraints: Constraints, error_emitter: Rc<ErrorEmitter>) -> ConstraintWriter {
+    pub fn new(
+        constraints: Constraints,
+        error_emitter: Rc<ErrorEmitter>,
+        capacity: usize,
+    ) -> ConstraintWriter {
         ConstraintWriter {
             checkpoint_counter: CheckpointCounter::default(),
             constraints,
-            buffer: Cell::new(String::new()),
+            buffer: Cell::new(String::with_capacity(capacity)),
             error_emitter,
             exceeded_max_width: Cell::new(false),
             last_line_start: Cell::new(0),
