@@ -26,6 +26,14 @@ impl<'a> Tail<'a> {
         const { &Tail(TailImpl::None) }
     }
 
+    pub fn filter(self, condition: bool) -> Self {
+        if condition {
+            self
+        } else {
+            Tail(TailImpl::None)
+        }
+    }
+
     pub fn func(f: impl Fn(&AstFormatter) -> FormatResult + 'a) -> Tail<'a> {
         Tail(TailImpl::Fn(Box::new(f)))
     }

@@ -76,9 +76,9 @@ impl AstFormatter {
                         .with_multi_line_constraint_to_single_line(
                             MultiLineConstraint::NoHangingIndent,
                             || {
-                                self.indented(
-                                    || self.postfix_chain_separate_lines(chain_rest, tail),
-                                )
+                                self.indented(|| {
+                                    self.postfix_chain_separate_lines(chain_rest, tail)
+                                })
                             },
                         )
                 })
@@ -120,13 +120,13 @@ impl AstFormatter {
         let checkpoint = self.open_checkpoint();
 
         self.with_chain_item_max_width(start_pos, || self.postfix_overflowable(overflowable))?;
+        // todo can we prove that the overflow is so long that a separate line won't be shorter?
+        let overflow_height = self.out.line() - first_line + 1;
         self.tail(tail)?;
-        if self.out.line() == first_line {
+        if overflow_height == 1 {
             // it all fits on one line
             return Ok(());
         }
-        // todo can we prove that the overflow is so long that a separate line won't be shorter?
-        let overflow_height = self.out.line() - first_line + 1;
         let overflow_lookahead = self.capture_lookahead(&checkpoint);
 
         // try writing the overflowable on the next line to measure its height in separate lines format

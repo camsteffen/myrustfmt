@@ -1,0 +1,5 @@
+- name: struct pattern with just rest
+  type: no_change
+  in_block: true
+  formatted: |
+    let Foo { .. } = x;

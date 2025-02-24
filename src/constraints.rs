@@ -42,7 +42,7 @@ pub enum MultiLineConstraint {
 /// The existence of an open checkpoint means that constraint errors are recoverable by restoring
 /// the checkpoint and attempting another formatting strategy. Care must be taken to drop
 /// checkpoints _before_ the final (non-recoverable) formatting strategy.
-/// 
+///
 /// Using an Rc does make the implementation a bit precarious, but it seems less error-prone than
 /// having to manually decrement the count at many early return sites.
 #[derive(Clone, Debug, Default)]

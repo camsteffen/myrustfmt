@@ -8,9 +8,7 @@ macro_rules! debug_err {
     ($af:expr, $result:expr) => {{
         let result = $result;
         if result.is_err() {
-            $af.out.with_taken_buffer(|b| {
-                dbg!(b);
-            });
+            $af.out.debug_buffer();
         }
         result
     }};

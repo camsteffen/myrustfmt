@@ -1,3 +1,4 @@
+use std::panic::Location;
 use crate::ast_formatter::FormatModuleResult;
 use crate::constraint_writer::{
     ConstraintWriter, ConstraintWriterCheckpoint, ConstraintWriterLookahead,
@@ -332,6 +333,14 @@ impl SourceFormatter {
 
     pub fn with_taken_buffer(&self, f: impl FnOnce(&mut String)) {
         self.out.with_taken_buffer(f)
+    }
+
+    #[track_caller]
+    pub fn debug_buffer(&self) {
+        let location = Location::caller();
+        self.with_taken_buffer(|b| {
+            eprintln!("[{location}] buffer:\n{b}");
+        });
     }
 }
 

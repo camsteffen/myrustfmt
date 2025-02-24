@@ -82,12 +82,9 @@ impl AstFormatter {
             ast::StmtKind::Let(local) => self.local(local),
             ast::StmtKind::Item(item) => self.item(item),
             ast::StmtKind::Expr(expr) => {
-                let tail = if matches!(expr.kind, control_flow_expr_kind!()) {
-                    &Tail::token_insert(";")
-                } else {
-                    Tail::none()
-                };
-                self.expr_tail(expr, tail)
+                let tail = Tail::token_insert(";")
+                    .filter(matches!(expr.kind, control_flow_expr_kind!()));
+                self.expr_tail(expr, &tail)
             }
             ast::StmtKind::Semi(expr) => self.expr_tail(expr, &Tail::token(";")),
             ast::StmtKind::Empty => self.out.token(";"),

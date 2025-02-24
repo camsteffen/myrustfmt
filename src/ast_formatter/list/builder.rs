@@ -278,12 +278,12 @@ where
         let len = self.list.len();
         af.list_contents_single_line(
             len,
-            |index| {
+            |index, tail| {
                 let strategy = ListStrategy::SingleLine;
                 self.format_item.format(
                     af,
                     &self.list[index],
-                    Tail::none(),
+                    tail,
                     ListItemContext {
                         len,
                         index,
