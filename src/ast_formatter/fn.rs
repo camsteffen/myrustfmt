@@ -175,17 +175,17 @@ impl AstFormatter {
     }
 
     fn fn_decl(&self, fn_decl: &ast::FnDecl, braces: &'static Braces, tail: &Tail) -> FormatResult {
+        let params = list(braces, &fn_decl.inputs, Self::param);
         let do_single_line = || {
             self.with_single_line(|| {
-                list(braces, &fn_decl.inputs, Self::param)
-                    .format_single_line(self)?;
+                params.format_single_line(self)?;
                 self.fn_ret_ty(&fn_decl.output)?;
                 Ok(())
             })?;
             self.tail(tail)?;
             Ok(())
         };
-        if self.out.constraints().multi_line.get() <= MultiLineShape::HangingIndent {
+        if self.out.constraints().multi_line.get() < MultiLineShape::DisjointIndent {
             return do_single_line();
         }
         // args and return type all on one line
@@ -193,8 +193,7 @@ impl AstFormatter {
             .next(do_single_line)
             // args on separate lines
             .otherwise(|| {
-                list(braces, &fn_decl.inputs, Self::param)
-                    .format_separate_lines(self)?;
+                params.format_separate_lines(self)?;
                 self.fn_ret_ty(&fn_decl.output)?;
                 self.tail(tail)?;
                 Ok(())
