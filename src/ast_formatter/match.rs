@@ -3,11 +3,9 @@ use rustc_ast::ast;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::backtrack::Backtrack;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
-use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
 use crate::constraints::MultiLineShape;
 use crate::error::{ConstraintError, FormatResult, FormatResultExt};
-use crate::util::cell_ext::CellExt;
 
 impl AstFormatter {
     pub fn match_(&self, scrutinee: &ast::Expr, arms: &[ast::Arm]) -> FormatResult {
@@ -32,7 +30,7 @@ impl AstFormatter {
         } else if let Some(body) = arm.body.as_deref() {
             self.pat_tail(
                 &arm.pat,
-                &Tail::func(|af| {
+                &self.tail_fn(|af| {
                     af.out.space_token_space("=>")?;
                     af.arm_body(body)?;
                     Ok(())
@@ -104,7 +102,7 @@ impl AstFormatter {
     // todo should we count lines or simply observe whether it's multi-line?
     /// Adds a block only if doing so allows for more code to fit in the first line
     fn arm_body_add_block_if_first_line_is_longer(&self, body: &ast::Expr) -> FormatResult {
-        let Some(max_width) = self.constraints().max_width.get() else {
+        let Some(max_width) = self.constraints().borrow().max_width else {
             return self.arm_body_same_line(body, self.backtrack());
         };
 
@@ -126,8 +124,7 @@ impl AstFormatter {
         let result = self
             .with_single_line(|| {
                 self.constraints()
-                    .max_width
-                    .with_replaced(Some(max_width + extra_width), || self.expr(body))
+                    .with_max_width(Some(max_width + extra_width), || self.expr(body))
             })
             .constraint_err_only()?;
         let used_extra_width = self.out.last_line_len() > max_width;
@@ -169,9 +166,8 @@ impl AstFormatter {
         backtrack
             .next(|| {
                 self.constraints()
-                    .multi_line
-                    .with_replaced(MultiLineShape::VerticalList, || {
-                        self.expr_tail(body, &Tail::token_insert(","))
+                    .with_multi_line_shape_min(MultiLineShape::VerticalList, || {
+                        self.expr_tail(body, &self.tail_fn(|af| af.out.token_insert(",")))
                     })
             })
             .otherwise(|| self.expr_add_block(body))

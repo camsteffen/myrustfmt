@@ -4,7 +4,7 @@ use crate::ast_formatter::FormatModuleResult;
 use crate::constraint_writer::{
     ConstraintWriter, ConstraintWriterCheckpoint, ConstraintWriterLookahead,
 };
-use crate::constraints::{CheckpointCounter, Constraints};
+use crate::constraints::{CheckpointCounter, OwnedConstraints};
 use crate::error::FormatResult;
 use crate::error_emitter::ErrorEmitter;
 use crate::source_formatter::whitespace::{VerticalWhitespaceMode, WhitespaceMode};
@@ -35,7 +35,7 @@ pub struct SourceFormatter {
 impl SourceFormatter {
     pub fn new(
         source: Rc<String>,
-        constraints: Constraints,
+        constraints: OwnedConstraints,
         error_emitter: Rc<ErrorEmitter>,
     ) -> SourceFormatter {
         let capacity = source.len() * 2;
@@ -49,7 +49,7 @@ impl SourceFormatter {
     pub fn new_defaults(source: impl Into<String>) -> SourceFormatter {
         Self::new(
             Rc::new(source.into()),
-            Constraints::default(),
+            OwnedConstraints::default(),
             Rc::new(ErrorEmitter::new(None)),
         )
     }
@@ -63,7 +63,7 @@ impl SourceFormatter {
         self.out.checkpoint_counter()
     }
 
-    pub fn constraints(&self) -> &Constraints {
+    pub fn constraints(&self) -> &OwnedConstraints {
         self.out.constraints()
     }
 

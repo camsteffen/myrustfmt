@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext, ListStrategy};
-use crate::ast_formatter::util::tail::Tail;
+use crate::ast_formatter::util::tail::{Tail, TailKind};
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
@@ -9,7 +9,6 @@ use crate::ast_formatter::list::builder::{list, FormatListItem, ListBuilder};
 use crate::ast_formatter::list::list_config::{ArrayListConfig, TupleListConfig, ListConfig};
 use crate::ast_utils::postfix_expr_kind;
 use crate::constraints::MultiLineShape;
-use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
@@ -168,7 +167,7 @@ impl AstFormatter {
                 self.backtrack()
                     .next(|| {
                         self.constraints()
-                            .with_multi_line_shape(MultiLineShape::VerticalList, || {
+                            .with_multi_line_shape_min(MultiLineShape::VerticalList, || {
                                 self.expr(inner)
                             })?;
                         self.out.token(")")?;
@@ -224,7 +223,7 @@ impl AstFormatter {
         &self,
     ) -> impl Fn(&AstFormatter, &P<ast::Expr>, &Tail, ListItemContext) -> FormatResult {
         // todo kinda hacky
-        let outer_multi_line = self.constraints().multi_line.get();
+        let outer_multi_line = self.constraints().borrow().multi_line;
 
         move |af, expr, tail, lcx| {
             af.skip_single_expr_blocks_tail(expr, tail, |expr, tail| {
@@ -242,13 +241,20 @@ impl AstFormatter {
                         } else {
                             MultiLineShape::VerticalList
                         };
-                        af.constraints().multi_line.with_replaced(shape, format)?;
+                        // todo avoid replace?
+                        af.constraints()
+                            .with_multi_line_shape_replaced(shape, format)?;
                         Ok(())
                     }
                     // on separate lines, enforce IndentMiddle by adding a block
                     ListStrategy::SeparateLines if lcx.len > 1 => {
                         af.backtrack()
-                            .next(|| af.constraints().with_indent_middle(format))
+                            .next(|| {
+                                af.constraints().with_multi_line_shape_min(
+                                    MultiLineShape::HangingIndent,
+                                    format,
+                                )
+                            })
                             .otherwise(|| {
                                 af.expr_add_block(expr)?;
                                 af.tail(tail)?;
@@ -292,7 +298,7 @@ impl AstFormatter {
             let first_line = self.out.line();
             self.expr_tail(
                 start,
-                &Tail::func(|af| {
+                &self.tail_fn(|af| {
                     af.out.token(sigil)?;
                     let Some(end) = end else {
                         return af.tail(tail);
@@ -333,7 +339,7 @@ impl AstFormatter {
 
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
         let first_line = self.out.line();
-        self.expr_tail(func, &Tail::token("("))?;
+        self.expr_tail(func, &self.make_tail(TailKind::Token("(")))?;
         let is_multi_line_func = self.out.line() != first_line;
         self.constraints().with_single_line_unless_opt(
             is_multi_line_func.then_some(MultiLineShape::DisjointIndent),

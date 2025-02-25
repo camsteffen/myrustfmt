@@ -1,5 +1,5 @@
 use crate::ast_formatter::FormatModuleResult;
-use crate::constraints::{CheckpointCounter, Constraints, MultiLineShape};
+use crate::constraints::{CheckpointCounter, Constraints, MultiLineShape, OwnedConstraints};
 use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededError};
 use crate::error_emitter::ErrorEmitter;
 use crate::util::cell_ext::CellExt;
@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 pub struct ConstraintWriter {
     checkpoint_counter: CheckpointCounter,
-    constraints: Constraints,
+    constraints: OwnedConstraints,
     buffer: Cell<String>,
     error_emitter: Rc<ErrorEmitter>,
     /// True if max width was ever exceeded (and there was no fallback)
@@ -31,7 +31,7 @@ pub struct ConstraintWriterSelfCheckpoint {
     #[cfg(debug_assertions)]
     checkpoint_count: usize,
     #[cfg(debug_assertions)]
-    constraints: Constraints,
+    constraints: Rc<Constraints>,
 }
 
 pub struct ConstraintWriterLookahead {
@@ -46,7 +46,7 @@ pub struct ConstraintWriterResult {
 
 impl ConstraintWriter {
     pub fn new(
-        constraints: Constraints,
+        constraints: OwnedConstraints,
         error_emitter: Rc<ErrorEmitter>,
         capacity: usize,
     ) -> ConstraintWriter {
@@ -73,7 +73,7 @@ impl ConstraintWriter {
         &self.checkpoint_counter
     }
 
-    pub fn constraints(&self) -> &Constraints {
+    pub fn constraints(&self) -> &OwnedConstraints {
         &self.constraints
     }
 
@@ -108,17 +108,14 @@ impl ConstraintWriter {
             ref last_width_exceeded_line,
             ref line,
         } = *self;
-        let constraints = constraints.clone();
-        // N.B. record the count after cloning constraints
-        let checkpoint_count = checkpoint_counter.count();
         ConstraintWriterSelfCheckpoint {
             line: line.get(),
             last_line_start: last_line_start.get(),
             last_width_exceeded_line: last_width_exceeded_line.get(),
             #[cfg(debug_assertions)]
-            checkpoint_count,
+            checkpoint_count: checkpoint_counter.count(),
             #[cfg(debug_assertions)]
-            constraints,
+            constraints: Rc::clone(&constraints.borrow()),
         }
     }
 
@@ -142,7 +139,7 @@ impl ConstraintWriter {
             ref constraints,
         } = *checkpoint;
         #[cfg(debug_assertions)]
-        assert_eq!(&self.constraints, constraints);
+        assert_eq!(&*self.constraints.borrow(), constraints);
         assert_eq!(self.checkpoint_counter.count(), checkpoint_count);
         self.last_line_start.set(last_line_start);
         self.last_width_exceeded_line.set(last_width_exceeded_line);
@@ -185,7 +182,7 @@ impl ConstraintWriter {
     }
 
     pub fn newline(&self) -> Result<(), NewlineNotAllowedError> {
-        if matches!(self.constraints.multi_line.get(), MultiLineShape::SingleLine) {
+        if matches!(self.constraints.borrow().multi_line, MultiLineShape::SingleLine) {
             return Err(NewlineNotAllowedError);
         }
         self.buffer.with_taken(|b| b.push('\n'));
@@ -221,11 +218,11 @@ impl ConstraintWriter {
 
     pub fn max_width(&self) -> Option<u32> {
         self.constraints
+            .borrow()
             .max_width_for_line
-            .get()
             .filter(|m| m.line == self.line())
             .map(|m| m.max_width)
-            .or(self.constraints.max_width.get())
+            .or(self.constraints.borrow().max_width)
     }
 
     pub fn remaining_width(&self) -> Option<Result<u32, WidthLimitExceededError>> {

@@ -1,6 +1,7 @@
+use std::cell::RefCell;
 use crate::ast_module::AstModule;
 use crate::config::Config;
-use crate::constraints::Constraints;
+use crate::constraints::{Constraints, OwnedConstraints};
 use crate::error_emitter::ErrorEmitter;
 use crate::source_formatter::SourceFormatter;
 use std::path::PathBuf;
@@ -50,7 +51,8 @@ impl FormatModuleResult {
 
 impl AstFormatter {
     pub fn new(source: Rc<String>, path: Option<PathBuf>, config: Rc<Config>) -> Self {
-        let constraints = Constraints::new(config.max_width);
+        let constraints =
+            OwnedConstraints(RefCell::new(Rc::new(Constraints::new(config.max_width))));
         let error_emitter = Rc::new(ErrorEmitter::new(path));
         let out = SourceFormatter::new(source, constraints, Rc::clone(&error_emitter));
         AstFormatter { error_emitter, out }

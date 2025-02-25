@@ -4,7 +4,6 @@ use crate::ast_formatter::list::builder::list;
 use crate::ast_utils::is_rustfmt_skip;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
-use crate::util::cell_ext::CellExt;
 use rustc_ast::ast;
 use rustc_span::Span;
 use crate::ast_formatter::util::tail::Tail;
@@ -33,8 +32,7 @@ impl AstFormatter {
         if attrs.iter().any(is_rustfmt_skip) {
             self.out
                 .constraints()
-                .max_width
-                .with_replaced(None, || self.out.copy_span(span))?;
+                .with_max_width(None, || self.out.copy_span(span))?;
             self.tail(tail)?;
         } else {
             f()?;

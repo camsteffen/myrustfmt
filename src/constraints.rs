@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::error::FormatResult;
-use crate::util::cell_ext::CellExt;
-use std::cell::Cell;
+use std::cell::RefCell;
+use std::ops::Deref;
 use std::rc::Rc;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -55,50 +55,70 @@ impl CheckpointCounter {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Constraints {
-    /// Things would be much simpler without this
-    // todo no Option
-    pub max_width: Cell<Option<u32>>,
-    /// Used to set the max width for the current line, so it no longer applies after a newline
-    /// character is printed
-    pub max_width_for_line: Cell<Option<MaxWidthForLine>>,
-    pub multi_line: Cell<MultiLineShape>,
-}
+/// Creates a new Rc for every modification to optimize for cheap clones
+#[derive(Default, PartialEq)]
+pub struct OwnedConstraints(pub RefCell<Rc<Constraints>>);
 
-impl Default for Constraints {
-    fn default() -> Self {
-        Constraints::new(Config::default().max_width)
+impl Deref for OwnedConstraints {
+    type Target = RefCell<Rc<Constraints>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
-impl Constraints {
-    pub fn new(max_width: u32) -> Constraints {
-        Constraints {
-            max_width: Cell::new(Some(max_width)),
-            max_width_for_line: Cell::new(None),
-            multi_line: Cell::new(MultiLineShape::DisjointIndent),
-        }
-    }
-
-    pub fn with_multi_line_shape<T>(
+impl OwnedConstraints {
+    pub fn with_modified<T>(
         &self,
-        constraint: MultiLineShape,
-        f: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        if self.multi_line.get() <= constraint {
-            f()
-        } else {
-            self.multi_line.with_replaced(constraint, f)
+        modify: impl FnOnce(&mut Constraints),
+        scope: impl FnOnce() -> T,
+    ) -> T {
+        let mut constraints_ref = self.0.borrow_mut();
+        let mut constraints = Constraints::clone(&constraints_ref);
+        modify(&mut constraints);
+        let old = std::mem::replace(&mut *constraints_ref, Rc::new(constraints));
+        drop(constraints_ref);
+        let out = scope();
+        *self.0.borrow_mut() = old;
+        out
+    }
+
+    pub fn with_replaced<T>(&self, constraints: Rc<Constraints>, scope: impl FnOnce() -> T) -> T {
+        let old = std::mem::replace(&mut *self.0.borrow_mut(), constraints);
+        let out = scope();
+        *self.0.borrow_mut() = old;
+        out
+    }
+
+    pub fn with_max_width<T>(&self, max_width: Option<u32>, scope: impl FnOnce() -> T) -> T {
+        self.with_modified(|c| c.max_width = max_width, scope)
+    }
+
+    pub fn with_max_width_for_line<T>(
+        &self,
+        max_width: Option<MaxWidthForLine>,
+        scope: impl FnOnce() -> T,
+    ) -> T {
+        self.with_modified(|c| c.max_width_for_line = max_width, scope)
+    }
+
+    pub fn with_multi_line_shape_min<T>(
+        &self,
+        shape: MultiLineShape,
+        scope: impl FnOnce() -> T,
+    ) -> T {
+        if self.borrow().multi_line <= shape {
+            return scope();
         }
+        self.with_multi_line_shape_replaced(shape, scope)
     }
 
-    pub fn with_indent_middle(&self, scope: impl Fn() -> FormatResult) -> FormatResult {
-        self.with_multi_line_shape(MultiLineShape::HangingIndent, scope)
-    }
-
-    pub fn with_no_hanging_indent(&self, scope: impl Fn() -> FormatResult) -> FormatResult {
-        self.with_multi_line_shape(MultiLineShape::VerticalList, scope)
+    pub fn with_multi_line_shape_replaced<T>(
+        &self,
+        shape: MultiLineShape,
+        scope: impl FnOnce() -> T,
+    ) -> T {
+        self.with_modified(|c| c.multi_line = shape, scope)
     }
 
     /// Unless the given MultiLineConstraint is applicable, enforce a single-line constraint
@@ -107,11 +127,10 @@ impl Constraints {
         shape: MultiLineShape,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        if self.multi_line.get() >= shape {
+        if self.borrow().multi_line >= shape {
             scope()
         } else {
-            self.multi_line
-                .with_replaced(MultiLineShape::SingleLine, scope)
+            self.with_multi_line_shape_replaced(MultiLineShape::SingleLine, scope)
         }
     }
 
@@ -124,5 +143,32 @@ impl Constraints {
             return scope();
         };
         self.with_single_line_unless(shape, scope)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Constraints {
+    /// Things would be much simpler without this
+    // todo no Option
+    pub max_width: Option<u32>,
+    /// Used to set the max width for the current line, so it no longer applies after a newline
+    /// character is printed
+    pub max_width_for_line: Option<MaxWidthForLine>,
+    pub multi_line: MultiLineShape,
+}
+
+impl Default for Constraints {
+    fn default() -> Self {
+        Constraints::new(Config::default().max_width)
+    }
+}
+
+impl Constraints {
+    pub fn new(max_width: u32) -> Constraints {
+        Constraints {
+            max_width: Some(max_width),
+            max_width_for_line: None,
+            multi_line: MultiLineShape::DisjointIndent,
+        }
     }
 }

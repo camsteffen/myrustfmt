@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::{CheckpointCounter, Constraints, MaxWidthForLine, MultiLineShape};
+use crate::constraints::{CheckpointCounter, MaxWidthForLine, MultiLineShape, OwnedConstraints};
 use crate::error::{FormatResult, WidthLimitExceededError};
 use crate::util::cell_ext::CellExt;
 
@@ -10,22 +10,22 @@ impl AstFormatter {
         self.out.checkpoint_counter()
     }
 
-    pub(super) fn constraints(&self) -> &Constraints {
+    pub(super) fn constraints(&self) -> &OwnedConstraints {
         self.out.constraints()
     }
 
     pub fn indented<T>(&self, f: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         let indent = self.out.indent.get() + INDENT_WIDTH;
-        self.out
-            .indent
-            .with_replaced(indent, || match self.constraints().multi_line.get() {
+        self.out.indent.with_replaced(indent, || {
+            let shape = self.constraints().borrow().multi_line;
+            match shape {
                 MultiLineShape::SingleLine | MultiLineShape::DisjointIndent => f(),
                 _ => {
                     self.constraints()
-                        .multi_line
-                        .with_replaced(MultiLineShape::DisjointIndent, f)
+                        .with_multi_line_shape_replaced(MultiLineShape::DisjointIndent, f)
                 }
-            })
+            }
+        })
     }
 
     pub fn indented_optional(
@@ -45,7 +45,7 @@ impl AstFormatter {
             "single line constraint applied with no fallback"
         );
         self.constraints()
-            .with_multi_line_shape(MultiLineShape::SingleLine, f)
+            .with_multi_line_shape_replaced(MultiLineShape::SingleLine, f)
     }
 
     /** Enforces a max number of characters until a newline is printed */
@@ -54,20 +54,19 @@ impl AstFormatter {
         let max_width = self.out.last_line_len() + width_limit;
         if self
             .constraints()
+            .borrow()
             .max_width
-            .get()
             .is_some_and(|mw| max_width >= mw)
             || self
                 .constraints()
+                .borrow()
                 .max_width_for_line
-                .get()
                 .is_some_and(|m| m.line == line && m.max_width <= max_width)
         {
             return f();
         }
         self.constraints()
-            .max_width_for_line
-            .with_replaced(Some(MaxWidthForLine { line, max_width }), f)
+            .with_max_width_for_line(Some(MaxWidthForLine { line, max_width }), f)
     }
 
     pub fn with_width_limit_first_line_opt<T>(
@@ -127,15 +126,13 @@ impl AstFormatter {
         let max_width = self.out.last_line_len() + width_limit;
         if self
             .constraints()
+            .borrow()
             .max_width
-            .get()
             .is_some_and(|m| m <= max_width)
         {
             f()
         } else {
-            self.constraints()
-                .max_width
-                .with_replaced(Some(max_width), f)
+            self.constraints().with_max_width(Some(max_width), f)
         }
     }
 }

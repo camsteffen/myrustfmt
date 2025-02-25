@@ -1,6 +1,5 @@
 use crate::error::{ConstraintError, FormatResult};
 use crate::source_formatter::SourceFormatter;
-use crate::util::cell_ext::CellExt;
 use rustc_lexer::Token;
 use rustc_lexer::TokenKind;
 
@@ -110,9 +109,7 @@ impl SourceFormatter {
         if is_horizontal && is_line_comment {
             return Err(ConstraintError::NewlineNotAllowed.into());
         }
-        self.constraints()
-            .max_width
-            .with_replaced(None, || self.copy(len))?;
+        self.constraints().with_max_width(None, || self.copy(len))?;
         let mut emitted_required = false;
         if is_horizontal {
             // todo also if vertical and multi-line comment?

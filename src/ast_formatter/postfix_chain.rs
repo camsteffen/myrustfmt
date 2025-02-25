@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
-use crate::ast_formatter::util::tail::Tail;
+use crate::ast_formatter::util::tail::{Tail, TailKind};
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
 use crate::constraints::MultiLineShape;
 use crate::error::{ConstraintError, FormatResult, FormatResultExt};
@@ -198,7 +198,11 @@ impl AstFormatter {
             }
             ast::ExprKind::MethodCall(ref method_call) => {
                 self.out.token(".")?;
-                self.path_segment(&method_call.seg, true, &Tail::token("("))?;
+                self.path_segment(
+                    &method_call.seg,
+                    true,
+                    &self.make_tail(TailKind::Token("(")),
+                )?;
                 // todo this is consistent with rustfmt, but would it be better to force args to be
                 //   on the same line, just allowing overflow of the last arg?
                 self.call_args_after_open_paren(&method_call.args, Tail::none())?;
@@ -221,7 +225,11 @@ impl AstFormatter {
                 ast::ExprKind::Index(_, ref index, _) => {
                     self.out.token("[")?;
                     self.backtrack()
-                        .next(|| self.with_single_line(|| self.expr_tail(index, &Tail::token("]"))))
+                        .next(|| {
+                            self.with_single_line(|| {
+                                self.expr_tail(index, &self.make_tail(TailKind::Token("]")))
+                            })
+                        })
                         .otherwise(|| self.embraced_after_opening("]", || self.expr(index)))?;
                 }
                 ast::ExprKind::Try(..) => self.out.token("?")?,

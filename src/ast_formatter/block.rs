@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::util::tail::Tail;
+use crate::ast_formatter::util::tail::{Tail, TailKind};
 use crate::ast_utils::{control_flow_expr_kind, plain_block};
 use crate::error::FormatResult;
 use crate::util::whitespace_utils::is_whitespace;
@@ -82,11 +82,15 @@ impl AstFormatter {
             ast::StmtKind::Let(local) => self.local(local),
             ast::StmtKind::Item(item) => self.item(item),
             ast::StmtKind::Expr(expr) => {
-                let tail = Tail::token_insert(";")
-                    .filter(matches!(expr.kind, control_flow_expr_kind!()));
+                let tail = match expr.kind {
+                    control_flow_expr_kind!() => &self.make_tail(TailKind::TokenInsert(";")),
+                    _ => Tail::none(),
+                };
                 self.expr_tail(expr, &tail)
             }
-            ast::StmtKind::Semi(expr) => self.expr_tail(expr, &Tail::token(";")),
+            ast::StmtKind::Semi(expr) => {
+                self.expr_tail(expr, &self.make_tail(TailKind::Token(";")))
+            }
             ast::StmtKind::Empty => self.out.token(";"),
             ast::StmtKind::MacCall(mac_call_stmt) => {
                 self.with_attrs(&mac_call_stmt.attrs, stmt.span, || {
@@ -142,7 +146,7 @@ impl AstFormatter {
                 self.out.skip_token("{")?;
                 self.skip_single_expr_blocks_tail(
                     inner,
-                    &Tail::func(|af| {
+                    &self.tail_fn(|af| {
                         af.out.skip_token("}")?;
                         self.tail(tail)?;
                         Ok(())

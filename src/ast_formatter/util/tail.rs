@@ -1,4 +1,6 @@
+use std::rc::Rc;
 use crate::ast_formatter::AstFormatter;
+use crate::constraints::Constraints;
 use crate::error::FormatResult;
 
 /// A Tail squeezes the code before it leftward to make room for itself.
@@ -11,43 +13,36 @@ use crate::error::FormatResult;
 /// A Tail is unaware of its width by design, to avoid error-prone math.
 ///
 /// As a general rule, ONLY add a Tail argument to a function if it affects the formatting strategy.
-pub struct Tail<'a>(TailImpl<'a>);
+pub struct Tail<'a>(Option<TailImpl<'a>>);
 
-enum TailImpl<'a> {
-    None,
+struct TailImpl<'a> {
+    constraints: Rc<Constraints>,
+    kind: TailKind<'a>,
+}
+
+pub enum TailKind<'a> {
     Fn(Box<dyn Fn(&AstFormatter) -> FormatResult + 'a>),
     Token(&'static str),
     TokenInsert(&'static str),
     TokenMaybeMissing(&'static str),
 }
 
+impl AstFormatter {
+    pub fn make_tail<'a>(&self, kind: TailKind<'a>) -> Tail<'a> {
+        Tail(Some(TailImpl {
+            constraints: Rc::clone(&self.constraints().borrow()),
+            kind,
+        }))
+    }
+
+    pub fn tail_fn<'a>(&self, tail: impl Fn(&AstFormatter) -> FormatResult + 'a) -> Tail<'a> {
+        self.make_tail(TailKind::Fn(Box::new(tail)))
+    }
+}
+
 impl<'a> Tail<'a> {
     pub const fn none() -> &'static Tail<'static> {
-        const { &Tail(TailImpl::None) }
-    }
-
-    pub fn filter(self, condition: bool) -> Self {
-        if condition {
-            self
-        } else {
-            Tail(TailImpl::None)
-        }
-    }
-
-    pub fn func(f: impl Fn(&AstFormatter) -> FormatResult + 'a) -> Tail<'a> {
-        Tail(TailImpl::Fn(Box::new(f)))
-    }
-
-    pub const fn token(token: &'static str) -> Self {
-        Tail(TailImpl::Token(token))
-    }
-
-    pub const fn token_insert(token: &'static str) -> Self {
-        Tail(TailImpl::TokenInsert(token))
-    }
-
-    pub const fn token_maybe_missing(token: &'static str) -> Self {
-        Tail(TailImpl::TokenMaybeMissing(token))
+        const { &Tail(None) }
     }
 }
 
@@ -57,12 +52,13 @@ impl AstFormatter {
     /// For example, if an expression is formatted with a single-line constraint, the tail does not
     /// also need to be single-line.
     pub fn tail(&self, tail: &Tail) -> FormatResult {
-        match tail.0 {
-            TailImpl::None => Ok(()),
-            TailImpl::Fn(ref f) => f(self),
-            TailImpl::Token(token) => self.out.token(token),
-            TailImpl::TokenInsert(token) => self.out.token_insert(token),
-            TailImpl::TokenMaybeMissing(token) => self.out.token_maybe_missing(token),
-        }
+        let Some(tail) = &tail.0 else { return Ok(()) };
+        self.constraints()
+            .with_replaced(Rc::clone(&tail.constraints), || match tail.kind {
+                TailKind::Fn(ref f) => f(self),
+                TailKind::Token(token) => self.out.token(token),
+                TailKind::TokenInsert(token) => self.out.token_insert(token),
+                TailKind::TokenMaybeMissing(token) => self.out.token_maybe_missing(token),
+            })
     }
 }

@@ -11,9 +11,8 @@ pub use list_item_context::{ListItemContext, ListStrategy};
 pub use rest::ListRest;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::util::tail::Tail;
+use crate::ast_formatter::util::tail::{Tail, TailKind};
 use crate::error::FormatResult;
-use crate::util::cell_ext::CellExt;
 
 impl AstFormatter {
     /* [item, item, item] */
@@ -35,21 +34,28 @@ impl AstFormatter {
         };
         self.with_single_line(|| {
             do_pad(self)?;
-            let prev_max_width_for_line = self.constraints().max_width_for_line.get();
+            let close = |af: &Self| {
+                do_pad(af)?;
+                af.out.token(close_brace)?;
+                Ok(())
+            };
+            // N.B. tails created outside of width limit
+            let close_tail = self.tail_fn(close);
+            let last_tail = self.tail_fn(|af| {
+                if !rest.is_none() || force_trailing_comma {
+                    af.out.token(",")?;
+                } else {
+                    af.out.skip_token_if_present(",")?;
+                }
+                if rest.is_none() {
+                    close(af)?;
+                }
+                Ok(())
+            });
             self.with_width_limit_first_line_opt(max_width, || {
-                let close = |af: &Self| {
-                    self.constraints()
-                        .max_width_for_line
-                        .with_replaced(prev_max_width_for_line, || {
-                            do_pad(af)?;
-                            af.out.token(close_brace)?;
-                            Ok(())
-                        })
-                };
                 if len == 0 {
                     if !rest.is_none() {
-                        self.list_rest(rest, Tail::none())?;
-                        close(self)?;
+                        self.list_rest(rest, &close_tail)?;
                     }
                     return Ok(());
                 };
@@ -60,23 +66,10 @@ impl AstFormatter {
                     self.out.space()?;
                 }
                 // A tail is only necessary with the last item since it may overflow
-                format_item(
-                    last,
-                    &Tail::func(|af| {
-                        if !rest.is_none() || force_trailing_comma {
-                            af.out.token(",")?;
-                        } else {
-                            af.out.skip_token_if_present(",")?;
-                        }
-                        if rest.is_none() {
-                            close(af)?
-                        }
-                        Ok(())
-                    }),
-                )?;
+                format_item(last, &last_tail)?;
                 if !rest.is_none() {
                     self.out.space()?;
-                    self.list_rest(rest, &Tail::func(close))?;
+                    self.list_rest(rest, &close_tail)?;
                 }
                 Ok(())
             })?;
@@ -154,8 +147,9 @@ impl AstFormatter {
         close_brace: &str,
         tail: &Tail,
     ) -> FormatResult {
-        let item_comma =
-            |index| -> FormatResult { format_item(index, &Tail::token_maybe_missing(",")) };
+        let item_comma = |index| -> FormatResult {
+            format_item(index, &self.make_tail(TailKind::TokenMaybeMissing(",")))
+        };
         self.embraced_after_opening(close_brace, || {
             match rest {
                 ListRest::None => {

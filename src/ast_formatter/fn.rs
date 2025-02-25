@@ -87,7 +87,7 @@ impl AstFormatter {
         self.fn_decl(
             fn_decl,
             Braces::PIPE,
-            &Tail::func(|af| {
+            &self.tail_fn(|af| {
                 af.out.space()?;
                 let can_remove_block = matches!(fn_decl.output, ast::FnRetTy::Default(_));
                 af.closure_body(body, can_remove_block, tail)?;
@@ -109,7 +109,7 @@ impl AstFormatter {
                 self.backtrack()
                     .next(|| {
                         self.constraints()
-                            .with_multi_line_shape(MultiLineShape::BlockIndent, || {
+                            .with_multi_line_shape_min(MultiLineShape::BlockIndent, || {
                                 self.expr_tail(body, tail)
                             })
                     })
@@ -185,7 +185,7 @@ impl AstFormatter {
             self.tail(tail)?;
             Ok(())
         };
-        if self.out.constraints().multi_line.get() < MultiLineShape::DisjointIndent {
+        if self.out.constraints().borrow().multi_line < MultiLineShape::DisjointIndent {
             return do_single_line();
         }
         // args and return type all on one line
@@ -242,7 +242,7 @@ impl AstFormatter {
         let tail = if matches!(param.ty.kind, ast::TyKind::Infer) {
             tail
         } else {
-            &Tail::func(colon_ty)
+            &self.tail_fn(colon_ty)
         };
         self.pat_tail(&param.pat, tail)?;
         Ok(())
