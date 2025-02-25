@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::util::tail::{Tail, TailKind};
+use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
@@ -16,13 +16,13 @@ impl AstFormatter {
         self.out.token_space("let")?;
         let Some((init, else_)) = kind.init_else_opt() else {
             let Some(ty) = ty else {
-                self.pat_tail(pat, &self.make_tail(TailKind::Token(";")))?;
+                self.pat_tail(pat, &self.tail_token(";"))?;
                 return Ok(());
             };
             self.pat(pat)?;
             // todo tail?
             self.out.token_space(":")?;
-            self.ty_tail(ty, &self.make_tail(TailKind::Token(";")))?;
+            self.ty_tail(ty, &self.tail_token(";"))?;
             return Ok(());
         };
         self.pat(pat)?;
@@ -33,7 +33,7 @@ impl AstFormatter {
         }
         // else else else lol
         let Some(else_) = else_ else {
-            self.local_init(init, &self.make_tail(TailKind::Token(";")))?;
+            self.local_init(init, &self.tail_token(";"))?;
             return Ok(());
         };
         self.local_init(init, Tail::none())?;
@@ -96,10 +96,9 @@ impl AstFormatter {
                 self.with_single_line(|| {
                     self.out.space()?;
                     self.expr(expr)?;
+                    self.tail(tail)?;
                     Ok(())
-                })?;
-                self.tail(tail)?;
-                Ok(())
+                })
             })
             // todo use lookahead to avoid re-formatting
             // wrap and indent then single line

@@ -24,10 +24,9 @@ impl AstFormatter {
                         self.out.space_token_space(op.as_str())?;
                         self.expr(expr)?;
                     }
+                    self.tail(tail)?;
                     Ok(())
-                })?;
-                self.tail(tail)?;
-                Ok(())
+                })
             })
             .otherwise(|| {
                 self.constraints()

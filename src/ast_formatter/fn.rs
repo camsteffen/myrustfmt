@@ -180,10 +180,9 @@ impl AstFormatter {
             self.with_single_line(|| {
                 params.format_single_line(self)?;
                 self.fn_ret_ty(&fn_decl.output)?;
+                self.tail(tail)?;
                 Ok(())
-            })?;
-            self.tail(tail)?;
-            Ok(())
+            })
         };
         if self.out.constraints().borrow().multi_line < MultiLineShape::DisjointIndent {
             return do_single_line();

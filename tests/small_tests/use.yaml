@@ -4,3 +4,9 @@
     use foo::{ bar };
   after: |
     use foo::bar;
+- name: remove braces and comma from singleton list
+  type: before_after
+  before: |
+    use foo::{ bar, };
+  after: |
+    use foo::bar;

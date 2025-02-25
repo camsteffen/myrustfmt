@@ -68,30 +68,32 @@ impl Deref for OwnedConstraints {
 }
 
 impl OwnedConstraints {
-    pub fn with_modified<T>(
+    pub fn with_replaced_value<V, T>(
         &self,
-        modify: impl FnOnce(&mut Constraints),
+        get: impl Fn(&mut Constraints) -> &mut V,
+        value: V,
         scope: impl FnOnce() -> T,
     ) -> T {
         let mut constraints_ref = self.0.borrow_mut();
-        let mut constraints = Constraints::clone(&constraints_ref);
-        modify(&mut constraints);
-        let old = std::mem::replace(&mut *constraints_ref, Rc::new(constraints));
-        drop(constraints_ref);
-        let out = scope();
-        *self.0.borrow_mut() = old;
-        out
-    }
-
-    pub fn with_replaced<T>(&self, constraints: Rc<Constraints>, scope: impl FnOnce() -> T) -> T {
-        let old = std::mem::replace(&mut *self.0.borrow_mut(), constraints);
-        let out = scope();
-        *self.0.borrow_mut() = old;
-        out
+        if let Some(constraints) = Rc::get_mut(&mut constraints_ref) {
+            let old = std::mem::replace(get(constraints), value);
+            drop(constraints_ref);
+            let out = scope();
+            *get(Rc::get_mut(&mut self.0.borrow_mut()).unwrap()) = old;
+            out
+        } else {
+            let mut constraints = Constraints::clone(&constraints_ref);
+            *get(&mut constraints) = value;
+            let old = std::mem::replace(&mut *constraints_ref, Rc::new(constraints));
+            drop(constraints_ref);
+            let out = scope();
+            *self.0.borrow_mut() = old;
+            out
+        }
     }
 
     pub fn with_max_width<T>(&self, max_width: Option<u32>, scope: impl FnOnce() -> T) -> T {
-        self.with_modified(|c| c.max_width = max_width, scope)
+        self.with_replaced_value(|c| &mut c.max_width, max_width, scope)
     }
 
     pub fn with_max_width_for_line<T>(
@@ -99,7 +101,7 @@ impl OwnedConstraints {
         max_width: Option<MaxWidthForLine>,
         scope: impl FnOnce() -> T,
     ) -> T {
-        self.with_modified(|c| c.max_width_for_line = max_width, scope)
+        self.with_replaced_value(|c| &mut c.max_width_for_line, max_width, scope)
     }
 
     pub fn with_multi_line_shape_min<T>(
@@ -118,7 +120,7 @@ impl OwnedConstraints {
         shape: MultiLineShape,
         scope: impl FnOnce() -> T,
     ) -> T {
-        self.with_modified(|c| c.multi_line = shape, scope)
+        self.with_replaced_value(|c| &mut c.multi_line, shape, scope)
     }
 
     /// Unless the given MultiLineConstraint is applicable, enforce a single-line constraint

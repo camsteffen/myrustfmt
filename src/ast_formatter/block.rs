@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::util::tail::{Tail, TailKind};
+use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{control_flow_expr_kind, plain_block};
 use crate::error::FormatResult;
 use crate::util::whitespace_utils::is_whitespace;
@@ -24,10 +24,10 @@ impl AstFormatter {
                 self.backtrack()
                     .next(|| {
                         self.with_single_line(|| {
-                            self.expr_only_block_after_open_brace(expr_only_block)
-                        })?;
-                        self.tail(tail)?;
-                        Ok(())
+                            self.expr_only_block_after_open_brace(expr_only_block)?;
+                            self.tail(tail)?;
+                            Ok(())
+                        })
                     })
                     .otherwise(|| {
                         self.block_generic_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))?;
@@ -83,14 +83,12 @@ impl AstFormatter {
             ast::StmtKind::Item(item) => self.item(item),
             ast::StmtKind::Expr(expr) => {
                 let tail = match expr.kind {
-                    control_flow_expr_kind!() => &self.make_tail(TailKind::TokenInsert(";")),
+                    control_flow_expr_kind!() => &self.tail_fn(|af| af.out.token_insert(";")),
                     _ => Tail::none(),
                 };
                 self.expr_tail(expr, &tail)
             }
-            ast::StmtKind::Semi(expr) => {
-                self.expr_tail(expr, &self.make_tail(TailKind::Token(";")))
-            }
+            ast::StmtKind::Semi(expr) => self.expr_tail(expr, &self.tail_token(";")),
             ast::StmtKind::Empty => self.out.token(";"),
             ast::StmtKind::MacCall(mac_call_stmt) => {
                 self.with_attrs(&mac_call_stmt.attrs, stmt.span, || {

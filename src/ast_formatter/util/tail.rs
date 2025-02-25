@@ -1,7 +1,8 @@
-use std::rc::Rc;
 use crate::ast_formatter::AstFormatter;
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
+use crate::util::cell_ext::CellExt;
+use std::rc::Rc;
 
 /// A Tail squeezes the code before it leftward to make room for itself.
 ///
@@ -12,31 +13,27 @@ use crate::error::FormatResult;
 ///
 /// A Tail is unaware of its width by design, to avoid error-prone math.
 ///
+/// A Tail captures a snapshot of the Constraints when it is created, and those constraints are
+/// restored when the Tail is rendered.
+///
 /// As a general rule, ONLY add a Tail argument to a function if it affects the formatting strategy.
 pub struct Tail<'a>(Option<TailImpl<'a>>);
 
 struct TailImpl<'a> {
     constraints: Rc<Constraints>,
-    kind: TailKind<'a>,
-}
-
-pub enum TailKind<'a> {
-    Fn(Box<dyn Fn(&AstFormatter) -> FormatResult + 'a>),
-    Token(&'static str),
-    TokenInsert(&'static str),
-    TokenMaybeMissing(&'static str),
+    func: Box<dyn Fn(&AstFormatter) -> FormatResult + 'a>,
 }
 
 impl AstFormatter {
-    pub fn make_tail<'a>(&self, kind: TailKind<'a>) -> Tail<'a> {
+    pub fn tail_fn<'a>(&self, tail: impl Fn(&AstFormatter) -> FormatResult + 'a) -> Tail<'a> {
         Tail(Some(TailImpl {
             constraints: Rc::clone(&self.constraints().borrow()),
-            kind,
+            func: Box::new(tail),
         }))
     }
 
-    pub fn tail_fn<'a>(&self, tail: impl Fn(&AstFormatter) -> FormatResult + 'a) -> Tail<'a> {
-        self.make_tail(TailKind::Fn(Box::new(tail)))
+    pub fn tail_token<'a>(&self, token: &'static str) -> Tail<'a> {
+        self.tail_fn(|af| af.out.token(token))
     }
 }
 
@@ -47,18 +44,11 @@ impl<'a> Tail<'a> {
 }
 
 impl AstFormatter {
-    // todo audit the following:
-    /// N.B. When in doubt, call this function *after* the end of a constraint scope.
-    /// For example, if an expression is formatted with a single-line constraint, the tail does not
-    /// also need to be single-line.
     pub fn tail(&self, tail: &Tail) -> FormatResult {
-        let Some(tail) = &tail.0 else { return Ok(()) };
-        self.constraints()
-            .with_replaced(Rc::clone(&tail.constraints), || match tail.kind {
-                TailKind::Fn(ref f) => f(self),
-                TailKind::Token(token) => self.out.token(token),
-                TailKind::TokenInsert(token) => self.out.token_insert(token),
-                TailKind::TokenMaybeMissing(token) => self.out.token_maybe_missing(token),
-            })
+        if let Some(tail) = &tail.0 {
+            self.constraints()
+                .with_replaced(Rc::clone(&tail.constraints), || (tail.func)(self))?
+        }
+        Ok(())
     }
 }

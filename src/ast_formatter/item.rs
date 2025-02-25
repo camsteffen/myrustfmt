@@ -5,7 +5,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::builder::list;
 use crate::ast_formatter::list::list_config::{ListConfig, ListWrapToFitConfig};
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext};
-use crate::ast_formatter::util::tail::{Tail, TailKind};
+use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
@@ -40,7 +40,7 @@ impl AstFormatter {
             }
             ast::ItemKind::Use(use_tree) => {
                 self.out.token_space("use")?;
-                self.use_tree(use_tree, &self.make_tail(TailKind::Token(";")))?;
+                self.use_tree(use_tree, &self.tail_token(";"))?;
             }
             ast::ItemKind::Static(static_item) => {
                 self.out.token_space("static")?;
@@ -127,12 +127,12 @@ impl AstFormatter {
         self.ident(ident)?;
         self.out.token_space(":")?;
         let Some(expr) = &const_item.expr else {
-            self.ty_tail(&const_item.ty, &self.make_tail(TailKind::Token(";")))?;
+            self.ty_tail(&const_item.ty, &self.tail_token(";"))?;
             return Ok(());
         };
         self.ty(&const_item.ty)?;
         self.out.space_token_space("=")?;
-        self.expr_tail(expr, &self.make_tail(TailKind::Token(";")))?;
+        self.expr_tail(expr, &self.tail_token(";"))?;
         Ok(())
     }
 
@@ -345,6 +345,7 @@ impl AstFormatter {
                     self.use_tree(
                         item,
                         &self.tail_fn(|af| {
+                            af.out.skip_token_if_present(",")?;
                             af.out.skip_token("}")?;
                             af.tail(tail)?;
                             Ok(())

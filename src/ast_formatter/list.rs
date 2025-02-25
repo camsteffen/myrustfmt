@@ -11,7 +11,7 @@ pub use list_item_context::{ListItemContext, ListStrategy};
 pub use rest::ListRest;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::util::tail::{Tail, TailKind};
+use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 
 impl AstFormatter {
@@ -39,7 +39,7 @@ impl AstFormatter {
                 af.out.token(close_brace)?;
                 Ok(())
             };
-            // N.B. tails created outside of width limit
+            // N.B. tails are created outside of width limit
             let close_tail = self.tail_fn(close);
             let last_tail = self.tail_fn(|af| {
                 if !rest.is_none() || force_trailing_comma {
@@ -147,9 +147,8 @@ impl AstFormatter {
         close_brace: &str,
         tail: &Tail,
     ) -> FormatResult {
-        let item_comma = |index| -> FormatResult {
-            format_item(index, &self.make_tail(TailKind::TokenMaybeMissing(",")))
-        };
+        let comma = self.tail_fn(|af| af.out.token_maybe_missing(","));
+        let item_comma = |index| format_item(index, &comma);
         self.embraced_after_opening(close_brace, || {
             match rest {
                 ListRest::None => {

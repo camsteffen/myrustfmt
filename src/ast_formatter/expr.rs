@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext, ListStrategy};
-use crate::ast_formatter::util::tail::{Tail, TailKind};
+use crate::ast_formatter::util::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
@@ -339,7 +339,7 @@ impl AstFormatter {
 
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
         let first_line = self.out.line();
-        self.expr_tail(func, &self.make_tail(TailKind::Token("(")))?;
+        self.expr_tail(func, &self.tail_token("("))?;
         let is_multi_line_func = self.out.line() != first_line;
         self.constraints().with_single_line_unless_opt(
             is_multi_line_func.then_some(MultiLineShape::DisjointIndent),

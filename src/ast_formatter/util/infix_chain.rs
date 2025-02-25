@@ -20,10 +20,9 @@ impl AstFormatter {
                         self.out.space_token_space(token)?;
                         format_item(item)?;
                     }
+                    self.tail(tail)?;
                     Ok(())
-                })?;
-                self.tail(tail)?;
-                Ok(())
+                })
             })
             .otherwise(|| {
                 format_item(first)?;
