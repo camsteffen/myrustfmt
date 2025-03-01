@@ -139,24 +139,24 @@ impl SourceFormatter {
     }
 
     pub fn newline_above(&self) -> FormatResult {
-        self.newline(VerticalWhitespaceMode::Above)
+        self.newline(VerticalWhitespaceMode::Top)
     }
 
     pub fn newline_below(&self) -> FormatResult {
-        self.newline(VerticalWhitespaceMode::Below)
+        self.newline(VerticalWhitespaceMode::Bottom)
     }
 
     pub fn newline_within(&self) -> FormatResult {
-        self.newline(VerticalWhitespaceMode::Within)
+        self.newline(VerticalWhitespaceMode::Break)
     }
 
     pub fn newline_within_indent(&self) -> FormatResult {
-        self.newline_indent(VerticalWhitespaceMode::Within)
+        self.newline_indent(VerticalWhitespaceMode::Break)
     }
 
     pub fn newline_above_if_comments(&self) -> FormatResult {
         self.handle_whitespace_and_comments(WhitespaceMode::Flexible {
-            vertical_mode: VerticalWhitespaceMode::Above,
+            vertical_mode: VerticalWhitespaceMode::Top,
             space_if_horizontal: false,
         })
     }
@@ -174,7 +174,7 @@ impl SourceFormatter {
             }
         }
         self.handle_whitespace_and_comments(WhitespaceMode::Flexible {
-            vertical_mode: VerticalWhitespaceMode::Within,
+            vertical_mode: VerticalWhitespaceMode::Break,
             space_if_horizontal: false,
         })
     }
@@ -242,7 +242,7 @@ impl SourceFormatter {
     // todo maybe this is always worse than backtrack
     pub fn space_or_newline(&self) -> FormatResult {
         self.handle_whitespace_and_comments(WhitespaceMode::Flexible {
-            vertical_mode: VerticalWhitespaceMode::Within,
+            vertical_mode: VerticalWhitespaceMode::Break,
             space_if_horizontal: true,
         })?;
         Ok(())
