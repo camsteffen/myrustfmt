@@ -139,21 +139,20 @@ impl SourceFormatter {
 
 /// Tokenize whitespace and comment tokens. Stop upon encountering anything else.
 fn tokenize(source: &str) -> impl Iterator<Item = (Token, &str)> {
-    let mut tokens = rustc_lexer::tokenize(source);
-    let mut remaining = source;
+    let mut cursor = rustc_lexer::Cursor::new(source);
     std::iter::from_fn(move || {
+        let remaining = cursor.as_str();
         let next_char = remaining.chars().next();
         if !next_char.is_some_and(|c| c == '/' || rustc_lexer::is_whitespace(c)) {
-            // save the rustc tokenizer from parsing something we don't care about
+            // optimization: don't parse some token we don't care about
             return None;
         }
-        let token = tokens.next()?;
+        let token = cursor.advance_token();
         match token.kind {
             TokenKind::BlockComment { .. }
             | TokenKind::LineComment { .. }
             | TokenKind::Whitespace => {
-                let token_str;
-                (token_str, remaining) = remaining.split_at(token.len as usize);
+                let token_str = &remaining[..token.len as usize];
                 Some((token, token_str))
             }
             _ => None,
