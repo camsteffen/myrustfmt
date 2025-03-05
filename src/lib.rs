@@ -2,7 +2,7 @@
 
 #![warn(clippy::uninlined_format_args)]
 
-#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::bool_assert_comparison, clippy::missing_errors_doc)]
 
 // these crates are loaded from the sysroot, so they need extern crate.
 extern crate rustc_ast;

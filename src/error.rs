@@ -122,7 +122,7 @@ impl FormatError {
                             next_token(f)?;
                         }
                         ParseErrorKind::ExpectedToken(ref token) => {
-                            write!(f, "expected token: `{}`", token)?;
+                            write!(f, "expected token: `{token}`")?;
                             next_token(f)?;
                         }
                         ParseErrorKind::UnsupportedSyntax => {
@@ -133,10 +133,10 @@ impl FormatError {
                 }
             };
             if cfg!(debug_assertions) {
-                write!(f, "\nSource:\n{}", source)?;
+                write!(f, "\nSource:\n{source}")?;
             }
             if let Some(backtrace) = backtrace {
-                write!(f, "\n{}", backtrace)?;
+                write!(f, "\n{backtrace}")?;
             }
             Ok(())
         })
