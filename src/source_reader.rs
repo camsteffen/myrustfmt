@@ -29,8 +29,8 @@ impl SourceReader {
         }
     }
 
-    pub fn advance(&self, len: usize) {
-        self.pos.set(self.pos.get() + BytePos::from_usize(len));
+    pub fn advance(&self, len: u32) {
+        self.pos.set(self.pos.get() + BytePos::from_u32(len));
     }
 
     pub fn expect_pos(&self, pos: BytePos) -> ParseResult {
@@ -56,14 +56,14 @@ impl SourceReader {
         if !self.remaining().starts_with(token) {
             return false;
         }
-        self.advance(token.len());
+        self.advance(token.len().try_into().unwrap());
         true
     }
 
     pub fn eat_next_token(&self) -> &str {
         let token = self.next_token();
-        self.advance(token.len as usize);
-        &self.remaining()[..token.len as usize]
+        self.advance(token.len);
+        &self.remaining()[..token.len.try_into().unwrap()]
     }
 
     fn next_token(&self) -> rustc_lexer::Token {

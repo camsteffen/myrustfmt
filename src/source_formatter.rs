@@ -100,7 +100,7 @@ impl SourceFormatter {
 
     // todo make sure any math using two values of this are guaranteed to be on the same line
     pub fn last_line_len(&self) -> u32 {
-        self.out.last_line_len() as u32
+        self.out.last_line_len()
     }
 
     pub fn len(&self) -> usize {
@@ -192,7 +192,7 @@ impl SourceFormatter {
             self.handle_whitespace_and_comments(WhitespaceMode::Horizontal { space: false });
         if self.source.remaining().starts_with(token) {
             ws_result?;
-            self.source.advance(token.len());
+            self.source.advance(token.len().try_into().unwrap());
             Ok(true)
         } else {
             self.restore_checkpoint(&checkpoint);
@@ -300,11 +300,11 @@ impl SourceFormatter {
     }
 
     pub fn indent(&self) {
-        self.out.spaces(self.indent.get() as usize);
+        self.out.spaces(self.indent.get());
     }
 
-    fn copy(&self, len: usize) -> FormatResult {
-        let segment = &self.source.remaining()[..len];
+    fn copy(&self, len: u32) -> FormatResult {
+        let segment = &self.source.remaining()[..len.try_into().unwrap()];
         self.out.write_possibly_multiline(segment)?;
         self.source.advance(len);
         Ok(())
@@ -313,24 +313,24 @@ impl SourceFormatter {
     pub fn copy_span(&self, span: Span) -> FormatResult {
         self.horizontal_whitespace_only()?;
         self.source.expect_pos(span.lo())?;
-        self.copy(span.hi().to_usize() - span.lo().to_usize())?;
+        self.copy(span.hi().to_u32() - span.lo().to_u32())?;
         Ok(())
     }
 
     pub fn copy_to(&self, pos: BytePos) -> FormatResult {
-        self.copy(pos.to_usize() - self.source.pos.get().to_usize())
+        self.copy(pos.to_u32() - self.source.pos.get().to_u32())
     }
 
     /** Write a token assuming it is next in source */
     fn token_unchecked(&self, token: &str) -> FormatResult {
         self.out.token(&token)?;
-        self.source.advance(token.len());
+        self.source.advance(token.len().try_into().unwrap());
         Ok(())
     }
 
     pub fn last_line_is_closers(&self) -> bool {
         self.with_last_line(|line| {
-            let after_indent = &line[self.indent.get() as usize..];
+            let after_indent = &line[self.indent.get().try_into().unwrap()..];
             after_indent.chars().all(is_closer_char)
         })
     }

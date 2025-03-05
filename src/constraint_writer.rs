@@ -191,8 +191,8 @@ impl ConstraintWriter {
         Ok(())
     }
 
-    pub fn spaces(&self, count: usize) {
-        self.buffer.with_taken(|b| b.extend(std::iter::repeat_n(' ', count)));
+    pub fn spaces(&self, count: u32) {
+        self.buffer.with_taken(|b| b.extend((0..count).map(|_| ' ')));
     }
 
     pub fn check_width_constraints(&self) -> Result<(), WidthLimitExceededError> {
@@ -228,7 +228,7 @@ impl ConstraintWriter {
     pub fn remaining_width(&self) -> Option<Result<u32, WidthLimitExceededError>> {
         self.max_width().map(|max_width| {
             max_width
-                .checked_sub(self.last_line_len() as u32)
+                .checked_sub(self.last_line_len().try_into().unwrap())
                 .ok_or(WidthLimitExceededError)
         })
     }
@@ -237,8 +237,10 @@ impl ConstraintWriter {
         self.buffer.with_taken(|b| f(&b[self.last_line_start.get()..]))
     }
 
-    pub fn last_line_len(&self) -> usize {
-        self.len() - self.last_line_start.get()
+    pub fn last_line_len(&self) -> u32 {
+        (self.len() - self.last_line_start.get())
+            .try_into()
+            .unwrap()
     }
 
     // for debugging

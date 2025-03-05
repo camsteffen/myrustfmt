@@ -39,14 +39,9 @@ pub enum VerticalWhitespaceMode {
 #[derive(Debug)]
 enum WhitespaceTokenStrategy {
     /// Coerce into horizontal space
-    Horizontal {
-        error_on_newline: bool,
-        space: bool,
-    },
+    Horizontal { error_on_newline: bool, space: bool },
     /// Coerce into vertical space
-    Vertical {
-        allow_blank_line: bool,
-    },
+    Vertical { allow_blank_line: bool },
     /// Emit horizontal space by default, but preserve newlines by comments
     Flexible {
         space_if_horizontal: bool,
@@ -60,7 +55,7 @@ enum WhitespaceOutput {
     EmitNewline { double: bool, indent: bool },
     EmitSpace,
     LineCommentNotAllowed,
-    NewlineNotAllowed { distance: usize },
+    NewlineNotAllowed { distance: u32 },
 }
 
 impl VerticalWhitespaceMode {
@@ -77,17 +72,16 @@ impl VerticalWhitespaceMode {
 impl SourceFormatter {
     pub fn handle_whitespace_and_comments(&self, mode: WhitespaceMode) -> FormatResult {
         let mut is_required_whitespace_emitted = false;
-        let tokens = tokenize(self.source.remaining());
-        let outputs = outputs_from_tokens(tokens, mode);
+        let source = self.source.remaining();
+        let tokens = tokenize(source);
+        let outputs = outputs_from_tokens(tokens, mode, source);
         for (output, len) in outputs {
             match output {
                 WhitespaceOutput::CopyComment => {
-                    self
-                        .constraints()
-                        .with_max_width(None, || self.copy(len as usize))?;
-                },
+                    self.constraints().with_max_width(None, || self.copy(len))?;
+                }
                 WhitespaceOutput::EmitNewline { double, indent } => {
-                    self.source.advance(len as usize);
+                    self.source.advance(len);
                     self.out.newline()?;
                     if double {
                         self.out.newline()?;
@@ -98,7 +92,7 @@ impl SourceFormatter {
                     is_required_whitespace_emitted = true;
                 }
                 WhitespaceOutput::EmitSpace => {
-                    self.source.advance(len as usize);
+                    self.source.advance(len);
                     self.out.token(" ")?;
                     match mode {
                         WhitespaceMode::Horizontal { .. } | WhitespaceMode::Flexible { .. } => {
@@ -108,7 +102,7 @@ impl SourceFormatter {
                     }
                 }
                 WhitespaceOutput::Nothing => {
-                    self.source.advance(len as usize);
+                    self.source.advance(len);
                 }
                 WhitespaceOutput::NewlineNotAllowed { distance } => {
                     self.source.advance(distance);
@@ -138,7 +132,7 @@ impl SourceFormatter {
 }
 
 /// Tokenize whitespace and comment tokens. Stop upon encountering anything else.
-fn tokenize(source: &str) -> impl Iterator<Item = (Token, &str)> {
+fn tokenize(source: &str) -> impl Iterator<Item = Token> {
     let mut cursor = rustc_lexer::Cursor::new(source);
     std::iter::from_fn(move || {
         let remaining = cursor.as_str();
@@ -151,32 +145,39 @@ fn tokenize(source: &str) -> impl Iterator<Item = (Token, &str)> {
         match token.kind {
             TokenKind::BlockComment { .. }
             | TokenKind::LineComment { .. }
-            | TokenKind::Whitespace => {
-                let token_str = &remaining[..token.len as usize];
-                Some((token, token_str))
-            }
+            | TokenKind::Whitespace => Some(token),
             _ => None,
         }
     })
 }
 
 /// Iterate over tokens and decide what to output
-fn outputs_from_tokens<'a, 'b>(
-    tokens: impl Iterator<Item = (Token, &'a str)> + 'b,
+fn outputs_from_tokens<'a>(
+    tokens: impl Iterator<Item = Token> + 'a,
     mode: WhitespaceMode,
-) -> impl Iterator<Item = (WhitespaceOutput, u32)> + 'b {
+    source: &'a str,
+) -> impl Iterator<Item = (WhitespaceOutput, u32)> + 'a {
     let mut tokens = tokens.peekable();
     let mut seen_comments = false;
     let mut last_is_line_comment = false;
+    let mut remaining = source;
     std::iter::from_fn(move || {
-        let Some((token, token_str)) = tokens.next() else {
+        let Some(token) = tokens.next() else {
             if last_is_line_comment {
                 last_is_line_comment = false;
                 // add trailing newline
-                return Some((WhitespaceOutput::EmitNewline {double: false, indent: false}, 0));
+                return Some((
+                    WhitespaceOutput::EmitNewline {
+                        double: false,
+                        indent: false,
+                    },
+                    0,
+                ));
             }
-            return None
+            return None;
         };
+        let token_str;
+        (token_str, remaining) = remaining.split_at(token.len.try_into().unwrap());
         let (is_comment, is_line_comment) = match token.kind {
             TokenKind::LineComment { .. } => (true, true),
             TokenKind::BlockComment { .. } => (true, false),
@@ -190,7 +191,7 @@ fn outputs_from_tokens<'a, 'b>(
         } else {
             let is_comments_after = tokens.peek().is_some();
             let strategy = whitespace_token_strategy(mode, seen_comments, is_comments_after);
-            whitespace_token_action(token_str, strategy, is_comments_after)
+            whitespace_token_action(token_str, token.len, strategy, is_comments_after)
         };
         seen_comments |= is_comment;
         last_is_line_comment = is_line_comment;
@@ -245,6 +246,7 @@ fn whitespace_token_strategy(
 /// Finally decides what to do with a whitespace token
 fn whitespace_token_action(
     token_str: &str,
+    token_len: u32,
     strategy: WhitespaceTokenStrategy,
     is_comments_after: bool,
 ) -> WhitespaceOutput {
@@ -255,9 +257,10 @@ fn whitespace_token_action(
         } => {
             if error_on_newline {
                 if let Some(newline_pos) = token_str.find('\n') {
-                    return WhitespaceOutput::NewlineNotAllowed {
-                        distance: newline_pos,
-                    };
+                    // since token_len is u32, newline_pos is bound by u32
+                    let _: u32 = token_len;
+                    let distance = u32::try_from(newline_pos).unwrap();
+                    return WhitespaceOutput::NewlineNotAllowed { distance };
                 }
             }
             if !space {

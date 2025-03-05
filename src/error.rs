@@ -88,7 +88,7 @@ impl FormatError {
             let next_token = |f: &mut Formatter<'_>| {
                 let remaining = &source[pos..];
                 if let Some(token) = rustc_lexer::tokenize(remaining).next() {
-                    let token_str = &remaining[..token.len as usize];
+                    let token_str = &remaining[..token.len.try_into().unwrap()];
                     write!(f, ". Next token is `{token_str}`")?;
                 } else {
                     write!(f, ". Reached end of file")?;
