@@ -1,8 +1,14 @@
 #![feature(rustc_private)]
-
-#![warn(clippy::uninlined_format_args)]
-
-#![allow(clippy::bool_assert_comparison, clippy::missing_errors_doc)]
+// Uncomment to let clippy babble (with some overrides made below)
+// #![warn(clippy::pedantic)]
+#![warn(clippy::inconsistent_struct_constructor, clippy::uninlined_format_args, clippy::unnecessary_semicolon)]
+#![allow(
+    clippy::bool_assert_comparison,
+    clippy::from_iter_instead_of_collect,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::must_use_candidate
+)]
 
 // these crates are loaded from the sysroot, so they need extern crate.
 extern crate rustc_ast;

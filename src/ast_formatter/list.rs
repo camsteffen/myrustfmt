@@ -58,7 +58,7 @@ impl AstFormatter {
                         self.list_rest(rest, &close_tail)?;
                     }
                     return Ok(());
-                };
+                }
                 let (until_last, last) = (0..(len - 1), len - 1);
                 for index in until_last {
                     format_item(index, Tail::none())?;

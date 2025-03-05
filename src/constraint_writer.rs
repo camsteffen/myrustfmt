@@ -35,8 +35,8 @@ pub struct ConstraintWriterSelfCheckpoint {
 }
 
 pub struct ConstraintWriterLookahead {
-    checkpoint: ConstraintWriterSelfCheckpoint,
     buf_segment: String,
+    checkpoint: ConstraintWriterSelfCheckpoint,
 }
 
 pub struct ConstraintWriterResult {
