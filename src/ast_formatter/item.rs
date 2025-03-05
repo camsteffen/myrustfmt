@@ -64,7 +64,7 @@ impl AstFormatter {
                         self.out.space()?;
                         self.block_generic(items, |item| self.item(item))?;
                     }
-                    ast::ModKind::Loaded(_, ast::Inline::No, _, ..) | ast::ModKind::Unloaded => {
+                    ast::ModKind::Loaded(_, ast::Inline::No, ..) | ast::ModKind::Unloaded => {
                         self.out.token(";")?;
                     }
                 }

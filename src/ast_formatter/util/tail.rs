@@ -37,7 +37,7 @@ impl AstFormatter {
     }
 }
 
-impl<'a> Tail<'a> {
+impl Tail<'_> {
     pub const fn none() -> &'static Tail<'static> {
         const { &Tail(None) }
     }

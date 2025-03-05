@@ -91,10 +91,10 @@ fn build_diag_ctxt(source_map: Arc<SourceMap>) -> DiagCtxt {
 fn build_parser<'a>(psess: &'a ParseSess, source: CrateSource) -> Parser<'a> {
     let parser = match source {
         // todo provide span when the file is found from a mod
-        CrateSource::File(path) => rustc_parse::new_parser_from_file(psess, &path, None),
+        CrateSource::File(path) => rustc_parse::new_parser_from_file(psess, path, None),
         CrateSource::Source(source) => rustc_parse::new_parser_from_source_str(
             psess,
-            FileName::anon_source_code(&source),
+            FileName::anon_source_code(source),
             source.to_owned(),
         ),
     };

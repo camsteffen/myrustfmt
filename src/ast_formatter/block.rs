@@ -86,7 +86,7 @@ impl AstFormatter {
                     control_flow_expr_kind!() => &self.tail_fn(|af| af.out.token_insert(";")),
                     _ => Tail::none(),
                 };
-                self.expr_tail(expr, &tail)
+                self.expr_tail(expr, tail)
             }
             ast::StmtKind::Semi(expr) => self.expr_tail(expr, &self.tail_token(";")),
             ast::StmtKind::Empty => self.out.token(";"),

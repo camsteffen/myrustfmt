@@ -204,7 +204,7 @@ impl SourceFormatter {
     pub fn copy_next_token(&self) -> FormatResult {
         self.horizontal_whitespace_only()?;
         let token = self.source.eat_next_token();
-        self.out.token(&token)?;
+        self.out.token(token)?;
         Ok(())
     }
 
@@ -222,13 +222,13 @@ impl SourceFormatter {
     pub fn token(&self, token: &str) -> FormatResult {
         self.horizontal_whitespace_only()?;
         self.source.eat(token)?;
-        self.out.token(&token)?;
+        self.out.token(token)?;
         Ok(())
     }
 
     /// Inserts a token without consuming it from source
     pub fn token_insert(&self, token: &str) -> FormatResult {
-        self.out.token(&token)?;
+        self.out.token(token)?;
         Ok(())
     }
 
@@ -323,7 +323,7 @@ impl SourceFormatter {
 
     /** Write a token assuming it is next in source */
     fn token_unchecked(&self, token: &str) -> FormatResult {
-        self.out.token(&token)?;
+        self.out.token(token)?;
         self.source.advance(token.len().try_into().unwrap());
         Ok(())
     }

@@ -93,7 +93,7 @@ fn expect_formatted_equals(formatted: &str, expected: &str, name: &str) -> TestR
     if formatted == expected {
         return Ok(());
     }
-    for line in diff::lines(expected, &formatted) {
+    for line in diff::lines(expected, formatted) {
         match line {
             diff::Result::Left(s) => println!("- {s}"),
             diff::Result::Right(s) => println!("+ {s}"),

@@ -6,14 +6,14 @@ impl AstFormatter {
     // todo should backtrack be specific to a constraint? unless_too_wide(..).otherwise(..)
     pub fn backtrack<T>(&self) -> Backtrack<T> {
         Backtrack {
-            af: &self,
+            af: self,
             state: BacktrackState::Init,
         }
     }
 
     pub fn backtrack_from_checkpoint<T>(&self, checkpoint: Checkpoint) -> Backtrack<T> {
         Backtrack {
-            af: &self,
+            af: self,
             state: BacktrackState::Incomplete(checkpoint),
         }
     }

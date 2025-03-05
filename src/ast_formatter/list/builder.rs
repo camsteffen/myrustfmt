@@ -66,7 +66,7 @@ pub fn list<'ast, 'tail, Item>(
         list,
         rest: ListRest::None,
         format_item: format_list_item_from_fn(format_item),
-        tail: &Tail::none(),
+        tail: Tail::none(),
         config: DefaultListConfig,
         item_config: DefaultListItemConfig::default(),
         omit_open_brace: false,
