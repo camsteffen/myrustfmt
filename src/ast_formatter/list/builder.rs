@@ -89,7 +89,7 @@ pub struct ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfig> {
     single_line_max_contents_width: Option<u32>,
 }
 
-impl<'a, 'ast, 'tail, Item, FormatItem, Config, ItemConfig>
+impl<'ast, 'tail, Item, FormatItem, Config, ItemConfig>
     ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfig>
 where
     Config: ListConfig,

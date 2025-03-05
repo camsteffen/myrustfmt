@@ -1,5 +1,9 @@
 #![feature(rustc_private)]
 
+#![warn(clippy::uninlined_format_args)]
+
+#![allow(clippy::missing_errors_doc)]
+
 // these crates are loaded from the sysroot, so they need extern crate.
 extern crate rustc_ast;
 // extern crate rustc_ast_pretty;
@@ -139,7 +143,7 @@ pub fn format_module_file_roots(
         };
         while let Some((path, relative)) = queue.pop_front() {
             let submodules =
-                format_module_file(&path, relative, Rc::clone(&config), &mut on_format_module)?;
+                format_module_file(&path, relative, &config, &mut on_format_module)?;
             queue.extend(
                 submodules
                     .into_iter()
@@ -156,7 +160,7 @@ pub fn format_module_file_roots(
 fn format_module_file(
     path: &Path,
     relative: Option<Ident>,
-    config: Rc<Config>,
+    config: &Config,
     on_format_module: &mut OnFormatModule,
 ) -> Result<Vec<Submodule>, ()> {
     let result = parse_module(CrateSource::File(path), relative)
@@ -193,7 +197,7 @@ pub fn format_str_config(
             source,
             submodules: _,
         } = parse_module(CrateSource::Source(source), None)?;
-        let ast_formatter = AstFormatter::new(Rc::new(source), None, Rc::new(config));
+        let ast_formatter = AstFormatter::new(Rc::new(source), None, &config);
         Ok(ast_formatter.module(&module))
     })
 }

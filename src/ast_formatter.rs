@@ -50,7 +50,7 @@ impl FormatModuleResult {
 }
 
 impl AstFormatter {
-    pub fn new(source: Rc<String>, path: Option<PathBuf>, config: Rc<Config>) -> Self {
+    pub fn new(source: Rc<String>, path: Option<PathBuf>, config: &Config) -> Self {
         let constraints =
             OwnedConstraints(RefCell::new(Rc::new(Constraints::new(config.max_width))));
         let error_emitter = Rc::new(ErrorEmitter::new(path));

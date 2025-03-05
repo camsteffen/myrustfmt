@@ -88,8 +88,8 @@ impl SourceFormatter {
         let source_pos = self.source.pos.get();
         self.source.pos.set(from.source_pos);
         SourceFormatterLookahead {
-            writer_lookahead,
             source_pos,
+            writer_lookahead,
         }
     }
 
