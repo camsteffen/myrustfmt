@@ -4,6 +4,7 @@ use crate::error::{FormatError, FormatResult};
 
 impl AstFormatter {
     // todo should backtrack be specific to a constraint? unless_too_wide(..).otherwise(..)
+    /// See [`Backtrack`]
     pub fn backtrack<T>(&self) -> Backtrack<T> {
         Backtrack {
             af: self,
@@ -25,8 +26,6 @@ impl AstFormatter {
 /// is chained with `otherwise`. If a strategy fails with a constraint error, it will restore a
 /// checkpoint before running the next strategy. If a strategy succeeds, it will hold the result
 /// until the end, and all subsequent strategies will be ignored.
-///
-/// A checkpoint is created lazily to optimize for when only one strategy is given.
 ///
 /// Backtrack is a higher abstraction than using Checkpoint directly, and should be preferred for
 /// simple cases since it ensures that the Checkpoint is dropped at the right time.

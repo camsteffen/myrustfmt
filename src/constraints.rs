@@ -1,6 +1,7 @@
+use std::backtrace::Backtrace;
 use crate::config::Config;
 use crate::error::FormatResult;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -46,12 +47,36 @@ pub enum MultiLineShape {
 ///
 /// Using an Rc does make the implementation a bit precarious, but it seems less error-prone than
 /// having to manually decrement the count at many early return sites.
-#[derive(Clone, Debug, Default)]
-pub struct CheckpointCounter(Rc<()>);
+#[derive(Default)]
+pub struct CheckpointCounter {
+    count: Cell<u32>,
+    #[cfg(debug_assertions)]
+    backtrace: RefCell<Option<Box<Backtrace>>>,
+}
 
 impl CheckpointCounter {
-    pub fn count(&self) -> usize {
-        Rc::strong_count(&self.0) - 1
+    pub fn count(&self) -> u32 {
+        self.count.get()
+    }
+
+    pub fn increment(&self) {
+        #[cfg(debug_assertions)]
+        if self.count.get() == 0 {
+            self.backtrace.replace(Some(Box::new(Backtrace::capture())));
+        }
+        self.count.set(self.count.get() + 1);
+    }
+
+    pub fn decrement(&self) {
+        self.count.set(self.count.get() - 1);
+        #[cfg(debug_assertions)]
+        if self.count.get() == 0 {
+            self.backtrace.replace(None);
+        }
+    }
+
+    pub fn take_backtrace(&self) -> Option<Box<Backtrace>> {
+        self.backtrace.borrow_mut().take()
     }
 }
 

@@ -14,7 +14,7 @@ fn test() {
     assert_eq!(
         format_str_config(source, Config::default())
             .unwrap()
-            .expect_not_exceeded_max_width(),
+            .expect_no_errors(),
         r#"
 fn test() {
     asdfasddfasdf(asdfasdfasdfasdfasdfasasfasfasdfasdfafasdfasdfasdfadfa, || {
@@ -37,7 +37,7 @@ fn test() {
     assert_eq!(
         format_str_config(source, Config::default())
             .unwrap()
-            .expect_not_exceeded_max_width(),
+            .expect_no_errors(),
         r#"
 fn test() {
     let has_nested = items

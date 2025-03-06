@@ -1,18 +1,17 @@
-use crate::ast_formatter::FormatModuleResult;
 use crate::constraints::{CheckpointCounter, Constraints, MultiLineShape, OwnedConstraints};
-use crate::error::{ConstraintError, NewlineNotAllowedError, WidthLimitExceededError};
+use crate::error::{
+    ConstraintError, ConstraintErrorKind, NewlineNotAllowedError, WidthLimitExceededError,
+};
 use crate::error_emitter::ErrorEmitter;
 use crate::util::cell_ext::CellExt;
 use std::cell::Cell;
 use std::rc::Rc;
 
 pub struct ConstraintWriter {
-    checkpoint_counter: CheckpointCounter,
+    checkpoint_counter: Rc<CheckpointCounter>,
     constraints: OwnedConstraints,
     buffer: Cell<String>,
     error_emitter: Rc<ErrorEmitter>,
-    /// True if max width was ever exceeded (and there was no fallback)
-    exceeded_max_width: Cell<bool>,
     last_line_start: Cell<usize>,
     last_width_exceeded_line: Cell<Option<u32>>,
     line: Cell<u32>,
@@ -29,7 +28,7 @@ pub struct ConstraintWriterSelfCheckpoint {
     last_line_start: usize,
     last_width_exceeded_line: Option<u32>,
     #[cfg(debug_assertions)]
-    checkpoint_count: usize,
+    checkpoint_count: u32,
     #[cfg(debug_assertions)]
     constraints: Rc<Constraints>,
 }
@@ -51,25 +50,21 @@ impl ConstraintWriter {
         capacity: usize,
     ) -> ConstraintWriter {
         ConstraintWriter {
-            checkpoint_counter: CheckpointCounter::default(),
+            checkpoint_counter: Rc::new(CheckpointCounter::default()),
             constraints,
             buffer: Cell::new(String::with_capacity(capacity)),
             error_emitter,
-            exceeded_max_width: Cell::new(false),
             last_line_start: Cell::new(0),
             last_width_exceeded_line: Cell::new(None),
             line: Cell::new(0),
         }
     }
 
-    pub fn finish(self) -> FormatModuleResult {
-        FormatModuleResult {
-            formatted: self.buffer.into_inner(),
-            exceeded_max_width: self.exceeded_max_width.get(),
-        }
+    pub fn finish(self) -> String {
+        self.buffer.into_inner()
     }
 
-    pub fn checkpoint_counter(&self) -> &CheckpointCounter {
+    pub fn checkpoint_counter(&self) -> &Rc<CheckpointCounter> {
         &self.checkpoint_counter
     }
 
@@ -102,8 +97,6 @@ impl ConstraintWriter {
             constraints: _,
             buffer: _,
             error_emitter: _,
-            // exceeded_max_width should only be changed when there is no fallback
-            exceeded_max_width: _,
             ref last_line_start,
             ref last_width_exceeded_line,
             ref line,
@@ -164,7 +157,7 @@ impl ConstraintWriter {
         self.restore_self_checkpoint(&lookahead.checkpoint);
     }
 
-    pub fn token(&self, token: &str) -> Result<(), WidthLimitExceededError> {
+    pub fn token(&self, token: &str) -> Result<(), ConstraintError> {
         self.buffer.with_taken(|b| b.push_str(token));
         self.check_width_constraints()
     }
@@ -195,24 +188,27 @@ impl ConstraintWriter {
         self.buffer.with_taken(|b| b.extend((0..count).map(|_| ' ')));
     }
 
-    pub fn check_width_constraints(&self) -> Result<(), WidthLimitExceededError> {
-        match self.remaining_width() {
-            None | Some(Ok(_)) => Ok(()),
-            Some(Err(WidthLimitExceededError { .. })) => {
-                if self.checkpoint_counter.count() > 0 {
-                    Err(WidthLimitExceededError)
-                } else {
-                    let line = self.line.get();
-                    if self.last_width_exceeded_line.get() != Some(line) {
-                        self.exceeded_max_width.set(true);
-                        self.last_width_exceeded_line.set(Some(line));
-                        self.with_last_line(|line_str| {
-                            self.error_emitter.emit_width_exceeded(line, line_str)
-                        });
-                    }
-                    Ok(())
-                }
+    pub fn check_width_constraints(&self) -> Result<(), ConstraintError> {
+        let _: WidthLimitExceededError = match self.remaining_width() {
+            None | Some(Ok(_)) => return Ok(()),
+            Some(Err(e)) => e,
+        };
+        // If there is a fallback formatting strategy, then raise an error to trigger the
+        // fallback. Otherwise, emit an error and keep going.
+        if self.checkpoint_counter.count() > 0 {
+            Err(ConstraintError::new(
+                ConstraintErrorKind::WidthLimitExceeded,
+                self.checkpoint_counter.take_backtrace(),
+            ))
+        } else {
+            let line = self.line.get();
+            if self.last_width_exceeded_line.get() != Some(line) {
+                self.last_width_exceeded_line.set(Some(line));
+                self.with_last_line(|line_str| {
+                    self.error_emitter.emit_width_exceeded(line, line_str)
+                });
             }
+            Ok(())
         }
     }
 

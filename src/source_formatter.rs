@@ -1,6 +1,5 @@
 use std::cell::Cell;
 use std::panic::Location;
-use crate::ast_formatter::FormatModuleResult;
 use crate::constraint_writer::{
     ConstraintWriter, ConstraintWriterCheckpoint, ConstraintWriterLookahead,
 };
@@ -46,6 +45,7 @@ impl SourceFormatter {
         }
     }
 
+    #[cfg(test)]
     pub fn new_defaults(source: impl Into<String>) -> SourceFormatter {
         Self::new(
             Rc::new(source.into()),
@@ -54,12 +54,12 @@ impl SourceFormatter {
         )
     }
 
-    pub fn finish(self) -> FormatModuleResult {
+    pub fn finish(self) -> String {
         self.source.finish();
         self.out.finish()
     }
 
-    pub fn checkpoint_counter(&self) -> &CheckpointCounter {
+    pub fn checkpoint_counter(&self) -> &Rc<CheckpointCounter> {
         self.out.checkpoint_counter()
     }
 
@@ -109,6 +109,10 @@ impl SourceFormatter {
 
     pub fn line(&self) -> u32 {
         self.out.line()
+    }
+
+    pub fn line_col(&self) -> (u32, u32) {
+        (self.out.line(), self.out.last_line_len())
     }
 
     pub fn pos(&self) -> usize {

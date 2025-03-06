@@ -1,4 +1,4 @@
-use crate::error::{ConstraintError, FormatResult};
+use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::source_formatter::SourceFormatter;
 use rustc_lexer::Token;
 use rustc_lexer::TokenKind;
@@ -49,8 +49,8 @@ enum WhitespaceTokenStrategy {
     },
 }
 
-enum WhitespaceOutput {
-    Nothing,
+enum WhitespaceAction {
+    Skip,
     CopyComment,
     EmitNewline { double: bool, indent: bool },
     EmitSpace,
@@ -74,13 +74,13 @@ impl SourceFormatter {
         let mut is_required_whitespace_emitted = false;
         let source = self.source.remaining();
         let tokens = tokenize(source);
-        let outputs = outputs_from_tokens(tokens, mode, source);
-        for (output, len) in outputs {
-            match output {
-                WhitespaceOutput::CopyComment => {
+        let actions = actions_from_tokens(tokens, mode, source);
+        for (action, len) in actions {
+            match action {
+                WhitespaceAction::CopyComment => {
                     self.constraints().with_max_width(None, || self.copy(len))?;
                 }
-                WhitespaceOutput::EmitNewline { double, indent } => {
+                WhitespaceAction::EmitNewline { double, indent } => {
                     self.source.advance(len);
                     self.out.newline()?;
                     if double {
@@ -91,7 +91,7 @@ impl SourceFormatter {
                     }
                     is_required_whitespace_emitted = true;
                 }
-                WhitespaceOutput::EmitSpace => {
+                WhitespaceAction::EmitSpace => {
                     self.source.advance(len);
                     self.out.token(" ")?;
                     match mode {
@@ -101,15 +101,15 @@ impl SourceFormatter {
                         WhitespaceMode::Vertical(_) => {}
                     }
                 }
-                WhitespaceOutput::Nothing => {
+                WhitespaceAction::Skip => {
                     self.source.advance(len);
                 }
-                WhitespaceOutput::NewlineNotAllowed { distance } => {
+                WhitespaceAction::NewlineNotAllowed { distance } => {
                     self.source.advance(distance);
-                    return Err(ConstraintError::NewlineNotAllowed.into());
+                    return Err(ConstraintErrorKind::NewlineNotAllowed.into());
                 }
-                WhitespaceOutput::LineCommentNotAllowed => {
-                    return Err(ConstraintError::NewlineNotAllowed.into());
+                WhitespaceAction::LineCommentNotAllowed => {
+                    return Err(ConstraintErrorKind::NewlineNotAllowed.into());
                 }
             }
         }
@@ -152,11 +152,11 @@ fn tokenize(source: &str) -> impl Iterator<Item = Token> {
 }
 
 /// Iterate over tokens and decide what to output
-fn outputs_from_tokens<'a>(
+fn actions_from_tokens<'a>(
     tokens: impl Iterator<Item = Token> + 'a,
     mode: WhitespaceMode,
     source: &'a str,
-) -> impl Iterator<Item = (WhitespaceOutput, u32)> + 'a {
+) -> impl Iterator<Item = (WhitespaceAction, u32)> + 'a {
     let mut tokens = tokens.peekable();
     let mut seen_comments = false;
     let mut last_is_line_comment = false;
@@ -167,7 +167,7 @@ fn outputs_from_tokens<'a>(
                 last_is_line_comment = false;
                 // add trailing newline
                 return Some((
-                    WhitespaceOutput::EmitNewline {
+                    WhitespaceAction::EmitNewline {
                         double: false,
                         indent: false,
                     },
@@ -185,9 +185,17 @@ fn outputs_from_tokens<'a>(
             _ => unreachable!(),
         };
         let action = if mode.is_horizontal() && is_line_comment {
-            WhitespaceOutput::LineCommentNotAllowed
+            WhitespaceAction::LineCommentNotAllowed
         } else if is_comment {
-            WhitespaceOutput::CopyComment
+            let mut result = WhitespaceAction::CopyComment;
+            if mode.is_horizontal() {
+                if let Some(pos) = token_str.find('\n') {
+                    result = WhitespaceAction::NewlineNotAllowed {
+                        distance: pos.try_into().unwrap(),
+                    }
+                }
+            }
+            result
         } else {
             let is_comments_after = tokens.peek().is_some();
             let strategy = whitespace_token_strategy(mode, seen_comments, is_comments_after);
@@ -249,7 +257,7 @@ fn whitespace_token_action(
     token_len: u32,
     strategy: WhitespaceTokenStrategy,
     is_comments_after: bool,
-) -> WhitespaceOutput {
+) -> WhitespaceAction {
     match strategy {
         WhitespaceTokenStrategy::Horizontal {
             error_on_newline,
@@ -260,17 +268,17 @@ fn whitespace_token_action(
                     // since token_len is u32, newline_pos is bound by u32
                     let _: u32 = token_len;
                     let distance = u32::try_from(newline_pos).unwrap();
-                    return WhitespaceOutput::NewlineNotAllowed { distance };
+                    return WhitespaceAction::NewlineNotAllowed { distance };
                 }
             }
             if !space {
-                return WhitespaceOutput::Nothing;
+                return WhitespaceAction::Skip;
             }
-            WhitespaceOutput::EmitSpace
+            WhitespaceAction::EmitSpace
         }
         WhitespaceTokenStrategy::Vertical { allow_blank_line } => {
             let double = allow_blank_line && token_str.matches('\n').nth(1).is_some();
-            WhitespaceOutput::EmitNewline {
+            WhitespaceAction::EmitNewline {
                 double,
                 indent: is_comments_after,
             }
@@ -282,14 +290,14 @@ fn whitespace_token_action(
             let mut newlines = token_str.matches('\n');
             if newlines.next().is_some() {
                 let double = allow_blank_line && newlines.next().is_some();
-                WhitespaceOutput::EmitNewline {
+                WhitespaceAction::EmitNewline {
                     double,
                     indent: is_comments_after,
                 }
             } else if space_if_horizontal {
-                WhitespaceOutput::EmitSpace
+                WhitespaceAction::EmitSpace
             } else {
-                WhitespaceOutput::Nothing
+                WhitespaceAction::Skip
             }
         }
     }

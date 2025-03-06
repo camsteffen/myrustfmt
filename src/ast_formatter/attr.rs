@@ -2,7 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
 use crate::ast_formatter::list::builder::list;
 use crate::ast_utils::is_rustfmt_skip;
-use crate::error::FormatResult;
+use crate::error::{ConstraintErrorKind, FormatResult, FormatResultExt};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use rustc_span::Span;
@@ -13,30 +13,69 @@ impl AstFormatter {
         &self,
         attrs: &[ast::Attribute],
         span: Span,
-        f: impl FnOnce() -> FormatResult,
+        format: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
-        self.with_attrs_tail(attrs, span, Tail::none(), f)
+        self.with_attrs_tail(attrs, span, Tail::none(), format)
     }
 
     // todo test usages
+    // N.B the format function must emit the tail - this function emits the tail
+    // only in cases where the format function is not used.
     pub fn with_attrs_tail(
         &self,
         attrs: &[ast::Attribute],
         span: Span,
         tail: &Tail,
-        f: impl FnOnce() -> FormatResult,
+        format: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
         // todo skip attributes as well?
-        // todo make my own attribute? or comment?
         self.attrs(attrs)?;
+        // todo make my own attribute? or comment?
+        // handle #[rustfmt::skip]
         if attrs.iter().any(is_rustfmt_skip) {
             self.out
                 .constraints()
                 .with_max_width(None, || self.out.copy_span(span))?;
             self.tail(tail)?;
+        } else if self.checkpoint_counter().count() == 0 {
+            self.with_copy_span_fallback(span, format)?;
         } else {
-            f()?;
+            format()?;
         }
+        Ok(())
+    }
+
+    /// This is a "last resort" fallback for when a constraint error occurs, but we have no
+    /// formatting strategy to try next. This means we have no way of formatting the user's code
+    /// with the given constraints. So the error should be reported to the user, and we'll just copy
+    /// the source as-is.
+    fn with_copy_span_fallback(&self, span: Span, format: impl FnOnce() -> FormatResult) -> FormatResult {
+        // N.B. We're not using the typical `Checkpoint` here because we don't want to increment the
+        // checkpoint counter which is only incremented when there is a valid formatting strategy to
+        // fall back to.
+        let checkpoint = self.out.checkpoint();
+        let Err(e) = format().constraint_err_only()? else {
+            return Ok(());
+        };
+        match e.error {
+            ConstraintErrorKind::NewlineNotAllowed => {
+                let (line, col) = self.out.line_col();
+                // todo emit a more appropriate error for bad comments
+                self.error_emitter.emit_newline_not_allowed(line, col);
+            }
+            // width limit errors are emitted before the error value is returned
+            ConstraintErrorKind::WidthLimitExceeded => {}
+            // unexpected
+            ConstraintErrorKind::Logical => {
+                return Err(e.into())
+            }
+        }
+        assert!(self.error_emitter.error_count() > 0, "an error should be emitted before copy fallback");
+        self.out.restore_checkpoint(&checkpoint);
+        drop(checkpoint);
+        self.out
+            .constraints()
+            .with_max_width(None, || self.out.copy_span(span))?;
         Ok(())
     }
 

@@ -18,6 +18,12 @@ impl AstFormatter {
     }
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
+        self.with_attrs_tail(&expr.attrs, expr.span, tail, || {
+            self.expr_after_attrs(expr, tail)
+        })
+    }
+
+    pub fn expr_after_attrs(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
         let mut tail = Some(tail);
         let mut take_tail = || tail.take().unwrap();
         match expr.kind {

@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use crate::ast_formatter::AstFormatter;
 use crate::constraints::CheckpointCounter;
 use crate::source_formatter::{SourceFormatterCheckpoint, SourceFormatterLookahead};
@@ -6,20 +7,23 @@ use crate::source_formatter::{SourceFormatterCheckpoint, SourceFormatterLookahea
 /// All checkpoints must be closed *before* the final formatting strategy.
 #[must_use]
 pub struct Checkpoint {
-    #[allow(
-        dead_code,
-        reason = "uses an Rc to increment the checkpoint count for the lifetime of the checkpoint",
-    )]
-    counter: CheckpointCounter,
+    counter: Rc<CheckpointCounter>,
     sf_checkpoint: SourceFormatterCheckpoint,
+}
+
+impl Drop for Checkpoint {
+    fn drop(&mut self) {
+        self.counter.decrement();
+    }
 }
 
 impl AstFormatter {
     pub fn open_checkpoint(&self) -> Checkpoint {
+        let counter = Rc::clone(self.checkpoint_counter());
         // N.B. increment the counter before creating the checkpoint;
         // The checkpoint creation records a copy of the checkpoint count, and that count should
         // include itself.
-        let counter = self.checkpoint_counter().clone();
+        counter.increment();
         let sf_checkpoint = self.out.checkpoint();
         Checkpoint {
             counter,

@@ -26,7 +26,7 @@ pub fn breakpoint_test(before: &str, after: &str, in_block: bool) -> TestResult 
     Ok(())
 }
 
-fn format_in_block(stmt: &str, max_width: Option<u32>) -> String {
+fn format_in_block(stmt: &str, max_width: Option<u32>) -> TestResult<String> {
     let (prefix, indent, suffix) = ("fn test() {\n", "    ", "}\n");
     let stmt = String::from_iter(stmt.lines().map(|s| format!("{indent}{s}\n")));
     let module_source = format!("{prefix}{stmt}{suffix}");
@@ -41,7 +41,7 @@ fn format_in_block(stmt: &str, max_width: Option<u32>) -> String {
     }
     let result = format_str_config(&module_source, config)
         .unwrap()
-        .expect_not_exceeded_max_width();
+        .into_result()?;
     let lines = result
         .strip_prefix(prefix)
         .unwrap_or_else(|| panic!(
@@ -63,7 +63,7 @@ fn format_in_block(stmt: &str, max_width: Option<u32>) -> String {
         }
         out.push('\n');
     }
-    out
+    Ok(out)
 }
 
 pub fn format_max_width_expected(
@@ -74,15 +74,13 @@ pub fn format_max_width_expected(
     in_block: bool,
 ) -> TestResult {
     let formatted = if in_block {
-        format_in_block(source, max_width)
+        format_in_block(source, max_width)?
     } else {
         let mut config = Config::default();
         if let Some(max_width) = max_width {
             config = config.max_width(max_width)
         }
-        format_str_config(source, config)
-            .unwrap()
-            .expect_not_exceeded_max_width()
+        format_str_config(source, config).unwrap().into_result()?
     };
     let expected = format!("{expected}\n");
     expect_formatted_equals(&formatted, &expected, name)?;

@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use crate::ast_formatter::AstFormatter;
 use crate::constraints::{CheckpointCounter, MaxWidthForLine, MultiLineShape, OwnedConstraints};
 use crate::error::{FormatResult, WidthLimitExceededError};
@@ -6,7 +7,7 @@ use crate::util::cell_ext::CellExt;
 pub const INDENT_WIDTH: u32 = 4;
 
 impl AstFormatter {
-    pub(super) fn checkpoint_counter(&self) -> &CheckpointCounter {
+    pub(super) fn checkpoint_counter(&self) -> &Rc<CheckpointCounter> {
         self.out.checkpoint_counter()
     }
 

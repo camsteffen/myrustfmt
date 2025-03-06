@@ -33,3 +33,11 @@
     } else {
         e
     }
+- name: attribute over if statement
+  type: no_change
+  in_block: true
+  formatted: |
+    #[cfg(abc)]
+    if x {
+        y
+    }

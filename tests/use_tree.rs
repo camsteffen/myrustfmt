@@ -8,7 +8,7 @@ fn nested_groups_on_separate_line() {
     assert_eq!(
         format_str_defaults(source)
             .unwrap()
-            .expect_not_exceeded_max_width(),
+            .expect_no_errors(),
         r#"
 use aaaaaaaaaaaaaaaaaa::{
     aaaaaaaaa, bbbbbbbbbbbbbbbbbbbbbbbbbbb,

@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::error::Error;
 use crate::ast_module::AstModule;
 use crate::config::Config;
 use crate::constraints::{Constraints, OwnedConstraints};
@@ -36,16 +37,32 @@ pub struct AstFormatter {
 // todo rename?
 #[derive(Debug)]
 pub struct FormatModuleResult {
+    pub error_count: u32,
     pub formatted: String,
-    pub exceeded_max_width: bool,
 }
 
 impl FormatModuleResult {
-    pub fn expect_not_exceeded_max_width(self) -> String {
-        if self.exceeded_max_width {
-            panic!("Exceeded max width. Formatted:\n{}", self.formatted);
+    pub fn into_result(self) -> Result<String, Box<dyn Error>> {
+        let Self {
+            error_count,
+            formatted,
+        } = self;
+        if error_count > 0 {
+            return Err(
+                format!("Some errors occurred. Formatted:\n{}", formatted)
+                    .into(),
+            );
         }
-        self.formatted
+        Ok(formatted)
+    }
+
+    pub fn expect_no_errors(self) -> String {
+        let Self {
+            error_count,
+            formatted,
+        } = self;
+        assert_eq!(error_count, 0, "Some errors occurred. Formatted:\n{}", formatted);
+        formatted
     }
 }
 
@@ -75,11 +92,14 @@ impl AstFormatter {
             Ok(())
         })();
         match result {
-            Ok(()) => self.out.finish(),
             Err(e) => {
                 self.error_emitter
                     .fatal_format_error(e, self.out.source(), self.out.pos())
             }
+            Ok(()) => FormatModuleResult {
+                error_count: self.error_emitter.error_count(),
+                formatted: self.out.finish(),
+            },
         }
     }
 }

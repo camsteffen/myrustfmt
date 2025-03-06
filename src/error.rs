@@ -14,6 +14,10 @@ pub trait FormatResultExt<T> {
 }
 
 impl<T> FormatResultExt<T> for FormatResult<T> {
+    /// If self is Ok or Err with a ConstraintError, the result is returned wrapped in Ok.
+    /// If self is a non-constraint-error, it is returned in an Err (the outer Result).
+    /// This is often useful since constraint errors are used to trigger a fallback strategy, but
+    /// other errors indicate a critical bug, and so they are usually propagated (e.g. using `?`).
     fn constraint_err_only(self) -> Result<Result<T, ConstraintError>, ParseError> {
         match self {
             Err(FormatError::Parse(e)) => Err(e),
@@ -37,8 +41,43 @@ pub enum FormatError {
     Parse(ParseError),
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum ConstraintError {
+#[derive(Debug)]
+pub struct ConstraintError {
+    pub error: ConstraintErrorKind,
+    #[cfg(debug_assertions)]
+    pub backtrace: Box<Backtrace>,
+    #[cfg(debug_assertions)]
+    pub open_checkpoint_backtrace: Option<Box<Backtrace>>,
+}
+
+impl ConstraintError {
+    pub fn new(
+        error: ConstraintErrorKind,
+        open_checkpoint_backtrace: Option<Box<Backtrace>>,
+    ) -> ConstraintError {
+        ConstraintError {
+            error,
+            #[cfg(debug_assertions)]
+            backtrace: Box::new(Backtrace::capture()),
+            open_checkpoint_backtrace,
+        }
+    }
+
+    fn backtraces(&self) -> (Option<&Backtrace>, Option<&Backtrace>) {
+        #[cfg(debug_assertions)]
+        {
+            (
+                Some(&self.backtrace),
+                self.open_checkpoint_backtrace.as_deref(),
+            )
+        }
+        #[cfg(not(debug_assertions))]
+        { (None, None) }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ConstraintErrorKind {
     // todo rename to NextStrategy?
     Logical,
     NewlineNotAllowed,
@@ -95,16 +134,18 @@ impl FormatError {
                 }
                 Ok(())
             };
-            let backtrace = match self {
+            let (backtrace, open_checkpoint_backtrace) = match self {
                 FormatError::Constraint(e) => {
-                    match e {
-                        ConstraintError::Logical => {
+                    match e.error {
+                        ConstraintErrorKind::Logical => {
                             write!(f, "unhandled logical constraint error")?
                         }
-                        ConstraintError::NewlineNotAllowed => write!(f, "newline not allowed")?,
-                        ConstraintError::WidthLimitExceeded => write!(f, "width limit exceeded")?,
+                        ConstraintErrorKind::NewlineNotAllowed => write!(f, "newline not allowed")?,
+                        ConstraintErrorKind::WidthLimitExceeded => {
+                            write!(f, "width limit exceeded")?
+                        }
                     }
-                    None
+                    e.backtraces()
                 }
                 FormatError::Parse(parse_error) => {
                     match parse_error.kind {
@@ -129,14 +170,17 @@ impl FormatError {
                             write!(f, "unsupported syntax")?;
                         }
                     }
-                    Some(&parse_error.backtrace)
+                    (Some(&*parse_error.backtrace), None)
                 }
             };
-            if cfg!(debug_assertions) {
+            if cfg!(debug_assertions) && path.is_none() {
                 write!(f, "\nSource:\n{source}")?;
             }
             if let Some(backtrace) = backtrace {
-                write!(f, "\n{backtrace}")?;
+                write!(f, "\nformat error backtrace:\n{backtrace}")?;
+            }
+            if let Some(backtrace) = open_checkpoint_backtrace {
+                write!(f, "\nopen checkpoint backtrace:\n{backtrace}")?;
             }
             Ok(())
         })
@@ -149,33 +193,51 @@ impl From<ConstraintError> for FormatError {
     }
 }
 
+impl From<ConstraintErrorKind> for ConstraintError {
+    fn from(error: ConstraintErrorKind) -> Self {
+        ConstraintError::new(error, None)
+    }
+}
+
+impl From<ConstraintErrorKind> for FormatError {
+    fn from(error: ConstraintErrorKind) -> Self {
+        ConstraintError::from(error).into()
+    }
+}
+
 impl From<ParseError> for FormatError {
     fn from(e: ParseError) -> Self {
         FormatError::Parse(e)
     }
 }
 
-impl From<NewlineNotAllowedError> for ConstraintError {
+impl From<NewlineNotAllowedError> for ConstraintErrorKind {
     fn from(_: NewlineNotAllowedError) -> Self {
-        ConstraintError::NewlineNotAllowed
+        ConstraintErrorKind::NewlineNotAllowed
     }
 }
 
-impl From<WidthLimitExceededError> for ConstraintError {
+impl From<NewlineNotAllowedError> for ConstraintError {
+    fn from(_: NewlineNotAllowedError) -> Self {
+        ConstraintErrorKind::NewlineNotAllowed.into()
+    }
+}
+
+impl From<WidthLimitExceededError> for ConstraintErrorKind {
     fn from(_: WidthLimitExceededError) -> Self {
-        ConstraintError::WidthLimitExceeded
+        ConstraintErrorKind::WidthLimitExceeded
     }
 }
 
 impl From<NewlineNotAllowedError> for FormatError {
     fn from(e: NewlineNotAllowedError) -> Self {
-        FormatError::Constraint(ConstraintError::from(e))
+        ConstraintError::from(ConstraintErrorKind::from(e)).into()
     }
 }
 
 impl From<WidthLimitExceededError> for FormatError {
     fn from(e: WidthLimitExceededError) -> Self {
-        FormatError::Constraint(ConstraintError::from(e))
+        FormatError::Constraint(ConstraintError::from(ConstraintErrorKind::from(e)))
     }
 }
 

@@ -5,7 +5,7 @@ use crate::ast_formatter::backtrack::Backtrack;
 use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
 use crate::constraints::MultiLineShape;
-use crate::error::{ConstraintError, FormatResult, FormatResultExt};
+use crate::error::{ConstraintErrorKind, FormatResult, FormatResultExt};
 
 impl AstFormatter {
     pub fn match_(&self, scrutinee: &ast::Expr, arms: &[ast::Arm]) -> FormatResult {
@@ -127,29 +127,29 @@ impl AstFormatter {
                     .with_max_width(Some(max_width + extra_width), || self.expr(body))
             })
             .constraint_err_only()?;
+        let succeeded = match result {
+            Err(e) if e.error != ConstraintErrorKind::NewlineNotAllowed => {
+                return Err(e.into());
+            }
+            result => result.is_ok(),
+        };
         let used_extra_width = self.out.last_line_len() > max_width;
-        let should_add_block = match (used_extra_width, result) {
-            (true, Ok(()) | Err(ConstraintError::NewlineNotAllowed)) => {
-                // we used the extra width, so we need to add a block to make the first line fit
-                true
+        let should_add_block = if used_extra_width {
+            // we used the extra width, so we need to add a block to make the first line fit
+            true
+        } else if !succeeded {
+            // we did not use the extra width, but it did not fit on one line,
+            // so try to format normally without a block
+            false
+        } else {
+            // it fits on one line, but now we need a comma
+            match self.out.token_insert(",").constraint_err_only()? {
+                // welp the comma didn't fit,
+                // but the expression will fit on one line if we add a block
+                Err(_) => true,
+                // it all fits on one line!
+                Ok(()) => return Ok(()),
             }
-            (false, Err(ConstraintError::NewlineNotAllowed)) => {
-                // we did not use the extra width, but it did not fit on one line,
-                // so try to format normally without a block
-                false
-            }
-            (false, Ok(())) => {
-                // it fits on one line, but now we need a comma
-                match self.out.token_insert(",").constraint_err_only()? {
-                    // welp the comma didn't fit,
-                    // but the expression will fit on one line if we add a block
-                    Err(_) => true,
-                    // it all fits on one line!
-                    Ok(()) => return Ok(()),
-                }
-            }
-            // terminal error
-            (_, Err(e)) => return Err(e.into()),
         };
         self.restore_checkpoint(&checkpoint);
         if should_add_block {

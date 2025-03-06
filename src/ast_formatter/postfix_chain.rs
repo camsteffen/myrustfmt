@@ -3,7 +3,7 @@ use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_formatter::util::tail::Tail;
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
 use crate::constraints::MultiLineShape;
-use crate::error::{ConstraintError, FormatResult, FormatResultExt};
+use crate::error::{ConstraintErrorKind, FormatResult, FormatResultExt};
 use rustc_ast::ast;
 
 // In rustfmt, this is called chain_width, and is 60 by default
@@ -141,7 +141,7 @@ impl AstFormatter {
             Ok(separate_lines_height) => {
                 if separate_lines_height <= overflow_height {
                     // fallback to separate lines strategy
-                    Err(ConstraintError::Logical.into())
+                    Err(ConstraintErrorKind::Logical.into())
                 } else {
                     self.restore_checkpoint(&checkpoint);
                     self.restore_lookahead(&overflow_lookahead);

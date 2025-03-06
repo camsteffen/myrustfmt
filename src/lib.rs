@@ -1,20 +1,21 @@
 #![feature(rustc_private)]
 // Uncomment to let clippy babble (with some overrides made below)
 // #![warn(clippy::pedantic)]
-#![warn(clippy::inconsistent_struct_constructor, clippy::uninlined_format_args, clippy::unnecessary_semicolon)]
+#![warn(
+    clippy::inconsistent_struct_constructor,
+    clippy::uninlined_format_args,
+    clippy::unnecessary_semicolon,
+)]
 #![allow(
     clippy::bool_assert_comparison,
     clippy::from_iter_instead_of_collect,
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
-    clippy::must_use_candidate
+    clippy::must_use_candidate,
 )]
 
 // these crates are loaded from the sysroot, so they need extern crate.
 extern crate rustc_ast;
-// extern crate rustc_ast_pretty;
-// extern crate rustc_builtin_macros;
-// extern crate rustc_data_structures;
 extern crate rustc_driver;
 extern crate rustc_errors;
 extern crate rustc_expand;
@@ -23,7 +24,6 @@ extern crate rustc_parse;
 extern crate rustc_session;
 extern crate rustc_span;
 extern crate thin_vec;
-extern crate core;
 
 pub mod ast_formatter;
 mod ast_module;
@@ -84,10 +84,10 @@ impl OnFormatModule {
         source: &str,
     ) -> ControlFlow<()> {
         let FormatModuleResult {
+            error_count,
             formatted,
-            exceeded_max_width,
         } = result;
-        if exceeded_max_width {
+        if error_count > 0 {
             self.has_errors = true;
             ControlFlow::Continue(())
         } else if self.is_check {
@@ -148,8 +148,7 @@ pub fn format_module_file_roots(
             has_errors: false,
         };
         while let Some((path, relative)) = queue.pop_front() {
-            let submodules =
-                format_module_file(&path, relative, &config, &mut on_format_module)?;
+            let submodules = format_module_file(&path, relative, &config, &mut on_format_module)?;
             queue.extend(
                 submodules
                     .into_iter()
