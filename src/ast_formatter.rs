@@ -20,7 +20,7 @@ mod expr;
 mod r#fn;
 mod generics;
 mod item;
-pub mod list;
+mod list;
 mod local;
 mod r#match;
 mod pat;
@@ -29,7 +29,7 @@ mod postfix_chain;
 mod ty;
 mod util;
 
-pub struct AstFormatter {
+struct AstFormatter {
     error_emitter: Rc<ErrorEmitter>,
     out: SourceFormatter,
 }
@@ -66,16 +66,21 @@ impl FormatModuleResult {
     }
 }
 
-impl AstFormatter {
-    pub fn new(source: Rc<String>, path: Option<PathBuf>, config: &Config) -> Self {
-        let constraints =
-            OwnedConstraints(RefCell::new(Rc::new(Constraints::new(config.max_width))));
-        let error_emitter = Rc::new(ErrorEmitter::new(path));
-        let out = SourceFormatter::new(source, constraints, Rc::clone(&error_emitter));
-        AstFormatter { error_emitter, out }
-    }
+pub fn format_module(
+    module: &AstModule,
+    source: Rc<String>,
+    path: Option<PathBuf>,
+    config: &Config,
+) -> FormatModuleResult {
+    let constraints = OwnedConstraints(RefCell::new(Rc::new(Constraints::new(config.max_width))));
+    let error_emitter = Rc::new(ErrorEmitter::new(path));
+    let out = SourceFormatter::new(source, constraints, Rc::clone(&error_emitter));
+    let formatter = AstFormatter { error_emitter, out };
+    formatter.module(module)
+}
 
-    pub fn module(self, module: &AstModule) -> FormatModuleResult {
+impl AstFormatter {
+    fn module(self, module: &AstModule) -> FormatModuleResult {
         let result = (|| -> FormatResult {
             self.out.newline_above_if_comments()?;
             self.with_attrs(&module.attrs, module.spans.inner_span, || {

@@ -40,7 +40,7 @@ mod source_reader;
 mod submodules;
 mod util;
 
-use crate::ast_formatter::{AstFormatter, FormatModuleResult};
+use crate::ast_formatter::{format_module, FormatModuleResult};
 use crate::config::Config;
 use crate::parse::{ParseModuleResult, parse_module};
 use crate::submodules::Submodule;
@@ -176,8 +176,12 @@ fn format_module_file(
         submodules,
     } = result;
     let source = Rc::new(source);
-    let ast_formatter = AstFormatter::new(Rc::clone(&source), Some(path.to_path_buf()), config);
-    let result = ast_formatter.module(&module);
+    let result = format_module(
+        &module,
+        Rc::clone(&source),
+        Some(path.to_path_buf()),
+        config,
+    );
     match on_format_module.on_format_module(path, result, &source) {
         ControlFlow::Continue(()) => Ok(submodules),
         ControlFlow::Break(()) => Err(()),
@@ -202,7 +206,6 @@ pub fn format_str_config(
             source,
             submodules: _,
         } = parse_module(CrateSource::Source(source), None)?;
-        let ast_formatter = AstFormatter::new(Rc::new(source), None, &config);
-        Ok(ast_formatter.module(&module))
+        Ok(format_module(&module, Rc::new(source), None, &config))
     })
 }
