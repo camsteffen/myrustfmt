@@ -41,7 +41,7 @@ impl AstFormatter {
     }
 
     pub fn with_single_line<T>(&self, f: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        assert!(
+        debug_assert!(
             self.checkpoint_counter().count() > 0,
             "single line constraint applied with no fallback"
         );

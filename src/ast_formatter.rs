@@ -11,7 +11,7 @@ use crate::error::FormatResult;
 
 mod attr;
 mod backtrack;
-mod binary;
+mod binary_expr;
 mod block;
 mod checkpoint;
 mod common;

@@ -15,3 +15,33 @@
         + 1111111111111111 * 2222222222222222
         + 11111111111111111
         - 11111111111111111
+- name: don't wrap within indent-width
+  type: no_change
+  in_block: true
+  formatted: |
+    aaa + b
+        + cccccccccccccccccccccccccccccccccccccccc
+        + dddddddddddddddddddddddddddddddddddddddd
+        + eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee;
+    aaaa
+        + b
+        + cccccccccccccccccccccccccccccccccccccccc
+        + dddddddddddddddddddddddddddddddddddddddd
+        + eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee;
+- name: force wrap within indent-width with line comment
+  type: no_change
+  in_block: true
+  formatted: |
+    a // hehe
+        + b;
+- name: don't wrap within indent-width after multi-line item
+  focus: true
+  type: no_change
+  in_block: true
+  formatted: |
+    [
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    ] + b
+        + c;

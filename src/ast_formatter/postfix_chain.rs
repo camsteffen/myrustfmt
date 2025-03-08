@@ -24,26 +24,14 @@ impl AstFormatter {
     pub fn postfix_chain(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
         let chain = build_postfix_chain(expr);
         let start_pos = self.out.last_line_len();
-        self.postfix_chain_given_width_limit(&chain, start_pos, tail)
-    }
-
-    fn postfix_chain_given_width_limit(
-        &self,
-        chain: &[PostfixItem<'_>],
-        start_pos: u32,
-        tail: &Tail,
-    ) -> FormatResult {
         let first_line = self.out.line();
-        let mut chain_rest = chain;
 
         // items that start within the first indent-width on the first line
+        let mut chain_iter = chain.iter();
         let indent_margin = self.out.indent.get() + INDENT_WIDTH;
         let multi_line_root = loop {
-            let Some((next, chain_rest_next)) = chain_rest.split_first() else {
-                return self.tail(tail);
-            };
-            chain_rest = chain_rest_next;
-            if chain_rest.is_empty() {
+            let next = chain_iter.next().unwrap();
+            if chain_iter.as_slice().is_empty() {
                 self.postfix_item(next)?;
                 return self.tail(tail);
             }
@@ -56,6 +44,7 @@ impl AstFormatter {
                 break false;
             }
         };
+        let chain_rest = chain_iter.as_slice();
 
         if multi_line_root {
             // each item on a separate line, no indent

@@ -53,7 +53,7 @@ impl AstFormatter {
                     .format(self)?
             }
             ast::ExprKind::Binary(op, ref left, ref right) => {
-                self.binary(left, right, op, take_tail())?
+                self.binary_expr(left, right, op, take_tail())?
             }
             ast::ExprKind::Unary(op, ref target) => {
                 self.out.token(op.as_str())?;
@@ -350,9 +350,9 @@ impl AstFormatter {
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
         let first_line = self.out.line();
         self.expr_tail(func, &self.tail_token("("))?;
-        let is_multi_line_func = self.out.line() != first_line;
-        self.constraints().with_single_line_unless_opt(
-            is_multi_line_func.then_some(MultiLineShape::Unrestricted),
+        self.constraints().with_single_line_unless_or(
+            MultiLineShape::Unrestricted,
+            self.out.line() == first_line,
             || self.call_args_after_open_paren(args, tail),
         )?;
         Ok(())
@@ -418,10 +418,10 @@ impl AstFormatter {
         let multi_line = || {
             // todo this is failing earlier than "indent middle" is really violated;
             //   do we need to revise the guidelines in MultiLineConstraint docs?
-            self.constraints().with_single_line_unless_opt(
-                else_.is_some().then_some(MultiLineShape::Unrestricted),
-                || self.block_separate_lines_after_open_brace(block),
-            )?;
+            self.constraints()
+                .with_single_line_unless_or(MultiLineShape::Unrestricted, else_.is_none(), || {
+                    self.block_separate_lines_after_open_brace(block)
+                })?;
             let mut else_ = else_;
             loop {
                 let Some(else_expr) = else_ else { break };

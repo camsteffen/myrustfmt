@@ -152,6 +152,7 @@ impl OwnedConstraints {
     }
 
     /// Unless the given MultiLineConstraint is applicable, enforce a single-line constraint
+    // todo these names suck
     pub fn with_single_line_unless<T>(
         &self,
         shape: MultiLineShape,
@@ -164,14 +165,15 @@ impl OwnedConstraints {
         }
     }
 
-    pub fn with_single_line_unless_opt<T>(
+    pub fn with_single_line_unless_or<T>(
         &self,
-        shape: Option<MultiLineShape>,
+        shape: MultiLineShape,
+        condition: bool,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        let Some(shape) = shape else {
+        if condition {
             return scope();
-        };
+        }
         self.with_single_line_unless(shape, scope)
     }
 }
