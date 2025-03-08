@@ -182,10 +182,10 @@ impl OwnedConstraints {
 pub struct Constraints {
     /// Things would be much simpler without this
     // todo no Option
-    pub max_width: Option<u32>,
+    max_width: Option<u32>,
     /// Used to set the max width for the current line, so it no longer applies after a newline
-    /// character is printed
-    pub max_width_for_line: Option<MaxWidthForLine>,
+    /// character is printed. When Some, this takes precedence over max_width.
+    max_width_for_line: Option<MaxWidthForLine>,
     pub multi_line: MultiLineShape,
 }
 
@@ -201,6 +201,15 @@ impl Constraints {
             max_width: Some(max_width),
             max_width_for_line: None,
             multi_line: MultiLineShape::Unrestricted,
+        }
+    }
+
+    pub fn max_width_at(&self, line: u32) -> Option<u32> {
+        match self.max_width_for_line {
+            Some(max_width_for_line) if max_width_for_line.line == line => {
+                Some(max_width_for_line.max_width)
+            }
+            _ => self.max_width,
         }
     }
 }

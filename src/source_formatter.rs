@@ -67,6 +67,10 @@ impl SourceFormatter {
         self.out.constraints()
     }
 
+    pub fn current_max_width(&self) -> Option<u32> {
+        self.out.current_max_width()
+    }
+
     pub fn checkpoint(&self) -> SourceFormatterCheckpoint {
         SourceFormatterCheckpoint {
             source_pos: self.source.pos.get(),

@@ -211,17 +211,12 @@ impl ConstraintWriter {
         }
     }
 
-    pub fn max_width(&self) -> Option<u32> {
-        self.constraints
-            .borrow()
-            .max_width_for_line
-            .filter(|m| m.line == self.line())
-            .map(|m| m.max_width)
-            .or(self.constraints.borrow().max_width)
+    pub fn current_max_width(&self) -> Option<u32> {
+        self.constraints.borrow().max_width_at(self.line())
     }
 
     pub fn remaining_width(&self) -> Option<Result<u32, WidthLimitExceededError>> {
-        self.max_width().map(|max_width| {
+        self.current_max_width().map(|max_width| {
             max_width
                 .checked_sub(self.last_line_len().try_into().unwrap())
                 .ok_or(WidthLimitExceededError)

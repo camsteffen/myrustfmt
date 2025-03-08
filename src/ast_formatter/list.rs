@@ -11,7 +11,7 @@ pub use list_item_context::{ListItemContext, ListStrategy};
 pub use rest::ListRest;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::util::tail::Tail;
+use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 
 impl AstFormatter {

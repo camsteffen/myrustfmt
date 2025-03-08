@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{Braces, ListItemContext};
-use crate::ast_formatter::util::tail::Tail;
+use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 
 use crate::ast_formatter::list::builder::list;

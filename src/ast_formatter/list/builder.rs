@@ -1,10 +1,10 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::util::backtrack::Backtrack;
+use crate::ast_formatter::backtrack::Backtrack;
 use crate::ast_formatter::list::list_config::{DefaultListConfig, ListConfig, ListWrapToFitConfig};
 use crate::ast_formatter::list::list_item_config::DefaultListItemConfig;
 use crate::ast_formatter::list::list_item_context::ListItemContext;
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListRest, ListStrategy};
-use crate::ast_formatter::util::tail::Tail;
+use crate::ast_formatter::tail::Tail;
 use crate::constraints::MultiLineShape;
 use crate::error::{FormatResult, FormatResultExt};
 

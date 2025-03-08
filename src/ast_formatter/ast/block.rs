@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::util::tail::Tail;
+use crate::ast_formatter::tail::Tail;
 use crate::ast_utils::{control_flow_expr_kind, plain_block};
 use crate::error::FormatResult;
 use crate::util::whitespace_utils::is_whitespace;

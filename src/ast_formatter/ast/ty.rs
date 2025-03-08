@@ -2,7 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
 use crate::ast_formatter::list::builder::list;
 use crate::ast_formatter::list::list_config::TupleListConfig;
-use crate::ast_formatter::util::tail::Tail;
+use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use rustc_ast::ast;
 

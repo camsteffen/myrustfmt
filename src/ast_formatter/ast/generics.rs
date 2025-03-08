@@ -4,7 +4,7 @@ use crate::error::FormatResult;
 
 use crate::ast_formatter::list::builder::list;
 use rustc_ast::ast;
-use crate::ast_formatter::util::tail::Tail;
+use crate::ast_formatter::tail::Tail;
 
 impl AstFormatter {
     pub fn generic_params(&self, params: &[ast::GenericParam]) -> FormatResult {

@@ -6,7 +6,7 @@ use crate::error::{ConstraintErrorKind, FormatResult, FormatResultExt};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use rustc_span::Span;
-use crate::ast_formatter::util::tail::Tail;
+use crate::ast_formatter::tail::Tail;
 
 impl AstFormatter {
     pub fn with_attrs(

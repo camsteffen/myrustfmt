@@ -2,27 +2,21 @@ use std::cell::RefCell;
 use std::error::Error;
 use crate::ast_module::AstModule;
 use crate::config::Config;
-use crate::constraints::{Constraints, OwnedConstraints};
+use crate::constraints::{CheckpointCounter, Constraints, OwnedConstraints};
 use crate::error_emitter::ErrorEmitter;
 use crate::source_formatter::SourceFormatter;
 use std::path::PathBuf;
 use std::rc::Rc;
 use crate::error::FormatResult;
 
-mod attr;
-mod block;
+mod ast;
 mod checkpoint;
-mod common;
-mod expr;
-mod r#fn;
-mod generics;
-mod item;
-mod list;
-mod local;
-mod pat;
-mod path;
-mod ty;
 mod util;
+mod list;
+pub mod tail;
+pub mod backtrack;
+
+pub const INDENT_WIDTH: u32 = 4;
 
 #[derive(Debug)]
 pub struct FormatModuleResult {
@@ -100,5 +94,13 @@ impl AstFormatter {
                 formatted: self.out.finish(),
             },
         }
+    }
+
+    pub fn checkpoint_counter(&self) -> &Rc<CheckpointCounter> {
+        self.out.checkpoint_counter()
+    }
+
+    pub fn constraints(&self) -> &OwnedConstraints {
+        self.out.constraints()
     }
 }

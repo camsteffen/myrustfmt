@@ -3,7 +3,7 @@ use crate::error::FormatResult;
 
 use crate::ast_formatter::list::builder::list;
 use crate::ast_formatter::list::{Braces, ListItemContext};
-use crate::ast_formatter::util::tail::Tail;
+use crate::ast_formatter::tail::Tail;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 

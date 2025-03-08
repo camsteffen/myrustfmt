@@ -1,8 +1,7 @@
 use rustc_ast::ast;
 
-use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::util::backtrack::Backtrack;
-use crate::ast_formatter::util::constraint_modifiers::INDENT_WIDTH;
+use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
+use crate::ast_formatter::backtrack::Backtrack;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
 use crate::constraints::MultiLineShape;
 use crate::error::{ConstraintErrorKind, FormatResult, FormatResultExt};
@@ -102,7 +101,7 @@ impl AstFormatter {
     // todo should we count lines or simply observe whether it's multi-line?
     /// Adds a block only if doing so allows for more code to fit in the first line
     fn arm_body_add_block_if_first_line_is_longer(&self, body: &ast::Expr) -> FormatResult {
-        let Some(max_width) = self.constraints().borrow().max_width else {
+        let Some(max_width) = self.out.current_max_width() else {
             return self.arm_body_same_line(body, self.backtrack());
         };
 
