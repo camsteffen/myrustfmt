@@ -109,11 +109,11 @@ impl AstFormatter {
             })
             .otherwise(|| {
                 self.indented(|| {
-                    self.out.newline_within_indent()?;
+                    self.newline_break_indent()?;
                     self.generic_bounds(bounds, Tail::none())?;
                     Ok(())
                 })?;
-                self.out.newline_within_indent()?;
+                self.newline_break_indent()?;
                 Ok(true)
             })
     }

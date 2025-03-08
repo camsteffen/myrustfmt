@@ -1,5 +1,5 @@
 use rustc_ast::ast;
-use rustc_span::{Symbol, sym};
+use rustc_span::sym;
 
 // todo needed?
 // macro_rules! block_like_expr_kind {
@@ -96,8 +96,7 @@ pub fn arm_body_requires_block(expr: &ast::Expr) -> bool {
 }
 
 pub fn is_rustfmt_skip(attr: &ast::Attribute) -> bool {
-    static PATH: [Symbol; 2] = [sym::rustfmt, sym::skip];
-    attr.path_matches(&PATH)
+    attr.path_matches(&[sym::rustfmt, sym::skip])
 }
 
 // a block with no label, no `async`, no `unsafe`

@@ -121,7 +121,7 @@ impl AstFormatter {
                         Ok(())
                     })
                     .otherwise(|| {
-                        self.out.newline_within_indent()?;
+                        self.newline_break_indent()?;
                         item_comma()?;
                         Ok(())
                     })?;
@@ -155,14 +155,14 @@ impl AstFormatter {
                     for index in 0..len - 1 {
                         item_comma(index)?;
                         // todo should this be "between"?
-                        self.out.newline_within_indent()?;
+                        self.newline_break_indent()?;
                     }
                     item_comma(len - 1)?;
                 }
                 _ => {
                     for index in 0..len {
                         item_comma(index)?;
-                        self.out.newline_within_indent()?;
+                        self.newline_break_indent()?;
                     }
                     self.list_rest(rest, Tail::none())?;
                 }

@@ -2,10 +2,39 @@ use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::source_formatter::SourceFormatter;
 use rustc_lexer::Token;
 use rustc_lexer::TokenKind;
+use crate::whitespace::VerticalWhitespaceMode;
+
+impl SourceFormatter {
+    /// Skip over whitespace, allow horizontal comments, disallow newlines.
+    /// In other words, usually do nothing but allow for comments.
+    /// SourceFormatter is responsible for invoking this between tokens.
+    // todo maybe AstFormatter should call this
+    pub(super) fn horizontal_whitespace(&self) -> FormatResult {
+        self.whitespace_and_comments(WhitespaceMode::Horizontal { space: false })
+    }
+
+    /// Write a newline, allow comments
+    pub fn newline(&self, mode: VerticalWhitespaceMode) -> FormatResult {
+        self.whitespace_and_comments(WhitespaceMode::Vertical(mode))
+    }
+
+    /// Allow either comments with newlines, horizontal comments, or nothing
+    pub fn newline_if_comments(&self, mode: VerticalWhitespaceMode) -> FormatResult {
+        self.whitespace_and_comments(WhitespaceMode::Flexible {
+            vertical_mode: mode,
+            space_if_horizontal: false,
+        })
+    }
+
+    /// Write a space, allow horizontal comments
+    pub fn space(&self) -> FormatResult {
+        self.whitespace_and_comments(WhitespaceMode::Horizontal { space: true })
+    }
+}
 
 /// Wherever there is whitespace, and possibly comments, a WhitespaceMode is used to format it
 #[derive(Clone, Copy, Debug)]
-pub enum WhitespaceMode {
+enum WhitespaceMode {
     /// Horizontal space only. Error on newlines or line comments.
     Horizontal { space: bool },
     /// One or more newlines
@@ -23,54 +52,8 @@ impl WhitespaceMode {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum VerticalWhitespaceMode {
-    /// "between items" where a blank line is allowed. (e.g. between statements or items)
-    Between,
-    /// at the top of a file or block - a blank line is allowed only after comments
-    Top,
-    /// at the bottom of a file or block - a blank line is allowed only before comments.
-    Bottom,
-    /// a line break where blank lines should be removed, usually breaking a construct into
-    /// multiple lines that could have been on one line
-    Break,
-}
-
-#[derive(Debug)]
-enum WhitespaceTokenStrategy {
-    /// Coerce into horizontal space
-    Horizontal { error_on_newline: bool, space: bool },
-    /// Coerce into vertical space
-    Vertical { allow_blank_line: bool },
-    /// Emit horizontal space by default, but preserve newlines by comments
-    Flexible {
-        space_if_horizontal: bool,
-        allow_blank_line: bool,
-    },
-}
-
-enum WhitespaceAction {
-    Skip,
-    CopyComment,
-    EmitNewline { double: bool, indent: bool },
-    EmitSpace,
-    LineCommentNotAllowed,
-    NewlineNotAllowed { distance: u32 },
-}
-
-impl VerticalWhitespaceMode {
-    pub fn allow_blank_line(self, is_comments_before: bool, is_comments_after: bool) -> bool {
-        match self {
-            VerticalWhitespaceMode::Between => true,
-            VerticalWhitespaceMode::Top => is_comments_before,
-            VerticalWhitespaceMode::Bottom => is_comments_after,
-            VerticalWhitespaceMode::Break => is_comments_before && is_comments_after,
-        }
-    }
-}
-
 impl SourceFormatter {
-    pub fn handle_whitespace_and_comments(&self, mode: WhitespaceMode) -> FormatResult {
+    fn whitespace_and_comments(&self, mode: WhitespaceMode) -> FormatResult {
         let mut is_required_whitespace_emitted = false;
         let source = self.source.remaining();
         let tokens = tokenize(source);
@@ -101,9 +84,6 @@ impl SourceFormatter {
                         WhitespaceMode::Vertical(_) => {}
                     }
                 }
-                WhitespaceAction::Skip => {
-                    self.source.advance(len);
-                }
                 WhitespaceAction::NewlineNotAllowed { distance } => {
                     self.source.advance(distance);
                     return Err(ConstraintErrorKind::NewlineNotAllowed.into());
@@ -111,6 +91,7 @@ impl SourceFormatter {
                 WhitespaceAction::LineCommentNotAllowed => {
                     return Err(ConstraintErrorKind::NewlineNotAllowed.into());
                 }
+                WhitespaceAction::Skip => self.source.advance(len),
             }
         }
         if !is_required_whitespace_emitted {
@@ -149,6 +130,15 @@ fn tokenize(source: &str) -> impl Iterator<Item = Token> {
             _ => None,
         }
     })
+}
+
+enum WhitespaceAction {
+    CopyComment,
+    EmitNewline { double: bool, indent: bool },
+    EmitSpace,
+    LineCommentNotAllowed,
+    NewlineNotAllowed { distance: u32 },
+    Skip,
 }
 
 /// Iterate over tokens and decide what to output
@@ -205,6 +195,19 @@ fn actions_from_tokens<'a>(
         last_is_line_comment = is_line_comment;
         Some((action, token.len))
     })
+}
+
+#[derive(Debug)]
+enum WhitespaceTokenStrategy {
+    /// Coerce into horizontal space
+    Horizontal { error_on_newline: bool, space: bool },
+    /// Coerce into vertical space
+    Vertical { allow_blank_line: bool },
+    /// Emit horizontal space by default, but preserve newlines by comments
+    Flexible {
+        space_if_horizontal: bool,
+        allow_blank_line: bool,
+    },
 }
 
 /// Computes the strategy for handling a whitespace token based on the mode and the presence of

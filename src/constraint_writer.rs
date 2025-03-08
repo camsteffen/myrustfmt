@@ -38,11 +38,6 @@ pub struct ConstraintWriterLookahead {
     checkpoint: ConstraintWriterSelfCheckpoint,
 }
 
-pub struct ConstraintWriterResult {
-    pub formatted: String,
-    pub exceeded_max_width: bool,
-}
-
 impl ConstraintWriter {
     pub fn new(
         constraints: OwnedConstraints,

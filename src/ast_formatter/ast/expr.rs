@@ -78,7 +78,7 @@ impl AstFormatter {
                         self.constraints()
                             .with_single_line_unless(MultiLineShape::HangingIndent, || {
                                 self.indented(|| {
-                                    self.out.newline_within_indent()?;
+                                    self.newline_break_indent()?;
                                     self.out.token_space("as")?;
                                     self.ty(ty)?;
                                     self.tail(tail)?;
@@ -462,7 +462,7 @@ impl AstFormatter {
                         || self.with_single_line(|| self.out.space_token("{")),
                     )
                     .otherwise(|| {
-                        self.out.newline_within_indent()?;
+                        self.newline_break_indent()?;
                         self.out.token("{")?;
                         Ok(())
                     })?;

@@ -6,9 +6,9 @@ impl AstFormatter {
     /// Writes a closing brace. Allows for indented comments between braces.
     pub fn embraced_empty_after_opening(&self, closing_brace: &str) -> FormatResult {
         let first_line = self.out.line();
-        self.indented(|| self.out.newline_break_if_comments())?;
+        self.indented(|| self.newline_break_if_comments())?;
         if self.out.line() != first_line {
-            self.out.indent();
+            self.indent();
         }
         self.out.token(closing_brace)?;
         Ok(())
@@ -27,13 +27,13 @@ impl AstFormatter {
     /// Writes contents between braces with indentation
     pub fn embraced_inside(&self, contents: impl FnOnce() -> FormatResult) -> FormatResult {
         self.indented(|| {
-            self.out.newline_top()?;
-            self.out.indent();
+            self.newline_top()?;
+            self.indent();
             contents()?;
-            self.out.newline_bottom()?;
+            self.newline_bottom()?;
             Ok(())
         })?;
-        self.out.indent();
+        self.indent();
         Ok(())
     }
 }

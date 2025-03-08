@@ -59,11 +59,11 @@ impl AstFormatter {
         if where_clause.is_empty() {
             return Ok(false);
         }
-        self.out.newline_within_indent()?;
+        self.newline_break_indent()?;
         self.out.token("where")?;
         self.indented(|| {
             for (i, pred) in where_clause.predicates.iter().enumerate() {
-                self.out.newline_within_indent()?;
+                self.newline_break_indent()?;
                 match &pred.kind {
                     ast::WherePredicateKind::BoundPredicate(pred) => {
                         self.ty(&pred.bounded_ty)?;
@@ -80,7 +80,7 @@ impl AstFormatter {
             Ok(())
         })?;
         if is_before_body {
-            self.out.newline_within_indent()?;
+            self.newline_break_indent()?;
         }
         Ok(true)
     }

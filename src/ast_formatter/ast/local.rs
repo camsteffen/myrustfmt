@@ -72,7 +72,7 @@ impl AstFormatter {
             Ok(())
         };
         let next_line_else = || -> FormatResult {
-            self.out.newline_within_indent()?;
+            self.newline_break_indent()?;
             self.out.token_space("else")?;
             self.out.token("{")?;
             else_separate_lines()?;
@@ -104,7 +104,7 @@ impl AstFormatter {
             // wrap and indent then single line
             .next(|| {
                 self.indented(|| {
-                    self.out.newline_within_indent()?;
+                    self.newline_break_indent()?;
                     self.with_single_line(|| self.expr(expr))?;
                     self.tail(tail)?;
                     Ok(())
@@ -120,7 +120,7 @@ impl AstFormatter {
             // wrap and indent
             .otherwise(|| {
                 self.indented(|| {
-                    self.out.newline_within_indent()?;
+                    self.newline_break_indent()?;
                     self.expr(expr)?;
                     self.tail(tail)?;
                     Ok(())

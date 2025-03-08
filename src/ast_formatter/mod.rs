@@ -15,6 +15,7 @@ mod util;
 mod list;
 pub mod tail;
 pub mod backtrack;
+mod whitespace;
 
 pub const INDENT_WIDTH: u32 = 4;
 
@@ -70,15 +71,15 @@ struct AstFormatter {
 impl AstFormatter {
     fn module(self, module: &AstModule) -> FormatModuleResult {
         let result = (|| -> FormatResult {
-            self.out.newline_top_if_comments()?;
+            self.newline_top_if_comments()?;
             self.with_attrs(&module.attrs, module.spans.inner_span, || {
                 if let [until_last @ .., last] = &module.items[..] {
                     for item in until_last {
                         self.item(item)?;
-                        self.out.newline_between_indent()?;
+                        self.newline_between_indent()?;
                     }
                     self.item(last)?;
-                    self.out.newline_bottom()?;
+                    self.newline_bottom()?;
                 }
                 Ok(())
             })?;

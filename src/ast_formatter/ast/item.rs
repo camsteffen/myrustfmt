@@ -181,7 +181,7 @@ impl AstFormatter {
                 })
                 .otherwise(|| {
                     self.indented(|| {
-                        self.out.newline_within_indent()?;
+                        self.newline_break_indent()?;
                         first_part()?;
                         Ok(true)
                     })
@@ -201,7 +201,7 @@ impl AstFormatter {
                 })
                 .otherwise(|| {
                     self.indented_optional(!indented, || {
-                        self.out.newline_within_indent()?;
+                        self.newline_break_indent()?;
                         self.out.token_space("for")?;
                         self.ty(&impl_.self_ty)?;
                         Ok(())
@@ -288,7 +288,7 @@ impl AstFormatter {
                     Ok(())
                 })
                 .otherwise(|| {
-                    self.out.newline_within_indent()?;
+                    self.newline_break_indent()?;
                     body()?;
                     Ok(())
                 })?;

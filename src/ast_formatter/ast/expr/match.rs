@@ -54,13 +54,13 @@ impl AstFormatter {
 
     fn arm_guard_separate_line(&self, arm: &ast::Arm, guard: &ast::Expr) -> FormatResult {
         self.indented(|| {
-            self.out.newline_within_indent()?;
+            self.newline_break_indent()?;
             self.arm_guard(guard)?;
             Ok(())
         })?;
         if let Some(body) = arm.body.as_deref() {
             self.out.space_token("=>")?;
-            self.out.newline_within_indent()?;
+            self.newline_break_indent()?;
             // todo allow single line without block?
             self.arm_body_force_block(body)?;
         }

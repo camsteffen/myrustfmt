@@ -110,7 +110,7 @@ impl AstFormatter {
         // todo account for having less width if the fallback will add a block
         let result = self
             .indented(|| {
-                self.out.newline_within_indent()?;
+                self.newline_break_indent()?;
                 self.postfix_item(overflowable)?;
                 let height = self.out.line() - first_line + 1;
                 self.tail(tail)?;
@@ -147,7 +147,7 @@ impl AstFormatter {
 
     fn postfix_chain_separate_lines(&self, chain: &[PostfixItem<'_>], tail: &Tail) -> FormatResult {
         for item in chain {
-            self.out.newline_within_indent()?;
+            self.newline_break_indent()?;
             self.postfix_item(item)?;
         }
         self.tail(tail)?;
@@ -159,7 +159,6 @@ impl AstFormatter {
         start_pos: u32,
         format: impl Fn() -> FormatResult,
     ) -> FormatResult {
-        self.out.no_space()?;
         let offset = self.out.last_line_len() - start_pos;
         let limit = (offset >= POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH)
             .then_some(POSTFIX_CHAIN_MAX_WIDTH);

@@ -6,13 +6,13 @@ use crate::constraint_writer::{
 use crate::constraints::{CheckpointCounter, OwnedConstraints};
 use crate::error::FormatResult;
 use crate::error_emitter::ErrorEmitter;
-use crate::source_formatter::whitespace::{VerticalWhitespaceMode, WhitespaceMode};
-use crate::source_reader::SourceReader;
+use source_reader::SourceReader;
 use crate::util::chars::is_closer_char;
 use rustc_span::{BytePos, Pos, Span};
 use std::rc::Rc;
 
 mod whitespace;
+mod source_reader;
 
 pub struct SourceFormatterCheckpoint {
     source_pos: BytePos,
@@ -47,7 +47,6 @@ delegate_to_constraint_writer! {
     pub fn current_max_width(&self) -> Option<u32>;
     // todo make sure any math using two values of this are guaranteed to be on the same line
     pub fn last_line_len(&self) -> u32;
-    pub fn len(&self) -> usize;
     pub fn line(&self) -> u32;
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T;
     pub fn with_taken_buffer(&self, f: impl FnOnce(&mut String));
@@ -125,57 +124,8 @@ impl SourceFormatter {
         &self.source.source
     }
 
-    fn newline(&self, mode: VerticalWhitespaceMode) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Vertical(mode))?;
-        Ok(())
-    }
-
-    fn newline_indent(&self, kind: VerticalWhitespaceMode) -> FormatResult {
-        self.newline(kind)?;
-        self.indent();
-        Ok(())
-    }
-
-    pub fn newline_between(&self) -> FormatResult {
-        self.newline(VerticalWhitespaceMode::Between)
-    }
-
-    pub fn newline_between_indent(&self) -> FormatResult {
-        self.newline_indent(VerticalWhitespaceMode::Between)
-    }
-
-    pub fn newline_top(&self) -> FormatResult {
-        self.newline(VerticalWhitespaceMode::Top)
-    }
-
-    pub fn newline_bottom(&self) -> FormatResult {
-        self.newline(VerticalWhitespaceMode::Bottom)
-    }
-
-    pub fn newline_break(&self) -> FormatResult {
-        self.newline(VerticalWhitespaceMode::Break)
-    }
-
-    pub fn newline_within_indent(&self) -> FormatResult {
-        self.newline_indent(VerticalWhitespaceMode::Break)
-    }
-
-    pub fn newline_top_if_comments(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Flexible {
-            vertical_mode: VerticalWhitespaceMode::Top,
-            space_if_horizontal: false,
-        })
-    }
-
-    pub fn newline_break_if_comments(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Flexible {
-            vertical_mode: VerticalWhitespaceMode::Break,
-            space_if_horizontal: false,
-        })
-    }
-
     pub fn skip_token(&self, token: &str) -> FormatResult {
-        self.horizontal_whitespace_only()?;
+        self.horizontal_whitespace()?;
         self.source.eat(token)?;
         Ok(())
     }
@@ -183,8 +133,7 @@ impl SourceFormatter {
     pub fn skip_token_if_present(&self, token: &str) -> FormatResult<bool> {
         // todo is this checkpoint avoidable?
         let checkpoint = self.checkpoint();
-        let ws_result =
-            self.handle_whitespace_and_comments(WhitespaceMode::Horizontal { space: false });
+        let ws_result = self.horizontal_whitespace();
         if self.source.remaining().starts_with(token) {
             ws_result?;
             self.source.advance(token.len().try_into().unwrap());
@@ -195,27 +144,25 @@ impl SourceFormatter {
         }
     }
 
-    /** Writes a space and accounts for spaces and comments in source */
     pub fn copy_next_token(&self) -> FormatResult {
-        self.horizontal_whitespace_only()?;
+        self.horizontal_whitespace()?;
         let token = self.source.eat_next_token();
         self.out.token(token)?;
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn eof(&self) -> FormatResult {
         self.source.expect_pos(BytePos::from_usize(self.source.source.len()))?;
         Ok(())
     }
 
-    /**
-     * Write a token, asserting it is next in source.
-     *
-     * N.B. a token should not contain whitespace
-     * N.B. a token is indivisible (e.g. "::<" is two tokens since you can write it as "::  <")
-     */
+    /// Write a token, asserting it is next in source.
+    ///
+    /// N.B. a token should not contain whitespace
+    /// N.B. a token is indivisible (e.g. "::<" is two tokens since you can write it as "::  <")
     pub fn token(&self, token: &str) -> FormatResult {
-        self.horizontal_whitespace_only()?;
+        self.horizontal_whitespace()?;
         self.source.eat(token)?;
         self.out.token(token)?;
         Ok(())
@@ -225,28 +172,6 @@ impl SourceFormatter {
     pub fn token_insert(&self, token: &str) -> FormatResult {
         self.out.token(token)?;
         Ok(())
-    }
-
-    /** Writes a space and accounts for spaces and comments in source */
-    // todo do newlines and comments sneak in when it should be single line?
-    pub fn space(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal { space: true })?;
-        Ok(())
-    }
-
-    // todo maybe this is always worse than backtrack
-    pub fn space_or_newline(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Flexible {
-            vertical_mode: VerticalWhitespaceMode::Break,
-            space_if_horizontal: true,
-        })?;
-        Ok(())
-    }
-
-    /// Handles whitespace and comments. This is useful when you need more fine-grained control of
-    /// active constraints when formatting comments.
-    pub fn no_space(&self) -> FormatResult {
-        self.horizontal_whitespace_only()
     }
 
     pub fn token_space(&self, token: &str) -> FormatResult {
@@ -277,16 +202,10 @@ impl SourceFormatter {
 
     /// Copy a token from source
     pub fn token_from_source(&self, span: Span) -> FormatResult {
-        self.horizontal_whitespace_only()?;
+        self.horizontal_whitespace()?;
         self.source.expect_pos(span.lo())?;
         let token = self.source.get_span(span);
         self.token_unchecked(token)?;
-        Ok(())
-    }
-
-    // todo reconcile with horizontal_whitespace_only
-    fn horizontal_whitespace_only(&self) -> FormatResult {
-        self.handle_whitespace_and_comments(WhitespaceMode::Horizontal { space: false })?;
         Ok(())
     }
 
@@ -302,14 +221,10 @@ impl SourceFormatter {
     }
 
     pub fn copy_span(&self, span: Span) -> FormatResult {
-        self.horizontal_whitespace_only()?;
+        self.horizontal_whitespace()?;
         self.source.expect_pos(span.lo())?;
         self.copy(span.hi().to_u32() - span.lo().to_u32())?;
         Ok(())
-    }
-
-    pub fn copy_to(&self, pos: BytePos) -> FormatResult {
-        self.copy(pos.to_u32() - self.source.pos.get().to_u32())
     }
 
     /** Write a token assuming it is next in source */

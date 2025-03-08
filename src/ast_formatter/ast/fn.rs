@@ -39,7 +39,7 @@ impl AstFormatter {
                     self.backtrack()
                         .next(|| self.out.space_token("{"))
                         .otherwise(|| {
-                            self.out.newline_within_indent()?;
+                            self.newline_break_indent()?;
                             self.out.token("{")?;
                             Ok(())
                         })?;
@@ -254,7 +254,7 @@ impl AstFormatter {
                 self.backtrack()
                     .next(|| self.out.space_token_space("->"))
                     .otherwise(|| {
-                        self.out.newline_within_indent()?;
+                        self.newline_break_indent()?;
                         self.out.token_space("->")?;
                         Ok(())
                     })?;

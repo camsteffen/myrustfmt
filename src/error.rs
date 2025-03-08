@@ -114,7 +114,6 @@ impl ParseError {
 pub enum ParseErrorKind {
     ExpectedPosition(usize),
     ExpectedToken(String),
-    UnsupportedSyntax,
 }
 
 impl FormatError {
@@ -167,9 +166,6 @@ impl FormatError {
                         ParseErrorKind::ExpectedToken(ref token) => {
                             write!(f, "expected token: `{token}`")?;
                             next_token(f)?;
-                        }
-                        ParseErrorKind::UnsupportedSyntax => {
-                            write!(f, "unsupported syntax")?;
                         }
                     }
                     (Some(&*parse_error.backtrace), None)

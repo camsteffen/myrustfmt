@@ -28,7 +28,7 @@ impl AstFormatter {
                 format_item(first)?;
                 self.indented_optional(should_indent, || {
                     for item in rest {
-                        self.out.newline_within_indent()?;
+                        self.newline_break_indent()?;
                         self.out.token_space(token)?;
                         format_item(item)?;
                     }

@@ -104,10 +104,10 @@ impl AstFormatter {
                     self.meta_item(&meta)?;
                     self.out.token("]")?;
                     match attr.style {
-                        ast::AttrStyle::Inner => self.out.newline_between()?,
-                        ast::AttrStyle::Outer => self.out.newline_break()?,
+                        ast::AttrStyle::Inner => self.newline_between()?,
+                        ast::AttrStyle::Outer => self.newline_break()?,
                     }
-                    self.out.indent();
+                    self.indent();
                     Ok(())
                 }
             },

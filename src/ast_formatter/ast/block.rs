@@ -69,7 +69,7 @@ impl AstFormatter {
             [first, rest @ ..] => self.embraced_after_opening("}", || {
                 format_item(first)?;
                 for item in rest {
-                    self.out.newline_between_indent()?;
+                    self.newline_between_indent()?;
                     format_item(item)?;
                 }
                 Ok(())

@@ -44,7 +44,7 @@ impl AstFormatter {
                         }
                         self.indented(|| {
                             for (op, expr) in iter {
-                                self.out.newline_within_indent()?;
+                                self.newline_break_indent()?;
                                 self.out.token_space(op.as_str())?;
                                 self.expr(expr)?;
                             }
