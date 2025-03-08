@@ -3,3 +3,15 @@
   in_block: true
   formatted: |
     let Foo { .. } = x;
+- name: struct max width
+  type: before_after
+  in_block: true
+  before: |
+    let ast::UseTreeKind::Nested { ref items, span: _ } = x;
+    let ast::UseTreeKind::Nested { ref itemsz, span: _ } = x;
+  after: |
+    let ast::UseTreeKind::Nested { ref items, span: _ } = x;
+    let ast::UseTreeKind::Nested {
+        ref itemsz,
+        span: _,
+    } = x;

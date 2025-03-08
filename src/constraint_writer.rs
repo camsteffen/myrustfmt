@@ -89,12 +89,8 @@ impl ConstraintWriter {
 
     pub fn self_checkpoint(&self) -> ConstraintWriterSelfCheckpoint {
         let Self {
-            #[cfg(debug_assertions)]
             ref checkpoint_counter,
-            #[cfg(debug_assertions)]
             ref constraints,
-            #[cfg(not(debug_assertions))]
-            constraints: _,
             buffer: _,
             error_emitter: _,
             ref last_line_start,
@@ -132,8 +128,10 @@ impl ConstraintWriter {
             ref constraints,
         } = *checkpoint;
         #[cfg(debug_assertions)]
-        assert_eq!(&*self.constraints.borrow(), constraints);
-        assert_eq!(self.checkpoint_counter.count(), checkpoint_count);
+        {
+            assert_eq!(&*self.constraints.borrow(), constraints);
+            assert_eq!(self.checkpoint_counter.count(), checkpoint_count);
+        }
         self.last_line_start.set(last_line_start);
         self.last_width_exceeded_line.set(last_width_exceeded_line);
         self.line.set(line);
@@ -198,6 +196,7 @@ impl ConstraintWriter {
         if self.checkpoint_counter.count() > 0 {
             Err(ConstraintError::new(
                 ConstraintErrorKind::WidthLimitExceeded,
+                #[cfg(debug_assertions)]
                 self.checkpoint_counter.take_backtrace(),
             ))
         } else {

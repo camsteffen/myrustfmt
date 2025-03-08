@@ -57,7 +57,7 @@ impl AstFormatter {
         let Err(e) = format().constraint_err_only()? else {
             return Ok(());
         };
-        match e.error {
+        match e.kind {
             ConstraintErrorKind::NewlineNotAllowed => {
                 let (line, col) = self.out.line_col();
                 // todo emit a more appropriate error for bad comments
@@ -66,7 +66,7 @@ impl AstFormatter {
             // width limit errors are emitted before the error value is returned
             ConstraintErrorKind::WidthLimitExceeded => {}
             // unexpected
-            ConstraintErrorKind::Logical => {
+            ConstraintErrorKind::NextStrategy => {
                 return Err(e.into())
             }
         }

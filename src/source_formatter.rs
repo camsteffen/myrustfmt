@@ -361,7 +361,7 @@ mod tests {
         let sf = SourceFormatter::new_defaults(" \naa");
         sf.token("aa").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish().formatted, "aa");
+        assert_eq!(sf.finish(), "aa");
     }
 
     #[test]
@@ -371,18 +371,18 @@ mod tests {
         sf.newline_within_indent().unwrap();
         sf.token("aa").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish().formatted, "aa\naa");
+        assert_eq!(sf.finish(), "aa\naa");
     }
 
     #[test]
     fn no_indent_for_blank_line() {
         let sf = SourceFormatter::new_defaults("aa\n    \naa");
-        sf.constraints().indent.set(4);
+        sf.indent.set(4);
         sf.token("aa").unwrap();
         sf.newline_within_indent().unwrap();
         sf.token("aa").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish().formatted, "aa\n\n    aa");
+        assert_eq!(sf.finish(), "aa\n\n    aa");
     }
 
     #[test]
@@ -392,7 +392,7 @@ mod tests {
         sf.space().unwrap();
         sf.token("bb").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish().formatted, "aa bb");
+        assert_eq!(sf.finish(), "aa bb");
     }
 
     #[test]
@@ -403,7 +403,7 @@ mod tests {
         sf.space().unwrap();
         sf.token("bb").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish().formatted, "aa, bb");
+        assert_eq!(sf.finish(), "aa, bb");
     }
 
     #[test]
@@ -413,7 +413,7 @@ mod tests {
         sf.space().unwrap();
         sf.token("bb").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish().formatted, "aa/*comment*/bb");
+        assert_eq!(sf.finish(), "aa/*comment*/bb");
     }
 
     #[test]
@@ -423,7 +423,7 @@ mod tests {
         sf.space().unwrap();
         sf.token("bb").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish().formatted, "aa /*comment*/bb");
+        assert_eq!(sf.finish(), "aa /*comment*/bb");
     }
 
     #[test]
@@ -433,7 +433,7 @@ mod tests {
         sf.space().unwrap();
         sf.token("bb").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish().formatted, "aa/*comment*/ bb");
+        assert_eq!(sf.finish(), "aa/*comment*/ bb");
     }
 
     #[test]
@@ -443,7 +443,7 @@ mod tests {
         sf.space().unwrap();
         sf.token("bb").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish().formatted, "aa /*comment*/ bb");
+        assert_eq!(sf.finish(), "aa /*comment*/ bb");
     }
 
     #[test]
@@ -453,7 +453,7 @@ mod tests {
         sf.space().unwrap();
         sf.token("bb").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish().formatted, "aa /*comment*/ bb");
+        assert_eq!(sf.finish(), "aa /*comment*/ bb");
     }
 
     #[test]
@@ -462,7 +462,7 @@ mod tests {
         sf.token("(").unwrap();
         sf.token("aa").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish().formatted, "( /*comment*/ aa");
+        assert_eq!(sf.finish(), "( /*comment*/ aa");
     }
 
     #[test]
@@ -471,6 +471,6 @@ mod tests {
         sf.token("(").unwrap();
         sf.token("aa").unwrap();
         sf.eof().unwrap();
-        assert_eq!(sf.finish().formatted, "(aa");
+        assert_eq!(sf.finish(), "(aa");
     }
 }

@@ -29,12 +29,6 @@ mod postfix_chain;
 mod ty;
 mod util;
 
-struct AstFormatter {
-    error_emitter: Rc<ErrorEmitter>,
-    out: SourceFormatter,
-}
-
-// todo rename?
 #[derive(Debug)]
 pub struct FormatModuleResult {
     pub error_count: u32,
@@ -77,6 +71,11 @@ pub fn format_module(
     let out = SourceFormatter::new(source, constraints, Rc::clone(&error_emitter));
     let formatter = AstFormatter { error_emitter, out };
     formatter.module(module)
+}
+
+struct AstFormatter {
+    error_emitter: Rc<ErrorEmitter>,
+    out: SourceFormatter,
 }
 
 impl AstFormatter {

@@ -188,18 +188,7 @@ fn format_module_file(
     }
 }
 
-pub fn format_str_defaults(source: &str) -> Result<FormatModuleResult, ErrorGuaranteed> {
-    format_str_config(source, Config::default())
-}
-
-pub fn format_str(source: &str, max_width: u32) -> Result<FormatModuleResult, ErrorGuaranteed> {
-    format_str_config(source, Config::default().max_width(max_width))
-}
-
-pub fn format_str_config(
-    source: &str,
-    config: Config,
-) -> Result<FormatModuleResult, ErrorGuaranteed> {
+pub fn format_str(source: &str, config: Config) -> Result<FormatModuleResult, ErrorGuaranteed> {
     rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
         let ParseModuleResult {
             module,

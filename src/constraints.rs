@@ -12,13 +12,15 @@ pub struct MaxWidthForLine {
 }
 
 /// Specifies what kind of multi-line shapes are allowed, if any.
-///
-/// The MultiLineConstraint is enforced in two ways:
-///   1. The SingleLine variant causes an error to be raised upon attempting to write a newline
-///      character.
-///   2. Other variants are "downgraded" to the SingleLine variant at times when it is known that
-///      any newline character would violate the original constraint.
 /// 
+/// Each variant allows all the forms specified in preceding variants.
+///
+/// It is generally enforced in two ways:
+///  1. The SingleLine variant causes an error to be raised upon attempting to write a newline
+///     character.
+///  2. Other variants are "downgraded" to the SingleLine variant at times when it is known that
+///     a newline character would violate the original constraint.
+///
 /// At least the first line of output leading up to a newline must be written to the buffer before
 /// raising an error. This makes the implementation simpler by reducing code paths. But more
 /// importantly, it allows us to observe the first line of formatted output and know that it would
@@ -29,14 +31,14 @@ pub enum MultiLineShape {
     /// No newline characters allowed
     SingleLine,
     /// Allows constructs with curly braces spanning from the first line to the last line
-    BlockIndent,
-    /// Allows multi-line lists and lists where the last item overflows
+    BlockLike,
+    /// Allows multi-line lists including lists where the last item overflows
     VerticalList,
-    /// Allows wrap-indent after the first line, like in long chains
+    /// Allows wrap-indent after the first line, like in long chains. Also allows attributes.
     HangingIndent,
-    /// Allows constructs that are indented in multiple places, such as an if-else expression.
-    /// (This is really a non-constraint, but is named to clarify the difference from other modes.)
-    DisjointIndent,
+    /// Allows everything else. Notably, this allows expressions that are indented in multiple
+    /// places, such as an if-else expression.
+    Unrestricted,
 }
 
 /// An empty Rc used to count the number of open checkpoints.
@@ -75,6 +77,7 @@ impl CheckpointCounter {
         }
     }
 
+    #[cfg(debug_assertions)]
     pub fn take_backtrace(&self) -> Option<Box<Backtrace>> {
         self.backtrace.borrow_mut().take()
     }
@@ -195,7 +198,7 @@ impl Constraints {
         Constraints {
             max_width: Some(max_width),
             max_width_for_line: None,
-            multi_line: MultiLineShape::DisjointIndent,
+            multi_line: MultiLineShape::Unrestricted,
         }
     }
 }

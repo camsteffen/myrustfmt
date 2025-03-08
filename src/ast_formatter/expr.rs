@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext, ListStrategy};
 use crate::ast_formatter::util::tail::Tail;
-use crate::error::FormatResult;
+use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 use crate::ast_formatter::list::ListRest;
@@ -18,6 +18,11 @@ impl AstFormatter {
     }
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
+        if !expr.attrs.is_empty()
+            && self.constraints().borrow().multi_line < MultiLineShape::HangingIndent
+        {
+            return Err(ConstraintErrorKind::NextStrategy.into());
+        }
         self.with_attrs_tail(&expr.attrs, expr.span, tail, || {
             self.expr_after_attrs(expr, tail)
         })
@@ -237,13 +242,12 @@ impl AstFormatter {
                 match lcx.strategy {
                     // overflow last item
                     ListStrategy::SingleLine
-                        if outer_multi_line >= MultiLineShape::VerticalList
-                            && lcx.index == lcx.len - 1 =>
+                        if outer_multi_line >= MultiLineShape::VerticalList && lcx.is_last() =>
                     {
                         // override the multi-line shape to be less strict than SingleLine
                         let shape = if lcx.len > 1 {
-                            // don't overflow nested lists in a list with multiple items
-                            MultiLineShape::BlockIndent
+                            // don't overflow nested lists when the outer list has multiple items
+                            MultiLineShape::BlockLike
                         } else {
                             MultiLineShape::VerticalList
                         };
@@ -313,7 +317,7 @@ impl AstFormatter {
                         af.expr_tail(end, tail)?;
                     } else {
                         self.constraints()
-                            .with_single_line_unless(MultiLineShape::DisjointIndent, || {
+                            .with_single_line_unless(MultiLineShape::Unrestricted, || {
                                 af.expr_tail(end, tail)
                             })?;
                     }
@@ -348,7 +352,7 @@ impl AstFormatter {
         self.expr_tail(func, &self.tail_token("("))?;
         let is_multi_line_func = self.out.line() != first_line;
         self.constraints().with_single_line_unless_opt(
-            is_multi_line_func.then_some(MultiLineShape::DisjointIndent),
+            is_multi_line_func.then_some(MultiLineShape::Unrestricted),
             || self.call_args_after_open_paren(args, tail),
         )?;
         Ok(())
@@ -415,7 +419,7 @@ impl AstFormatter {
             // todo this is failing earlier than "indent middle" is really violated;
             //   do we need to revise the guidelines in MultiLineConstraint docs?
             self.constraints().with_single_line_unless_opt(
-                else_.is_some().then_some(MultiLineShape::DisjointIndent),
+                else_.is_some().then_some(MultiLineShape::Unrestricted),
                 || self.block_separate_lines_after_open_brace(block),
             )?;
             let mut else_ = else_;
@@ -444,7 +448,7 @@ impl AstFormatter {
 
     pub fn token_expr_open_brace(&self, token: &str, expr: &ast::Expr) -> FormatResult<bool> {
         self.constraints()
-            .with_single_line_unless(MultiLineShape::DisjointIndent, || {
+            .with_single_line_unless(MultiLineShape::Unrestricted, || {
                 let first_line = self.out.line();
                 self.out.token_space(token)?;
                 self.expr(expr)?;

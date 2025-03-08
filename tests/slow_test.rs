@@ -1,6 +1,7 @@
 #![feature(rustc_private)]
 
-use myrustfmt::format_str;
+use myrustfmt::{format_str, };
+use myrustfmt::config::Config;
 
 // https://github.com/rust-lang/rustfmt/issues/4867
 #[test]
@@ -20,7 +21,7 @@ mod modA {
     }
 }"#;
     assert_eq!(
-        format_str(source, 800).unwrap().formatted,
+        format_str(source, Config::default().max_width(800)).unwrap().formatted,
         r#"
 mod modA {
     mod modB {

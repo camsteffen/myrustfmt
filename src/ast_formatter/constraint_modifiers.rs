@@ -20,10 +20,10 @@ impl AstFormatter {
         self.out.indent.with_replaced(indent, || {
             let shape = self.constraints().borrow().multi_line;
             match shape {
-                MultiLineShape::SingleLine | MultiLineShape::DisjointIndent => f(),
+                MultiLineShape::SingleLine | MultiLineShape::Unrestricted => f(),
                 _ => {
                     self.constraints()
-                        .with_multi_line_shape_replaced(MultiLineShape::DisjointIndent, f)
+                        .with_multi_line_shape_replaced(MultiLineShape::Unrestricted, f)
                 }
             }
         })

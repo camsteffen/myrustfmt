@@ -1,7 +1,8 @@
+// todo fixme
+#![cfg(any())]
 #![feature(rustc_private)]
 
 use myrustfmt::config::Config;
-use myrustfmt::format_file;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::Path;

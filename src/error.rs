@@ -43,7 +43,7 @@ pub enum FormatError {
 
 #[derive(Debug)]
 pub struct ConstraintError {
-    pub error: ConstraintErrorKind,
+    pub kind: ConstraintErrorKind,
     #[cfg(debug_assertions)]
     pub backtrace: Box<Backtrace>,
     #[cfg(debug_assertions)]
@@ -52,13 +52,15 @@ pub struct ConstraintError {
 
 impl ConstraintError {
     pub fn new(
-        error: ConstraintErrorKind,
+        kind: ConstraintErrorKind,
+        #[cfg(debug_assertions)]
         open_checkpoint_backtrace: Option<Box<Backtrace>>,
     ) -> ConstraintError {
         ConstraintError {
-            error,
+            kind,
             #[cfg(debug_assertions)]
             backtrace: Box::new(Backtrace::capture()),
+            #[cfg(debug_assertions)]
             open_checkpoint_backtrace,
         }
     }
@@ -78,8 +80,8 @@ impl ConstraintError {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ConstraintErrorKind {
-    // todo rename to NextStrategy?
-    Logical,
+    /// Returned when we know that there is a fallback strategy that is preferred
+    NextStrategy,
     NewlineNotAllowed,
     WidthLimitExceeded,
 }
@@ -136,9 +138,9 @@ impl FormatError {
             };
             let (backtrace, open_checkpoint_backtrace) = match self {
                 FormatError::Constraint(e) => {
-                    match e.error {
-                        ConstraintErrorKind::Logical => {
-                            write!(f, "unhandled logical constraint error")?
+                    match e.kind {
+                        ConstraintErrorKind::NextStrategy => {
+                            write!(f, "unhandled NextStrategy error")?
                         }
                         ConstraintErrorKind::NewlineNotAllowed => write!(f, "newline not allowed")?,
                         ConstraintErrorKind::WidthLimitExceeded => {
@@ -194,14 +196,18 @@ impl From<ConstraintError> for FormatError {
 }
 
 impl From<ConstraintErrorKind> for ConstraintError {
-    fn from(error: ConstraintErrorKind) -> Self {
-        ConstraintError::new(error, None)
+    fn from(kind: ConstraintErrorKind) -> Self {
+        ConstraintError::new(
+            kind,
+            #[cfg(debug_assertions)]
+            None,
+        )
     }
 }
 
 impl From<ConstraintErrorKind> for FormatError {
-    fn from(error: ConstraintErrorKind) -> Self {
-        ConstraintError::from(error).into()
+    fn from(kind: ConstraintErrorKind) -> Self {
+        ConstraintError::from(kind).into()
     }
 }
 

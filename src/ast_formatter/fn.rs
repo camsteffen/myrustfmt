@@ -109,7 +109,7 @@ impl AstFormatter {
                 self.backtrack()
                     .next(|| {
                         self.constraints()
-                            .with_multi_line_shape_min(MultiLineShape::BlockIndent, || {
+                            .with_multi_line_shape_min(MultiLineShape::BlockLike, || {
                                 self.expr_tail(body, tail)
                             })
                     })
@@ -184,7 +184,7 @@ impl AstFormatter {
                 Ok(())
             })
         };
-        if self.out.constraints().borrow().multi_line < MultiLineShape::DisjointIndent {
+        if self.out.constraints().borrow().multi_line < MultiLineShape::Unrestricted {
             return do_single_line();
         }
         // args and return type all on one line

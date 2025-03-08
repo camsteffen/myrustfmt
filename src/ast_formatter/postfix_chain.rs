@@ -47,10 +47,8 @@ impl AstFormatter {
                 self.postfix_item(next)?;
                 return self.tail(tail);
             }
-            self.constraints().with_single_line_unless(
-                MultiLineShape::DisjointIndent,
-                || self.postfix_item(next),
-            )?;
+            self.constraints()
+                .with_single_line_unless(MultiLineShape::Unrestricted, || self.postfix_item(next))?;
             if self.out.line() != first_line {
                 break true;
             }
@@ -141,7 +139,7 @@ impl AstFormatter {
             Ok(separate_lines_height) => {
                 if separate_lines_height <= overflow_height {
                     // fallback to separate lines strategy
-                    Err(ConstraintErrorKind::Logical.into())
+                    Err(ConstraintErrorKind::NextStrategy.into())
                 } else {
                     self.restore_checkpoint(&checkpoint);
                     self.restore_lookahead(&overflow_lookahead);

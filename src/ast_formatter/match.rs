@@ -128,14 +128,16 @@ impl AstFormatter {
             })
             .constraint_err_only()?;
         let succeeded = match result {
-            Err(e) if e.error != ConstraintErrorKind::NewlineNotAllowed => {
+            Err(e) if e.kind != ConstraintErrorKind::NewlineNotAllowed => {
                 return Err(e.into());
             }
             result => result.is_ok(),
         };
         let used_extra_width = self.out.last_line_len() > max_width;
         let should_add_block = if used_extra_width {
-            // we used the extra width, so we need to add a block to make the first line fit
+            // We used the extra width, so we will add a block to make the first line fit.
+            // (A block may not be strictly needed, but without a block, the result would be broken
+            // into more lines.)
             true
         } else if !succeeded {
             // we did not use the extra width, but it did not fit on one line,
