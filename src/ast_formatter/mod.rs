@@ -70,7 +70,7 @@ struct AstFormatter {
 impl AstFormatter {
     fn module(self, module: &AstModule) -> FormatModuleResult {
         let result = (|| -> FormatResult {
-            self.out.newline_above_if_comments()?;
+            self.out.newline_top_if_comments()?;
             self.with_attrs(&module.attrs, module.spans.inner_span, || {
                 if let [until_last @ .., last] = &module.items[..] {
                     for item in until_last {
@@ -78,7 +78,7 @@ impl AstFormatter {
                         self.out.newline_between_indent()?;
                     }
                     self.item(last)?;
-                    self.out.newline_below()?;
+                    self.out.newline_bottom()?;
                 }
                 Ok(())
             })?;

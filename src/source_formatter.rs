@@ -31,6 +31,29 @@ pub struct SourceFormatter {
     pub indent: Cell<u32>,
 }
 
+macro_rules! delegate_to_constraint_writer {
+    ($($vis:vis fn $name:ident $(<$gen:tt>)?(&self $(, $arg:ident: $ty:ty)*) $(-> $ret_ty:ty)? ;)*) => {
+        impl SourceFormatter {
+            $($vis fn $name $(<$gen>)? (&self $(, $arg: $ty)*) $(-> $ret_ty)? {
+                self.out.$name($($arg),*)
+            })*
+        }
+    }
+}
+
+delegate_to_constraint_writer! {
+    pub fn checkpoint_counter(&self) -> &Rc<CheckpointCounter>;
+    pub fn constraints(&self) -> &OwnedConstraints;
+    pub fn current_max_width(&self) -> Option<u32>;
+    // todo make sure any math using two values of this are guaranteed to be on the same line
+    pub fn last_line_len(&self) -> u32;
+    pub fn len(&self) -> usize;
+    pub fn line(&self) -> u32;
+    pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T;
+    pub fn with_taken_buffer(&self, f: impl FnOnce(&mut String));
+
+}
+
 impl SourceFormatter {
     pub fn new(
         source: Rc<String>,
@@ -57,18 +80,6 @@ impl SourceFormatter {
     pub fn finish(self) -> String {
         self.source.finish();
         self.out.finish()
-    }
-
-    pub fn checkpoint_counter(&self) -> &Rc<CheckpointCounter> {
-        self.out.checkpoint_counter()
-    }
-
-    pub fn constraints(&self) -> &OwnedConstraints {
-        self.out.constraints()
-    }
-
-    pub fn current_max_width(&self) -> Option<u32> {
-        self.out.current_max_width()
     }
 
     pub fn checkpoint(&self) -> SourceFormatterCheckpoint {
@@ -102,19 +113,6 @@ impl SourceFormatter {
         self.source.pos.set(lookahead.source_pos);
     }
 
-    // todo make sure any math using two values of this are guaranteed to be on the same line
-    pub fn last_line_len(&self) -> u32 {
-        self.out.last_line_len()
-    }
-
-    pub fn len(&self) -> usize {
-        self.out.len()
-    }
-
-    pub fn line(&self) -> u32 {
-        self.out.line()
-    }
-
     pub fn line_col(&self) -> (u32, u32) {
         (self.out.line(), self.out.last_line_len())
     }
@@ -127,12 +125,12 @@ impl SourceFormatter {
         &self.source.source
     }
 
-    pub fn newline(&self, mode: VerticalWhitespaceMode) -> FormatResult {
+    fn newline(&self, mode: VerticalWhitespaceMode) -> FormatResult {
         self.handle_whitespace_and_comments(WhitespaceMode::Vertical(mode))?;
         Ok(())
     }
 
-    pub fn newline_indent(&self, kind: VerticalWhitespaceMode) -> FormatResult {
+    fn newline_indent(&self, kind: VerticalWhitespaceMode) -> FormatResult {
         self.newline(kind)?;
         self.indent();
         Ok(())
@@ -146,15 +144,15 @@ impl SourceFormatter {
         self.newline_indent(VerticalWhitespaceMode::Between)
     }
 
-    pub fn newline_above(&self) -> FormatResult {
+    pub fn newline_top(&self) -> FormatResult {
         self.newline(VerticalWhitespaceMode::Top)
     }
 
-    pub fn newline_below(&self) -> FormatResult {
+    pub fn newline_bottom(&self) -> FormatResult {
         self.newline(VerticalWhitespaceMode::Bottom)
     }
 
-    pub fn newline_within(&self) -> FormatResult {
+    pub fn newline_break(&self) -> FormatResult {
         self.newline(VerticalWhitespaceMode::Break)
     }
 
@@ -162,25 +160,14 @@ impl SourceFormatter {
         self.newline_indent(VerticalWhitespaceMode::Break)
     }
 
-    pub fn newline_above_if_comments(&self) -> FormatResult {
+    pub fn newline_top_if_comments(&self) -> FormatResult {
         self.handle_whitespace_and_comments(WhitespaceMode::Flexible {
             vertical_mode: VerticalWhitespaceMode::Top,
             space_if_horizontal: false,
         })
     }
 
-    pub fn newline_if_comments(&self) -> FormatResult {
-        #[cfg(any())]
-        fn test(self) {
-            enum NewlineKind {
-                IfComments,
-            }
-            {
-                self.handle_whitespace_and_comments(
-                    WhitespaceMode::Vertical(NewlineKind::IfComments),
-                );
-            }
-        }
+    pub fn newline_break_if_comments(&self) -> FormatResult {
         self.handle_whitespace_and_comments(WhitespaceMode::Flexible {
             vertical_mode: VerticalWhitespaceMode::Break,
             space_if_horizontal: false,
@@ -281,24 +268,20 @@ impl SourceFormatter {
         Ok(())
     }
 
-    /** Write a token that may be next in source, or otherwise is missing from source */
+    /// Write a token that might be missing from source
     pub fn token_maybe_missing(&self, token: &str) -> FormatResult {
         self.skip_token_if_present(token)?;
         self.token_insert(token)?;
         Ok(())
     }
 
-    /** Copy a token from source */
+    /// Copy a token from source
     pub fn token_from_source(&self, span: Span) -> FormatResult {
         self.horizontal_whitespace_only()?;
         self.source.expect_pos(span.lo())?;
         let token = self.source.get_span(span);
         self.token_unchecked(token)?;
         Ok(())
-    }
-
-    pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T {
-        self.out.with_last_line(f)
     }
 
     // todo reconcile with horizontal_whitespace_only
@@ -341,10 +324,6 @@ impl SourceFormatter {
             let after_indent = &line[self.indent.get().try_into().unwrap()..];
             after_indent.chars().all(is_closer_char)
         })
-    }
-
-    pub fn with_taken_buffer(&self, f: impl FnOnce(&mut String)) {
-        self.out.with_taken_buffer(f)
     }
 
     #[track_caller]

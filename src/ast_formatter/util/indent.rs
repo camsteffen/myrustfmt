@@ -21,11 +21,11 @@ impl AstFormatter {
     pub fn indented_optional(
         &self,
         should_indent: bool,
-        f: impl FnOnce() -> FormatResult,
+        format: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
         if !should_indent {
-            return f();
+            return format();
         }
-        self.indented(f)
+        self.indented(format)
     }
 }

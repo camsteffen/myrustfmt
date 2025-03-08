@@ -247,7 +247,7 @@ impl From<WidthLimitExceededError> for FormatError {
     }
 }
 
-fn display_from_fn(f: impl Fn(&mut Formatter<'_>) -> std::fmt::Result) -> impl Display {
+fn display_from_fn(fmt: impl Fn(&mut Formatter<'_>) -> std::fmt::Result) -> impl Display {
     struct Impl<F>(F);
     impl<F> Display for Impl<F>
     where
@@ -257,5 +257,5 @@ fn display_from_fn(f: impl Fn(&mut Formatter<'_>) -> std::fmt::Result) -> impl D
             self.0(f)
         }
     }
-    Impl(f)
+    Impl(fmt)
 }

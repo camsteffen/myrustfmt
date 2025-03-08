@@ -105,7 +105,7 @@ impl AstFormatter {
                     self.out.token("]")?;
                     match attr.style {
                         ast::AttrStyle::Inner => self.out.newline_between()?,
-                        ast::AttrStyle::Outer => self.out.newline_within()?,
+                        ast::AttrStyle::Outer => self.out.newline_break()?,
                     }
                     self.out.indent();
                     Ok(())
