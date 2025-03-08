@@ -1,8 +1,8 @@
 use rustc_ast::ast;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::backtrack::Backtrack;
-use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
+use crate::ast_formatter::util::backtrack::Backtrack;
+use crate::ast_formatter::util::constraint_modifiers::INDENT_WIDTH;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
 use crate::constraints::MultiLineShape;
 use crate::error::{ConstraintErrorKind, FormatResult, FormatResultExt};

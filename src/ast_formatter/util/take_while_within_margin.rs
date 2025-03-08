@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::constraint_modifiers::INDENT_WIDTH;
+use crate::ast_formatter::util::constraint_modifiers::INDENT_WIDTH;
 
 impl AstFormatter {
     pub fn take_while_within_margin<'a, T>(

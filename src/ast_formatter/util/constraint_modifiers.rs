@@ -7,11 +7,11 @@ use crate::util::cell_ext::CellExt;
 pub const INDENT_WIDTH: u32 = 4;
 
 impl AstFormatter {
-    pub(super) fn checkpoint_counter(&self) -> &Rc<CheckpointCounter> {
+    pub fn checkpoint_counter(&self) -> &Rc<CheckpointCounter> {
         self.out.checkpoint_counter()
     }
 
-    pub(super) fn constraints(&self) -> &OwnedConstraints {
+    pub fn constraints(&self) -> &OwnedConstraints {
         self.out.constraints()
     }
 

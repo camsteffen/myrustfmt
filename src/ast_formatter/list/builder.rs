@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::backtrack::Backtrack;
+use crate::ast_formatter::util::backtrack::Backtrack;
 use crate::ast_formatter::list::list_config::{DefaultListConfig, ListConfig, ListWrapToFitConfig};
 use crate::ast_formatter::list::list_item_config::DefaultListItemConfig;
 use crate::ast_formatter::list::list_item_context::ListItemContext;

@@ -57,6 +57,8 @@ impl AstFormatter {
     }
 }
 
+/// Traverses the tree to collect a sequence of chained binary operations.
+/// Traversal will only include binary operators of the same precedence.
 fn collect_binary_expr_chain<'a>(
     left: &'a ast::Expr,
     right: &'a ast::Expr,

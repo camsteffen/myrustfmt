@@ -6,11 +6,15 @@ use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::builder::{list, FormatListItem, ListBuilder};
-use crate::ast_formatter::list::list_config::{ArrayListConfig, TupleListConfig, ListConfig};
+use crate::ast_formatter::list::list_config::{ArrayListConfig, ListConfig, TupleListConfig};
 use crate::ast_utils::postfix_expr_kind;
 use crate::constraints::MultiLineShape;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
+
+mod binary;
+mod postfix_chain;
+mod r#match;
 
 impl AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
