@@ -4,15 +4,15 @@ use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
 
 impl AstFormatter {
-    pub fn indented<T>(&self, f: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
+    pub fn indented<T>(&self, format: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         let indent = self.out.indent.get() + INDENT_WIDTH;
         self.out.indent.with_replaced(indent, || {
             let shape = self.constraints().borrow().multi_line;
             match shape {
-                MultiLineShape::SingleLine | MultiLineShape::Unrestricted => f(),
+                MultiLineShape::SingleLine | MultiLineShape::Unrestricted => format(),
                 _ => {
                     self.constraints()
-                        .with_multi_line_shape_replaced(MultiLineShape::Unrestricted, f)
+                        .with_multi_line_shape_replaced(MultiLineShape::Unrestricted, format)
                 }
             }
         })

@@ -157,13 +157,13 @@ impl AstFormatter {
     fn with_chain_item_max_width(
         &self,
         start_pos: u32,
-        f: impl Fn() -> FormatResult,
+        format: impl Fn() -> FormatResult,
     ) -> FormatResult {
         self.out.no_space()?;
         let offset = self.out.last_line_len() - start_pos;
         let limit = (offset >= POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH)
             .then_some(POSTFIX_CHAIN_MAX_WIDTH);
-        self.with_width_limit_from_start_first_line_opt(start_pos, limit, f)
+        self.with_width_limit_from_start_first_line_opt(start_pos, limit, format)
     }
 
     fn postfix_item(&self, item: &PostfixItem<'_>) -> FormatResult {

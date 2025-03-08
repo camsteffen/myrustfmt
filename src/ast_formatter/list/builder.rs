@@ -28,7 +28,7 @@ pub trait FormatListItem<Item> {
 }
 
 fn format_list_item_from_fn<Item>(
-    f: impl Fn(&AstFormatter, &Item, &Tail, ListItemContext) -> FormatResult,
+    format: impl Fn(&AstFormatter, &Item, &Tail, ListItemContext) -> FormatResult,
 ) -> impl FormatListItem<Item> {
     struct Impl<F>(F);
     impl<F, Item> FormatListItem<Item> for Impl<F>
@@ -45,7 +45,7 @@ fn format_list_item_from_fn<Item>(
             self.0(af, item, tail, lcx)
         }
     }
-    Impl(f)
+    Impl(format)
 }
 
 /// Main entrypoint for formatting a list
