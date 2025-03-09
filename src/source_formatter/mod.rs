@@ -6,7 +6,7 @@ use crate::constraint_writer::{
 use crate::constraints::{CheckpointCounter, OwnedConstraints};
 use crate::error::FormatResult;
 use crate::error_emitter::ErrorEmitter;
-use source_reader::SourceReader;
+use self::source_reader::SourceReader;
 use crate::util::chars::is_closer_char;
 use rustc_span::{BytePos, Pos, Span};
 use std::rc::Rc;

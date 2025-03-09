@@ -1,7 +1,9 @@
 #![feature(rustc_private)]
+#![feature(unqualified_local_imports)]
 // Uncomment to let clippy babble (with some overrides made below)
 // #![warn(clippy::pedantic)]
 #![warn(
+    unqualified_local_imports,
     clippy::inconsistent_struct_constructor,
     clippy::uninlined_format_args,
     clippy::unnecessary_semicolon,
@@ -40,9 +42,9 @@ mod submodules;
 mod util;
 mod whitespace;
 
-use crate::ast_formatter::{format_module, FormatModuleResult};
+use crate::ast_formatter::{FormatModuleResult, format_module};
 use crate::config::Config;
-use crate::parse::{parse_module, ParseModuleResult};
+use crate::parse::{ParseModuleResult, parse_module};
 use crate::submodules::Submodule;
 use rustc_span::ErrorGuaranteed;
 use rustc_span::edition::Edition;
@@ -95,7 +97,7 @@ impl OnFormatModule {
         } else if formatted != source {
             fs::write(path, formatted).unwrap();
             if self.is_verbose {
-                eprintln!("Reformatted: {}", path.display());
+                eprintln!("Formatted: {}", path.display());
             }
             ControlFlow::Continue(())
         } else {

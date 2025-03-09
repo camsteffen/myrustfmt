@@ -5,10 +5,10 @@ mod list_item_config;
 mod list_item_context;
 mod rest;
 
-pub use braces::Braces;
-pub use list_item_config::ListItemConfig;
-pub use list_item_context::{ListItemContext, ListStrategy};
-pub use rest::ListRest;
+pub use self::braces::Braces;
+pub use self::list_item_config::ListItemConfig;
+pub use self::list_item_context::{ListItemContext, ListStrategy};
+pub use self::rest::ListRest;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::tail::Tail;
@@ -72,8 +72,7 @@ impl AstFormatter {
                     self.list_rest(rest, &close_tail)?;
                 }
                 Ok(())
-            })?;
-            Ok(())
+            })
         })
     }
 

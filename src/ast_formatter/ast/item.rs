@@ -1,5 +1,6 @@
 use rustc_ast::ast;
 use rustc_span::symbol::Ident;
+use rustc_span::Symbol;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::builder::list;
@@ -28,16 +29,7 @@ impl AstFormatter {
 
     pub fn item_kind(&self, kind: &ast::ItemKind, item: &ast::Item) -> FormatResult {
         match *kind {
-            ast::ItemKind::ExternCrate(name) => {
-                self.out.token_space("extern")?;
-                self.out.token_space("crate")?;
-                if name.is_some() {
-                    self.out.copy_next_token()?;
-                    self.out.space_token_space("as")?;
-                }
-                self.ident(item.ident)?;
-                self.out.token(";")?;
-            }
+            ast::ItemKind::ExternCrate(name) => self.extern_crate(name, item)?,
             ast::ItemKind::Use(ref use_tree) => {
                 self.out.token_space("use")?;
                 self.use_tree(use_tree, &self.tail_token(";"))?;
@@ -135,6 +127,18 @@ impl AstFormatter {
         self.out.space()?;
         list(Braces::CURLY, variants, Self::variant)
             .format_separate_lines(self)?;
+        Ok(())
+    }
+
+    fn extern_crate(&self, name: Option<Symbol>, item: &ast::Item) -> FormatResult {
+        self.out.token_space("extern")?;
+        self.out.token_space("crate")?;
+        if name.is_some() {
+            self.out.copy_next_token()?;
+            self.out.space_token_space("as")?;
+        }
+        self.ident(item.ident)?;
+        self.out.token(";")?;
         Ok(())
     }
 

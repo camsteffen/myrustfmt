@@ -1,12 +1,13 @@
 use std::cell::RefCell;
 use std::error::Error;
+use std::path::PathBuf;
+use std::rc::Rc;
+
 use crate::ast_module::AstModule;
 use crate::config::Config;
 use crate::constraints::{CheckpointCounter, Constraints, OwnedConstraints};
 use crate::error_emitter::ErrorEmitter;
 use crate::source_formatter::SourceFormatter;
-use std::path::PathBuf;
-use std::rc::Rc;
 use crate::error::FormatResult;
 
 mod ast;
