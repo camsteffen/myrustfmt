@@ -248,14 +248,10 @@ impl AstFormatter {
         item: &ast::Item,
     ) -> FormatResult {
         self.token_ident_generic_params("struct", item.ident, generics)?;
-        if !matches!(variants, ast::VariantData::Unit(_)) {
-            self.variant_data(variants, false)?;
-        }
-        if matches!(
-            variants,
-            ast::VariantData::Unit(_) | ast::VariantData::Tuple(..)
-        ) {
-            self.out.token(";")?;
+        self.variant_data(variants, false)?;
+        match variants {
+            ast::VariantData::Struct { .. } => {}
+            ast::VariantData::Tuple(..) | ast::VariantData::Unit(_) => self.out.token(";")?,
         }
         Ok(())
     }
