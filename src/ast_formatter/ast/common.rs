@@ -20,8 +20,8 @@ impl AstFormatter {
         self.out.token_from_source(strlit.span)
     }
 
-    pub fn safety(&self, safety: &ast::Safety) -> FormatResult {
-        match *safety {
+    pub fn safety(&self, safety: ast::Safety) -> FormatResult {
+        match safety {
             ast::Safety::Unsafe(_) => self.out.token_space("unsafe"),
             ast::Safety::Safe(_) => self.out.token_space("safe"),
             ast::Safety::Default => Ok(()),

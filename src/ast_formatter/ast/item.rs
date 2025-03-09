@@ -27,7 +27,7 @@ impl AstFormatter {
     }
 
     pub fn item_kind(&self, kind: &ast::ItemKind, item: &ast::Item) -> FormatResult {
-        match kind {
+        match *kind {
             ast::ItemKind::ExternCrate(name) => {
                 self.out.token_space("extern")?;
                 self.out.token_space("crate")?;
@@ -38,11 +38,11 @@ impl AstFormatter {
                 self.ident(item.ident)?;
                 self.out.token(";")?;
             }
-            ast::ItemKind::Use(use_tree) => {
+            ast::ItemKind::Use(ref use_tree) => {
                 self.out.token_space("use")?;
                 self.use_tree(use_tree, &self.tail_token(";"))?;
             }
-            ast::ItemKind::Static(static_item) => {
+            ast::ItemKind::Static(ref static_item) => {
                 self.out.token_space("static")?;
                 self.ident(item.ident)?;
                 self.out.token_space(":")?;
@@ -53,25 +53,12 @@ impl AstFormatter {
                 }
                 self.out.token(";")?;
             }
-            ast::ItemKind::Const(const_item) => self.const_item(const_item, item.ident)?,
-            ast::ItemKind::Fn(fn_) => self.fn_(fn_, item)?,
-            ast::ItemKind::Mod(safety, mod_kind) => {
-                self.safety(safety)?;
-                self.out.token_space("mod")?;
-                self.ident(item.ident)?;
-                match mod_kind {
-                    ast::ModKind::Loaded(items, ast::Inline::Yes, ..) => {
-                        self.out.space()?;
-                        self.block_generic(items, |item| self.item(item))?;
-                    }
-                    ast::ModKind::Loaded(_, ast::Inline::No, ..) | ast::ModKind::Unloaded => {
-                        self.out.token(";")?;
-                    }
-                }
-            }
+            ast::ItemKind::Const(ref const_item) => self.const_item(const_item, item.ident)?,
+            ast::ItemKind::Fn(ref fn_) => self.fn_(fn_, item)?,
+            ast::ItemKind::Mod(safety, ref mod_kind) => self.mod_item(safety, mod_kind, item)?,
             ast::ItemKind::ForeignMod(_) => todo!(),
             ast::ItemKind::GlobalAsm(_) => todo!(),
-            ast::ItemKind::TyAlias(ty_alias) => {
+            ast::ItemKind::TyAlias(ref ty_alias) => {
                 self.token_ident_generic_params("type", item.ident, &ty_alias.generics)?;
                 if let Some(ty) = &ty_alias.ty {
                     self.out.space_token_space("=")?;
@@ -79,15 +66,17 @@ impl AstFormatter {
                 }
                 self.out.token(";")?;
             }
-            ast::ItemKind::Enum(def, generics) => self.enum_(&def.variants, generics, item)?,
-            ast::ItemKind::Struct(variants, generics) => {
+            ast::ItemKind::Enum(ref def, ref generics) => {
+                self.enum_(&def.variants, generics, item)?
+            }
+            ast::ItemKind::Struct(ref variants, ref generics) => {
                 self.struct_item(variants, generics, item)?
             }
             ast::ItemKind::Union(_, _) => todo!(),
-            ast::ItemKind::Trait(trait_) => self.trait_(trait_, item)?,
+            ast::ItemKind::Trait(ref trait_) => self.trait_(trait_, item)?,
             ast::ItemKind::TraitAlias(_, _) => todo!(),
-            ast::ItemKind::Impl(impl_) => self.impl_(impl_)?,
-            ast::ItemKind::MacCall(mac_call) => {
+            ast::ItemKind::Impl(ref impl_) => self.impl_(impl_)?,
+            ast::ItemKind::MacCall(ref mac_call) => {
                 self.mac_call(mac_call)?;
                 if !matches!(mac_call.args.delim, rustc_ast::token::Delimiter::Brace) {
                     self.out.token(";")?;
@@ -146,6 +135,27 @@ impl AstFormatter {
         self.out.space()?;
         list(Braces::CURLY, variants, Self::variant)
             .format_separate_lines(self)?;
+        Ok(())
+    }
+
+    fn mod_item(
+        &self,
+        safety: ast::Safety,
+        mod_kind: &ast::ModKind,
+        item: &ast::Item,
+    ) -> FormatResult {
+        self.safety(safety)?;
+        self.out.token_space("mod")?;
+        self.ident(item.ident)?;
+        match mod_kind {
+            ast::ModKind::Loaded(items, ast::Inline::Yes, ..) => {
+                self.out.space()?;
+                self.block_generic(items, |item| self.item(item))?;
+            }
+            ast::ModKind::Loaded(_, ast::Inline::No, ..) | ast::ModKind::Unloaded => {
+                self.out.token(";")?;
+            }
+        }
         Ok(())
     }
 

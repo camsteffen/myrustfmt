@@ -159,7 +159,7 @@ impl AstFormatter {
     fn fn_header(
         &self,
         &ast::FnHeader {
-            ref safety,
+            safety,
             ref coroutine_kind,
             constness,
             ref ext,
