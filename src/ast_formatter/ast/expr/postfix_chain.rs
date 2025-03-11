@@ -86,19 +86,19 @@ impl AstFormatter {
     ) -> FormatResult {
         let first_line = self.out.line();
         let checkpoint = self.out.checkpoint();
-        let enforce_max_width_guard = self.out.enforce_max_width();
-
-        self.with_chain_item_max_width(start_pos, || {
-            self.postfix_item_tail(overflowable, Tail::none(), true)
+        let overflow_height = self.out.with_enforce_max_width(|| -> FormatResult<_> {
+            self.with_chain_item_max_width(start_pos, || {
+                self.postfix_item_tail(overflowable, Tail::none(), true)
+            })?;
+            // todo can we prove that the overflow is so long that a separate line won't be shorter?
+            let overflow_height = self.out.line() - first_line + 1;
+            self.tail(tail)?;
+            Ok(overflow_height)
         })?;
-        // todo can we prove that the overflow is so long that a separate line won't be shorter?
-        let overflow_height = self.out.line() - first_line + 1;
-        self.tail(tail)?;
         if overflow_height == 1 {
             // it all fits on one line
             return Ok(());
         }
-        drop(enforce_max_width_guard);
         let overflow_lookahead = self.out.capture_lookahead(&checkpoint);
 
         // try writing the overflowable on the next line to measure its height in separate lines format
