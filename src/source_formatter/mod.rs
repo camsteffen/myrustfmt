@@ -42,11 +42,10 @@ macro_rules! delegate_to_constraint_writer {
 }
 
 delegate_to_constraint_writer! {
-    pub fn constraint_recovery_mode_max(&self, mode: ConstraintRecoveryMode) -> Option<impl Drop>;
     pub fn constraints(&self) -> &OwnedConstraints;
     pub fn current_max_width(&self) -> Option<u32>;
-    pub fn enforce_max_width(&self) -> Option<impl Drop>;
     pub fn has_any_constraint_recovery(&self) -> bool;
+    pub fn with_constraint_recovery_mode_max<T>(&self, mode: ConstraintRecoveryMode, scope: impl FnOnce() -> T) -> T;
     pub fn with_enforce_max_width<T>(&self, scope: impl FnOnce() -> T) -> T;
     // todo make sure any math using two values of this are guaranteed to be on the same line
     pub fn last_line_len(&self) -> u32;

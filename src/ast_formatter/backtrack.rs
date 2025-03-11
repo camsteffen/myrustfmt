@@ -70,10 +70,7 @@ impl<T> Backtrack<'_, T> {
             self.state = BacktrackState::Incomplete(self.af.out.checkpoint());
         }
         if let BacktrackState::Incomplete(checkpoint) = &self.state {
-            let result = {
-                let _guard = self.af.out.constraint_recovery_mode_max(mode);
-                strategy()
-            };
+            let result = self.af.out.with_constraint_recovery_mode_max(mode, strategy);
             match result {
                 // restore the checkpoint before continuing to the next formatting strategy
                 Err(FormatError::Constraint(_)) => self.af.out.restore_checkpoint(checkpoint),

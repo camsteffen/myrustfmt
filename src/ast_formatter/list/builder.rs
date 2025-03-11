@@ -5,16 +5,7 @@ use crate::ast_formatter::list::list_item_context::ListItemContext;
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListRest, ListStrategy};
 use crate::ast_formatter::tail::Tail;
 use crate::constraints::MultiLineShape;
-use crate::error::{ConstraintError, FormatResult, FormatResultExt};
-
-macro_rules! return_if_ok {
-    ($expr:expr) => {
-        match $expr {
-            Ok(value) => return Ok(value),
-            Err(e) => e,
-        }
-    };
-}
+use crate::error::{FormatResult, FormatResultExt};
 
 pub trait FormatListItem<Item> {
     fn format(
@@ -199,65 +190,74 @@ where
 
     // todo better name
     fn contents_default(&self, af: &AstFormatter) -> FormatResult {
-        let checkpoint = af.out.checkpoint();
         let first_line = af.out.line();
-        let mut dirty = false;
-        let overflow_lookahead = 'lookahead: {
-            let any_items_require_own_line =
-                self.list.iter().any(ItemConfig::item_requires_own_line);
-            if any_items_require_own_line {
-                break 'lookahead None;
-            }
-            dirty = true;
-            let enforce_max_width_guard = af.out.enforce_max_width();
-            if self
-                .contents_single_line(af)
-                .constraint_err_only()?
-                .is_err()
-            {
-                break 'lookahead None;
-            }
-            if (
-                self.rest.is_none()
-                    && ItemConfig::last_item_prefers_overflow(self.list.last().unwrap())
-            ) || af.out.line() == first_line
-            {
-                let _: ConstraintError = return_if_ok!(af.tail(self.tail).constraint_err_only()?);
-                break 'lookahead None;
-            }
-            // todo don't lookahead if there isn't any width gained by wrapping
-            let overflow_height = af.out.line() - first_line + 1;
-            if af.tail(self.tail).constraint_err_only()?.is_err() {
-                break 'lookahead None;
-            }
-            drop(enforce_max_width_guard);
-            let lookahead = af.out.capture_lookahead(&checkpoint);
-            Some((lookahead, overflow_height))
-        };
-        let Some((overflow_lookahead, overflow_height)) = overflow_lookahead else {
-            if dirty {
-                af.out.restore_checkpoint(&checkpoint);
-            }
-            return af
-                .backtrack_from_checkpoint(checkpoint)
-                .next_opt(self.contents_wrap_to_fit_fn_opt(af))
-                .otherwise(|| self.contents_separate_lines(af));
-        };
-        if let Some(f) = self.contents_wrap_to_fit_fn_opt(af) {
-            let _: ConstraintError =
-                return_if_ok!(af.out.with_enforce_max_width(f).constraint_err_only()?);
-            af.out.restore_checkpoint(&checkpoint);
+        #[derive(Debug)]
+        enum OverflowResult {
+            Done,
+            NoOverflow,
+            Overflow { height: u32 },
         }
-        match af
-            .out
-            .with_enforce_max_width(|| self.contents_separate_lines(af))
-            .constraint_err_only()?
-        {
-            Err(_) => {
-                af.out.restore_checkpoint(&checkpoint);
-                af.out.restore_lookahead(&overflow_lookahead);
+        let any_items_require_own_line = self.list.iter().any(ItemConfig::item_requires_own_line);
+        let checkpoint;
+        let result = if any_items_require_own_line {
+            checkpoint = None;
+            OverflowResult::NoOverflow
+        } else {
+            checkpoint = Some(af.out.checkpoint());
+            af.out.with_enforce_max_width(|| -> FormatResult<_> {
+                let result = self.contents_single_line(af);
+                if result.constraint_err_only()?.is_err() {
+                    return Ok(OverflowResult::NoOverflow);
+                }
+                if (
+                    self.rest.is_none()
+                        && ItemConfig::last_item_prefers_overflow(self.list.last().unwrap())
+                ) || af.out.line() == first_line
+                {
+                    if af.tail(self.tail).constraint_err_only()?.is_err() {
+                        return Ok(OverflowResult::NoOverflow);
+                    }
+                    return Ok(OverflowResult::Done);
+                }
+                // todo don't lookahead if there isn't any width gained by wrapping
+                let height = af.out.line() - first_line + 1;
+                if af.tail(self.tail).constraint_err_only()?.is_err() {
+                    return Ok(OverflowResult::NoOverflow);
+                }
+                Ok(OverflowResult::Overflow { height })
+            })?
+        };
+        match result {
+            OverflowResult::Done => {}
+            OverflowResult::NoOverflow => {
+                let checkpoint = if let Some(checkpoint) = checkpoint {
+                    af.out.restore_checkpoint(&checkpoint);
+                    checkpoint
+                } else {
+                    af.out.checkpoint()
+                };
+                af.backtrack_from_checkpoint(checkpoint)
+                    .next_opt(self.contents_wrap_to_fit_fn_opt(af))
+                    .otherwise(|| self.contents_separate_lines(af))?;
             }
-            Ok(()) => {
+            OverflowResult::Overflow {
+                height: overflow_height,
+            } => {
+                let checkpoint = checkpoint.unwrap();
+                let overflow_lookahead = af.out.capture_lookahead(&checkpoint);
+                if let Some(format) = self.contents_wrap_to_fit_fn_opt(af) {
+                    let result = af.out.with_enforce_max_width(format);
+                    if result.constraint_err_only()?.is_ok() {
+                        // return Ok(());
+                    }
+                    af.out.restore_checkpoint(&checkpoint);
+                }
+                let result = af.out.with_enforce_max_width(|| self.contents_separate_lines(af));
+                if result.constraint_err_only()?.is_err() {
+                    af.out.restore_checkpoint(&checkpoint);
+                    af.out.restore_lookahead(&overflow_lookahead);
+                    return Ok(());
+                }
                 let separate_lines_height = af.out.line() - first_line + 1;
                 if overflow_height < separate_lines_height {
                     af.out.restore_checkpoint(&checkpoint);

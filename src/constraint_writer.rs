@@ -53,17 +53,6 @@ pub struct ConstraintWriterLookahead {
     checkpoint: ConstraintWriterSelfCheckpoint,
 }
 
-struct ConstraintRecoveryModeGuard<'a> {
-    prev: ConstraintRecoveryMode,
-    writer: &'a ConstraintWriter,
-}
-
-impl Drop for ConstraintRecoveryModeGuard<'_> {
-    fn drop(&mut self) {
-        self.writer.constraint_recovery_mode.set(self.prev);
-    }
-}
-
 impl ConstraintWriter {
     pub fn new(
         constraints: OwnedConstraints,
@@ -98,27 +87,22 @@ impl ConstraintWriter {
         self.line.get()
     }
 
-    #[must_use]
-    pub fn constraint_recovery_mode_max(&self, mode: ConstraintRecoveryMode) -> Option<impl Drop> {
+    pub fn with_constraint_recovery_mode_max<T>(
+        &self,
+        mode: ConstraintRecoveryMode,
+        scope: impl FnOnce() -> T,
+    ) -> T {
         if self.constraint_recovery_mode.get() >= mode {
-            return None;
+            return scope();
         }
-        Some(ConstraintRecoveryModeGuard {
-            prev: self.constraint_recovery_mode.replace(mode),
-            writer: self,
-        })
-    }
-
-    #[must_use]
-    pub fn enforce_max_width(&self) -> Option<impl Drop> {
-        self.constraint_recovery_mode_max(
-            ConstraintRecoveryMode::NewlineNotAllowedOrMaxWidthExceeded,
-        )
+        self.constraint_recovery_mode.with_replaced(mode, scope)
     }
 
     pub fn with_enforce_max_width<T>(&self, scope: impl FnOnce() -> T) -> T {
-        let _guard = self.enforce_max_width();
-        scope()
+        self.with_constraint_recovery_mode_max(
+            ConstraintRecoveryMode::NewlineNotAllowedOrMaxWidthExceeded,
+            scope,
+        )
     }
 
     pub fn has_any_constraint_recovery(&self) -> bool {

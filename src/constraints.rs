@@ -29,14 +29,16 @@ pub struct MaxWidthForLine {
 pub enum MultiLineShape {
     /// No newline characters allowed
     SingleLine,
-    /// Allows constructs with curly braces spanning from the first line to the last line
+    /// Constructs with curly braces like a block or loop/if/match/etc.
+    /// All lines between the first and last lines must be indented (e.g. no if/else).
+    /// Does not include struct literals since they are deemed more like a list than a block.
     BlockLike,
     /// Allows multi-line lists including lists where the last item overflows
     VerticalList,
-    /// Allows wrap-indent after the first line, like in long chains. Also allows attributes.
+    /// Allows "hanging indent" as in a long chain where lines after the first are indented.
+    /// Also allows attributes.
     HangingIndent,
-    /// Allows everything else. Notably, this allows expressions that are indented in multiple
-    /// places, such as an if-else expression.
+    /// Allows everything else
     Unrestricted,
 }
 

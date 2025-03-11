@@ -111,50 +111,61 @@ impl AstFormatter {
         let extra_width = start - next_line_start;
 
         let checkpoint = self.out.checkpoint();
-        let enforce_max_width_guard = self.out.enforce_max_width();
-        // We're going to try formatting on the same line, but adding the extra width we would have
-        // if wrapping with a block. Use the single-line constraint since we just want to see what
-        // fits on the first line.
-        let result = self
-            .with_single_line(|| {
-                self.constraints()
-                    .with_max_width(Some(max_width + extra_width), || self.expr(body))
-            })
-            .constraint_err_only()?;
-        let succeeded = match result {
-            Err(e) if e.kind != ConstraintErrorKind::NewlineNotAllowed => {
-                // todo emit width exceeded error if it was not being enforced
-                return Err(e.into());
+        enum ExtraWidthResult {
+            AddBlock,
+            SameLine,
+            Done,
+        }
+        let result = self.out.with_enforce_max_width(|| -> FormatResult<ExtraWidthResult> {
+            // We're going to try formatting on the same line, but adding the extra width we would have
+            // if wrapping with a block. Use the single-line constraint since we just want to see what
+            // fits on the first line.
+            let result = self
+                .with_single_line(|| {
+                    self.constraints()
+                        .with_max_width(Some(max_width + extra_width), || self.expr(body))
+                })
+                .constraint_err_only()?;
+            let succeeded = match result {
+                Err(e) if e.kind != ConstraintErrorKind::NewlineNotAllowed => {
+                    // todo emit width exceeded error if it was not being enforced
+                    return Err(e.into());
+                }
+                result => result.is_ok(),
+            };
+            let used_extra_width = self.out.last_line_len() > max_width;
+            if used_extra_width {
+                // Either the extra width is strictly required to fit the first line,
+                // or the extra width allows more code to fit in the first line.
+                // Either way, add a block.
+                return Ok(ExtraWidthResult::AddBlock);
             }
-            result => result.is_ok(),
-        };
-        let used_extra_width = self.out.last_line_len() > max_width;
-        let should_add_block = if used_extra_width {
-            // We used the extra width, so we will add a block to make the first line fit.
-            // (A block may not be strictly needed, but without a block, the result would be broken
-            // into more lines.)
-            true
-        } else if !succeeded {
-            // we did not use the extra width, but it did not fit on one line,
-            // so try to format normally without a block
-            false
-        } else {
+            if !succeeded {
+                // We did not use the extra width, but it did not fit on one line,
+                // so try again to format on the same line without the extra width.
+                return Ok(ExtraWidthResult::SameLine);
+            }
             // it fits on one line, but now we need a comma
             match self.out.token_insert(",").constraint_err_only()? {
                 // welp the comma didn't fit,
                 // but the expression will fit on one line if we add a block
-                Err(_) => true,
+                Err(_) => Ok(ExtraWidthResult::AddBlock),
                 // it all fits on one line!
-                Ok(()) => return Ok(()),
+                Ok(()) => Ok(ExtraWidthResult::Done),
             }
-        };
-        drop(enforce_max_width_guard);
-        self.out.restore_checkpoint(&checkpoint);
-        if should_add_block {
-            self.expr_add_block(body)
-        } else {
-            self.arm_body_same_line(body, self.backtrack_from_checkpoint(checkpoint))
+        })?;
+        match result {
+            ExtraWidthResult::Done => {}
+            ExtraWidthResult::AddBlock => {
+                self.out.restore_checkpoint(&checkpoint);
+                self.expr_add_block(body)?;
+            }
+            ExtraWidthResult::SameLine => {
+                self.out.restore_checkpoint(&checkpoint);
+                self.arm_body_same_line(body, self.backtrack_from_checkpoint(checkpoint))?;
+            }
         }
+        Ok(())
     }
 
     fn arm_body_same_line(&self, body: &ast::Expr, backtrack: Backtrack) -> FormatResult {
