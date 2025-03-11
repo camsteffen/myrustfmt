@@ -73,18 +73,12 @@ impl AstFormatter {
             return Ok(());
         }
         let (overflowable, before_overflow) = chain.split_last().unwrap();
-
         self.with_single_line(|| self.postfix_items(before_overflow, start_pos))?;
-
-        self.postfix_chain_overflow_last_unless_separate_lines_preferred(
-            overflowable,
-            start_pos,
-            tail,
-        )?;
+        self.postfix_chain_overflow(overflowable, start_pos, tail)?;
         Ok(())
     }
 
-    fn postfix_chain_overflow_last_unless_separate_lines_preferred(
+    fn postfix_chain_overflow(
         &self,
         overflowable: &PostfixItem<'_>,
         start_pos: u32,
