@@ -16,7 +16,7 @@ struct PostfixItem<'a> {
     /// Subsequent items have a dot-notation item here, like `.field` or `.method()`.
     root_or_dot_item: &'a ast::Expr,
     /// any `?` or `[index]` occurring after `root_or_dot_item`
-    tail: Vec<&'a ast::Expr>,
+    non_dot_items: Vec<&'a ast::Expr>,
 }
 
 impl AstFormatter {
@@ -31,8 +31,7 @@ impl AstFormatter {
         let multi_line_root = loop {
             let next = chain_iter.next().unwrap();
             if chain_iter.as_slice().is_empty() {
-                self.postfix_item(next)?;
-                return self.tail(tail);
+                return self.postfix_item_tail(next, tail, false);
             }
             self.constraints()
                 .with_single_line_unless(MultiLineShape::Unrestricted, || self.postfix_item(next))?;
@@ -95,7 +94,9 @@ impl AstFormatter {
         let checkpoint = self.out.checkpoint();
         let enforce_max_width_guard = self.out.enforce_max_width();
 
-        self.with_chain_item_max_width(start_pos, || self.postfix_overflowable(overflowable))?;
+        self.with_chain_item_max_width(start_pos, || {
+            self.postfix_item_tail(overflowable, Tail::none(), true)
+        })?;
         // todo can we prove that the overflow is so long that a separate line won't be shorter?
         let overflow_height = self.out.line() - first_line + 1;
         self.tail(tail)?;
@@ -144,12 +145,6 @@ impl AstFormatter {
         //   - if you err out, there will be a cost of increased indent and added lines
     }
 
-    fn postfix_overflowable(&self, overflowable: &PostfixItem<'_>) -> FormatResult {
-        self.postfix_item_root(overflowable.root_or_dot_item)?;
-        self.with_single_line(|| self.postfix_tail(&overflowable.tail))?;
-        Ok(())
-    }
-
     fn postfix_chain_separate_lines(&self, chain: &[PostfixItem<'_>], tail: &Tail) -> FormatResult {
         for item in chain {
             self.newline_break_indent()?;
@@ -171,30 +166,42 @@ impl AstFormatter {
     }
 
     fn postfix_item(&self, item: &PostfixItem<'_>) -> FormatResult {
-        self.postfix_item_root(item.root_or_dot_item)?;
-        self.postfix_tail(&item.tail)?;
-        Ok(())
+        self.postfix_item_tail(item, Tail::none(), false)
     }
 
-    fn postfix_item_root(&self, item: &ast::Expr) -> FormatResult {
-        match item.kind {
+    fn postfix_item_tail(
+        &self,
+        item: &PostfixItem<'_>,
+        tail: &Tail,
+        single_line_tail: bool,
+    ) -> FormatResult {
+        let non_dot_items = |af: &Self| {
+            af.with_single_line_opt(single_line_tail, || {
+                af.postfix_non_dot_items(&item.non_dot_items, tail)
+            })
+        };
+        match item.root_or_dot_item.kind {
             ast::ExprKind::Await(..) => {
                 self.out.token(".")?;
-                self.out.token("await")?
+                self.out.token("await")?;
+                non_dot_items(self)?;
             }
             ast::ExprKind::Field(_, ident) => {
                 self.out.token(".")?;
-                self.ident(ident)?
+                self.ident(ident)?;
+                non_dot_items(self)?;
             }
             ast::ExprKind::MethodCall(ref method_call) => {
                 self.out.token(".")?;
                 self.path_segment(&method_call.seg, true, &self.tail_token("("))?;
                 // todo this is consistent with rustfmt, but would it be better to force args to be
                 //   on the same line, just allowing overflow of the last arg?
-                self.call_args_after_open_paren(&method_call.args, Tail::none())?;
+                self.call_args_after_open_paren(&method_call.args, &self.tail_fn(non_dot_items))?;
             }
             // root expression
-            _ => self.expr(item)?,
+            _ => {
+                self.expr_tail(item.root_or_dot_item, &self.tail_fn(non_dot_items))?;
+            }
         }
         Ok(())
     }
@@ -205,18 +212,35 @@ impl AstFormatter {
         })
     }
 
-    fn postfix_tail(&self, tail: &[&ast::Expr]) -> FormatResult {
-        for expr in tail {
+    fn postfix_non_dot_items(&self, postfix_tail: &[&ast::Expr], tail: &Tail) -> FormatResult {
+        if postfix_tail.is_empty() {
+            return self.tail(tail);
+        }
+        for (i, expr) in postfix_tail.iter().enumerate() {
+            let is_last = i == postfix_tail.len() - 1;
+            let tail = if is_last { tail } else { Tail::none() };
             match expr.kind {
                 ast::ExprKind::Index(_, ref index, _) => {
                     self.out.token("[")?;
                     self.backtrack()
                         .next(|| {
-                            self.with_single_line(|| self.expr_tail(index, &self.tail_token("]")))
+                            self.with_single_line(|| {
+                                self.expr(index)?;
+                                self.out.token("]")?;
+                                self.tail(tail)?;
+                                Ok(())
+                            })
                         })
-                        .otherwise(|| self.embraced_after_opening("]", || self.expr(index)))?;
+                        .otherwise(|| {
+                            self.embraced_after_opening("]", || self.expr(index))?;
+                            self.tail(tail)?;
+                            Ok(())
+                        })?;
                 }
-                ast::ExprKind::Try(..) => self.out.token("?")?,
+                ast::ExprKind::Try(..) => {
+                    self.out.token("?")?;
+                    self.tail(tail)?;
+                }
                 _ => unreachable!(),
             }
         }
@@ -227,15 +251,15 @@ impl AstFormatter {
 fn build_postfix_chain(expr: &ast::Expr) -> Vec<PostfixItem<'_>> {
     let mut current = expr;
     let mut items = Vec::new();
-    let mut tail = Vec::new();
+    let mut non_dot_items = Vec::new();
     let root = loop {
         if postfix_expr_is_dot(current) {
             items.push(PostfixItem {
                 root_or_dot_item: current,
-                tail: tail.drain(..).rev().collect(),
+                non_dot_items: non_dot_items.drain(..).rev().collect(),
             })
         } else {
-            tail.push(current);
+            non_dot_items.push(current);
         }
         let receiver = postfix_expr_receiver(current);
         if !is_postfix_expr(receiver) {
@@ -243,10 +267,10 @@ fn build_postfix_chain(expr: &ast::Expr) -> Vec<PostfixItem<'_>> {
         }
         current = receiver;
     };
-    tail.reverse();
+    non_dot_items.reverse();
     items.push(PostfixItem {
         root_or_dot_item: root,
-        tail,
+        non_dot_items,
     });
     items.reverse();
     items

@@ -8,6 +8,17 @@ impl AstFormatter {
             .with_multi_line_shape_replaced(MultiLineShape::SingleLine, format)
     }
 
+    pub fn with_single_line_opt<T>(
+        &self,
+        apply: bool,
+        scope: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
+        if !apply {
+            return scope();
+        }
+        self.with_single_line(scope)
+    }
+
     pub fn with_width_limit<T>(
         &self,
         width_limit: u32,

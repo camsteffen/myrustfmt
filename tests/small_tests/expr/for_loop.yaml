@@ -1,7 +1,0 @@
-- name: for loop with label
-  type: no_change
-  in_block: true
-  formatted: |
-    'label: for x in y {
-        x;
-    }

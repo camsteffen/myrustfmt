@@ -1,4 +1,5 @@
 #![feature(rustc_private)]
+#![feature(str_split_inclusive_remainder)]
 
 use std::error::Error;
 use serde::Deserialize;
@@ -12,6 +13,7 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 datatest_stable::harness! {
     { test = small_test_file, root = "tests/small_tests", pattern = r".yaml" },
+    { test = small_test_file_rs, root = "tests/small_tests_rs", pattern = r".rs" },
 }
 
 fn small_test_file(test_source_path: &Path) -> TestResult {
@@ -28,6 +30,106 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
         return Err("a test has focus: true".into());
     }
     Ok(())
+}
+
+fn small_test_file_rs(test_source_path: &Path) -> TestResult {
+    let string = fs::read_to_string(test_source_path)?;
+    let mut lines = string.split_inclusive('\n');
+    let mut lines_peekable = lines.by_ref().peekable();
+    let mut test_kind = None;
+    loop {
+        let Some(&line) = lines_peekable.peek() else {
+            break;
+        };
+        let Some(comment) = line.strip_prefix("//") else {
+            break;
+        };
+        lines_peekable.next();
+        let Some(comment) = comment.strip_prefix(" ") else {
+            return Err("expected a leading space in header comment".into());
+        };
+        let comment = comment.strip_suffix('\n').unwrap();
+        let (name, value) = comment
+            .split_once(": ")
+            .ok_or("expected \": \" in header comment")?;
+        match name {
+            "test-kind" => {
+                if test_kind.is_some() {
+                    return Err("test-kind already declared".into());
+                }
+                test_kind = Some(match value {
+                    "before-after" => TestKindRaw::BeforeAfter,
+                    "breakpoint" => TestKindRaw::Breakpoint,
+                    "no-change" => TestKindRaw::NoChange,
+                    _ => return Err(format!("invalid test-kind: {value:?}").into()),
+                });
+            }
+            _ => return Err(format!("invalid name: {name:?}").into()),
+        }
+    }
+    match lines_peekable.peek().copied() {
+        Some("\n") => {}
+        next => return Err(
+            format!("expected a blank line after header comments, found {next:?}")
+                .into(),
+        ),
+    }
+    let Some(test_kind_raw) = test_kind else {
+        return Err("expected test-kind".into());
+    };
+    let source = lines.remainder().unwrap_or("");
+    let kind = match test_kind_raw {
+        TestKindRaw::BeforeAfter => {
+            let (before, after) = parse_before_after(source)?;
+            TestKind::BeforeAfter { before, after }
+        }
+        TestKindRaw::Breakpoint => {
+            let (before, after) = parse_before_after(source)?;
+            TestKind::Breakpoint { before, after }
+        }
+        TestKindRaw::NoChange => {
+            for line in source.lines() {
+                if let Some((_, comment)) = line.split_once("//") {
+                    if comment.to_ascii_lowercase().contains(":after:") {
+                        return Err("Unexpected control comment".into());
+                    }
+                }
+            }
+            TestKind::NoChange {
+                formatted: source.to_owned(),
+            }
+        }
+    };
+    // todo use file contents
+    let expect_errors = test_source_path
+        .with_extension("stderr")
+        .try_exists()
+        .unwrap();
+    let test = Test {
+        name: test_source_path
+            .file_stem()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned(),
+        focus: false,
+        kind,
+        in_block: false,
+        max_width: None,
+        expect_errors,
+    };
+    small_test(&test)?;
+    Ok(())
+}
+
+fn parse_before_after(source: &str) -> TestResult<(String, String)> {
+    let delim = "\n\n// :after:\n\n";
+    let Some(index) = source.find(delim) else {
+        return Err(format!("Expected to find {delim:?}").into());
+    };
+    let before = source[..index + 1].to_owned(); // include a trailing newline
+    let after = source[index + delim.len()..].to_owned();
+    Ok((before, after))
 }
 
 fn small_test(test: &Test) -> TestResult {
@@ -99,6 +201,12 @@ enum TestKind {
     Breakpoint { before: String, after: String },
     NoChange { formatted: String },
     BeforeAfter { before: String, after: String },
+}
+
+enum TestKindRaw {
+    BeforeAfter,
+    Breakpoint,
+    NoChange,
 }
 
 fn breakpoint_test(before: &str, after: &str, in_block: bool) -> TestResult {
