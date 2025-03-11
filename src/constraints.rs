@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::error::FormatResult;
-use std::cell::{RefCell};
+use std::cell::RefCell;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -70,7 +70,7 @@ impl Deref for ConstraintsGen {
 struct ConstraintsChange<T> {
     data: ConstraintsChangeData<T>,
     #[cfg(debug_assertions)]
-    prev_generation: u32
+    prev_generation: u32,
 }
 
 impl<Revert: FnOnce(&mut Constraints)> ConstraintsChange<Revert> {
@@ -82,24 +82,32 @@ impl<Revert: FnOnce(&mut Constraints)> ConstraintsChange<Revert> {
         match self.data {
             ConstraintsChangeData::Ref(prev) => c_ref.constraints = prev,
             ConstraintsChangeData::Revert(revert) => {
-                let constraints = Rc::get_mut(&mut c_ref.constraints).expect("constraint change expected to have exclusive ownership to revert");
+                let constraints = Rc::get_mut(&mut c_ref.constraints).expect(
+                    "constraint change expected to have exclusive ownership to revert",
+                );
                 revert(constraints)
-            },
+            }
         }
     }
 }
 
 enum ConstraintsChangeData<Revert> {
     Ref(Rc<Constraints>),
-    Revert(Revert)
+    Revert(Revert),
 }
 
-struct ConstraintsChangeGuard<'a, Revert> where Revert: FnOnce(&mut Constraints) {
+struct ConstraintsChangeGuard<'a, Revert>
+where
+    Revert: FnOnce(&mut Constraints),
+{
     change: Option<ConstraintsChange<Revert>>,
     constraints: &'a OwnedConstraints,
 }
 
-impl<Revert> Drop for ConstraintsChangeGuard<'_, Revert> where Revert: FnOnce(&mut Constraints) {
+impl<Revert> Drop for ConstraintsChangeGuard<'_, Revert>
+where
+    Revert: FnOnce(&mut Constraints),
+{
     fn drop(&mut self) {
         if !std::thread::panicking() {
             if let Some(change) = self.change.take() {
@@ -111,18 +119,19 @@ impl<Revert> Drop for ConstraintsChangeGuard<'_, Revert> where Revert: FnOnce(&m
 
 impl OwnedConstraints {
     pub fn new(constraints: Constraints) -> OwnedConstraints {
-        OwnedConstraints(RefCell::new(ConstraintsGen { constraints: Rc::new(constraints), generation: 0 }))
+        OwnedConstraints(RefCell::new(ConstraintsGen {
+            constraints: Rc::new(constraints),
+            generation: 0,
+        }))
     }
-    
-    fn change<T>(
-        &self,
-        get: impl Fn(&mut Constraints) -> &mut T + 'static,
-        value: T,
-    ) -> impl Drop {
+
+    fn change<T>(&self, get: impl Fn(&mut Constraints) -> &mut T + 'static, value: T) -> impl Drop {
         let mut constraints_ref = self.0.borrow_mut();
         let data = if let Some(constraints) = Rc::get_mut(&mut constraints_ref.constraints) {
             let prev = std::mem::replace(get(constraints), value);
-            ConstraintsChangeData::Revert(move |constraints: &mut Constraints| *get(constraints) = prev)
+            ConstraintsChangeData::Revert(move |constraints: &mut Constraints| {
+                *get(constraints) = prev
+            })
         } else {
             let mut constraints = Constraints::clone(&constraints_ref.constraints);
             *get(&mut constraints) = value;
@@ -142,8 +151,8 @@ impl OwnedConstraints {
             constraints: self,
         }
     }
-    
-    fn with_replaced_value<V:'static, T>(
+
+    fn with_replaced_value<V: 'static, T>(
         &self,
         get: impl Fn(&mut Constraints) -> &mut V + 'static,
         value: V,

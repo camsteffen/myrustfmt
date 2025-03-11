@@ -1,0 +1,5 @@
+- name: break with label
+  type: no_change
+  in_block: true
+  formatted: |
+    break 'heh thing;

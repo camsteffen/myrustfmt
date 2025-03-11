@@ -110,14 +110,17 @@ impl AstFormatter {
         // todo share logic with match arm
         // todo should we check if the wrap allows a *longer* first line, like match arm?
         // todo account for having less width if the fallback will add a block
-        let result = self.out.with_enforce_max_width(|| self
-            .indented(|| {
-                self.newline_break_indent()?;
-                self.postfix_item(overflowable)?;
-                let height = self.out.line() - first_line + 1;
-                self.tail(tail)?;
-                Ok(height)
-            }))
+        let result = self
+            .out
+            .with_enforce_max_width(|| {
+                self.indented(|| {
+                    self.newline_break_indent()?;
+                    self.postfix_item(overflowable)?;
+                    let height = self.out.line() - first_line + 1;
+                    self.tail(tail)?;
+                    Ok(height)
+                })
+            })
             .constraint_err_only()?;
 
         match result {

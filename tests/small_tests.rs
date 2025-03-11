@@ -149,11 +149,14 @@ fn format_max_width_expected(
 }
 
 fn handle_format_errors(result: FormatModuleResult, expect_errors: bool) -> TestResult<String> {
-    let FormatModuleResult {error_count, formatted} =result;
+    let FormatModuleResult {
+        error_count,
+        formatted,
+    } = result;
     match error_count {
         0 if expect_errors => Err("expected errors".into()),
         1.. if !expect_errors => Err("errors occurred".into()),
-        _ => Ok(formatted)
+        _ => Ok(formatted),
     }
 }
 

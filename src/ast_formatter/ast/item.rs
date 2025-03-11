@@ -167,7 +167,7 @@ impl AstFormatter {
         self.with_attrs(&variant.attrs, variant.span, || {
             self.vis(&variant.vis)?;
             self.ident(variant.ident)?;
-            self.variant_data(&variant.data, true)?;
+            self.variant_data(&variant.data, true, true)?;
             if let Some(_discriminant) = &variant.disr_expr {
                 todo!()
             }
@@ -261,11 +261,16 @@ impl AstFormatter {
         generics: &ast::Generics,
         item: &ast::Item,
     ) -> FormatResult {
+        let (has_body, has_semi) = match variants {
+            ast::VariantData::Struct { .. } => (true, false),
+            ast::VariantData::Tuple(..) => (true, true),
+            ast::VariantData::Unit(_) => (false, true),
+        };
         self.token_ident_generic_params("struct", item.ident, generics)?;
-        self.variant_data(variants, false)?;
-        match variants {
-            ast::VariantData::Struct { .. } => {}
-            ast::VariantData::Tuple(..) | ast::VariantData::Unit(_) => self.out.token(";")?,
+        self.where_clause(&generics.where_clause, has_body)?;
+        self.variant_data(variants, false, generics.where_clause.is_empty())?;
+        if has_semi {
+            self.out.token(";")?;
         }
         Ok(())
     }
@@ -306,10 +311,17 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn variant_data(&self, variants: &ast::VariantData, is_enum: bool) -> FormatResult {
+    fn variant_data(
+        &self,
+        variants: &ast::VariantData,
+        is_enum: bool,
+        is_same_line: bool,
+    ) -> FormatResult {
         match variants {
             ast::VariantData::Struct { fields, .. } => {
-                self.out.space()?;
+                if is_same_line {
+                    self.out.space()?;
+                }
                 let list = list(Braces::CURLY, fields, Self::field_def)
                     .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width);
                 if is_enum {

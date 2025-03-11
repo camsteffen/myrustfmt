@@ -40,11 +40,14 @@ impl AstFormatter {
                                 drop(within_margin);
                                 break;
                             };
-                            let success = self.backtrack().next(|| {
-                                self.out.space_token_space(op.as_str())?;
-                                self.expr(expr)?;
-                                Ok(true)
-                            }).otherwise(|| Ok(false))?;
+                            let success = self
+                                .backtrack()
+                                .next(|| {
+                                    self.out.space_token_space(op.as_str())?;
+                                    self.expr(expr)?;
+                                    Ok(true)
+                                })
+                                .otherwise(|| Ok(false))?;
                             if !success {
                                 drop(within_margin);
                                 // back up one for a redo

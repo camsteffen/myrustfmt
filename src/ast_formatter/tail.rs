@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::{ ConstraintsGen};
+use crate::constraints::ConstraintsGen;
 use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
 

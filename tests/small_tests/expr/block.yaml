@@ -15,3 +15,8 @@
     {
         x;
     }
+- name: label
+  type: no_change
+  in_block: true
+  formatted: |
+    let _ = 'hi: {};

@@ -97,7 +97,7 @@ impl ConstraintWriter {
     pub fn line(&self) -> u32 {
         self.line.get()
     }
-    
+
     #[must_use]
     pub fn constraint_recovery_mode_max(&self, mode: ConstraintRecoveryMode) -> Option<impl Drop> {
         if self.constraint_recovery_mode.get() >= mode {
@@ -111,9 +111,11 @@ impl ConstraintWriter {
 
     #[must_use]
     pub fn enforce_max_width(&self) -> Option<impl Drop> {
-        self.constraint_recovery_mode_max(ConstraintRecoveryMode::NewlineNotAllowedOrMaxWidthExceeded)
+        self.constraint_recovery_mode_max(
+            ConstraintRecoveryMode::NewlineNotAllowedOrMaxWidthExceeded,
+        )
     }
-    
+
     pub fn with_enforce_max_width<T>(&self, scope: impl FnOnce() -> T) -> T {
         let _guard = self.enforce_max_width();
         scope()
@@ -126,7 +128,7 @@ impl ConstraintWriter {
             ConstraintRecoveryMode::NewlineNotAllowedOrMaxWidthExceeded => true,
         }
     }
-    
+
     pub fn is_enforcing_max_width(&self) -> bool {
         match self.constraint_recovery_mode.get() {
             ConstraintRecoveryMode::Nothing => false,
@@ -253,9 +255,9 @@ impl ConstraintWriter {
         // If there is a fallback formatting strategy, then raise an error to trigger the
         // fallback. Otherwise, emit an error and keep going.
         if self.is_enforcing_max_width() {
-            Err(ConstraintError::new(
-                ConstraintErrorKind::WidthLimitExceeded,
-            ))
+            Err(
+                ConstraintError::new(ConstraintErrorKind::WidthLimitExceeded),
+            )
         } else {
             let line = self.line.get();
             if self.last_width_exceeded_line.get() != Some(line) {

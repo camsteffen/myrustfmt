@@ -65,9 +65,7 @@ impl AstFormatter {
                 self.expr_tail(target, take_tail())?;
             }
             ast::ExprKind::Lit(_) => self.out.copy_span(expr.span)?,
-            ast::ExprKind::Cast(ref target, ref ty) => {
-                    self.cast(target, ty, take_tail())?
-            }
+            ast::ExprKind::Cast(ref target, ref ty) => self.cast(target, ty, take_tail())?,
             ast::ExprKind::Type(_, _) => todo!(),
             ast::ExprKind::Let(ref pat, ref init, ..) => {
                 self.out.token_space("let")?;
@@ -88,7 +86,7 @@ impl AstFormatter {
                 label,
                 ..
             } => {
-                self.label(label)?;
+                self.label(label, true)?;
                 self.out.token_space("for")?;
                 self.pat(pat)?;
                 self.out.space_token_space("in")?;
@@ -97,7 +95,7 @@ impl AstFormatter {
                 self.block_separate_lines(body)?;
             }
             ast::ExprKind::Loop(ref block, label, _) => {
-                self.label(label)?;
+                self.label(label, true)?;
                 self.out.token_space("loop")?;
                 self.block_separate_lines(block)?;
             }
@@ -139,7 +137,7 @@ impl AstFormatter {
                 if label.is_some() || inner.is_some() {
                     self.out.space()?;
                 }
-                self.label(label)?;
+                self.label(label, false)?;
                 if let Some(inner) = inner {
                     self.expr_tail(inner, take_tail())?;
                 }
@@ -157,9 +155,7 @@ impl AstFormatter {
             ast::ExprKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,
             ast::ExprKind::Struct(ref struct_) => self.struct_expr(struct_, take_tail())?,
             ast::ExprKind::Repeat(_, _) => todo!(),
-            ast::ExprKind::Paren(ref inner) => {
-                    self.paren(inner, take_tail())?
-            }
+            ast::ExprKind::Paren(ref inner) => self.paren(inner, take_tail())?,
             ast::ExprKind::Yield(_) => todo!(),
             ast::ExprKind::Yeet(_) => todo!(),
             ast::ExprKind::Become(_) => todo!(),
@@ -230,12 +226,15 @@ impl AstFormatter {
                         af.backtrack()
                             // If it's too wide, adding a block won't help.
                             // The block is only for ensuring a "hanging indent"-compliant shape.
-                            .next_with_constraint_recovery_mode(ConstraintRecoveryMode::NewlineNotAllowed, || {
+                            .next_with_constraint_recovery_mode(
+                                ConstraintRecoveryMode::NewlineNotAllowed,
+                                || {
                                     af.constraints().with_multi_line_shape_min(
                                         MultiLineShape::HangingIndent,
                                         format,
                                     )
-                            })
+                                },
+                            )
                             .otherwise(|| {
                                 af.expr_add_block(expr)?;
                                 af.tail(tail)?;
@@ -260,14 +259,17 @@ impl AstFormatter {
         self.expr_tail(&anon_const.value, tail)
     }
 
-    pub fn label(&self, label: Option<ast::Label>) -> FormatResult {
+    pub fn label(&self, label: Option<ast::Label>, has_colon: bool) -> FormatResult {
         if let Some(label) = label {
             self.ident(label.ident)?;
+            if has_colon {
+                self.out.token(":")?;
+            }
             self.out.space()?;
         }
         Ok(())
     }
-    
+
     fn cast(&self, target: &ast::Expr, ty: &ast::Ty, tail: &Tail) -> FormatResult {
         self.expr(target)?;
         self.backtrack()
@@ -291,15 +293,13 @@ impl AstFormatter {
             })?;
         Ok(())
     }
-    
+
     fn paren(&self, inner: &ast::Expr, tail: &Tail) -> FormatResult {
         self.out.token("(")?;
         self.backtrack()
             .next(|| {
                 self.constraints()
-                    .with_multi_line_shape_min(MultiLineShape::VerticalList, || {
-                        self.expr(inner)
-                    })?;
+                    .with_multi_line_shape_min(MultiLineShape::VerticalList, || self.expr(inner))?;
                 self.out.token(")")?;
                 self.tail(tail)?;
                 Ok(())

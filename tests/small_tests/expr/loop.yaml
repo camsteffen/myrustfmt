@@ -1,0 +1,7 @@
+- name: loop with label
+  type: no_change
+  in_block: true
+  formatted: |
+    'label: loop {
+        x;
+    }

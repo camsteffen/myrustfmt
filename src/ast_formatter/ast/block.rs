@@ -13,7 +13,7 @@ impl AstFormatter {
         block: &ast::Block,
         tail: &Tail,
     ) -> FormatResult {
-        self.label(label)?;
+        self.label(label, true)?;
         self.out.token("{")?;
         match self.try_into_expr_only_block(block) {
             None => {

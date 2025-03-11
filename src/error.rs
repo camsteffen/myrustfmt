@@ -49,9 +49,7 @@ pub struct ConstraintError {
 }
 
 impl ConstraintError {
-    pub fn new(
-        kind: ConstraintErrorKind,
-    ) -> ConstraintError {
+    pub fn new(kind: ConstraintErrorKind) -> ConstraintError {
         ConstraintError {
             kind,
             #[cfg(debug_assertions)]
@@ -61,9 +59,7 @@ impl ConstraintError {
 
     fn backtrace(&self) -> Option<&Backtrace> {
         #[cfg(debug_assertions)]
-        {
-            Some(&self.backtrace)
-        }
+        { Some(&self.backtrace) }
         #[cfg(not(debug_assertions))]
         { None }
     }
@@ -181,9 +177,7 @@ impl From<ConstraintError> for FormatError {
 
 impl From<ConstraintErrorKind> for ConstraintError {
     fn from(kind: ConstraintErrorKind) -> Self {
-        ConstraintError::new(
-            kind,
-        )
+        ConstraintError::new(kind)
     }
 }
 

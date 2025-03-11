@@ -43,7 +43,7 @@ mod submodules;
 mod util;
 mod whitespace;
 
-use crate::ast_formatter::{format_module};
+use crate::ast_formatter::format_module;
 use crate::config::Config;
 use crate::parse::{ParseModuleResult, parse_module};
 use crate::submodules::Submodule;

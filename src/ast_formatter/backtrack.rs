@@ -13,7 +13,10 @@ impl AstFormatter {
         }
     }
 
-    pub fn backtrack_from_checkpoint<T>(&self, checkpoint: SourceFormatterCheckpoint) -> Backtrack<T> {
+    pub fn backtrack_from_checkpoint<T>(
+        &self,
+        checkpoint: SourceFormatterCheckpoint,
+    ) -> Backtrack<T> {
         Backtrack {
             af: self,
             state: BacktrackState::Incomplete(checkpoint),
@@ -48,13 +51,21 @@ impl<T> Backtrack<'_, T> {
         self.do_next(MAX_CONSTRAINT_RECOVERY_MODE, strategy);
         self
     }
-    
-    pub fn next_with_constraint_recovery_mode(mut self, mode: ConstraintRecoveryMode, strategy: impl FnOnce() -> FormatResult<T>) -> Self {
+
+    pub fn next_with_constraint_recovery_mode(
+        mut self,
+        mode: ConstraintRecoveryMode,
+        strategy: impl FnOnce() -> FormatResult<T>,
+    ) -> Self {
         self.do_next(mode, strategy);
         self
     }
-    
-    fn do_next(&mut self, mode: ConstraintRecoveryMode, strategy: impl FnOnce() -> FormatResult<T>) {
+
+    fn do_next(
+        &mut self,
+        mode: ConstraintRecoveryMode,
+        strategy: impl FnOnce() -> FormatResult<T>,
+    ) {
         if let BacktrackState::Init = self.state {
             self.state = BacktrackState::Incomplete(self.af.out.checkpoint());
         }

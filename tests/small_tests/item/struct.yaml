@@ -6,3 +6,18 @@
     struct Struct {
         x: X,
     }
+- name: where clause unit struct
+  type: no_change
+  formatted: |
+    struct Foo<X>
+    where
+        X: Y;
+- name: where clause normal struct
+  type: no_change
+  formatted: |
+    struct Foo<X>
+    where
+        X: Y,
+    {
+        x: y,
+    }

@@ -1,7 +1,9 @@
 use std::cell::Cell;
 use std::panic::Location;
-use crate::constraint_writer::{ConstraintRecoveryMode, ConstraintWriter, ConstraintWriterCheckpoint, ConstraintWriterLookahead};
-use crate::constraints::{OwnedConstraints};
+use crate::constraint_writer::{
+    ConstraintRecoveryMode, ConstraintWriter, ConstraintWriterCheckpoint, ConstraintWriterLookahead,
+};
+use crate::constraints::OwnedConstraints;
 use crate::error::FormatResult;
 use crate::error_emitter::ErrorEmitter;
 use self::source_reader::SourceReader;
