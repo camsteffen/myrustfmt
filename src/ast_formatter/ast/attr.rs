@@ -73,7 +73,7 @@ impl AstFormatter {
             // unexpected
             ConstraintErrorKind::NextStrategy => return Err(e.into()),
         }
-        debug_assert!(self.error_emitter.error_count() > 0, "an error should be emitted before copy fallback");
+        debug_assert!(self.error_emitter.error_count() > 0, "an error should be emitted before copy fallback\nstack trace:\n{}", e.backtrace);
         self.out.restore_checkpoint(&checkpoint);
         drop(checkpoint);
         self.out

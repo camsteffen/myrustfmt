@@ -292,3 +292,26 @@
             foooooo
         }
     }
+- name: body is closure with multi-line args
+  type: before_after
+  in_block: true
+  before: |
+    match x {
+        pppppppppppppppppppppppppppppppppppp => |
+            arrrrrrrrrrrrrrrrrrrrrrrrrrrrg,
+            arrrrrrrrrrrrrrrrrrrrrrrrrrrrg,
+            arrrrrrrrrrrrrrrrrrrrrrrrrrrrg,
+            arrrrrrrrrrrrrrrrrrrrrrrrrrrrg,
+        | x,
+    }
+  after: |
+    match x {
+        pppppppppppppppppppppppppppppppppppp => {
+            |
+                arrrrrrrrrrrrrrrrrrrrrrrrrrrrg,
+                arrrrrrrrrrrrrrrrrrrrrrrrrrrrg,
+                arrrrrrrrrrrrrrrrrrrrrrrrrrrrg,
+                arrrrrrrrrrrrrrrrrrrrrrrrrrrrg,
+            | x
+        }
+    }

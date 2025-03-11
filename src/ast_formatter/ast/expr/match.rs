@@ -108,12 +108,6 @@ impl AstFormatter {
         let start = self.out.last_line_len();
         // the starting position if we wrapped to the next line and indented
         let next_line_start = self.out.indent.get() + INDENT_WIDTH;
-        if start <= next_line_start {
-            // adding a block wouldn't afford us more width so no need to experiment to see if it
-            // would be fewer lines
-            // todo is this even possible?
-            return self.arm_body_same_line(body, self.backtrack());
-        }
         let extra_width = start - next_line_start;
 
         let checkpoint = self.out.checkpoint();
@@ -129,6 +123,7 @@ impl AstFormatter {
             .constraint_err_only()?;
         let succeeded = match result {
             Err(e) if e.kind != ConstraintErrorKind::NewlineNotAllowed => {
+                // todo emit width exceeded error if it was not being enforced
                 return Err(e.into());
             }
             result => result.is_ok(),

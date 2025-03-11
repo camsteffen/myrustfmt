@@ -25,6 +25,9 @@ impl AstFormatter {
             self.ty_tail(ty, &self.tail_token(";"))?;
             return Ok(());
         };
+        
+        // with initializer...
+        
         self.pat(pat)?;
         if let Some(ty) = ty {
             // todo tail?
@@ -36,6 +39,9 @@ impl AstFormatter {
             self.local_init(init, &self.tail_token(";"))?;
             return Ok(());
         };
+        
+        // with else...
+        
         self.local_init(init, Tail::none())?;
         let is_single_line_init = self.out.line() == first_line;
         let else_separate_lines = || {

@@ -102,3 +102,11 @@
     let Some(_) = x else {
         return y;
     };
+- name: assign list that exceeds max width
+  type: no_change
+  in_block: true
+  expect_errors: true
+  formatted: |
+    let x = [
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    ];
