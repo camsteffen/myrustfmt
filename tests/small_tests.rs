@@ -6,7 +6,7 @@ use std::fs;
 use std::io::BufReader;
 use std::path::Path;
 use myrustfmt::config::Config;
-use myrustfmt::format_str;
+use myrustfmt::{format_str, FormatModuleResult};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -24,6 +24,9 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
             small_test(test)?;
         }
     }
+    if has_focus {
+        return Err("a test has focus: true".into());
+    }
     Ok(())
 }
 
@@ -31,6 +34,7 @@ fn small_test(test: &Test) -> TestResult {
     eprintln!("Test: {}", &test.name);
     match &test.kind {
         TestKind::Breakpoint { before, after } => {
+            assert!(!test.expect_errors);
             assert!(test.max_width.is_none());
             breakpoint_test(before, after, test.in_block)?
         }
@@ -42,6 +46,7 @@ fn small_test(test: &Test) -> TestResult {
                 formatted,
                 "formatted",
                 test.in_block,
+                test.expect_errors,
             )?;
         }
         TestKind::BeforeAfter { before, after } => {
@@ -53,6 +58,7 @@ fn small_test(test: &Test) -> TestResult {
                 after,
                 "before -> after",
                 test.in_block,
+                test.expect_errors,
             )?;
             format_max_width_expected(
                 after,
@@ -60,6 +66,7 @@ fn small_test(test: &Test) -> TestResult {
                 after,
                 "after (idempotency)",
                 test.in_block,
+                false,
             )?;
         }
     }
@@ -73,6 +80,8 @@ struct Test {
     focus: bool,
     #[serde(flatten)]
     kind: TestKind,
+    #[serde(default)]
+    expect_errors: bool,
     #[serde(default)]
     in_block: bool,
     max_width: Option<u32>,
@@ -102,6 +111,7 @@ fn breakpoint_test(before: &str, after: &str, in_block: bool) -> TestResult {
         before,
         "before max width reduction",
         in_block,
+        false,
     )?;
     println!("after width reduction...");
     format_max_width_expected(
@@ -110,6 +120,7 @@ fn breakpoint_test(before: &str, after: &str, in_block: bool) -> TestResult {
         after,
         "after max width reduction",
         in_block,
+        false,
     )?;
     Ok(())
 }
@@ -120,22 +131,33 @@ fn format_max_width_expected(
     expected: &str,
     name: &str,
     in_block: bool,
+    expect_errors: bool,
 ) -> TestResult {
     let formatted = if in_block {
-        format_in_block(source, max_width)?
+        format_in_block(source, max_width, expect_errors)?
     } else {
         let mut config = Config::default();
         if let Some(max_width) = max_width {
             config = config.max_width(max_width)
         }
-        format_str(source, config).unwrap().into_result()?
+        let result = format_str(source, config).unwrap();
+        handle_format_errors(result, expect_errors)?
     };
     let expected = format!("{expected}\n");
     expect_formatted_equals(&formatted, &expected, name)?;
     Ok(())
 }
 
-fn format_in_block(stmt: &str, max_width: Option<u32>) -> TestResult<String> {
+fn handle_format_errors(result: FormatModuleResult, expect_errors: bool) -> TestResult<String> {
+    let FormatModuleResult {error_count, formatted} =result;
+    match error_count {
+        0 if expect_errors => Err("expected errors".into()),
+        1.. if !expect_errors => Err("errors occurred".into()),
+        _ => Ok(formatted)
+    }
+}
+
+fn format_in_block(stmt: &str, max_width: Option<u32>, expect_errors: bool) -> TestResult<String> {
     let (prefix, indent, suffix) = ("fn test() {\n", "    ", "}\n");
     let stmt = String::from_iter(stmt.lines().map(|s| format!("{indent}{s}\n")));
     let module_source = format!("{prefix}{stmt}{suffix}");
@@ -148,7 +170,8 @@ fn format_in_block(stmt: &str, max_width: Option<u32>) -> TestResult<String> {
         }
         config = config.max_width(max_width);
     }
-    let result = format_str(&module_source, config).unwrap().into_result()?;
+    let result = format_str(&module_source, config).unwrap();
+    let result = handle_format_errors(result, expect_errors)?;
     let lines = result
         .strip_prefix(prefix)
         .unwrap_or_else(|| panic!(

@@ -35,7 +35,6 @@
     a // hehe
         + b;
 - name: don't wrap within indent-width after multi-line item
-  focus: true
   type: no_change
   in_block: true
   formatted: |

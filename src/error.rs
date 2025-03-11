@@ -46,35 +46,26 @@ pub struct ConstraintError {
     pub kind: ConstraintErrorKind,
     #[cfg(debug_assertions)]
     pub backtrace: Box<Backtrace>,
-    #[cfg(debug_assertions)]
-    pub open_checkpoint_backtrace: Option<Box<Backtrace>>,
 }
 
 impl ConstraintError {
     pub fn new(
         kind: ConstraintErrorKind,
-        #[cfg(debug_assertions)]
-        open_checkpoint_backtrace: Option<Box<Backtrace>>,
     ) -> ConstraintError {
         ConstraintError {
             kind,
             #[cfg(debug_assertions)]
             backtrace: Box::new(Backtrace::capture()),
-            #[cfg(debug_assertions)]
-            open_checkpoint_backtrace,
         }
     }
 
-    fn backtraces(&self) -> (Option<&Backtrace>, Option<&Backtrace>) {
+    fn backtrace(&self) -> Option<&Backtrace> {
         #[cfg(debug_assertions)]
         {
-            (
-                Some(&self.backtrace),
-                self.open_checkpoint_backtrace.as_deref(),
-            )
+            Some(&self.backtrace)
         }
         #[cfg(not(debug_assertions))]
-        { (None, None) }
+        { None }
     }
 }
 
@@ -135,7 +126,7 @@ impl FormatError {
                 }
                 Ok(())
             };
-            let (backtrace, open_checkpoint_backtrace) = match self {
+            let backtrace = match self {
                 FormatError::Constraint(e) => {
                     match e.kind {
                         ConstraintErrorKind::NextStrategy => {
@@ -146,7 +137,7 @@ impl FormatError {
                             write!(f, "width limit exceeded")?
                         }
                     }
-                    e.backtraces()
+                    e.backtrace()
                 }
                 FormatError::Parse(parse_error) => {
                     match parse_error.kind {
@@ -168,7 +159,7 @@ impl FormatError {
                             next_token(f)?;
                         }
                     }
-                    (Some(&*parse_error.backtrace), None)
+                    Some(&*parse_error.backtrace)
                 }
             };
             if cfg!(debug_assertions) && path.is_none() {
@@ -176,9 +167,6 @@ impl FormatError {
             }
             if let Some(backtrace) = backtrace {
                 write!(f, "\nformat error backtrace:\n{backtrace}")?;
-            }
-            if let Some(backtrace) = open_checkpoint_backtrace {
-                write!(f, "\nopen checkpoint backtrace:\n{backtrace}")?;
             }
             Ok(())
         })
@@ -195,8 +183,6 @@ impl From<ConstraintErrorKind> for ConstraintError {
     fn from(kind: ConstraintErrorKind) -> Self {
         ConstraintError::new(
             kind,
-            #[cfg(debug_assertions)]
-            None,
         )
     }
 }

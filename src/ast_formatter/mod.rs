@@ -1,17 +1,15 @@
-use std::cell::RefCell;
-use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::ast_module::AstModule;
 use crate::config::Config;
-use crate::constraints::{CheckpointCounter, Constraints, OwnedConstraints};
+use crate::constraints::{Constraints, OwnedConstraints};
 use crate::error_emitter::ErrorEmitter;
 use crate::source_formatter::SourceFormatter;
 use crate::error::FormatResult;
+use crate::FormatModuleResult;
 
 mod ast;
-mod checkpoint;
 mod util;
 mod list;
 pub mod tail;
@@ -20,44 +18,13 @@ mod whitespace;
 
 pub const INDENT_WIDTH: u32 = 4;
 
-#[derive(Debug)]
-pub struct FormatModuleResult {
-    pub error_count: u32,
-    pub formatted: String,
-}
-
-impl FormatModuleResult {
-    pub fn into_result(self) -> Result<String, Box<dyn Error>> {
-        let Self {
-            error_count,
-            formatted,
-        } = self;
-        if error_count > 0 {
-            return Err(
-                format!("Some errors occurred. Formatted:\n{}", formatted)
-                    .into(),
-            );
-        }
-        Ok(formatted)
-    }
-
-    pub fn expect_no_errors(self) -> String {
-        let Self {
-            error_count,
-            formatted,
-        } = self;
-        assert_eq!(error_count, 0, "Some errors occurred. Formatted:\n{}", formatted);
-        formatted
-    }
-}
-
 pub fn format_module(
     module: &AstModule,
     source: Rc<String>,
     path: Option<PathBuf>,
     config: &Config,
 ) -> FormatModuleResult {
-    let constraints = OwnedConstraints(RefCell::new(Rc::new(Constraints::new(config.max_width))));
+    let constraints = OwnedConstraints::new(Constraints::new(config.max_width));
     let error_emitter = Rc::new(ErrorEmitter::new(path));
     let out = SourceFormatter::new(source, constraints, Rc::clone(&error_emitter));
     let formatter = AstFormatter { error_emitter, out };
@@ -96,10 +63,6 @@ impl AstFormatter {
                 formatted: self.out.finish(),
             },
         }
-    }
-
-    pub fn checkpoint_counter(&self) -> &Rc<CheckpointCounter> {
-        self.out.checkpoint_counter()
     }
 
     pub fn constraints(&self) -> &OwnedConstraints {

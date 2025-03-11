@@ -1,4 +1,4 @@
-use crate::constraints::{CheckpointCounter, Constraints, MultiLineShape, OwnedConstraints};
+use crate::constraints::{ConstraintsGen, MultiLineShape, OwnedConstraints};
 use crate::error::{
     ConstraintError, ConstraintErrorKind, NewlineNotAllowedError, WidthLimitExceededError,
 };
@@ -7,10 +7,23 @@ use crate::util::cell_ext::CellExt;
 use std::cell::Cell;
 use std::rc::Rc;
 
+pub const MAX_CONSTRAINT_RECOVERY_MODE: ConstraintRecoveryMode = ConstraintRecoveryMode::NewlineNotAllowedOrMaxWidthExceeded;
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub enum ConstraintRecoveryMode {
+    Nothing,
+    NewlineNotAllowed,
+    NewlineNotAllowedOrMaxWidthExceeded,
+}
+
 pub struct ConstraintWriter {
-    checkpoint_counter: Rc<CheckpointCounter>,
     constraints: OwnedConstraints,
     buffer: Cell<String>,
+    constraint_recovery_mode: Cell<ConstraintRecoveryMode>,
+    /// If non-zero, an error is returned as soon as any output exceeds max width, interrupting the
+    /// current formatting strategy in order to trigger a fallback strategy.
+    /// If zero, continues normally when max width is exceeded and emits a user-visible error.
+    enforce_max_width_count: Cell<u32>,
     error_emitter: Rc<ErrorEmitter>,
     last_line_start: Cell<usize>,
     last_width_exceeded_line: Cell<Option<u32>>,
@@ -24,18 +37,31 @@ pub struct ConstraintWriterCheckpoint {
 
 // todo rename
 pub struct ConstraintWriterSelfCheckpoint {
+    #[cfg(debug_assertions)]
+    constraint_recovery_mode: ConstraintRecoveryMode,
+    #[cfg(debug_assertions)]
+    enforce_max_width_count: u32,
     line: u32,
     last_line_start: usize,
     last_width_exceeded_line: Option<u32>,
     #[cfg(debug_assertions)]
-    checkpoint_count: u32,
-    #[cfg(debug_assertions)]
-    constraints: Rc<Constraints>,
+    constraints: ConstraintsGen,
 }
 
 pub struct ConstraintWriterLookahead {
     buf_segment: String,
     checkpoint: ConstraintWriterSelfCheckpoint,
+}
+
+struct ConstraintRecoveryModeGuard<'a> {
+    prev: ConstraintRecoveryMode,
+    writer: &'a ConstraintWriter,
+}
+
+impl Drop for ConstraintRecoveryModeGuard<'_> {
+    fn drop(&mut self) {
+        self.writer.constraint_recovery_mode.set(self.prev);
+    }
 }
 
 impl ConstraintWriter {
@@ -45,9 +71,10 @@ impl ConstraintWriter {
         capacity: usize,
     ) -> ConstraintWriter {
         ConstraintWriter {
-            checkpoint_counter: Rc::new(CheckpointCounter::default()),
             constraints,
             buffer: Cell::new(String::with_capacity(capacity)),
+            constraint_recovery_mode: Cell::new(ConstraintRecoveryMode::Nothing),
+            enforce_max_width_count: Cell::new(0),
             error_emitter,
             last_line_start: Cell::new(0),
             last_width_exceeded_line: Cell::new(None),
@@ -57,10 +84,6 @@ impl ConstraintWriter {
 
     pub fn finish(self) -> String {
         self.buffer.into_inner()
-    }
-
-    pub fn checkpoint_counter(&self) -> &Rc<CheckpointCounter> {
-        &self.checkpoint_counter
     }
 
     pub fn constraints(&self) -> &OwnedConstraints {
@@ -74,6 +97,43 @@ impl ConstraintWriter {
     pub fn line(&self) -> u32 {
         self.line.get()
     }
+    
+    #[must_use]
+    pub fn constraint_recovery_mode_max(&self, mode: ConstraintRecoveryMode) -> Option<impl Drop> {
+        if self.constraint_recovery_mode.get() >= mode {
+            return None;
+        }
+        Some(ConstraintRecoveryModeGuard {
+            prev: self.constraint_recovery_mode.replace(mode),
+            writer: self,
+        })
+    }
+
+    #[must_use]
+    pub fn enforce_max_width(&self) -> Option<impl Drop> {
+        self.constraint_recovery_mode_max(ConstraintRecoveryMode::NewlineNotAllowedOrMaxWidthExceeded)
+    }
+    
+    pub fn with_enforce_max_width<T>(&self, scope: impl FnOnce() -> T) -> T {
+        let _guard = self.enforce_max_width();
+        scope()
+    }
+
+    pub fn has_any_constraint_recovery(&self) -> bool {
+        match self.constraint_recovery_mode.get() {
+            ConstraintRecoveryMode::Nothing => false,
+            ConstraintRecoveryMode::NewlineNotAllowed => true,
+            ConstraintRecoveryMode::NewlineNotAllowedOrMaxWidthExceeded => true,
+        }
+    }
+    
+    pub fn is_enforcing_max_width(&self) -> bool {
+        match self.constraint_recovery_mode.get() {
+            ConstraintRecoveryMode::Nothing => false,
+            ConstraintRecoveryMode::NewlineNotAllowed => false,
+            ConstraintRecoveryMode::NewlineNotAllowedOrMaxWidthExceeded => true,
+        }
+    }
 
     pub fn checkpoint(&self) -> ConstraintWriterCheckpoint {
         ConstraintWriterCheckpoint {
@@ -84,22 +144,23 @@ impl ConstraintWriter {
 
     pub fn self_checkpoint(&self) -> ConstraintWriterSelfCheckpoint {
         let Self {
-            ref checkpoint_counter,
-            ref constraints,
             buffer: _,
+            ref constraint_recovery_mode,
+            ref constraints,
+            ref enforce_max_width_count,
             error_emitter: _,
             ref last_line_start,
             ref last_width_exceeded_line,
             ref line,
         } = *self;
         ConstraintWriterSelfCheckpoint {
+            enforce_max_width_count: enforce_max_width_count.get(),
             line: line.get(),
             last_line_start: last_line_start.get(),
             last_width_exceeded_line: last_width_exceeded_line.get(),
+            constraint_recovery_mode: constraint_recovery_mode.get(),
             #[cfg(debug_assertions)]
-            checkpoint_count: checkpoint_counter.count(),
-            #[cfg(debug_assertions)]
-            constraints: Rc::clone(&constraints.borrow()),
+            constraints: constraints.borrow().clone(),
         }
     }
 
@@ -114,18 +175,21 @@ impl ConstraintWriter {
 
     pub fn restore_self_checkpoint(&self, checkpoint: &ConstraintWriterSelfCheckpoint) {
         let ConstraintWriterSelfCheckpoint {
+            #[cfg(debug_assertions)]
+            constraint_recovery_mode,
+            #[cfg(debug_assertions)]
+            enforce_max_width_count,
             last_line_start,
             last_width_exceeded_line,
             line,
-            #[cfg(debug_assertions)]
-            checkpoint_count,
             #[cfg(debug_assertions)]
             ref constraints,
         } = *checkpoint;
         #[cfg(debug_assertions)]
         {
+            assert_eq!(self.constraint_recovery_mode.get(), constraint_recovery_mode);
+            assert_eq!(self.enforce_max_width_count.get(), enforce_max_width_count);
             assert_eq!(&*self.constraints.borrow(), constraints);
-            assert_eq!(self.checkpoint_counter.count(), checkpoint_count);
         }
         self.last_line_start.set(last_line_start);
         self.last_width_exceeded_line.set(last_width_exceeded_line);
@@ -188,11 +252,9 @@ impl ConstraintWriter {
         };
         // If there is a fallback formatting strategy, then raise an error to trigger the
         // fallback. Otherwise, emit an error and keep going.
-        if self.checkpoint_counter.count() > 0 {
+        if self.is_enforcing_max_width() {
             Err(ConstraintError::new(
                 ConstraintErrorKind::WidthLimitExceeded,
-                #[cfg(debug_assertions)]
-                self.checkpoint_counter.take_backtrace(),
             ))
         } else {
             let line = self.line.get();

@@ -70,13 +70,6 @@ impl SourceReader {
         rustc_lexer::tokenize(self.remaining()).next().unwrap()
     }
 
-    // pub fn is_next_whitespace(&self) -> bool {
-    //     self.remaining()
-    //         .chars()
-    //         .next()
-    //         .is_some_and(rustc_lexer::is_whitespace)
-    // }
-
     pub fn remaining(&self) -> &str {
         &self.source[self.pos.get().to_usize()..]
     }

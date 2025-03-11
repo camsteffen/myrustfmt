@@ -1,8 +1,7 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::Constraints;
+use crate::constraints::{ ConstraintsGen};
 use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
-use std::rc::Rc;
 
 /// A Tail squeezes the code before it leftward to make room for itself.
 ///
@@ -20,14 +19,14 @@ use std::rc::Rc;
 pub struct Tail<'a>(Option<TailImpl<'a>>);
 
 struct TailImpl<'a> {
-    constraints: Rc<Constraints>,
+    constraints: ConstraintsGen,
     func: Box<dyn Fn(&AstFormatter) -> FormatResult + 'a>,
 }
 
 impl AstFormatter {
     pub fn tail_fn<'a>(&self, tail: impl Fn(&AstFormatter) -> FormatResult + 'a) -> Tail<'a> {
         Tail(Some(TailImpl {
-            constraints: Rc::clone(&self.constraints().borrow()),
+            constraints: self.constraints().borrow().clone(),
             func: Box::new(tail),
         }))
     }
@@ -47,7 +46,7 @@ impl AstFormatter {
     pub fn tail(&self, tail: &Tail) -> FormatResult {
         if let Some(tail) = &tail.0 {
             self.constraints()
-                .with_replaced(Rc::clone(&tail.constraints), || (tail.func)(self))?
+                .with_replaced(tail.constraints.clone(), || (tail.func)(self))?
         }
         Ok(())
     }

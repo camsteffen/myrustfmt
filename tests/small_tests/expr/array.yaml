@@ -105,3 +105,12 @@
             .asdfasdfasdfasdfasdfasdfasdfasdf,
         item,
     ]
+- name: multi-item list exceeds max width
+  type: no_change
+  in_block: true
+  expect_errors: true
+  formatted: |
+    [
+        xx,
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    ];

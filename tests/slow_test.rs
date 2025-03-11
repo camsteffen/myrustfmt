@@ -1,12 +1,13 @@
 #![feature(rustc_private)]
 
-use myrustfmt::{format_str, };
+use myrustfmt::format_str;
 use myrustfmt::config::Config;
 
 // https://github.com/rust-lang/rustfmt/issues/4867
 #[test]
 fn slow_test() {
-    let source = r#"
+    let source =
+        r#"
 mod modA {
     mod modB {
         mod modC {

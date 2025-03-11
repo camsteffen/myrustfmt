@@ -37,7 +37,8 @@ impl AstFormatter {
                 .constraints()
                 .with_max_width(None, || self.out.copy_span(span))?;
             self.tail(tail)?;
-        } else if self.checkpoint_counter().count() == 0 {
+        } else if !self.out.has_any_constraint_recovery() {
+            // todo don't do this in expr list item, when max width is not enforced
             self.with_copy_span_fallback(span, format)?;
         } else {
             format()?;
@@ -49,7 +50,11 @@ impl AstFormatter {
     /// formatting strategy to try next. This means we have no way of formatting the user's code
     /// with the given constraints. So the error should be reported to the user, and we'll just copy
     /// the source as-is.
-    fn with_copy_span_fallback(&self, span: Span, format: impl FnOnce() -> FormatResult) -> FormatResult {
+    fn with_copy_span_fallback(
+        &self,
+        span: Span,
+        format: impl FnOnce() -> FormatResult,
+    ) -> FormatResult {
         // N.B. We're not using the typical `Checkpoint` here because we don't want to increment the
         // checkpoint counter which is only incremented when there is a valid formatting strategy to
         // fall back to.
@@ -66,11 +71,9 @@ impl AstFormatter {
             // width limit errors are emitted before the error value is returned
             ConstraintErrorKind::WidthLimitExceeded => {}
             // unexpected
-            ConstraintErrorKind::NextStrategy => {
-                return Err(e.into())
-            }
+            ConstraintErrorKind::NextStrategy => return Err(e.into()),
         }
-        assert!(self.error_emitter.error_count() > 0, "an error should be emitted before copy fallback");
+        debug_assert!(self.error_emitter.error_count() > 0, "an error should be emitted before copy fallback");
         self.out.restore_checkpoint(&checkpoint);
         drop(checkpoint);
         self.out

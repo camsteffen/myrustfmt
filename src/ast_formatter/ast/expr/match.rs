@@ -116,7 +116,8 @@ impl AstFormatter {
         }
         let extra_width = start - next_line_start;
 
-        let checkpoint = self.open_checkpoint();
+        let checkpoint = self.out.checkpoint();
+        let enforce_max_width_guard = self.out.enforce_max_width();
         // We're going to try formatting on the same line, but adding the extra width we would have
         // if wrapping with a block. Use the single-line constraint since we just want to see what
         // fits on the first line.
@@ -152,9 +153,9 @@ impl AstFormatter {
                 Ok(()) => return Ok(()),
             }
         };
-        self.restore_checkpoint(&checkpoint);
+        drop(enforce_max_width_guard);
+        self.out.restore_checkpoint(&checkpoint);
         if should_add_block {
-            drop(checkpoint);
             self.expr_add_block(body)
         } else {
             self.arm_body_same_line(body, self.backtrack_from_checkpoint(checkpoint))

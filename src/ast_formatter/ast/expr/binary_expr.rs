@@ -34,9 +34,24 @@ impl AstFormatter {
                 self.constraints()
                     .with_single_line_unless(MultiLineShape::HangingIndent, || {
                         let mut iter = chain.iter();
-                        for (op, expr) in self.take_while_within_margin(iter.by_ref()) {
-                            self.out.space_token_space(op.as_str())?;
-                            self.expr(expr)?;
+                        let mut within_margin = self.take_while_within_margin(iter.by_ref());
+                        loop {
+                            let Some((op, expr)) = within_margin.next() else {
+                                drop(within_margin);
+                                break;
+                            };
+                            let success = self.backtrack().next(|| {
+                                self.out.space_token_space(op.as_str())?;
+                                self.expr(expr)?;
+                                Ok(true)
+                            }).otherwise(|| Ok(false))?;
+                            if !success {
+                                drop(within_margin);
+                                // back up one for a redo
+                                let index = chain.len() - iter.len() - 1;
+                                iter = chain[index..].iter();
+                                break;
+                            }
                         }
                         if iter.as_slice().is_empty() {
                             // don't indent the tail in this case

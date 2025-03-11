@@ -1,4 +1,5 @@
 #![feature(rustc_private)]
+#![feature(precise_capturing_in_traits)]
 #![feature(unqualified_local_imports)]
 // Uncomment to let clippy babble (with some overrides made below)
 // #![warn(clippy::pedantic)]
@@ -42,7 +43,7 @@ mod submodules;
 mod util;
 mod whitespace;
 
-use crate::ast_formatter::{FormatModuleResult, format_module};
+use crate::ast_formatter::{format_module};
 use crate::config::Config;
 use crate::parse::{ParseModuleResult, parse_module};
 use crate::submodules::Submodule;
@@ -50,12 +51,44 @@ use rustc_span::ErrorGuaranteed;
 use rustc_span::edition::Edition;
 use rustc_span::symbol::Ident;
 use std::collections::VecDeque;
+use std::error::Error;
 use std::fs;
 use std::io::Write;
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::rc::Rc;
+
+#[derive(Debug)]
+pub struct FormatModuleResult {
+    pub error_count: u32,
+    pub formatted: String,
+}
+
+impl FormatModuleResult {
+    pub fn into_result(self) -> Result<String, Box<dyn Error>> {
+        let Self {
+            error_count,
+            formatted,
+        } = self;
+        if error_count > 0 {
+            return Err(
+                format!("Some errors occurred. Formatted:\n{}", formatted)
+                    .into(),
+            );
+        }
+        Ok(formatted)
+    }
+
+    pub fn expect_no_errors(self) -> String {
+        let Self {
+            error_count,
+            formatted,
+        } = self;
+        assert_eq!(error_count, 0, "Some errors occurred. Formatted:\n{}", formatted);
+        formatted
+    }
+}
 
 #[derive(Clone, Copy)]
 pub enum CrateSource<'a> {
@@ -91,21 +124,21 @@ impl OnFormatModule {
         } = result;
         if error_count > 0 {
             self.has_errors = true;
-            ControlFlow::Continue(())
-        } else if self.is_check {
-            self.check_file(path, source, &formatted)
-        } else if formatted != source {
+        }
+        if self.is_check {
+            return self.check_file(path, source, &formatted);
+        }
+        if formatted == source {
+            if self.is_verbose {
+                eprintln!("Already formatted: {}", path.display());
+            }
+        } else {
             fs::write(path, formatted).unwrap();
             if self.is_verbose {
                 eprintln!("Formatted: {}", path.display());
             }
-            ControlFlow::Continue(())
-        } else {
-            if self.is_verbose {
-                eprintln!("Already formatted: {}", path.display());
-            }
-            ControlFlow::Continue(())
         }
+        ControlFlow::Continue(())
     }
 
     fn check_file(&self, path: &Path, contents: &str, formatted: &str) -> ControlFlow<()> {

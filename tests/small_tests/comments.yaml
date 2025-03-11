@@ -96,23 +96,19 @@
   after: |
     let/*comment*/ x;
 - name: prefix a token with a multi-line block
-  type: before_after
+  type: no_change
   in_block: true
-  before: |
+  expect_errors: true
+  formatted: |
     let  /*comment
           second line*/x;
-  after: |
-    let /*comment
-          second line*/x;
 - name: suffix a token with a multi-line block
-  type: before_after
+  type: no_change
   in_block: true
-  before: |
+  expect_errors: true
+  formatted: |
     let/*comment
           second line*/  x;
-  after: |
-    let/*comment
-          second line*/ x;
 - name: block comment padded with spaces where there would be no space
   type: before_after
   in_block: true

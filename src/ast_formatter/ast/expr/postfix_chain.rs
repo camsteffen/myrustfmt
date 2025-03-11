@@ -92,7 +92,8 @@ impl AstFormatter {
         tail: &Tail,
     ) -> FormatResult {
         let first_line = self.out.line();
-        let checkpoint = self.open_checkpoint();
+        let checkpoint = self.out.checkpoint();
+        let enforce_max_width_guard = self.out.enforce_max_width();
 
         self.with_chain_item_max_width(start_pos, || self.postfix_overflowable(overflowable))?;
         // todo can we prove that the overflow is so long that a separate line won't be shorter?
@@ -102,26 +103,27 @@ impl AstFormatter {
             // it all fits on one line
             return Ok(());
         }
-        let overflow_lookahead = self.capture_lookahead(&checkpoint);
+        drop(enforce_max_width_guard);
+        let overflow_lookahead = self.out.capture_lookahead(&checkpoint);
 
         // try writing the overflowable on the next line to measure its height in separate lines format
         // todo share logic with match arm
         // todo should we check if the wrap allows a *longer* first line, like match arm?
         // todo account for having less width if the fallback will add a block
-        let result = self
+        let result = self.out.with_enforce_max_width(|| self
             .indented(|| {
                 self.newline_break_indent()?;
                 self.postfix_item(overflowable)?;
                 let height = self.out.line() - first_line + 1;
                 self.tail(tail)?;
                 Ok(height)
-            })
+            }))
             .constraint_err_only()?;
 
         match result {
             Err(_) => {
-                self.restore_checkpoint(&checkpoint);
-                self.restore_lookahead(&overflow_lookahead);
+                self.out.restore_checkpoint(&checkpoint);
+                self.out.restore_lookahead(&overflow_lookahead);
                 Ok(())
             }
             Ok(separate_lines_height) => {
@@ -129,8 +131,8 @@ impl AstFormatter {
                     // fallback to separate lines strategy
                     Err(ConstraintErrorKind::NextStrategy.into())
                 } else {
-                    self.restore_checkpoint(&checkpoint);
-                    self.restore_lookahead(&overflow_lookahead);
+                    self.out.restore_checkpoint(&checkpoint);
+                    self.out.restore_lookahead(&overflow_lookahead);
                     Ok(())
                 }
             }

@@ -4,10 +4,6 @@ use crate::error::{FormatResult, WidthLimitExceededError};
 
 impl AstFormatter {
     pub fn with_single_line<T>(&self, format: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        debug_assert!(
-            self.checkpoint_counter().count() > 0,
-            "single line constraint applied with no fallback"
-        );
         self.constraints()
             .with_multi_line_shape_replaced(MultiLineShape::SingleLine, format)
     }

@@ -11,8 +11,9 @@ use crate::ast_utils::postfix_expr_kind;
 use crate::constraints::MultiLineShape;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
+use crate::constraint_writer::ConstraintRecoveryMode;
 
-mod binary;
+mod binary_expr;
 mod postfix_chain;
 mod r#match;
 
@@ -65,27 +66,7 @@ impl AstFormatter {
             }
             ast::ExprKind::Lit(_) => self.out.copy_span(expr.span)?,
             ast::ExprKind::Cast(ref target, ref ty) => {
-                let tail = take_tail();
-                self.expr(target)?;
-                self.backtrack()
-                    .next(|| {
-                        self.out.space_token_space("as")?;
-                        self.ty(ty)?;
-                        self.tail(tail)?;
-                        Ok(())
-                    })
-                    .otherwise(|| {
-                        self.constraints()
-                            .with_single_line_unless(MultiLineShape::HangingIndent, || {
-                                self.indented(|| {
-                                    self.newline_break_indent()?;
-                                    self.out.token_space("as")?;
-                                    self.ty(ty)?;
-                                    self.tail(tail)?;
-                                    Ok(())
-                                })
-                            })
-                    })?;
+                    self.cast(target, ty, take_tail())?
             }
             ast::ExprKind::Type(_, _) => todo!(),
             ast::ExprKind::Let(ref pat, ref init, ..) => {
@@ -177,23 +158,7 @@ impl AstFormatter {
             ast::ExprKind::Struct(ref struct_) => self.struct_expr(struct_, take_tail())?,
             ast::ExprKind::Repeat(_, _) => todo!(),
             ast::ExprKind::Paren(ref inner) => {
-                let tail = take_tail();
-                self.out.token("(")?;
-                self.backtrack()
-                    .next(|| {
-                        self.constraints()
-                            .with_multi_line_shape_min(MultiLineShape::VerticalList, || {
-                                self.expr(inner)
-                            })?;
-                        self.out.token(")")?;
-                        self.tail(tail)?;
-                        Ok(())
-                    })
-                    .otherwise(|| {
-                        self.embraced_after_opening(")", || self.expr(inner))?;
-                        self.tail(tail)?;
-                        Ok(())
-                    })?;
+                    self.paren(inner, take_tail())?
             }
             ast::ExprKind::Yield(_) => todo!(),
             ast::ExprKind::Yeet(_) => todo!(),
@@ -263,11 +228,13 @@ impl AstFormatter {
                     // on separate lines, enforce IndentMiddle by adding a block
                     ListStrategy::SeparateLines if lcx.len > 1 => {
                         af.backtrack()
-                            .next(|| {
-                                af.constraints().with_multi_line_shape_min(
-                                    MultiLineShape::HangingIndent,
-                                    format,
-                                )
+                            // If it's too wide, adding a block won't help.
+                            // The block is only for ensuring a "hanging indent"-compliant shape.
+                            .next_with_constraint_recovery_mode(ConstraintRecoveryMode::NewlineNotAllowed, || {
+                                    af.constraints().with_multi_line_shape_min(
+                                        MultiLineShape::HangingIndent,
+                                        format,
+                                    )
                             })
                             .otherwise(|| {
                                 af.expr_add_block(expr)?;
@@ -298,6 +265,50 @@ impl AstFormatter {
             self.ident(label.ident)?;
             self.out.space()?;
         }
+        Ok(())
+    }
+    
+    fn cast(&self, target: &ast::Expr, ty: &ast::Ty, tail: &Tail) -> FormatResult {
+        self.expr(target)?;
+        self.backtrack()
+            .next(|| {
+                self.out.space_token_space("as")?;
+                self.ty(ty)?;
+                self.tail(tail)?;
+                Ok(())
+            })
+            .otherwise(|| {
+                self.constraints()
+                    .with_single_line_unless(MultiLineShape::HangingIndent, || {
+                        self.indented(|| {
+                            self.newline_break_indent()?;
+                            self.out.token_space("as")?;
+                            self.ty(ty)?;
+                            self.tail(tail)?;
+                            Ok(())
+                        })
+                    })
+            })?;
+        Ok(())
+    }
+    
+    fn paren(&self, inner: &ast::Expr, tail: &Tail) -> FormatResult {
+        self.out.token("(")?;
+        self.backtrack()
+            .next(|| {
+                self.constraints()
+                    .with_multi_line_shape_min(MultiLineShape::VerticalList, || {
+                        self.expr(inner)
+                    })?;
+                self.out.token(")")?;
+                self.tail(tail)?;
+                Ok(())
+            })
+            .otherwise(|| {
+                self.embraced_after_opening(")", || self.expr(inner))?;
+                self.tail(tail)?;
+                Ok(())
+            })?;
         Ok(())
     }
 
