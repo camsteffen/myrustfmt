@@ -1,6 +1,6 @@
 use rustc_ast::ast;
 
-use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
+use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::backtrack::Backtrack;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
 use crate::constraints::MultiLineShape;
@@ -9,7 +9,7 @@ use crate::error::{ConstraintErrorKind, FormatResult, FormatResultExt};
 impl AstFormatter {
     pub fn match_(&self, scrutinee: &ast::Expr, arms: &[ast::Arm]) -> FormatResult {
         self.token_expr_open_brace("match", scrutinee)?;
-        self.block_generic_after_open_brace(arms, |arm| self.arm(arm))?;
+        self.block_after_open_brace(arms, |arm| self.arm(arm))?;
         Ok(())
     }
 
@@ -40,7 +40,7 @@ impl AstFormatter {
     }
 
     fn arm_guard_same_line(&self, arm: &ast::Arm, guard: &ast::Expr) -> FormatResult {
-        self.with_single_line(|| {
+        self.with_single_line(|| -> FormatResult {
             self.out.space()?;
             self.arm_guard(guard)?;
             Ok(())
@@ -89,7 +89,7 @@ impl AstFormatter {
 
     fn arm_body_force_block(&self, body: &ast::Expr) -> FormatResult {
         if let Some(block) = plain_block(body) {
-            self.block_separate_lines(block)?;
+            self.block_expr_vertical(block)?;
         } else {
             self.expr_add_block(body)?;
         }
@@ -101,15 +101,6 @@ impl AstFormatter {
     // todo should we count lines or simply observe whether it's multi-line?
     /// Adds a block only if doing so allows for more code to fit in the first line
     fn arm_body_add_block_if_first_line_is_longer(&self, body: &ast::Expr) -> FormatResult {
-        let Some(max_width) = self.out.current_max_width() else {
-            return self.arm_body_same_line(body, self.backtrack());
-        };
-
-        let start = self.out.last_line_len();
-        // the starting position if we wrapped to the next line and indented
-        let next_line_start = self.out.indent.get() + INDENT_WIDTH;
-        let extra_width = start - next_line_start;
-
         let checkpoint = self.out.checkpoint();
         enum ExtraWidthResult {
             AddBlock,
@@ -117,23 +108,16 @@ impl AstFormatter {
             Done,
         }
         let result = self.out.with_enforce_max_width(|| -> FormatResult<ExtraWidthResult> {
-            // We're going to try formatting on the same line, but adding the extra width we would have
-            // if wrapping with a block. Use the single-line constraint since we just want to see what
-            // fits on the first line.
-            let result = self
-                .with_single_line(|| {
-                    self.constraints()
-                        .with_max_width(Some(max_width + extra_width), || self.expr(body))
-                })
-                .constraint_err_only()?;
-            let succeeded = match result {
+            // simulate having extra width by wrapping a block
+            let (used_extra_width, result) =
+                self.simulate_wrap_indent_first_line(|| self.expr(body));
+            let succeeded = match result.constraint_err_only()? {
                 Err(e) if e.kind != ConstraintErrorKind::NewlineNotAllowed => {
                     // todo emit width exceeded error if it was not being enforced
                     return Err(e.into());
                 }
                 result => result.is_ok(),
             };
-            let used_extra_width = self.out.last_line_len() > max_width;
             if used_extra_width {
                 // Either the extra width is strictly required to fit the first line,
                 // or the extra width allows more code to fit in the first line.

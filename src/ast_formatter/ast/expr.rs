@@ -92,12 +92,12 @@ impl AstFormatter {
                 self.out.space_token_space("in")?;
                 self.expr(iter)?;
                 self.out.space()?;
-                self.block_separate_lines(body)?;
+                self.block_expr_vertical(body)?;
             }
             ast::ExprKind::Loop(ref block, label, _) => {
                 self.label(label, true)?;
                 self.out.token_space("loop")?;
-                self.block_separate_lines(block)?;
+                self.block_expr_vertical(block)?;
             }
             ast::ExprKind::Match(ref scrutinee, ref arms, match_kind) => match match_kind {
                 ast::MatchKind::Postfix => todo!(),
@@ -435,7 +435,7 @@ impl AstFormatter {
             //   do we need to revise the guidelines in MultiLineConstraint docs?
             self.constraints()
                 .with_single_line_unless_or(MultiLineShape::Unrestricted, else_.is_none(), || {
-                    self.block_separate_lines_after_open_brace(block)
+                    self.block_expr_vertical_after_open_brace(block)
                 })?;
             let mut else_ = else_;
             loop {
@@ -443,12 +443,12 @@ impl AstFormatter {
                 self.out.space_token_space("else")?;
                 match &else_expr.kind {
                     ast::ExprKind::Block(block, _) => {
-                        self.block_separate_lines(block)?;
+                        self.block_expr_vertical(block)?;
                         break;
                     }
                     ast::ExprKind::If(condition, next_block, next_else) => {
                         self.token_expr_open_brace("if", condition)?;
-                        self.block_separate_lines_after_open_brace(next_block)?;
+                        self.block_expr_vertical_after_open_brace(next_block)?;
                         else_ = next_else.as_deref();
                     }
                     _ => unreachable!(),
@@ -520,7 +520,7 @@ impl AstFormatter {
 
     pub fn while_(&self, condition: &ast::Expr, block: &ast::Block) -> FormatResult {
         self.token_expr_open_brace("while", condition)?;
-        self.block_separate_lines_after_open_brace(block)?;
+        self.block_expr_vertical_after_open_brace(block)?;
         Ok(())
     }
 }

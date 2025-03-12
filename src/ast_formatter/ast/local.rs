@@ -45,7 +45,7 @@ impl AstFormatter {
         self.local_init(init, Tail::none())?;
         let is_single_line_init = self.out.line() == first_line;
         let else_separate_lines = || {
-            self.block_separate_lines_after_open_brace(else_)?;
+            self.block_expr_vertical_after_open_brace(else_)?;
             self.out.token(";")?;
             Ok(())
         };
@@ -95,6 +95,10 @@ impl AstFormatter {
 
     fn local_init(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
         self.out.space_token("=")?;
+        // let checkpoint = self.out.checkpoint();
+        // self.with_single_line(|| {
+        //     self.out.constraints().with_max_width(Some(self.out.constraints().max))
+        // })
         // todo do all these cases apply with else clause?
         // single line
         self.backtrack()

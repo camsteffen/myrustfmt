@@ -154,7 +154,7 @@ impl AstFormatter {
         match mod_kind {
             ast::ModKind::Loaded(items, ast::Inline::Yes, ..) => {
                 self.out.space()?;
-                self.block_generic(items, |item| self.item(item))?;
+                self.block(items, |item| self.item(item))?;
             }
             ast::ModKind::Loaded(_, ast::Inline::No, ..) | ast::ModKind::Unloaded => {
                 self.out.token(";")?;
@@ -225,7 +225,7 @@ impl AstFormatter {
         if !self.where_clause(&impl_.generics.where_clause, true)? {
             self.out.space()?;
         }
-        self.block_generic(&impl_.items, |item| self.assoc_item(item))?;
+        self.block(&impl_.items, |item| self.assoc_item(item))?;
         Ok(())
     }
 
@@ -292,7 +292,7 @@ impl AstFormatter {
         let wrapped_bounds = self.generic_bounds_optional(&trait_.bounds)?;
         // todo share this code with other constructs
         let has_where = self.where_clause(&trait_.generics.where_clause, true)?;
-        let body = || self.block_generic(&trait_.items, |item| self.assoc_item(item));
+        let body = || self.block(&trait_.items, |item| self.assoc_item(item));
         if wrapped_bounds || has_where {
             body()?;
         } else {

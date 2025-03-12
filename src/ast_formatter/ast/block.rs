@@ -17,7 +17,7 @@ impl AstFormatter {
         self.out.token("{")?;
         match self.try_into_expr_only_block(block) {
             None => {
-                self.block_generic_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))?;
+                self.block_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))?;
                 self.tail(tail)?;
             }
             Some(expr_only_block) => {
@@ -30,7 +30,7 @@ impl AstFormatter {
                         })
                     })
                     .otherwise(|| {
-                        self.block_generic_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))?;
+                        self.block_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))?;
                         self.tail(tail)?;
                         Ok(())
                     })?
@@ -39,27 +39,23 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn block_separate_lines(&self, block: &ast::Block) -> FormatResult {
+    pub fn block_expr_vertical(&self, block: &ast::Block) -> FormatResult {
         self.out.token("{")?;
-        self.block_separate_lines_after_open_brace(block)?;
+        self.block_expr_vertical_after_open_brace(block)?;
         Ok(())
     }
 
-    pub fn block_separate_lines_after_open_brace(&self, block: &ast::Block) -> FormatResult {
-        self.block_generic_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))
+    pub fn block_expr_vertical_after_open_brace(&self, block: &ast::Block) -> FormatResult {
+        self.block_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))
     }
 
-    pub fn block_generic<T>(
-        &self,
-        items: &[T],
-        format_item: impl Fn(&T) -> FormatResult,
-    ) -> FormatResult {
+    pub fn block<T>(&self, items: &[T], format_item: impl Fn(&T) -> FormatResult) -> FormatResult {
         self.out.token("{")?;
-        self.block_generic_after_open_brace(items, format_item)?;
+        self.block_after_open_brace(items, format_item)?;
         Ok(())
     }
 
-    pub fn block_generic_after_open_brace<T>(
+    pub fn block_after_open_brace<T>(
         &self,
         items: &[T],
         format_item: impl Fn(&T) -> FormatResult,
