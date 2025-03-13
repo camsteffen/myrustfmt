@@ -63,17 +63,17 @@ impl AstFormatter {
                     break 'horizontal None;
                 };
                 Some(move || {
-                    self.with_width_limit_from_start(
-                        start,
-                        RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
-                        || {
-                            self.with_single_line(|| {
+                    self.with_single_line(|| {
+                        self.with_width_limit_from_start(
+                            start,
+                            RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
+                            || {
                                 self.expr_only_block_after_open_brace(expr_only_else)?;
                                 self.out.token(";")?;
                                 Ok(())
-                            })
-                        },
-                    )
+                            },
+                        )
+                    })
                 })
             };
             self.backtrack()

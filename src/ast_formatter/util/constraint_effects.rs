@@ -1,5 +1,6 @@
+use std::num::NonZero;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
-use crate::constraints::{MaxWidthForLine, MultiLineShape};
+use crate::constraints::{MultiLineShape, WidthLimit};
 use crate::error::{FormatResult, WidthLimitExceededError};
 
 impl AstFormatter {
@@ -24,12 +25,13 @@ impl AstFormatter {
         width_limit: u32,
         format: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        let max_width = self.out.last_line_len() + width_limit;
-        if self.out.current_max_width().is_some_and(|m| m <= max_width) {
-            return format();
-        }
-        self.out
-            .with_enforce_max_width(|| self.constraints().with_max_width(Some(max_width), format))
+        let end = NonZero::new(self.out.last_line_len() + width_limit)
+            .unwrap();
+        // todo enforce max width here?
+        self.out.with_enforce_max_width(|| {
+            self.constraints()
+                .with_width_limit(WidthLimit::SingleLine { end }, format)
+        })
     }
 
     pub fn with_width_limit_first_line<T>(
@@ -38,16 +40,10 @@ impl AstFormatter {
         format: impl FnOnce() -> T,
     ) -> T {
         let line = self.out.line();
-        let max_width = self.out.last_line_len() + width_limit;
-        if self
-            .out
-            .current_max_width()
-            .is_some_and(|mw| max_width >= mw)
-        {
-            return format();
-        }
+        let end = NonZero::new(self.out.last_line_len() + width_limit)
+            .unwrap();
         self.constraints()
-            .with_max_width_for_line(Some(MaxWidthForLine { line, max_width }), format)
+            .with_width_limit(WidthLimit::FirstLine { end, line }, format)
     }
 
     pub fn with_width_limit_first_line_opt<T>(

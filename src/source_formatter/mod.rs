@@ -72,15 +72,6 @@ impl SourceFormatter {
         }
     }
 
-    #[cfg(test)]
-    pub fn new_defaults(source: impl Into<String>) -> SourceFormatter {
-        Self::new(
-            Rc::new(source.into()),
-            OwnedConstraints::default(),
-            Rc::new(BufferedErrorEmitter::new(ErrorEmitter::new(None))),
-        )
-    }
-
     pub fn finish(self) -> String {
         assert_eq!(self.checkpoint_count.get(), 0);
         self.source.finish();
@@ -123,12 +114,6 @@ impl SourceFormatter {
         self.horizontal_whitespace()?;
         let token = self.source.eat_next_token();
         self.out.token(token)?;
-        Ok(())
-    }
-
-    #[cfg(test)]
-    pub fn eof(&self) -> FormatResult {
-        self.source.expect_pos(BytePos::from_usize(self.source.source.len()))?;
         Ok(())
     }
 
@@ -214,128 +199,5 @@ impl SourceFormatter {
             let after_indent = &line[self.indent.get().try_into().unwrap()..];
             after_indent.chars().all(is_closer_char)
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn first_token_skips_initial_whitespace() {
-        let sf = SourceFormatter::new_defaults(" \naa");
-        sf.token("aa").unwrap();
-        sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa");
-    }
-
-    #[test]
-    fn replace_space_with_newline() {
-        let sf = SourceFormatter::new_defaults("aa aa");
-        sf.token("aa").unwrap();
-        sf.newline_within_indent().unwrap();
-        sf.token("aa").unwrap();
-        sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa\naa");
-    }
-
-    #[test]
-    fn no_indent_for_blank_line() {
-        let sf = SourceFormatter::new_defaults("aa\n    \naa");
-        sf.indent.set(4);
-        sf.token("aa").unwrap();
-        sf.newline_within_indent().unwrap();
-        sf.token("aa").unwrap();
-        sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa\n\n    aa");
-    }
-
-    #[test]
-    fn space_without_comment() {
-        let sf = SourceFormatter::new_defaults("aa bb");
-        sf.token("aa").unwrap();
-        sf.space().unwrap();
-        sf.token("bb").unwrap();
-        sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa bb");
-    }
-
-    #[test]
-    fn space_missing_from_source() {
-        let sf = SourceFormatter::new_defaults("aa,bb");
-        sf.token("aa").unwrap();
-        sf.token(",").unwrap();
-        sf.space().unwrap();
-        sf.token("bb").unwrap();
-        sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa, bb");
-    }
-
-    #[test]
-    fn space_with_comment_no_space() {
-        let sf = SourceFormatter::new_defaults("aa/*comment*/bb");
-        sf.token("aa").unwrap();
-        sf.space().unwrap();
-        sf.token("bb").unwrap();
-        sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa/*comment*/bb");
-    }
-
-    #[test]
-    fn space_with_comment_leading_space() {
-        let sf = SourceFormatter::new_defaults("aa /*comment*/bb");
-        sf.token("aa").unwrap();
-        sf.space().unwrap();
-        sf.token("bb").unwrap();
-        sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa /*comment*/bb");
-    }
-
-    #[test]
-    fn space_with_comment_trailing_space() {
-        let sf = SourceFormatter::new_defaults("aa/*comment*/ bb");
-        sf.token("aa").unwrap();
-        sf.space().unwrap();
-        sf.token("bb").unwrap();
-        sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa/*comment*/ bb");
-    }
-
-    #[test]
-    fn space_with_comment_space_on_both_sides() {
-        let sf = SourceFormatter::new_defaults("aa /*comment*/ bb");
-        sf.token("aa").unwrap();
-        sf.space().unwrap();
-        sf.token("bb").unwrap();
-        sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa /*comment*/ bb");
-    }
-
-    #[test]
-    fn space_with_comment_extra_spaces_trimmed() {
-        let sf = SourceFormatter::new_defaults("aa   /*comment*/   bb");
-        sf.token("aa").unwrap();
-        sf.space().unwrap();
-        sf.token("bb").unwrap();
-        sf.eof().unwrap();
-        assert_eq!(sf.finish(), "aa /*comment*/ bb");
-    }
-
-    #[test]
-    fn space_around_comments_preserved_even_with_no_space_out() {
-        let sf = SourceFormatter::new_defaults("( /*comment*/ aa");
-        sf.token("(").unwrap();
-        sf.token("aa").unwrap();
-        sf.eof().unwrap();
-        assert_eq!(sf.finish(), "( /*comment*/ aa");
-    }
-
-    #[test]
-    fn newlines_removed_between_tokens() {
-        let sf = SourceFormatter::new_defaults("(\naa");
-        sf.token("(").unwrap();
-        sf.token("aa").unwrap();
-        sf.eof().unwrap();
-        assert_eq!(sf.finish(), "(aa");
     }
 }

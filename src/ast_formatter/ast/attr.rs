@@ -35,7 +35,7 @@ impl AstFormatter {
         if attrs.iter().any(is_rustfmt_skip) {
             self.out
                 .constraints()
-                .with_max_width(None, || self.out.copy_span(span))?;
+                .with_no_width_limit(|| self.out.copy_span(span))?;
             self.tail(tail)?;
         } else if !self.out.has_any_constraint_recovery() {
             // todo don't do this in expr list item, when max width is not enforced
@@ -81,7 +81,7 @@ impl AstFormatter {
         self.out.restore_checkpoint(&checkpoint);
         self.out
             .constraints()
-            .with_max_width(None, || self.out.copy_span(span))?;
+            .with_no_width_limit(|| self.out.copy_span(span))?;
         self.tail(tail)?;
         Ok(())
     }

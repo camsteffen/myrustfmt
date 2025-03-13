@@ -61,7 +61,8 @@ impl SourceFormatter {
         for (action, len) in actions {
             match action {
                 WhitespaceAction::CopyComment => {
-                    self.constraints().with_max_width(None, || self.copy(len))?;
+                    // width limits don't apply to comments
+                    self.constraints().with_no_width_limit(|| self.copy(len))?;
                 }
                 WhitespaceAction::EmitNewline { double, indent } => {
                     self.source.advance(len);
