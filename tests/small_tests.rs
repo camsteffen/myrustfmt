@@ -6,8 +6,9 @@ use serde::Deserialize;
 use std::fs;
 use std::io::BufReader;
 use std::path::Path;
+use tracing_subscriber::EnvFilter;
 use myrustfmt::config::Config;
-use myrustfmt::{format_str, FormatModuleResult};
+use myrustfmt::format_str;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -16,7 +17,14 @@ datatest_stable::harness! {
     { test = small_test_file_rs, root = "tests/small_tests_rs", pattern = r".rs" },
 }
 
+fn init_tracing() {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_env("LOG"))
+        .try_init();
+}
+
 fn small_test_file(test_source_path: &Path) -> TestResult {
+    init_tracing();
     let file = fs::File::open(test_source_path).unwrap();
     let reader = BufReader::new(file);
     let tests: Vec<Test> = serde_yaml::from_reader(reader).unwrap();
@@ -33,6 +41,7 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
 }
 
 fn small_test_file_rs(test_source_path: &Path) -> TestResult {
+    init_tracing();
     let string = fs::read_to_string(test_source_path)?;
     let mut lines = string.split_inclusive('\n');
     let mut lines_peekable = lines.by_ref().peekable();
@@ -241,34 +250,31 @@ fn format_max_width_expected(
     in_block: bool,
     expect_errors: bool,
 ) -> TestResult {
-    let formatted = if in_block {
-        format_in_block(source, max_width, expect_errors)?
+    let (formatted, error_count) = if in_block {
+        format_in_block(source, max_width)?
     } else {
         let mut config = Config::default();
         if let Some(max_width) = max_width {
             config = config.max_width(max_width)
         }
         let result = format_str(source, config).unwrap();
-        handle_format_errors(result, expect_errors)?
+        (result.formatted, result.error_count)
     };
     let expected = format!("{expected}\n");
     expect_formatted_equals(&formatted, &expected, name)?;
+    handle_format_errors(error_count, expect_errors)?;
     Ok(())
 }
 
-fn handle_format_errors(result: FormatModuleResult, expect_errors: bool) -> TestResult<String> {
-    let FormatModuleResult {
-        error_count,
-        formatted,
-    } = result;
+fn handle_format_errors(error_count: u32, expect_errors: bool) -> TestResult {
     match error_count {
         0 if expect_errors => Err("expected errors".into()),
         1.. if !expect_errors => Err("errors occurred".into()),
-        _ => Ok(formatted),
+        _ => Ok(()),
     }
 }
 
-fn format_in_block(stmt: &str, max_width: Option<u32>, expect_errors: bool) -> TestResult<String> {
+fn format_in_block(stmt: &str, max_width: Option<u32>) -> TestResult<(String, u32)> {
     let (prefix, indent, suffix) = ("fn test() {\n", "    ", "}\n");
     let stmt = String::from_iter(stmt.lines().map(|s| format!("{indent}{s}\n")));
     let module_source = format!("{prefix}{stmt}{suffix}");
@@ -282,7 +288,8 @@ fn format_in_block(stmt: &str, max_width: Option<u32>, expect_errors: bool) -> T
         config = config.max_width(max_width);
     }
     let result = format_str(&module_source, config).unwrap();
-    let result = handle_format_errors(result, expect_errors)?;
+    let error_count = result.error_count;
+    let result = result.formatted;
     let lines = result
         .strip_prefix(prefix)
         .unwrap_or_else(|| panic!(
@@ -304,7 +311,7 @@ fn format_in_block(stmt: &str, max_width: Option<u32>, expect_errors: bool) -> T
         }
         out.push('\n');
     }
-    Ok(out)
+    Ok((out, error_count))
 }
 
 fn expect_formatted_equals(formatted: &str, expected: &str, name: &str) -> TestResult {

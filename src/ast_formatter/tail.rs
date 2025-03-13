@@ -1,7 +1,7 @@
+use std::rc::Rc;
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::ConstraintsGen;
+use crate::constraints::Constraints;
 use crate::error::FormatResult;
-use crate::util::cell_ext::CellExt;
 
 /// A Tail squeezes the code before it leftward to make room for itself.
 ///
@@ -19,14 +19,15 @@ use crate::util::cell_ext::CellExt;
 pub struct Tail<'a>(Option<TailImpl<'a>>);
 
 struct TailImpl<'a> {
-    constraints: ConstraintsGen,
+    constraints: Rc<Constraints>,
     func: Box<dyn Fn(&AstFormatter) -> FormatResult + 'a>,
 }
 
+// Tail creation
 impl AstFormatter {
     pub fn tail_fn<'a>(&self, tail: impl Fn(&AstFormatter) -> FormatResult + 'a) -> Tail<'a> {
         Tail(Some(TailImpl {
-            constraints: self.constraints().borrow().clone(),
+            constraints: Rc::clone(&self.constraints().borrow().scoped_constraints),
             func: Box::new(tail),
         }))
     }
@@ -44,10 +45,13 @@ impl Tail<'_> {
 
 impl AstFormatter {
     pub fn tail(&self, tail: &Tail) -> FormatResult {
-        if let Some(tail) = &tail.0 {
-            self.constraints()
-                .with_replaced(tail.constraints.clone(), || (tail.func)(self))?
-        }
-        Ok(())
+        let Some(tail) = &tail.0 else { return Ok(()) };
+        let prev = std::mem::replace(
+            &mut self.constraints().borrow_mut().scoped_constraints,
+            tail.constraints.clone(),
+        );
+        let out = (tail.func)(self);
+        self.constraints().borrow_mut().scoped_constraints = prev;
+        out
     }
 }

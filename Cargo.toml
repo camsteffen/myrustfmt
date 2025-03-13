@@ -9,7 +9,6 @@ tracing = "0.1.35"
 thiserror = "2.0.8"
 serde = { version = "1.0.217", features = ["derive"] }
 getopts = "0.2.21"
-#tracing-subscriber = "0.3.19"
 # https://youtrack.jetbrains.com/issue/RUST-946/Cant-find-libsyntax-from-rust-sources-in-external-librairies
 # rustc --print sysroot
 
@@ -27,6 +26,7 @@ datatest-stable = "0.3.2"
 diff = "0.1.13"
 regex = "1.11.1"
 serde_yaml = "0.9.33"
+tracing-subscriber = "0.3.19"
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 
 #[package.metadata.rust-analyzer]

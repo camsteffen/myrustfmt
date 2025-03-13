@@ -1,11 +1,8 @@
 use std::cell::Cell;
-use std::panic::Location;
-use crate::constraint_writer::{
-    ConstraintRecoveryMode, ConstraintWriter, ConstraintWriterCheckpoint, ConstraintWriterLookahead,
-};
+use crate::constraint_writer::{ConstraintRecoveryMode, ConstraintWriter, ConstraintWriterLookahead};
 use crate::constraints::OwnedConstraints;
 use crate::error::FormatResult;
-use crate::error_emitter::ErrorEmitter;
+use crate::error_emitter::{BufferedErrorEmitter, Error};
 use self::source_reader::SourceReader;
 use crate::util::chars::is_closer_char;
 use rustc_span::{BytePos, Pos, Span};
@@ -13,18 +10,18 @@ use std::rc::Rc;
 
 mod whitespace;
 mod source_reader;
+pub mod checkpoint;
 
-pub struct SourceFormatterCheckpoint {
-    source_pos: BytePos,
-    writer_checkpoint: ConstraintWriterCheckpoint,
-}
-
+#[derive(Debug)]
 pub struct SourceFormatterLookahead {
+    error_buffer: Vec<Error>,
     source_pos: BytePos,
     writer_lookahead: ConstraintWriterLookahead,
 }
 
 pub struct SourceFormatter {
+    checkpoint_count: Cell<u32>,
+    error_emitter: Rc<BufferedErrorEmitter>,
     source: SourceReader,
     out: ConstraintWriter,
     /// The number of spaces for the current level of indentation
@@ -32,9 +29,11 @@ pub struct SourceFormatter {
 }
 
 macro_rules! delegate_to_constraint_writer {
-    ($($vis:vis fn $name:ident $(<$gen:tt>)?(&self $(, $arg:ident: $ty:ty)*) $(-> $ret_ty:ty)? ;)*) => {
+    ($($(#[$attr:meta])? $vis:vis fn $name:ident $(<$gen:tt>)?(&self $(, $arg:ident: $ty:ty)*) $(-> $ret_ty:ty)? ;)*) => {
         impl SourceFormatter {
-            $($vis fn $name $(<$gen>)? (&self $(, $arg: $ty)*) $(-> $ret_ty)? {
+            $(
+            $(#[$attr])?
+            $vis fn $name $(<$gen>)? (&self $(, $arg: $ty)*) $(-> $ret_ty)? {
                 self.out.$name($($arg),*)
             })*
         }
@@ -44,27 +43,31 @@ macro_rules! delegate_to_constraint_writer {
 delegate_to_constraint_writer! {
     pub fn constraints(&self) -> &OwnedConstraints;
     pub fn current_max_width(&self) -> Option<u32>;
+    #[track_caller]
+    pub fn debug_buffer(&self);
     pub fn has_any_constraint_recovery(&self) -> bool;
+    pub fn max_recovery_mode(&self) -> ConstraintRecoveryMode;
     pub fn with_constraint_recovery_mode_max<T>(&self, mode: ConstraintRecoveryMode, scope: impl FnOnce() -> T) -> T;
     pub fn with_enforce_max_width<T>(&self, scope: impl FnOnce() -> T) -> T;
     // todo make sure any math using two values of this are guaranteed to be on the same line
     pub fn last_line_len(&self) -> u32;
     pub fn line(&self) -> u32;
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T;
-    pub fn with_taken_buffer(&self, f: impl FnOnce(&mut String));
-
 }
 
 impl SourceFormatter {
     pub fn new(
         source: Rc<String>,
         constraints: OwnedConstraints,
-        error_emitter: Rc<ErrorEmitter>,
+        error_emitter: Rc<BufferedErrorEmitter>,
     ) -> SourceFormatter {
         let capacity = source.len() * 2;
+        let out = ConstraintWriter::new(constraints, Rc::clone(&error_emitter), capacity);
         SourceFormatter {
+            checkpoint_count: Cell::new(0),
+            error_emitter,
             source: SourceReader::new(source),
-            out: ConstraintWriter::new(constraints, error_emitter, capacity),
+            out,
             indent: Cell::new(0),
         }
     }
@@ -74,52 +77,22 @@ impl SourceFormatter {
         Self::new(
             Rc::new(source.into()),
             OwnedConstraints::default(),
-            Rc::new(ErrorEmitter::new(None)),
+            Rc::new(BufferedErrorEmitter::new(ErrorEmitter::new(None))),
         )
     }
 
     pub fn finish(self) -> String {
+        assert_eq!(self.checkpoint_count.get(), 0);
         self.source.finish();
         self.out.finish()
-    }
-
-    pub fn checkpoint(&self) -> SourceFormatterCheckpoint {
-        SourceFormatterCheckpoint {
-            source_pos: self.source.pos.get(),
-            writer_checkpoint: self.out.checkpoint(),
-        }
-    }
-
-    pub fn restore_checkpoint(&self, checkpoint: &SourceFormatterCheckpoint) {
-        let SourceFormatterCheckpoint {
-            source_pos,
-            ref writer_checkpoint,
-        } = *checkpoint;
-        self.out.restore_checkpoint(writer_checkpoint);
-        self.source.pos.set(source_pos);
-    }
-
-    pub fn capture_lookahead(&self, from: &SourceFormatterCheckpoint) -> SourceFormatterLookahead {
-        let writer_lookahead = self.out.capture_lookahead(&from.writer_checkpoint);
-        let source_pos = self.source.pos.get();
-        self.source.pos.set(from.source_pos);
-        SourceFormatterLookahead {
-            source_pos,
-            writer_lookahead,
-        }
-    }
-
-    pub fn restore_lookahead(&self, lookahead: &SourceFormatterLookahead) {
-        self.out.restore_lookahead(&lookahead.writer_lookahead);
-        self.source.pos.set(lookahead.source_pos);
     }
 
     pub fn line_col(&self) -> (u32, u32) {
         (self.out.line(), self.out.last_line_len())
     }
 
-    pub fn pos(&self) -> usize {
-        self.source.pos.get().to_usize()
+    pub fn source_pos(&self) -> BytePos {
+        self.source.pos.get()
     }
 
     pub fn source(&self) -> &str {
@@ -241,14 +214,6 @@ impl SourceFormatter {
             let after_indent = &line[self.indent.get().try_into().unwrap()..];
             after_indent.chars().all(is_closer_char)
         })
-    }
-
-    #[track_caller]
-    pub fn debug_buffer(&self) {
-        let location = Location::caller();
-        self.with_taken_buffer(|b| {
-            eprintln!("[{location}] buffer:\n{b}\n\n");
-        });
     }
 }
 

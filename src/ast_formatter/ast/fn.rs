@@ -33,7 +33,7 @@ impl AstFormatter {
                 })
             })
             .otherwise(|| {
-                param_list.format_separate_lines(self)?;
+                param_list.format_vertical(self)?;
                 self.fn_ret_ty(&sig.decl.output)?;
                 if is_block_after_decl {
                     self.backtrack()
@@ -184,7 +184,7 @@ impl AstFormatter {
                 Ok(())
             })
         };
-        if self.out.constraints().borrow().multi_line < MultiLineShape::Unrestricted {
+        if self.out.constraints().multi_line() < MultiLineShape::Unrestricted {
             return do_single_line();
         }
         // args and return type all on one line
@@ -192,7 +192,7 @@ impl AstFormatter {
             .next(do_single_line)
             // args on separate lines
             .otherwise(|| {
-                params.format_separate_lines(self)?;
+                params.format_vertical(self)?;
                 self.fn_ret_ty(&fn_decl.output)?;
                 self.tail(tail)?;
                 Ok(())

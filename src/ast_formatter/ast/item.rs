@@ -126,7 +126,7 @@ impl AstFormatter {
         self.token_ident_generic_params("enum", item.ident, generics)?;
         self.out.space()?;
         list(Braces::CURLY, variants, Self::variant)
-            .format_separate_lines(self)?;
+            .format_vertical(self)?;
         Ok(())
     }
 
@@ -327,7 +327,7 @@ impl AstFormatter {
                 if is_enum {
                     list.format(self)?;
                 } else {
-                    list.format_separate_lines(self)?;
+                    list.format_vertical(self)?;
                 }
                 Ok(())
             }

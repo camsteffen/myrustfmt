@@ -14,6 +14,10 @@ impl AstFormatter {
         tail: &Tail,
     ) -> FormatResult {
         self.label(label, true)?;
+        match block.rules {
+            ast::BlockCheckMode::Default => {}
+            ast::BlockCheckMode::Unsafe(_) => self.out.token_space("unsafe")?,
+        }
         self.out.token("{")?;
         match self.try_into_expr_only_block(block) {
             None => {

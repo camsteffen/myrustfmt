@@ -16,7 +16,7 @@ use crate::error::FormatResult;
 
 impl AstFormatter {
     /* [item, item, item] */
-    fn list_contents_single_line(
+    fn list_contents_horizontal(
         &self,
         len: usize,
         format_item: impl Fn(/*index: */ usize, &Tail) -> FormatResult,
@@ -138,7 +138,7 @@ impl AstFormatter {
         item,
     ]
     */
-    fn list_contents_separate_lines(
+    fn list_contents_vertical(
         &self,
         len: usize,
         format_item: impl Fn(/*index: */ usize, &Tail) -> FormatResult,

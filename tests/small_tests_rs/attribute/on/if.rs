@@ -1,7 +1,7 @@
 // test-kind: no-change
 
 fn test() {
-    #[cfg(abc)]
+    #[attribute]
     if x {
         y
     }

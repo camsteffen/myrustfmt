@@ -29,7 +29,7 @@ impl AstFormatter {
         format: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
         // todo skip attributes as well?
-        self.attrs(attrs)?;
+        attrs.iter().try_for_each(|attr| self.attr(attr))?;
         // todo make my own attribute? or comment?
         // handle #[rustfmt::skip]
         if attrs.iter().any(is_rustfmt_skip) {
@@ -39,7 +39,7 @@ impl AstFormatter {
             self.tail(tail)?;
         } else if !self.out.has_any_constraint_recovery() {
             // todo don't do this in expr list item, when max width is not enforced
-            self.with_copy_span_fallback(span, format)?;
+            self.with_copy_span_fallback(span, format, tail)?;
         } else {
             format()?;
         }
@@ -54,11 +54,14 @@ impl AstFormatter {
         &self,
         span: Span,
         format: impl FnOnce() -> FormatResult,
+        tail: &Tail,
     ) -> FormatResult {
         // N.B. We're not using the typical `Checkpoint` here because we don't want to increment the
         // checkpoint counter which is only incremented when there is a valid formatting strategy to
         // fall back to.
-        let checkpoint = self.out.checkpoint();
+        let checkpoint = self.out.checkpoint_without_buffer_errors();
+        #[cfg(debug_assertions)]
+        let error_count_before = self.error_emitter.error_count();
         let Err(e) = format().constraint_err_only()? else {
             return Ok(());
         };
@@ -66,35 +69,33 @@ impl AstFormatter {
             ConstraintErrorKind::NewlineNotAllowed => {
                 let (line, col) = self.out.line_col();
                 // todo emit a more appropriate error for bad comments
-                self.error_emitter.emit_newline_not_allowed(line, col);
+                self.error_emitter.newline_not_allowed(line, col);
             }
             // width limit errors are emitted before the error value is returned
             ConstraintErrorKind::WidthLimitExceeded => {}
             // unexpected
             ConstraintErrorKind::NextStrategy => return Err(e.into()),
         }
-        debug_assert!(self.error_emitter.error_count() > 0, "an error should be emitted before copy fallback\nstack trace:\n{}", e.backtrace);
+        #[cfg(debug_assertions)]
+        assert!(self.error_emitter.error_count() > error_count_before, "an error should be emitted before copy fallback\nstack trace:\n{}", e.backtrace);
         self.out.restore_checkpoint(&checkpoint);
-        drop(checkpoint);
         self.out
             .constraints()
             .with_max_width(None, || self.out.copy_span(span))?;
-        Ok(())
-    }
-
-    fn attrs(&self, attrs: &[ast::Attribute]) -> FormatResult {
-        for attr in attrs {
-            self.attr(attr)?;
-        }
+        self.tail(tail)?;
         Ok(())
     }
 
     fn attr(&self, attr: &ast::Attribute) -> FormatResult {
         match attr.kind {
             // comments are handled by SourceFormatter
-            ast::AttrKind::DocComment(_comment_kind, _symbol) => Ok(()),
+            ast::AttrKind::DocComment(_comment_kind, _symbol) => {}
             ast::AttrKind::Normal(_) => match attr.meta() {
-                None => todo!(),
+                None => {
+                    // todo do better, format key-value pairs
+                    self.out.copy_span(attr.span)?;
+                    self.newline_break_indent()?;
+                }
                 Some(meta) => {
                     self.out.token("#")?;
                     match attr.style {
@@ -111,10 +112,10 @@ impl AstFormatter {
                         ast::AttrStyle::Outer => self.newline_break()?,
                     }
                     self.indent();
-                    Ok(())
                 }
             },
         }
+        Ok(())
     }
 
     pub fn meta_item(&self, meta: &ast::MetaItem) -> FormatResult {

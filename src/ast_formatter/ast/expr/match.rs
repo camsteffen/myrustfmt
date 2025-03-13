@@ -1,10 +1,9 @@
 use rustc_ast::ast;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::backtrack::Backtrack;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
 use crate::constraints::MultiLineShape;
-use crate::error::{ConstraintErrorKind, FormatResult, FormatResultExt};
+use crate::error::{FormatResult, FormatResultExt};
 
 impl AstFormatter {
     pub fn match_(&self, scrutinee: &ast::Expr, arms: &[ast::Arm]) -> FormatResult {
@@ -80,7 +79,7 @@ impl AstFormatter {
             } else if plain_block(body).is_some() {
                 self.expr(body)
             } else {
-                self.arm_body_add_block_if_first_line_is_longer(body)
+                self.arm_body_maybe_add_block(body)
             }
         })?;
         self.out.skip_token_if_present(",")?;
@@ -99,8 +98,7 @@ impl AstFormatter {
 
     // todo share logic with local which also wraps to avoid multi-line
     // todo should we count lines or simply observe whether it's multi-line?
-    /// Adds a block only if doing so allows for more code to fit in the first line
-    fn arm_body_add_block_if_first_line_is_longer(&self, body: &ast::Expr) -> FormatResult {
+    fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
         let checkpoint = self.out.checkpoint();
         enum ExtraWidthResult {
             AddBlock,
@@ -111,20 +109,12 @@ impl AstFormatter {
             // simulate having extra width by wrapping a block
             let (used_extra_width, result) =
                 self.simulate_wrap_indent_first_line(|| self.expr(body));
-            let succeeded = match result.constraint_err_only()? {
-                Err(e) if e.kind != ConstraintErrorKind::NewlineNotAllowed => {
-                    // todo emit width exceeded error if it was not being enforced
-                    return Err(e.into());
-                }
-                result => result.is_ok(),
-            };
+            let result = result.constraint_err_only()?;
             if used_extra_width {
-                // Either the extra width is strictly required to fit the first line,
-                // or the extra width allows more code to fit in the first line.
-                // Either way, add a block.
+                // adding a block allows more code to fit in the first line
                 return Ok(ExtraWidthResult::AddBlock);
             }
-            if !succeeded {
+            if result.is_err() {
                 // We did not use the extra width, but it did not fit on one line,
                 // so try again to format on the same line without the extra width.
                 return Ok(ExtraWidthResult::SameLine);
@@ -146,22 +136,18 @@ impl AstFormatter {
             }
             ExtraWidthResult::SameLine => {
                 self.out.restore_checkpoint(&checkpoint);
-                self.arm_body_same_line(body, self.backtrack_from_checkpoint(checkpoint))?;
+                // todo closures and structs should have single-line headers
+                // todo exclude comma for block-like expressions?
+                self.backtrack_from_checkpoint(checkpoint)
+                    .next(|| {
+                        self.constraints()
+                            .with_multi_line_shape_min(MultiLineShape::List, || {
+                                self.expr_tail(body, &self.tail_fn(|af| af.out.token_insert(",")))
+                            })
+                    })
+                    .otherwise(|| self.expr_add_block(body))?
             }
         }
         Ok(())
-    }
-
-    fn arm_body_same_line(&self, body: &ast::Expr, backtrack: Backtrack) -> FormatResult {
-        // todo closures and structs should have single-line headers
-        // todo exclude comma for block-like expressions?
-        backtrack
-            .next(|| {
-                self.constraints()
-                    .with_multi_line_shape_min(MultiLineShape::VerticalList, || {
-                        self.expr_tail(body, &self.tail_fn(|af| af.out.token_insert(",")))
-                    })
-            })
-            .otherwise(|| self.expr_add_block(body))
     }
 }

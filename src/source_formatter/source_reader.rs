@@ -35,9 +35,7 @@ impl SourceReader {
 
     pub fn expect_pos(&self, pos: BytePos) -> ParseResult {
         if pos != self.pos.get() {
-            return Err(
-                ParseError::new(ParseErrorKind::ExpectedPosition(pos.to_usize())),
-            );
+            return Err(ParseError::new(ParseErrorKind::ExpectedPosition(pos)));
         }
         Ok(())
     }

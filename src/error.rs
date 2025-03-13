@@ -1,3 +1,5 @@
+use rustc_span::BytePos;
+use crate::rustc_span::Pos;
 use crate::util::line_col::line_col;
 use std::backtrace::Backtrace;
 use std::fmt::{Display, Formatter};
@@ -99,12 +101,12 @@ impl ParseError {
 
 #[derive(Clone, Debug)]
 pub enum ParseErrorKind {
-    ExpectedPosition(usize),
+    ExpectedPosition(BytePos),
     ExpectedToken(String),
 }
 
 impl FormatError {
-    pub fn display(&self, source: &str, pos: usize, path: Option<&Path>) -> impl Display {
+    pub fn display(&self, source: &str, pos: BytePos, path: Option<&Path>) -> impl Display {
         display_from_fn(move |f| {
             let (line, col) = line_col(source, pos);
             write!(f, "Error formatting at ")?;
@@ -113,7 +115,7 @@ impl FormatError {
             }
             write!(f, "{line}:{col}, ")?;
             let next_token = |f: &mut Formatter<'_>| {
-                let remaining = &source[pos..];
+                let remaining = &source[pos.to_usize()..];
                 if let Some(token) = rustc_lexer::tokenize(remaining).next() {
                     let token_str = &remaining[..token.len.try_into().unwrap()];
                     write!(f, ". Next token is `{token_str}`")?;
@@ -141,7 +143,7 @@ impl FormatError {
                             write!(
                                 f,
                                 "expected position is {} bytes {}",
-                                expected_pos.abs_diff(pos),
+                                expected_pos.to_u32().abs_diff(pos.to_u32()),
                                 if expected_pos > pos {
                                     "ahead"
                                 } else {

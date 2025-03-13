@@ -47,6 +47,12 @@
         Struct {
             y,
         };
+- name: line comment after `=`
+  type: no_change
+  in_block: true
+  formatted: |
+    let x = // comment
+        y;
 
 # let...else
 - name: else block breaks into multi-line

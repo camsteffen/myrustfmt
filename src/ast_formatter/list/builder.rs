@@ -157,19 +157,19 @@ where
 
     pub fn format(&self, af: &AstFormatter) -> FormatResult {
         af.constraints()
-            .with_single_line_unless(MultiLineShape::VerticalList, || {
+            .with_single_line_unless(MultiLineShape::List, || {
                 self.do_format(af, Self::contents_default)
             })
     }
 
     pub fn format_single_line(&self, af: &AstFormatter) -> FormatResult {
-        self.do_format(af, Self::contents_single_line)?;
+        self.do_format(af, Self::contents_horizontal)?;
         af.tail(self.tail)?;
         Ok(())
     }
 
-    pub fn format_separate_lines(&self, af: &AstFormatter) -> FormatResult {
-        self.do_format(af, Self::contents_separate_lines)
+    pub fn format_vertical(&self, af: &AstFormatter) -> FormatResult {
+        self.do_format(af, Self::contents_vertical)
     }
 
     fn do_format(
@@ -192,69 +192,62 @@ where
     fn contents_default(&self, af: &AstFormatter) -> FormatResult {
         let first_line = af.out.line();
         let checkpoint = af.out.checkpoint();
-        enum SingleLineResult {
-            Nop,
-            Ok,
-            Discard,
-            Overflow { height: u32 },
+        #[derive(Debug)]
+        enum HorizontalResult {
+            Skip,
+            Fail,
+            Ok { height: u32 },
         }
         let result = af.out.with_enforce_max_width(|| -> FormatResult<_> {
             if self.list.iter().any(ItemConfig::item_requires_own_line) {
-                return Ok(SingleLineResult::Nop);
+                return Ok(HorizontalResult::Skip);
             }
-            let result = self.contents_single_line(af);
+            let result = self.contents_horizontal(af);
             if result.constraint_err_only()?.is_err() {
-                return Ok(SingleLineResult::Discard);
+                return Ok(HorizontalResult::Fail);
             }
             // N.B. measure before writing the tail
-            let is_single_line = af.out.line() == first_line;
             let height = af.out.line() - first_line + 1;
-
             if af.tail(self.tail).constraint_err_only()?.is_err() {
-                return Ok(SingleLineResult::Discard);
+                return Ok(HorizontalResult::Fail);
             }
-
-            if is_single_line
-                || (
-                    self.rest.is_none()
-                        && ItemConfig::last_item_prefers_overflow(self.list.last().unwrap())
-                )
-            {
-                return Ok(SingleLineResult::Ok);
-            }
-            // todo don't lookahead if there isn't any width gained by wrapping
-            Ok(SingleLineResult::Overflow { height })
+            Ok(HorizontalResult::Ok { height })
         })?;
 
         match result {
-            SingleLineResult::Ok => {}
-            SingleLineResult::Nop | SingleLineResult::Discard => {
-                if matches!(result, SingleLineResult::Discard) {
+            HorizontalResult::Skip | HorizontalResult::Fail => {
+                if matches!(result, HorizontalResult::Fail) {
                     af.out.restore_checkpoint(&checkpoint);
                 }
                 af.backtrack_from_checkpoint(checkpoint)
                     .next_opt(self.contents_wrap_to_fit_fn_opt(af))
-                    .otherwise(|| self.contents_separate_lines(af))?;
+                    .otherwise(|| self.contents_vertical(af))?;
             }
-            SingleLineResult::Overflow {
+            HorizontalResult::Ok { height: 1 } => {}
+            HorizontalResult::Ok { .. }
+                if self.rest.is_none()
+                    && ItemConfig::last_item_prefers_overflow(self.list.last().unwrap()) =>
+            {}
+            HorizontalResult::Ok {
                 height: overflow_height,
             } => {
+                // todo don't lookahead if there isn't any width gained by wrapping
                 let overflow_lookahead = af.out.capture_lookahead(&checkpoint);
 
-                // try separate lines
-                let result = af.out.with_enforce_max_width(|| self.contents_separate_lines(af));
+                // try vertical
+                let result = af.out.with_enforce_max_width(|| self.contents_vertical(af));
                 if result.constraint_err_only()?.is_err() {
                     // separate lines failed, so overflow it is!
                     af.out.restore_checkpoint(&checkpoint);
-                    af.out.restore_lookahead(&overflow_lookahead);
+                    af.out.restore_lookahead(overflow_lookahead);
                     return Ok(());
                 }
 
                 // choose between separate lines and overflow
-                let separate_lines_height = af.out.line() - first_line + 1;
-                if overflow_height < separate_lines_height {
+                let vertical_height = af.out.line() - first_line + 1;
+                if overflow_height < vertical_height {
                     af.out.restore_checkpoint(&checkpoint);
-                    af.out.restore_lookahead(&overflow_lookahead);
+                    af.out.restore_lookahead(overflow_lookahead);
                 }
             }
         }
@@ -277,12 +270,12 @@ where
         }
     }
 
-    fn contents_single_line(&self, af: &AstFormatter) -> FormatResult {
+    fn contents_horizontal(&self, af: &AstFormatter) -> FormatResult {
         let len = self.list.len();
-        af.list_contents_single_line(
+        af.list_contents_horizontal(
             len,
             |index, tail| {
-                let strategy = ListStrategy::SingleLine;
+                let strategy = ListStrategy::Horizontal;
                 self.format_item.format(
                     af,
                     &self.list[index],
@@ -330,10 +323,10 @@ where
         )
     }
 
-    fn contents_separate_lines(&self, af: &AstFormatter) -> FormatResult {
+    fn contents_vertical(&self, af: &AstFormatter) -> FormatResult {
         let len = self.list.len();
-        let strategy = ListStrategy::SeparateLines;
-        af.list_contents_separate_lines(
+        let strategy = ListStrategy::Vertical;
+        af.list_contents_vertical(
             len,
             |index, tail| {
                 self.format_item.format(

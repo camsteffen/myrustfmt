@@ -56,7 +56,7 @@
             asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf
                 + asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf
         ]
-- name: prefer separate lines chain over overflow if the number of lines is the same, and the method call can fit on one line
+- name: prefer vertical chain over overflow if the number of lines is the same, and the method call can fit on one line
   type: breakpoint
   in_block: true
   before: |
@@ -68,7 +68,7 @@
     rooty.asdf.asdf.asdfasdf(
         Thing { thing, thing },
     )
-- name: prefer separate lines chain over overflow when same number of lines, even when method call is multi-line
+- name: prefer vertical chain over overflow when same number of lines, even when method call is multi-line
   type: breakpoint
   in_block: true
   before: |

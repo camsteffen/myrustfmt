@@ -12,7 +12,7 @@ impl ListItemContext {
 
 #[derive(Clone, Copy, Debug)]
 pub enum ListStrategy {
-    SingleLine,
+    Horizontal,
     WrapToFit,
-    SeparateLines,
+    Vertical,
 }

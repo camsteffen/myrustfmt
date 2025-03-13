@@ -45,15 +45,15 @@ impl AstFormatter {
         let chain_rest = chain_iter.as_slice();
 
         if multi_line_root {
-            // each item on a separate line, no indent
-            self.postfix_chain_separate_lines(chain_rest, tail)
+            // no indent
+            self.postfix_chain_vertical(chain_rest, tail)
         } else {
             self.backtrack()
                 .next(|| self.postfix_chain_single_line_with_overflow(chain_rest, start_pos, tail))
                 .otherwise(|| {
                     self.constraints()
                         .with_single_line_unless(MultiLineShape::HangingIndent, || {
-                            self.indented(|| self.postfix_chain_separate_lines(chain_rest, tail))
+                            self.indented(|| self.postfix_chain_vertical(chain_rest, tail))
                         })
                 })
         }
@@ -121,16 +121,16 @@ impl AstFormatter {
         match result {
             Err(_) => {
                 self.out.restore_checkpoint(&checkpoint);
-                self.out.restore_lookahead(&overflow_lookahead);
+                self.out.restore_lookahead(overflow_lookahead);
                 Ok(())
             }
-            Ok(separate_lines_height) => {
-                if separate_lines_height <= overflow_height {
-                    // fallback to separate lines strategy
+            Ok(vertical_height) => {
+                if vertical_height <= overflow_height {
+                    // use vertical strategy
                     Err(ConstraintErrorKind::NextStrategy.into())
                 } else {
                     self.out.restore_checkpoint(&checkpoint);
-                    self.out.restore_lookahead(&overflow_lookahead);
+                    self.out.restore_lookahead(overflow_lookahead);
                     Ok(())
                 }
             }
@@ -139,7 +139,7 @@ impl AstFormatter {
         //   - if you err out, there will be a cost of increased indent and added lines
     }
 
-    fn postfix_chain_separate_lines(&self, chain: &[PostfixItem<'_>], tail: &Tail) -> FormatResult {
+    fn postfix_chain_vertical(&self, chain: &[PostfixItem<'_>], tail: &Tail) -> FormatResult {
         for item in chain {
             self.newline_break_indent()?;
             self.postfix_item(item)?;

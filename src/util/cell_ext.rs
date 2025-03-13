@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 
 pub trait CellExt<T> {
     fn with_replaced<U>(&self, value: T, scope: impl FnOnce() -> U) -> U;
@@ -26,21 +26,17 @@ impl<T> CellExt<T> for Cell<T> {
     }
 }
 
-impl<T> CellExt<T> for RefCell<T> {
-    fn with_replaced<U>(&self, value: T, scope: impl FnOnce() -> U) -> U {
-        let prev = self.replace(value);
-        let out = scope();
-        *self.borrow_mut() = prev;
-        out
+pub trait CellNumberExt {
+    fn decrement(&self);
+    fn increment(&self);
+}
+
+impl CellNumberExt for Cell<u32> {
+    fn decrement(&self) {
+        self.set(self.get() - 1);
     }
 
-    fn with_taken<U>(&self, f: impl FnOnce(&mut T) -> U) -> U
-    where
-        T: Default,
-    {
-        let mut value = self.take();
-        let out = f(&mut value);
-        *self.borrow_mut() = value;
-        out
+    fn increment(&self) {
+        self.set(self.get() + 1);
     }
 }

@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraint_writer::{ConstraintRecoveryMode, MAX_CONSTRAINT_RECOVERY_MODE};
+use crate::constraint_writer::ConstraintRecoveryMode;
 use crate::error::{FormatError, FormatResult};
-use crate::source_formatter::SourceFormatterCheckpoint;
+use crate::source_formatter::checkpoint::Checkpoint;
 
 impl AstFormatter {
     // todo should backtrack be specific to a constraint? unless_too_wide(..).otherwise(..)
@@ -13,10 +13,10 @@ impl AstFormatter {
         }
     }
 
-    pub fn backtrack_from_checkpoint<T>(
-        &self,
-        checkpoint: SourceFormatterCheckpoint,
-    ) -> Backtrack<T> {
+    pub fn backtrack_from_checkpoint<'a, T>(
+        &'a self,
+        checkpoint: Checkpoint<'a>,
+    ) -> Backtrack<'a, T> {
         Backtrack {
             af: self,
             state: BacktrackState::Incomplete(checkpoint),
@@ -36,19 +36,19 @@ impl AstFormatter {
 #[must_use]
 pub struct Backtrack<'a, T = ()> {
     af: &'a AstFormatter,
-    state: BacktrackState<T>,
+    state: BacktrackState<'a, T>,
 }
 
-enum BacktrackState<T> {
+enum BacktrackState<'a, T> {
     Init,
-    Incomplete(SourceFormatterCheckpoint),
+    Incomplete(Checkpoint<'a>),
     Done(FormatResult<T>),
 }
 
 impl<T> Backtrack<'_, T> {
     /// Provides the next formatting strategy, but not the final one.
     pub fn next(mut self, strategy: impl FnOnce() -> FormatResult<T>) -> Self {
-        self.do_next(MAX_CONSTRAINT_RECOVERY_MODE, strategy);
+        self.do_next(self.af.out.max_recovery_mode(), strategy);
         self
     }
 
@@ -82,14 +82,14 @@ impl<T> Backtrack<'_, T> {
 
     pub fn next_if(mut self, condition: bool, strategy: impl Fn() -> FormatResult<T>) -> Self {
         if condition {
-            self.do_next(MAX_CONSTRAINT_RECOVERY_MODE, strategy);
+            self.do_next(self.af.out.max_recovery_mode(), strategy);
         }
         self
     }
 
     pub fn next_opt(mut self, strategy: Option<impl Fn() -> FormatResult<T>>) -> Self {
         if let Some(strategy) = strategy {
-            self.do_next(MAX_CONSTRAINT_RECOVERY_MODE, strategy);
+            self.do_next(self.af.out.max_recovery_mode(), strategy);
         }
         self
     }

@@ -1,9 +1,9 @@
+use tracing::instrument;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext, ListStrategy};
 use crate::ast_formatter::tail::Tail;
 use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
-
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::builder::{list, FormatListItem, ListBuilder};
 use crate::ast_formatter::list::list_config::{ArrayListConfig, ListConfig, TupleListConfig};
@@ -12,6 +12,7 @@ use crate::constraints::MultiLineShape;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 use crate::constraint_writer::ConstraintRecoveryMode;
+use crate::ast_formatter::util::debug::expr_kind_name;
 
 mod binary_expr;
 mod postfix_chain;
@@ -23,8 +24,7 @@ impl AstFormatter {
     }
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
-        if !expr.attrs.is_empty()
-            && self.constraints().borrow().multi_line < MultiLineShape::HangingIndent
+        if self.constraints().multi_line() < MultiLineShape::HangingIndent && !expr.attrs.is_empty()
         {
             return Err(ConstraintErrorKind::NextStrategy.into());
         }
@@ -33,9 +33,10 @@ impl AstFormatter {
         })
     }
 
+    #[instrument(name = "expr", skip_all, fields(kind=expr_kind_name(expr)))]
     pub fn expr_after_attrs(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
-        let mut tail = Some(tail);
-        let mut take_tail = || tail.take().unwrap();
+        let mut tail_opt = Some(tail);
+        let mut take_tail = || tail_opt.take().unwrap();
         match expr.kind {
             ast::ExprKind::Array(ref items) => {
                 self.expr_list(Braces::SQUARE, items)
@@ -165,7 +166,7 @@ impl AstFormatter {
             ast::ExprKind::Err(_) => todo!(),
             ast::ExprKind::Dummy => todo!(),
         }
-        if let Some(tail) = tail {
+        if let Some(tail) = tail_opt {
             self.tail(tail)?;
         }
         Ok(())
@@ -199,22 +200,22 @@ impl AstFormatter {
         &self,
     ) -> impl Fn(&AstFormatter, &P<ast::Expr>, &Tail, ListItemContext) -> FormatResult {
         // todo kinda hacky
-        let outer_multi_line = self.constraints().borrow().multi_line;
+        let outer_multi_line = self.constraints().multi_line();
 
         move |af, expr, tail, lcx| {
             af.skip_single_expr_blocks_tail(expr, tail, |expr, tail| {
                 let format = || af.expr_tail(expr, tail);
                 match lcx.strategy {
                     // overflow last item
-                    ListStrategy::SingleLine
-                        if outer_multi_line >= MultiLineShape::VerticalList && lcx.is_last() =>
+                    ListStrategy::Horizontal
+                        if outer_multi_line >= MultiLineShape::List && lcx.is_last() =>
                     {
                         // override the multi-line shape to be less strict than SingleLine
                         let shape = if lcx.len > 1 {
                             // don't overflow nested lists when the outer list has multiple items
                             MultiLineShape::BlockLike
                         } else {
-                            MultiLineShape::VerticalList
+                            MultiLineShape::List
                         };
                         // todo avoid replace?
                         af.constraints()
@@ -222,7 +223,7 @@ impl AstFormatter {
                         Ok(())
                     }
                     // on separate lines, enforce IndentMiddle by adding a block
-                    ListStrategy::SeparateLines if lcx.len > 1 => {
+                    ListStrategy::Vertical if lcx.len > 1 => {
                         af.backtrack()
                             // If it's too wide, adding a block won't help.
                             // The block is only for ensuring a "hanging indent"-compliant shape.
@@ -299,7 +300,7 @@ impl AstFormatter {
         self.backtrack()
             .next(|| {
                 self.constraints()
-                    .with_multi_line_shape_min(MultiLineShape::VerticalList, || self.expr(inner))?;
+                    .with_multi_line_shape_min(MultiLineShape::List, || self.expr(inner))?;
                 self.out.token(")")?;
                 self.tail(tail)?;
                 Ok(())

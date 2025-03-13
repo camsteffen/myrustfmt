@@ -1,8 +1,9 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::tail::Tail;
-use crate::error::FormatResult;
+use crate::error::{FormatResult, FormatResultExt};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
+use crate::source_formatter::SourceFormatterLookahead;
 
 impl AstFormatter {
     pub fn local(&self, local: &ast::Local) -> FormatResult {
@@ -44,7 +45,7 @@ impl AstFormatter {
 
         self.local_init(init, Tail::none())?;
         let is_single_line_init = self.out.line() == first_line;
-        let else_separate_lines = || {
+        let else_block_vertical = || {
             self.block_expr_vertical_after_open_brace(else_)?;
             self.out.token(";")?;
             Ok(())
@@ -52,16 +53,16 @@ impl AstFormatter {
         let same_line_else = || -> FormatResult {
             self.out.space_token_space("else")?;
             self.out.token("{")?;
-            let expr_only_else = if is_single_line_init {
-                self.try_into_expr_only_block(else_)
-            } else {
-                None
-            };
-            let Some(expr_only_else) = expr_only_else else {
-                return else_separate_lines();
-            };
-            self.backtrack()
-                .next(|| {
+            let else_block_horizontal = 'horizontal: {
+                let expr_only_else = if is_single_line_init {
+                    self.try_into_expr_only_block(else_)
+                } else {
+                    None
+                };
+                let Some(expr_only_else) = expr_only_else else {
+                    break 'horizontal None;
+                };
+                Some(move || {
                     self.with_width_limit_from_start(
                         start,
                         RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
@@ -74,14 +75,17 @@ impl AstFormatter {
                         },
                     )
                 })
-                .otherwise(else_separate_lines)?;
+            };
+            self.backtrack()
+                .next_opt(else_block_horizontal)
+                .otherwise(else_block_vertical)?;
             Ok(())
         };
         let next_line_else = || -> FormatResult {
             self.newline_break_indent()?;
             self.out.token_space("else")?;
             self.out.token("{")?;
-            else_separate_lines()?;
+            else_block_vertical()?;
             Ok(())
         };
         self.backtrack()
@@ -95,46 +99,59 @@ impl AstFormatter {
 
     fn local_init(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
         self.out.space_token("=")?;
-        // let checkpoint = self.out.checkpoint();
-        // self.with_single_line(|| {
-        //     self.out.constraints().with_max_width(Some(self.out.constraints().max))
-        // })
-        // todo do all these cases apply with else clause?
-        // single line
-        self.backtrack()
-            .next(|| {
-                self.with_single_line(|| {
-                    self.out.space()?;
-                    self.expr(expr)?;
-                    self.tail(tail)?;
-                    Ok(())
-                })
-            })
-            // todo use lookahead to avoid re-formatting
-            // wrap and indent then single line
-            .next(|| {
-                self.indented(|| {
-                    self.newline_break_indent()?;
-                    self.with_single_line(|| self.expr(expr))?;
-                    self.tail(tail)?;
-                    Ok(())
-                })
-            })
-            // normal
-            .next(|| {
+        let checkpoint_after_eq = self.out.checkpoint();
+        enum Next {
+            SameLine,
+            WrapIndent,
+            WrapIndentLookahead(SourceFormatterLookahead),
+        }
+        // this block helps to drop checkpoint_after_space
+        let next = 'next: {
+            let space_result = self.out.with_enforce_max_width(|| self.out.space());
+            if space_result.constraint_err_only()?.is_err() {
+                // comments forced a line break
+                break 'next Next::WrapIndent;
+            }
+            let checkpoint_after_space = self.out.checkpoint();
+
+            // simulate extra width from wrap-indent
+            let (used_extra_width, result) = self.out.with_enforce_max_width(|| {
+                self.simulate_wrap_indent_first_line(|| self.expr_tail(expr, tail))
+            });
+            let result = result.constraint_err_only()?;
+            if used_extra_width {
+                if result.is_ok() {
+                    let lookahead = self.out.capture_lookahead(&checkpoint_after_space);
+                    Next::WrapIndentLookahead(lookahead)
+                } else {
+                    Next::WrapIndent
+                }
+            } else if result.is_err() {
+                Next::SameLine
+            } else {
+                return Ok(());
+            }
+        };
+        self.out.restore_checkpoint(&checkpoint_after_eq);
+        match next {
+            Next::SameLine => {
                 self.out.space()?;
                 self.expr(expr)?;
                 self.tail(tail)?;
-                Ok(())
-            })
-            // wrap and indent
-            .otherwise(|| {
+            }
+            Next::WrapIndent => {
                 self.indented(|| {
                     self.newline_break_indent()?;
                     self.expr(expr)?;
                     self.tail(tail)?;
                     Ok(())
-                })
-            })
+                })?;
+            }
+            Next::WrapIndentLookahead(lookahead) => {
+                self.indented(|| self.newline_break_indent())?;
+                self.out.restore_lookahead(lookahead);
+            }
+        }
+        Ok(())
     }
 }

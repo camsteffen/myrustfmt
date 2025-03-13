@@ -6,9 +6,9 @@ use crate::util::cell_ext::CellExt;
 impl AstFormatter {
     pub fn indented<T>(&self, format: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         let indent = self.out.indent.get() + INDENT_WIDTH;
-        self.out.indent.with_replaced(indent, || {
-            let shape = self.constraints().borrow().multi_line;
-            match shape {
+        self.out
+            .indent
+            .with_replaced(indent, || match self.constraints().multi_line() {
                 // SingleLine must be preserved
                 MultiLineShape::SingleLine | MultiLineShape::Unrestricted => format(),
                 // For any other shape, indentation "resets" the shape to Unrestricted
@@ -17,8 +17,7 @@ impl AstFormatter {
                     self.constraints()
                         .with_multi_line_shape_replaced(MultiLineShape::Unrestricted, format)
                 }
-            }
-        })
+            })
     }
 
     pub fn indented_optional(
