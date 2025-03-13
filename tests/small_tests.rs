@@ -195,7 +195,7 @@ struct Test {
     expect_errors: bool,
     #[serde(default)]
     in_block: bool,
-    max_width: Option<u32>,
+    max_width: Option<u16>,
 }
 
 #[derive(Deserialize)]
@@ -221,7 +221,7 @@ enum TestKindRaw {
 fn breakpoint_test(before: &str, after: &str, in_block: bool) -> TestResult {
     let before = before.trim();
     let after = after.trim();
-    let initial_used_width = before.lines().map(|line| line.len() as u32).max().unwrap();
+    let initial_used_width = before.lines().map(|line| line.len() as u16).max().unwrap();
     format_max_width_expected(
         before,
         Some(initial_used_width),
@@ -244,7 +244,7 @@ fn breakpoint_test(before: &str, after: &str, in_block: bool) -> TestResult {
 
 fn format_max_width_expected(
     source: &str,
-    max_width: Option<u32>,
+    max_width: Option<u16>,
     expected: &str,
     name: &str,
     in_block: bool,
@@ -274,14 +274,14 @@ fn handle_format_errors(error_count: u32, expect_errors: bool) -> TestResult {
     }
 }
 
-fn format_in_block(stmt: &str, max_width: Option<u32>) -> TestResult<(String, u32)> {
+fn format_in_block(stmt: &str, max_width: Option<u16>) -> TestResult<(String, u32)> {
     let (prefix, indent, suffix) = ("fn test() {\n", "    ", "}\n");
     let stmt = String::from_iter(stmt.lines().map(|s| format!("{indent}{s}\n")));
     let module_source = format!("{prefix}{stmt}{suffix}");
     let mut config = Config::default();
     if let Some(max_width) = max_width {
-        let max_width = max_width + indent.len() as u32;
-        let min_max_width = "fn test() {".len() as u32;
+        let max_width = max_width + indent.len() as u16;
+        let min_max_width = "fn test() {".len() as u16;
         if max_width < min_max_width {
             panic!("max width must be at least {min_max_width}");
         }

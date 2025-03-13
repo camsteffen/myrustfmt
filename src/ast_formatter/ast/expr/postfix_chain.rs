@@ -4,12 +4,13 @@ use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiv
 use crate::constraints::MultiLineShape;
 use crate::error::{ConstraintErrorKind, FormatResult, FormatResultExt};
 use rustc_ast::ast;
+use crate::num::HPos;
 
 // In rustfmt, this is called chain_width, and is 60 by default
-const POSTFIX_CHAIN_MAX_WIDTH: u32 = 60;
+const POSTFIX_CHAIN_MAX_WIDTH: HPos = 60;
 /// Don't apply chain max width unless the chain item's distance from the start
 /// of the chain is at least this much.
-const POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH: u32 = 15;
+const POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH: HPos = 15;
 
 struct PostfixItem<'a> {
     /// The first item in the chain has the root expression, which is not a postfix expression.
@@ -62,7 +63,7 @@ impl AstFormatter {
     fn postfix_chain_single_line_with_overflow(
         &self,
         chain: &[PostfixItem<'_>],
-        start_pos: u32,
+        start_pos: HPos,
         tail: &Tail,
     ) -> FormatResult {
         let last = chain.last().unwrap();
@@ -81,7 +82,7 @@ impl AstFormatter {
     fn postfix_chain_overflow(
         &self,
         overflowable: &PostfixItem<'_>,
-        start_pos: u32,
+        start_pos: HPos,
         tail: &Tail,
     ) -> FormatResult {
         let first_line = self.out.line();
@@ -150,7 +151,7 @@ impl AstFormatter {
 
     fn with_chain_item_max_width(
         &self,
-        start_pos: u32,
+        start_pos: HPos,
         format: impl Fn() -> FormatResult,
     ) -> FormatResult {
         let offset = self.out.last_line_len() - start_pos;
@@ -200,7 +201,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn postfix_items(&self, items: &[PostfixItem<'_>], start_pos: u32) -> FormatResult {
+    fn postfix_items(&self, items: &[PostfixItem<'_>], start_pos: HPos) -> FormatResult {
         items.iter().try_for_each(|item| {
             self.with_chain_item_max_width(start_pos, || self.postfix_item(item))
         })

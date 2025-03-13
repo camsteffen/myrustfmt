@@ -1,8 +1,8 @@
 use crate::error::FormatResult;
-use std::cell::RefCell;
+use std::cell::Cell;
 use std::num::NonZero;
-use std::ops::Deref;
-use std::rc::Rc;
+use crate::num::HPos;
+use crate::util::cell_ext::CellExt;
 
 /// Specifies what kind of multi-line shapes are allowed, if any.
 /// 
@@ -40,16 +40,16 @@ pub enum MultiLineShape {
 
 /// WidthLimit behaves very much like max_width, but they are separate values because both may
 /// change, independently of each other.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum WidthLimit {
     /// Applies a width limit where a single-line constraint is active
-    SingleLine { end: NonZero<u32> },
+    SingleLine { end: NonZero<HPos> },
     /// Applies a width limit to the first line of some output, then falls out of scope
-    FirstLine { end: NonZero<u32>, line: u32 },
+    FirstLine { end: NonZero<HPos>, line: u32 },
 }
 
 impl WidthLimit {
-    fn end(&self) -> u32 {
+    fn end(&self) -> HPos {
         match self {
             WidthLimit::SingleLine { end } => end.get(),
             WidthLimit::FirstLine { end, .. } => end.get(),
@@ -57,103 +57,41 @@ impl WidthLimit {
     }
 }
 
-/// Creates a new Rc for every modification to optimize for cheap clones
-#[derive(PartialEq)]
-pub struct OwnedConstraints(RefCell<OwnedConstraintsData>);
-
-impl Deref for OwnedConstraints {
-    type Target = RefCell<OwnedConstraintsData>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
-pub struct OwnedConstraintsData {
-    pub max_width: Option<u32>,
-    pub scoped_constraints: Rc<Constraints>,
+pub struct Constraints {
+    pub max_width: Cell<HPos>,
+    pub multi_line: Cell<MultiLineShape>,
+    pub width_limit: Cell<Option<WidthLimit>>,
 }
 
-impl OwnedConstraints {
-    pub fn new(constraints: Constraints, max_width: Option<u32>) -> OwnedConstraints {
-        OwnedConstraints(RefCell::new(OwnedConstraintsData {
-            scoped_constraints: Rc::new(constraints),
-            max_width,
-        }))
-    }
-
-    fn with_replaced_value<T, U>(
-        &self,
-        get: impl Fn(&mut Constraints) -> &mut T,
-        value: T,
-        scope: impl FnOnce() -> U,
-    ) -> U {
-        let mut constraints_ref = self.0.borrow_mut();
-        if let Some(constraints) = Rc::get_mut(&mut constraints_ref.scoped_constraints) {
-            let prev = std::mem::replace(get(constraints), value);
-            drop(constraints_ref);
-            let out = scope();
-            let mut c_ref = self.0.borrow_mut();
-            let constraints = Rc::get_mut(&mut c_ref.scoped_constraints).expect(
-                "constraint change expected to have exclusive ownership to revert",
-            );
-            *get(constraints) = prev;
-            out
-        } else {
-            let mut constraints = Constraints::clone(&constraints_ref.scoped_constraints);
-            *get(&mut constraints) = value;
-            let prev = std::mem::replace(
-                &mut constraints_ref.scoped_constraints,
-                Rc::new(constraints),
-            );
-            drop(constraints_ref);
-            let out = scope();
-            self.0.borrow_mut().scoped_constraints = prev;
-            out
+impl Constraints {
+    pub fn new(max_width: HPos) -> Constraints {
+        Constraints {
+            max_width: Cell::new(max_width),
+            multi_line: Cell::new(MultiLineShape::Unrestricted),
+            width_limit: Cell::new(None),
         }
     }
 
-    pub fn max_width_at(&self, line: u32) -> Option<u32> {
-        let ref_ = self.borrow();
-        let Some(scoped) = ref_.scoped_constraints.scoped_max_width_at(line) else {
-            return ref_.max_width;
+    pub fn max_width_at(&self, line: u32) -> HPos {
+        let Some(scoped) = self.scoped_max_width_at(line) else {
+            return self.max_width.get();
         };
-        let Some(max_width) = ref_.max_width else {
-            return Some(scoped);
-        };
-        Some(scoped.min(max_width))
-    }
-
-    pub fn multi_line(&self) -> MultiLineShape {
-        self.borrow().scoped_constraints.multi_line
-    }
-
-    pub fn with_global_max_width<T>(&self, max_width: Option<u32>, scope: impl FnOnce() -> T) -> T {
-        let prev = std::mem::replace(&mut self.0.borrow_mut().max_width, max_width);
-        let out = scope();
-        self.0.borrow_mut().max_width = prev;
-        out
-    }
-
-    pub fn with_no_width_limit<T>(&self, scope: impl FnOnce() -> T) -> T {
-        self.with_replaced_value(|c| &mut c.width_limit, None, scope)
+        self.max_width.get().min(scoped)
     }
 
     pub fn with_width_limit<T>(&self, width_limit: WidthLimit, scope: impl FnOnce() -> T) -> T {
         if matches!(width_limit, WidthLimit::SingleLine { .. }) {
-            debug_assert_eq!(self.multi_line(), MultiLineShape::SingleLine);
+            debug_assert_eq!(self.multi_line.get(), MultiLineShape::SingleLine);
         }
-        let ignore = {
-            let current = &self.0.borrow().scoped_constraints.width_limit;
-            current
-                .as_ref()
-                .is_some_and(|current| current.end() <= width_limit.end())
-        };
-        if ignore {
+        if self
+            .width_limit
+            .get()
+            .is_some_and(|current| current.end() <= width_limit.end())
+        {
             return scope();
         }
-        self.with_replaced_value(|c| &mut c.width_limit, Some(width_limit), scope)
+        self.width_limit.with_replaced(Some(width_limit), scope)
     }
 
     pub fn with_multi_line_shape_min<T>(
@@ -161,18 +99,10 @@ impl OwnedConstraints {
         shape: MultiLineShape,
         scope: impl FnOnce() -> T,
     ) -> T {
-        if self.multi_line() <= shape {
+        if self.multi_line.get() <= shape {
             return scope();
         }
-        self.with_multi_line_shape_replaced(shape, scope)
-    }
-
-    pub fn with_multi_line_shape_replaced<T>(
-        &self,
-        shape: MultiLineShape,
-        scope: impl FnOnce() -> T,
-    ) -> T {
-        self.with_replaced_value(|c| &mut c.multi_line, shape, scope)
+        self.multi_line.with_replaced(shape, scope)
     }
 
     /// Unless the given MultiLineConstraint is applicable, enforce a single-line constraint
@@ -182,10 +112,11 @@ impl OwnedConstraints {
         shape: MultiLineShape,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        if self.multi_line() >= shape {
+        if self.multi_line.get() >= shape {
             scope()
         } else {
-            self.with_multi_line_shape_replaced(MultiLineShape::SingleLine, scope)
+            let shape1 = MultiLineShape::SingleLine;
+            self.multi_line.with_replaced(shape1, scope)
         }
     }
 
@@ -200,20 +131,12 @@ impl OwnedConstraints {
         }
         self.with_single_line_unless(shape, scope)
     }
-}
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Constraints {
-    pub multi_line: MultiLineShape,
-    width_limit: Option<WidthLimit>,
-}
-
-impl Constraints {
-    pub fn scoped_max_width_at(&self, line: u32) -> Option<u32> {
-        let Some(width_limit) = &self.width_limit else {
+    pub fn scoped_max_width_at(&self, line: u32) -> Option<HPos> {
+        let Some(width_limit) = self.width_limit.get() else {
             return None;
         };
-        match *width_limit {
+        match width_limit {
             WidthLimit::SingleLine { end } => Some(end.into()),
             WidthLimit::FirstLine { end, line: l } => (l == line).then_some(end.into()),
         }

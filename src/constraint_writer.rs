@@ -1,4 +1,4 @@
-use crate::constraints::{MultiLineShape, OwnedConstraints, OwnedConstraintsData};
+use crate::constraints::{MultiLineShape, Constraints};
 use crate::error::{
     ConstraintError, ConstraintErrorKind, NewlineNotAllowedError, WidthLimitExceededError,
 };
@@ -7,6 +7,7 @@ use crate::util::cell_ext::{CellExt, CellNumberExt};
 use std::cell::Cell;
 use std::panic::Location;
 use std::rc::Rc;
+use crate::num::HPos;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum ConstraintRecoveryMode {
@@ -16,7 +17,7 @@ pub enum ConstraintRecoveryMode {
 }
 
 pub struct ConstraintWriter {
-    constraints: OwnedConstraints,
+    constraints: Constraints,
     buffer: Cell<String>,
     constraint_recovery_mode: Cell<ConstraintRecoveryMode>,
     error_emitter: Rc<BufferedErrorEmitter>,
@@ -39,7 +40,7 @@ pub struct ConstraintWriterSelfCheckpoint {
     last_line_start: usize,
     last_width_exceeded_line: Option<u32>,
     #[cfg(debug_assertions)]
-    constraints: OwnedConstraintsData,
+    constraints: Constraints,
 }
 
 #[derive(Debug)]
@@ -50,7 +51,7 @@ pub struct ConstraintWriterLookahead {
 
 impl ConstraintWriter {
     pub fn new(
-        constraints: OwnedConstraints,
+        constraints: Constraints,
         error_emitter: Rc<BufferedErrorEmitter>,
         capacity: usize,
     ) -> ConstraintWriter {
@@ -69,7 +70,7 @@ impl ConstraintWriter {
         self.buffer.into_inner()
     }
 
-    pub fn constraints(&self) -> &OwnedConstraints {
+    pub fn constraints(&self) -> &Constraints {
         &self.constraints
     }
 
@@ -141,7 +142,7 @@ impl ConstraintWriter {
             #[cfg(debug_assertions)]
             constraint_recovery_mode: constraint_recovery_mode.get(),
             #[cfg(debug_assertions)]
-            constraints: constraints.borrow().clone(),
+            constraints: constraints.clone(),
         }
     }
 
@@ -167,7 +168,7 @@ impl ConstraintWriter {
         #[cfg(debug_assertions)]
         {
             assert_eq!(self.constraint_recovery_mode.get(), constraint_recovery_mode);
-            assert_eq!(&*self.constraints.borrow(), constraints);
+            assert_eq!(&self.constraints, constraints);
         }
         self.last_line_start.set(last_line_start);
         self.last_width_exceeded_line.set(last_width_exceeded_line);
@@ -210,7 +211,7 @@ impl ConstraintWriter {
     }
 
     pub fn newline(&self) -> Result<(), NewlineNotAllowedError> {
-        if matches!(self.constraints.multi_line(), MultiLineShape::SingleLine) {
+        if matches!(self.constraints.multi_line.get(), MultiLineShape::SingleLine) {
             return Err(NewlineNotAllowedError);
         }
         self.buffer.with_taken(|b| b.push('\n'));
@@ -219,15 +220,14 @@ impl ConstraintWriter {
         Ok(())
     }
 
-    pub fn spaces(&self, count: u32) {
+    pub fn spaces(&self, count: HPos) {
         self.buffer.with_taken(|b| b.extend((0..count).map(|_| ' ')));
     }
 
     pub fn check_width_constraints(&self) -> Result<(), ConstraintError> {
-        let _: WidthLimitExceededError = match self.remaining_width() {
-            None | Some(Ok(_)) => return Ok(()),
-            Some(Err(e)) => e,
-        };
+        if self.remaining_width().is_ok() {
+            return Ok(());
+        }
         // If there is a fallback formatting strategy, then raise an error to trigger the
         // fallback. Otherwise, emit an error and keep going.
         if self.is_enforcing_max_width() {
@@ -244,26 +244,24 @@ impl ConstraintWriter {
         }
     }
 
-    pub fn current_max_width(&self) -> Option<u32> {
+    pub fn current_max_width(&self) -> HPos {
         self.constraints.max_width_at(self.line())
     }
 
-    pub fn remaining_width(&self) -> Option<Result<u32, WidthLimitExceededError>> {
-        self.current_max_width().map(|max_width| {
-            max_width
-                .checked_sub(self.last_line_len().try_into().unwrap())
-                .ok_or(WidthLimitExceededError)
-        })
+    pub fn remaining_width(&self) -> Result<HPos, WidthLimitExceededError> {
+        self.current_max_width()
+            .checked_sub(self.last_line_len().try_into().unwrap())
+            .ok_or(WidthLimitExceededError)
     }
 
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T {
         self.buffer.with_taken(|b| f(&b[self.last_line_start.get()..]))
     }
 
-    pub fn last_line_len(&self) -> u32 {
+    pub fn last_line_len(&self) -> HPos {
         (self.len() - self.last_line_start.get())
             .try_into()
-            .unwrap()
+            .expect("line length exceeds HPos::MAX")
     }
 
     pub fn with_taken_buffer(&self, f: impl FnOnce(&mut String)) {

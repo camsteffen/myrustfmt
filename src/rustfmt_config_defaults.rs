@@ -1,15 +1,17 @@
+use crate::num::HPos;
+
 // todo delete or what?
 #[allow(dead_code)]
 pub struct RustfmtConfig {
-    pub array_width: u32,
-    pub attr_fn_like_width: u32,
-    pub chain_width: u32,
-    pub fn_call_width: u32,
-    pub short_array_element_width_threshold: u32,
-    pub single_line_if_else_max_width: u32,
-    pub single_line_let_else_max_width: u32,
-    pub struct_lit_width: u32,
-    pub struct_variant_width: u32,
+    pub array_width: HPos,
+    pub attr_fn_like_width: HPos,
+    pub chain_width: HPos,
+    pub fn_call_width: HPos,
+    pub short_array_element_width_threshold: HPos,
+    pub single_line_if_else_max_width: HPos,
+    pub single_line_let_else_max_width: HPos,
+    pub struct_lit_width: HPos,
+    pub struct_variant_width: HPos,
 }
 
 pub const RUSTFMT_CONFIG_DEFAULTS: RustfmtConfig = RustfmtConfig {

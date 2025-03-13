@@ -1,12 +1,13 @@
 use std::cell::Cell;
 use crate::constraint_writer::{ConstraintRecoveryMode, ConstraintWriter, ConstraintWriterLookahead};
-use crate::constraints::OwnedConstraints;
+use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::{BufferedErrorEmitter, Error};
 use self::source_reader::SourceReader;
 use crate::util::chars::is_closer_char;
 use rustc_span::{BytePos, Pos, Span};
 use std::rc::Rc;
+use crate::num::HPos;
 
 mod whitespace;
 mod source_reader;
@@ -25,7 +26,7 @@ pub struct SourceFormatter {
     source: SourceReader,
     out: ConstraintWriter,
     /// The number of spaces for the current level of indentation
-    pub indent: Cell<u32>,
+    pub indent: Cell<HPos>,
 }
 
 macro_rules! delegate_to_constraint_writer {
@@ -41,8 +42,8 @@ macro_rules! delegate_to_constraint_writer {
 }
 
 delegate_to_constraint_writer! {
-    pub fn constraints(&self) -> &OwnedConstraints;
-    pub fn current_max_width(&self) -> Option<u32>;
+    pub fn constraints(&self) -> &Constraints;
+    pub fn current_max_width(&self) -> HPos;
     #[track_caller]
     pub fn debug_buffer(&self);
     pub fn has_any_constraint_recovery(&self) -> bool;
@@ -50,7 +51,7 @@ delegate_to_constraint_writer! {
     pub fn with_constraint_recovery_mode_max<T>(&self, mode: ConstraintRecoveryMode, scope: impl FnOnce() -> T) -> T;
     pub fn with_enforce_max_width<T>(&self, scope: impl FnOnce() -> T) -> T;
     // todo make sure any math using two values of this are guaranteed to be on the same line
-    pub fn last_line_len(&self) -> u32;
+    pub fn last_line_len(&self) -> HPos;
     pub fn line(&self) -> u32;
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T;
 }
@@ -58,7 +59,7 @@ delegate_to_constraint_writer! {
 impl SourceFormatter {
     pub fn new(
         source: Rc<String>,
-        constraints: OwnedConstraints,
+        constraints: Constraints,
         error_emitter: Rc<BufferedErrorEmitter>,
     ) -> SourceFormatter {
         let capacity = source.len() * 2;
@@ -78,7 +79,7 @@ impl SourceFormatter {
         self.out.finish()
     }
 
-    pub fn line_col(&self) -> (u32, u32) {
+    pub fn line_col(&self) -> (u32, HPos) {
         (self.out.line(), self.out.last_line_len())
     }
 

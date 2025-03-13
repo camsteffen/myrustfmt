@@ -1,3 +1,4 @@
+use crate::num::HPos;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 pub trait ListConfig {
@@ -15,7 +16,7 @@ impl ListConfig for DefaultListConfig {}
 
 pub enum ListWrapToFitConfig {
     No,
-    Yes { max_element_width: Option<u32> },
+    Yes { max_element_width: Option<HPos> },
 }
 
 pub struct ArrayListConfig;

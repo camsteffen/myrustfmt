@@ -8,14 +8,15 @@ impl AstFormatter {
         let indent = self.out.indent.get() + INDENT_WIDTH;
         self.out
             .indent
-            .with_replaced(indent, || match self.constraints().multi_line() {
+            .with_replaced(indent, || match self.constraints().multi_line.get() {
                 // SingleLine must be preserved
                 MultiLineShape::SingleLine | MultiLineShape::Unrestricted => format(),
                 // For any other shape, indentation "resets" the shape to Unrestricted
                 // since the shape is only concerned with where code touches the left margin.
                 _ => {
                     self.constraints()
-                        .with_multi_line_shape_replaced(MultiLineShape::Unrestricted, format)
+                        .multi_line
+                        .with_replaced(MultiLineShape::Unrestricted, format)
                 }
             })
     }

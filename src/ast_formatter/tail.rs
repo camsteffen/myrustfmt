@@ -1,7 +1,7 @@
-use std::rc::Rc;
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::Constraints;
+use crate::constraints::{MultiLineShape, WidthLimit};
 use crate::error::FormatResult;
+use crate::util::cell_ext::CellExt;
 
 /// A Tail squeezes the code before it leftward to make room for itself.
 ///
@@ -19,16 +19,18 @@ use crate::error::FormatResult;
 pub struct Tail<'a>(Option<TailImpl<'a>>);
 
 struct TailImpl<'a> {
-    constraints: Rc<Constraints>,
     func: Box<dyn Fn(&AstFormatter) -> FormatResult + 'a>,
+    multi_line: MultiLineShape,
+    width_limit: Option<WidthLimit>,
 }
 
 // Tail creation
 impl AstFormatter {
     pub fn tail_fn<'a>(&self, tail: impl Fn(&AstFormatter) -> FormatResult + 'a) -> Tail<'a> {
         Tail(Some(TailImpl {
-            constraints: Rc::clone(&self.constraints().borrow().scoped_constraints),
             func: Box::new(tail),
+            multi_line: self.constraints().multi_line.get(),
+            width_limit: self.constraints().width_limit.get(),
         }))
     }
 
@@ -46,12 +48,9 @@ impl Tail<'_> {
 impl AstFormatter {
     pub fn tail(&self, tail: &Tail) -> FormatResult {
         let Some(tail) = &tail.0 else { return Ok(()) };
-        let prev = std::mem::replace(
-            &mut self.constraints().borrow_mut().scoped_constraints,
-            tail.constraints.clone(),
-        );
-        let out = (tail.func)(self);
-        self.constraints().borrow_mut().scoped_constraints = prev;
-        out
+        self.constraints().multi_line.with_replaced(
+            tail.multi_line,
+            || self.constraints().width_limit.with_replaced(tail.width_limit, || (tail.func)(self)),
+        )
     }
 }

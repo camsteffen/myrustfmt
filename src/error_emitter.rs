@@ -1,10 +1,11 @@
 use std::cell::Cell;
 use std::path::PathBuf;
+use crate::num::HPos;
 use crate::util::cell_ext::{CellExt, CellNumberExt};
 
 #[derive(Debug)]
 pub enum Error {
-    NewlineNotAllowed { line: u32, col: u32 },
+    NewlineNotAllowed { line: u32, col: HPos },
     WidthLimitExceeded { line: u32, line_string: String },
 }
 
@@ -77,7 +78,7 @@ impl BufferedErrorEmitter {
 
     // actual errors
 
-    pub fn newline_not_allowed(&self, line: u32, col: u32) {
+    pub fn newline_not_allowed(&self, line: u32, col: HPos) {
         if self.is_buffering() {
             self.buffer.with_taken(|b| b.push(Error::NewlineNotAllowed { line, col }));
         } else {
@@ -146,7 +147,7 @@ impl ErrorEmitter {
         self.error_count.get()
     }
 
-    pub fn newline_not_allowed(&self, line: u32, col: u32) {
+    pub fn newline_not_allowed(&self, line: u32, col: HPos) {
         self.error_count.increment();
         let (line, col) = (line + 1, col + 1);
         eprint!("Newline character not allowed at ");

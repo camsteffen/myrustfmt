@@ -36,6 +36,7 @@ mod constraint_writer;
 mod constraints;
 mod error;
 mod error_emitter;
+mod num;
 mod parse;
 mod rustfmt_config_defaults;
 mod source_formatter;

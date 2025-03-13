@@ -3,11 +3,12 @@ use std::rc::Rc;
 
 use crate::ast_module::AstModule;
 use crate::config::Config;
-use crate::constraints::{Constraints, OwnedConstraints};
+use crate::constraints::Constraints;
 use crate::error_emitter::{BufferedErrorEmitter, ErrorEmitter};
 use crate::source_formatter::SourceFormatter;
 use crate::error::FormatResult;
 use crate::FormatModuleResult;
+use crate::num::HPos;
 
 mod ast;
 mod util;
@@ -16,7 +17,7 @@ pub mod tail;
 pub mod backtrack;
 mod whitespace;
 
-pub const INDENT_WIDTH: u32 = 4;
+pub const INDENT_WIDTH: HPos = 4;
 
 pub fn format_module(
     module: &AstModule,
@@ -24,7 +25,7 @@ pub fn format_module(
     path: Option<PathBuf>,
     config: &Config,
 ) -> FormatModuleResult {
-    let constraints = OwnedConstraints::new(Constraints::default(), Some(config.max_width));
+    let constraints = Constraints::new(config.max_width);
     let error_emitter = Rc::new(BufferedErrorEmitter::new(ErrorEmitter::new(path.clone())));
     let out = SourceFormatter::new(source, constraints, Rc::clone(&error_emitter));
     let formatter = AstFormatter { error_emitter, out };
@@ -69,7 +70,7 @@ impl AstFormatter {
         }
     }
 
-    pub fn constraints(&self) -> &OwnedConstraints {
+    pub fn constraints(&self) -> &Constraints {
         self.out.constraints()
     }
 }

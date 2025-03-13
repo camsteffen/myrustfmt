@@ -13,6 +13,7 @@ pub use self::rest::ListRest;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
+use crate::num::HPos;
 
 impl AstFormatter {
     /* [item, item, item] */
@@ -24,7 +25,7 @@ impl AstFormatter {
         close_brace: &str,
         force_trailing_comma: bool,
         pad: bool,
-        max_width: Option<u32>,
+        max_width: Option<HPos>,
     ) -> FormatResult {
         let do_pad = |af: &Self| -> FormatResult {
             if pad {
@@ -90,7 +91,7 @@ impl AstFormatter {
         tail: &Tail,
         format_item: impl Fn(/*index: */ usize) -> FormatResult,
         item_requires_own_line: impl Fn(/*index: */ usize) -> bool,
-        max_element_width: Option<u32>,
+        max_element_width: Option<HPos>,
     ) -> FormatResult {
         let format_item = |index| match max_element_width {
             Some(max_width) => {

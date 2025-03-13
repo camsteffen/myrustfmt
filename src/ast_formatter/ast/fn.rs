@@ -184,7 +184,7 @@ impl AstFormatter {
                 Ok(())
             })
         };
-        if self.out.constraints().multi_line() < MultiLineShape::Unrestricted {
+        if self.out.constraints().multi_line.get() < MultiLineShape::Unrestricted {
             return do_single_line();
         }
         // args and return type all on one line

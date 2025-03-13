@@ -2,11 +2,14 @@ use std::num::NonZero;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::constraints::{MultiLineShape, WidthLimit};
 use crate::error::{FormatResult, WidthLimitExceededError};
+use crate::num::HPos;
+use crate::util::cell_ext::CellExt;
 
 impl AstFormatter {
     pub fn with_single_line<T>(&self, format: impl FnOnce() -> T) -> T {
         self.constraints()
-            .with_multi_line_shape_replaced(MultiLineShape::SingleLine, format)
+            .multi_line
+            .with_replaced(MultiLineShape::SingleLine, format)
     }
 
     pub fn with_single_line_opt<T>(
@@ -22,7 +25,7 @@ impl AstFormatter {
 
     pub fn with_width_limit<T>(
         &self,
-        width_limit: u32,
+        width_limit: HPos,
         format: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         let end = NonZero::new(self.out.last_line_len() + width_limit)
@@ -36,7 +39,7 @@ impl AstFormatter {
 
     pub fn with_width_limit_first_line<T>(
         &self,
-        width_limit: u32,
+        width_limit: HPos,
         format: impl FnOnce() -> T,
     ) -> T {
         let line = self.out.line();
@@ -48,7 +51,7 @@ impl AstFormatter {
 
     pub fn with_width_limit_first_line_opt<T>(
         &self,
-        width_limit: Option<u32>,
+        width_limit: Option<HPos>,
         format: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         match width_limit {
@@ -59,8 +62,8 @@ impl AstFormatter {
 
     pub fn with_width_limit_from_start<T>(
         &self,
-        line_start_pos: u32,
-        width_limit: u32,
+        line_start_pos: HPos,
+        width_limit: HPos,
         format: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         let Some(remaining) = width_limit.checked_sub(self.out.last_line_len() - line_start_pos)
@@ -72,8 +75,8 @@ impl AstFormatter {
 
     pub fn with_width_limit_from_start_first_line<T>(
         &self,
-        line_start_pos: u32,
-        width_limit: u32,
+        line_start_pos: HPos,
+        width_limit: HPos,
         format: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         let Some(remaining) = width_limit.checked_sub(self.out.last_line_len() - line_start_pos)
@@ -85,8 +88,8 @@ impl AstFormatter {
 
     pub fn with_width_limit_from_start_first_line_opt<T>(
         &self,
-        line_start_pos: u32,
-        width_limit: Option<u32>,
+        line_start_pos: HPos,
+        width_limit: Option<HPos>,
         format: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         let Some(width_limit) = width_limit else {
@@ -117,12 +120,15 @@ impl AstFormatter {
         let start = self.out.last_line_len();
         // the starting position if we wrapped to the next line and indented
         let next_line_start = self.out.indent.get() + INDENT_WIDTH;
-        let extra_width = start.checked_sub(next_line_start);
+        let Some(extra_width) = start.checked_sub(next_line_start).filter(|&w| w > 0) else {
+            let result = self.with_single_line(scope);
+            return (false, result);
+        };
         let max_width_prev = self.out.current_max_width();
-        let max_width = max_width_prev.map(|w| w + extra_width.unwrap_or(0));
+        let max_width = max_width_prev.saturating_add(extra_width);
         let result =
-            self.with_single_line(|| self.constraints().with_global_max_width(max_width, scope));
-        let used_extra_width = max_width_prev.is_some_and(|w| self.out.last_line_len() > w);
+            self.with_single_line(|| self.constraints().max_width.with_replaced(max_width, scope));
+        let used_extra_width = self.out.last_line_len() > max_width_prev;
         (used_extra_width, result)
     }
 }

@@ -1,3 +1,5 @@
+use crate::num::HPos;
+
 macro_rules! config {
     ($($name:ident: $ty:ty = $default:expr,)*) => {
         pub struct Config {
@@ -28,5 +30,5 @@ macro_rules! config {
 }
 
 config! {
-    max_width: u32 = 100,
+    max_width: HPos = 100,
 }

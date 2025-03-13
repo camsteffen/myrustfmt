@@ -6,6 +6,7 @@ use crate::ast_formatter::list::{Braces, ListItemConfig, ListRest, ListStrategy}
 use crate::ast_formatter::tail::Tail;
 use crate::constraints::MultiLineShape;
 use crate::error::{FormatResult, FormatResultExt};
+use crate::num::HPos;
 
 pub trait FormatListItem<Item> {
     fn format(
@@ -76,7 +77,7 @@ pub struct ListBuilder<'ast, 'tail, Item, FormatItem, Config, ItemConfig> {
     config: Config,
     item_config: ItemConfig,
     omit_open_brace: bool,
-    single_line_max_contents_width: Option<u32>,
+    single_line_max_contents_width: Option<HPos>,
 }
 
 impl<'ast, 'tail, Item, FormatItem, Config, ItemConfig>
@@ -148,7 +149,7 @@ where
         }
     }
 
-    pub fn single_line_max_contents_width(self, width: u32) -> Self {
+    pub fn single_line_max_contents_width(self, width: HPos) -> Self {
         ListBuilder {
             single_line_max_contents_width: Some(width),
             ..self
@@ -298,7 +299,7 @@ where
     fn contents_wrap_to_fit(
         &self,
         af: &AstFormatter,
-        max_element_width: Option<u32>,
+        max_element_width: Option<HPos>,
     ) -> FormatResult {
         let len = self.list.len();
         let strategy = ListStrategy::WrapToFit;
