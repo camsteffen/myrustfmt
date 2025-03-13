@@ -8,7 +8,7 @@ use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::builder::{list, FormatListItem, ListBuilder};
 use crate::ast_formatter::list::list_config::{ArrayListConfig, ListConfig, TupleListConfig};
 use crate::ast_utils::postfix_expr_kind;
-use crate::constraints::MultiLineShape;
+use crate::constraints::VerticalShape;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 use crate::constraint_writer::ConstraintRecoveryMode;
@@ -25,7 +25,7 @@ impl AstFormatter {
     }
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
-        if self.constraints().multi_line.get() < MultiLineShape::HangingIndent
+        if self.constraints().vertical.get() < VerticalShape::HangingIndent
             && !expr.attrs.is_empty()
         {
             return Err(ConstraintErrorKind::NextStrategy.into());
@@ -202,7 +202,7 @@ impl AstFormatter {
         &self,
     ) -> impl Fn(&AstFormatter, &P<ast::Expr>, &Tail, ListItemContext) -> FormatResult {
         // todo kinda hacky
-        let outer_multi_line = self.constraints().multi_line.get();
+        let vertical_outer = self.constraints().vertical.get();
 
         move |af, expr, tail, lcx| {
             af.skip_single_expr_blocks_tail(expr, tail, |expr, tail| {
@@ -210,17 +210,17 @@ impl AstFormatter {
                 match lcx.strategy {
                     // overflow last item
                     ListStrategy::Horizontal
-                        if outer_multi_line >= MultiLineShape::List && lcx.is_last() =>
+                        if vertical_outer >= VerticalShape::List && lcx.is_last() =>
                     {
                         // override the multi-line shape to be less strict than SingleLine
                         let shape = if lcx.len > 1 {
                             // don't overflow nested lists when the outer list has multiple items
-                            MultiLineShape::BlockLike
+                            VerticalShape::BlockLike
                         } else {
-                            MultiLineShape::List
+                            VerticalShape::List
                         };
                         // todo avoid replace?
-                        af.constraints().multi_line.with_replaced(shape, format)?;
+                        af.constraints().vertical.with_replaced(shape, format)?;
                         Ok(())
                     }
                     // on separate lines, enforce IndentMiddle by adding a block
@@ -230,12 +230,7 @@ impl AstFormatter {
                             // The block is only for ensuring a "hanging indent"-compliant shape.
                             .next_with_constraint_recovery_mode(
                                 ConstraintRecoveryMode::NewlineNotAllowed,
-                                || {
-                                    af.constraints().with_multi_line_shape_min(
-                                        MultiLineShape::HangingIndent,
-                                        format,
-                                    )
-                                },
+                                || af.with_vertical_shape_min(VerticalShape::HangingIndent, format),
                             )
                             .otherwise(|| {
                                 af.expr_add_block(expr)?;
@@ -282,16 +277,15 @@ impl AstFormatter {
                 Ok(())
             })
             .otherwise(|| {
-                self.constraints()
-                    .with_single_line_unless(MultiLineShape::HangingIndent, || {
-                        self.indented(|| {
-                            self.newline_break_indent()?;
-                            self.out.token_space("as")?;
-                            self.ty(ty)?;
-                            self.tail(tail)?;
-                            Ok(())
-                        })
+                self.has_vertical_shape(VerticalShape::HangingIndent, || {
+                    self.indented(|| {
+                        self.newline_break_indent()?;
+                        self.out.token_space("as")?;
+                        self.ty(ty)?;
+                        self.tail(tail)?;
+                        Ok(())
                     })
+                })
             })?;
         Ok(())
     }
@@ -300,8 +294,7 @@ impl AstFormatter {
         self.out.token("(")?;
         self.backtrack()
             .next(|| {
-                self.constraints()
-                    .with_multi_line_shape_min(MultiLineShape::List, || self.expr(inner))?;
+                self.with_vertical_shape_min(VerticalShape::List, || self.expr(inner))?;
                 self.out.token(")")?;
                 self.tail(tail)?;
                 Ok(())
@@ -333,10 +326,9 @@ impl AstFormatter {
                     if af.out.line() == first_line {
                         af.expr_tail(end, tail)?;
                     } else {
-                        self.constraints()
-                            .with_single_line_unless(MultiLineShape::Unrestricted, || {
-                                af.expr_tail(end, tail)
-                            })?;
+                        self.has_vertical_shape(VerticalShape::Unrestricted, || {
+                            af.expr_tail(end, tail)
+                        })?;
                     }
                     Ok(())
                 }),
@@ -367,8 +359,8 @@ impl AstFormatter {
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
         let first_line = self.out.line();
         self.expr_tail(func, &self.tail_token("("))?;
-        self.constraints().with_single_line_unless_or(
-            MultiLineShape::Unrestricted,
+        self.has_vertical_shape_unless(
+            VerticalShape::Unrestricted,
             self.out.line() == first_line,
             || self.call_args_after_open_paren(args, tail),
         )?;
@@ -434,11 +426,10 @@ impl AstFormatter {
 
         let multi_line = || {
             // todo this is failing earlier than "indent middle" is really violated;
-            //   do we need to revise the guidelines in MultiLineConstraint docs?
-            self.constraints()
-                .with_single_line_unless_or(MultiLineShape::Unrestricted, else_.is_none(), || {
-                    self.block_expr_vertical_after_open_brace(block)
-                })?;
+            //   do we need to revise the guidelines in VerticalShape docs?
+            self.has_vertical_shape_unless(VerticalShape::Unrestricted, else_.is_none(), || {
+                self.block_expr_vertical_after_open_brace(block)
+            })?;
             let mut else_ = else_;
             loop {
                 let Some(else_expr) = else_ else { break };
@@ -464,23 +455,22 @@ impl AstFormatter {
     }
 
     pub fn token_expr_open_brace(&self, token: &str, expr: &ast::Expr) -> FormatResult<bool> {
-        self.constraints()
-            .with_single_line_unless(MultiLineShape::Unrestricted, || {
-                let first_line = self.out.line();
-                self.out.token_space(token)?;
-                self.expr(expr)?;
-                self.backtrack()
-                    .next_if(
-                        self.out.line() == first_line || self.out.last_line_is_closers(),
-                        || self.with_single_line(|| self.out.space_token("{")),
-                    )
-                    .otherwise(|| {
-                        self.newline_break_indent()?;
-                        self.out.token("{")?;
-                        Ok(())
-                    })?;
-                Ok(self.out.line() == first_line)
-            })
+        self.has_vertical_shape(VerticalShape::Unrestricted, || {
+            let first_line = self.out.line();
+            self.out.token_space(token)?;
+            self.expr(expr)?;
+            self.backtrack()
+                .next_if(
+                    self.out.line() == first_line || self.out.last_line_is_closers(),
+                    || self.with_single_line(|| self.out.space_token("{")),
+                )
+                .otherwise(|| {
+                    self.newline_break_indent()?;
+                    self.out.token("{")?;
+                    Ok(())
+                })?;
+            Ok(self.out.line() == first_line)
+        })
     }
 
     pub fn mac_call(&self, mac_call: &ast::MacCall) -> FormatResult {

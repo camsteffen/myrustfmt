@@ -4,23 +4,51 @@ use std::num::NonZero;
 use crate::num::HPos;
 use crate::util::cell_ext::CellExt;
 
-/// Specifies what kind of multi-line shapes are allowed, if any.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Constraints {
+    pub max_width: Cell<HPos>,
+    // The width limit behaves a lot like max width, but they are separate values because they may
+    // change independently of each other.
+    pub width_limit: Cell<Option<WidthLimit>>,
+    pub vertical: Cell<VerticalShape>,
+}
+
+/// Applies a width limit to a specific scope
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum WidthLimit {
+    /// Used where a single-line constraint is active
+    SingleLine { end: NonZero<HPos> },
+    /// Applies a width limit to the first line, then falls out of scope
+    FirstLine { end: NonZero<HPos>, line: u32 },
+}
+
+impl WidthLimit {
+    fn end(&self) -> HPos {
+        match self {
+            WidthLimit::SingleLine { end } => end.get(),
+            WidthLimit::FirstLine { end, .. } => end.get(),
+        }
+    }
+}
+
+/// Specifies what kind of multi-line shapes are allowed.
 /// 
-/// Each variant allows all the forms specified in preceding variants.
+/// Each variant is a superset of all preceding variants.
 ///
 /// It is generally enforced in two ways:
-///  1. The SingleLine variant causes an error to be raised upon attempting to write a newline
-///     character.
+///  1. The SingleLine variant causes an error to be raised upon attempting to write a newline.
 ///  2. Other variants are "downgraded" to the SingleLine variant at times when it is known that
 ///     a newline character would violate the original constraint.
-///
-/// At least the first line of output leading up to a newline must be written to the buffer before
-/// raising an error. This makes the implementation simpler by reducing code paths. But more
-/// importantly, it allows us to observe the first line of formatted output and know that it would
-/// be the same if no constraint were applied.
+/// 
+/// A couple of reasons for this approach:
+///  * It simplifies the implementation since we can simply "decorate" code paths with what shape it
+///    has or requires.
+///  * It creates an invariant that we'll always emit the entire first line of output leading up to
+///    a newline-not-allowed error. Sometimes this is useful to observe how long the first line of
+///    output _would_ be if a more permissive shape were enabled.
 // todo using SingleLine to measure the width of the first line should ignore trailing line comments
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
-pub enum MultiLineShape {
+pub enum VerticalShape {
     /// No newline characters allowed
     SingleLine,
     /// Generally allows nodes with curly braces like a block or loop/if/match, etc.
@@ -38,51 +66,53 @@ pub enum MultiLineShape {
     Unrestricted,
 }
 
-/// WidthLimit behaves very much like max_width, but they are separate values because both may
-/// change, independently of each other.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum WidthLimit {
-    /// Applies a width limit where a single-line constraint is active
-    SingleLine { end: NonZero<HPos> },
-    /// Applies a width limit to the first line of some output, then falls out of scope
-    FirstLine { end: NonZero<HPos>, line: u32 },
-}
-
-impl WidthLimit {
-    fn end(&self) -> HPos {
-        match self {
-            WidthLimit::SingleLine { end } => end.get(),
-            WidthLimit::FirstLine { end, .. } => end.get(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Constraints {
-    pub max_width: Cell<HPos>,
-    pub multi_line: Cell<MultiLineShape>,
-    pub width_limit: Cell<Option<WidthLimit>>,
-}
-
 impl Constraints {
     pub fn new(max_width: HPos) -> Constraints {
         Constraints {
             max_width: Cell::new(max_width),
-            multi_line: Cell::new(MultiLineShape::Unrestricted),
             width_limit: Cell::new(None),
+            vertical: Cell::new(VerticalShape::Unrestricted),
         }
     }
 
     pub fn max_width_at(&self, line: u32) -> HPos {
-        let Some(scoped) = self.scoped_max_width_at(line) else {
+        let Some(width_limit_end) = self.width_limit_end_at(line) else {
             return self.max_width.get();
         };
-        self.max_width.get().min(scoped)
+        self.max_width.get().min(width_limit_end)
+    }
+
+    fn width_limit_end_at(&self, line: u32) -> Option<HPos> {
+        let Some(width_limit) = self.width_limit.get() else {
+            return None;
+        };
+        match width_limit {
+            WidthLimit::SingleLine { end } => Some(end.into()),
+            WidthLimit::FirstLine { end, line: l } => (l == line).then_some(end.into()),
+        }
+    }
+}
+
+// effects
+impl Constraints {
+    pub fn with_single_line<T>(&self, format: impl FnOnce() -> T) -> T {
+        self.vertical.with_replaced(VerticalShape::SingleLine, format)
+    }
+
+    pub fn with_single_line_opt<T>(
+        &self,
+        apply: bool,
+        scope: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
+        if !apply {
+            return scope();
+        }
+        self.with_single_line(scope)
     }
 
     pub fn with_width_limit<T>(&self, width_limit: WidthLimit, scope: impl FnOnce() -> T) -> T {
         if matches!(width_limit, WidthLimit::SingleLine { .. }) {
-            debug_assert_eq!(self.multi_line.get(), MultiLineShape::SingleLine);
+            debug_assert_eq!(self.vertical.get(), VerticalShape::SingleLine);
         }
         if self
             .width_limit
@@ -94,51 +124,39 @@ impl Constraints {
         self.width_limit.with_replaced(Some(width_limit), scope)
     }
 
-    pub fn with_multi_line_shape_min<T>(
-        &self,
-        shape: MultiLineShape,
-        scope: impl FnOnce() -> T,
-    ) -> T {
-        if self.multi_line.get() <= shape {
+    /// Requires the given scope to conform to the given VerticalShape
+    pub fn with_vertical_shape_min<T>(&self, shape: VerticalShape, scope: impl FnOnce() -> T) -> T {
+        if self.vertical.get() <= shape {
             return scope();
         }
-        self.multi_line.with_replaced(shape, scope)
+        self.vertical.with_replaced(shape, scope)
     }
 
-    /// Unless the given MultiLineConstraint is applicable, enforce a single-line constraint
-    // todo these names suck
-    pub fn with_single_line_unless<T>(
+    /// Declares that the output in the given scope is known to have the given VerticalShape,
+    /// but only if the output actually has multiple lines (or starts with a newline).
+    ///
+    /// If the given VerticalShape is currently allowed, continues normally.
+    /// If not, then the required VerticalShape is set to SingleLine for the given scope.
+    pub fn has_vertical_shape<T>(
         &self,
-        shape: MultiLineShape,
+        shape: VerticalShape,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        if self.multi_line.get() >= shape {
-            scope()
-        } else {
-            let shape1 = MultiLineShape::SingleLine;
-            self.multi_line.with_replaced(shape1, scope)
+        if self.vertical.get() >= shape {
+            return scope();
         }
+        self.vertical.with_replaced(VerticalShape::SingleLine, scope)
     }
 
-    pub fn with_single_line_unless_or<T>(
+    pub fn has_vertical_shape_unless<T>(
         &self,
-        shape: MultiLineShape,
+        shape: VerticalShape,
         condition: bool,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         if condition {
             return scope();
         }
-        self.with_single_line_unless(shape, scope)
-    }
-
-    pub fn scoped_max_width_at(&self, line: u32) -> Option<HPos> {
-        let Some(width_limit) = self.width_limit.get() else {
-            return None;
-        };
-        match width_limit {
-            WidthLimit::SingleLine { end } => Some(end.into()),
-            WidthLimit::FirstLine { end, line: l } => (l == line).then_some(end.into()),
-        }
+        self.has_vertical_shape(shape, scope)
     }
 }

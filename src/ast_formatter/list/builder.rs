@@ -4,7 +4,7 @@ use crate::ast_formatter::list::list_item_config::DefaultListItemConfig;
 use crate::ast_formatter::list::list_item_context::ListItemContext;
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListRest, ListStrategy};
 use crate::ast_formatter::tail::Tail;
-use crate::constraints::MultiLineShape;
+use crate::constraints::VerticalShape;
 use crate::error::{FormatResult, FormatResultExt};
 use crate::num::HPos;
 
@@ -157,10 +157,9 @@ where
     }
 
     pub fn format(&self, af: &AstFormatter) -> FormatResult {
-        af.constraints()
-            .with_single_line_unless(MultiLineShape::List, || {
-                self.do_format(af, Self::contents_default)
-            })
+        af.has_vertical_shape(VerticalShape::List, || {
+            self.do_format(af, Self::contents_default)
+        })
     }
 
     pub fn format_single_line(&self, af: &AstFormatter) -> FormatResult {

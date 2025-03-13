@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::{MultiLineShape, WidthLimit};
+use crate::constraints::{VerticalShape, WidthLimit};
 use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
 
@@ -20,8 +20,8 @@ pub struct Tail<'a>(Option<TailImpl<'a>>);
 
 struct TailImpl<'a> {
     func: Box<dyn Fn(&AstFormatter) -> FormatResult + 'a>,
-    multi_line: MultiLineShape,
     width_limit: Option<WidthLimit>,
+    vertical_shape: VerticalShape,
 }
 
 // Tail creation
@@ -29,8 +29,8 @@ impl AstFormatter {
     pub fn tail_fn<'a>(&self, tail: impl Fn(&AstFormatter) -> FormatResult + 'a) -> Tail<'a> {
         Tail(Some(TailImpl {
             func: Box::new(tail),
-            multi_line: self.constraints().multi_line.get(),
             width_limit: self.constraints().width_limit.get(),
+            vertical_shape: self.constraints().vertical.get(),
         }))
     }
 
@@ -48,8 +48,8 @@ impl Tail<'_> {
 impl AstFormatter {
     pub fn tail(&self, tail: &Tail) -> FormatResult {
         let Some(tail) = &tail.0 else { return Ok(()) };
-        self.constraints().multi_line.with_replaced(
-            tail.multi_line,
+        self.constraints().vertical.with_replaced(
+            tail.vertical_shape,
             || self.constraints().width_limit.with_replaced(tail.width_limit, || (tail.func)(self)),
         )
     }

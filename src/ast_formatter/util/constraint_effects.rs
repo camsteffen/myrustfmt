@@ -1,28 +1,29 @@
 use std::num::NonZero;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
-use crate::constraints::{MultiLineShape, WidthLimit};
+use crate::constraints::{VerticalShape, WidthLimit};
 use crate::error::{FormatResult, WidthLimitExceededError};
 use crate::num::HPos;
 use crate::util::cell_ext::CellExt;
 
-impl AstFormatter {
-    pub fn with_single_line<T>(&self, format: impl FnOnce() -> T) -> T {
-        self.constraints()
-            .multi_line
-            .with_replaced(MultiLineShape::SingleLine, format)
-    }
-
-    pub fn with_single_line_opt<T>(
-        &self,
-        apply: bool,
-        scope: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        if !apply {
-            return scope();
+macro_rules! delegate_to_constraints {
+    ($($vis:vis fn $name:ident $(<$gen:tt>)?(&self $(, $arg:ident: $ty:ty)* $(,)?) $(-> $ret_ty:ty)? ;)*) => {
+        impl AstFormatter {
+            $($vis fn $name $(<$gen>)? (&self $(, $arg: $ty)*) $(-> $ret_ty)? {
+                self.constraints().$name($($arg),*)
+            })*
         }
-        self.with_single_line(scope)
     }
+}
 
+delegate_to_constraints! {
+    pub fn with_single_line<T>(&self, format: impl FnOnce() -> T) -> T;
+    pub fn with_single_line_opt<T>(&self, apply: bool, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
+    pub fn with_vertical_shape_min<T>(&self, shape: VerticalShape, scope: impl FnOnce() -> T) -> T;
+    pub fn has_vertical_shape<T>(&self, shape: VerticalShape, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
+    pub fn has_vertical_shape_unless<T>(&self, shape: VerticalShape, condition: bool, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
+}
+
+impl AstFormatter {
     pub fn with_width_limit<T>(
         &self,
         width_limit: HPos,
@@ -109,7 +110,7 @@ impl AstFormatter {
     /// If formatting fails with a newline-not-allowed error, it is still useful to observe the
     /// boolean to know whether the first line of code (the code emitted leading up to the error)
     /// used the extra width. (This does assume that downstream formatting will emit all of the
-    /// first line without short-circuiting. See also `MultiLineShape`.)
+    /// first line without short-circuiting. See also `VerticalShape`.)
     ///
     /// When the extra width is used, this means one of two things: either the extra width allowed
     /// for a different formatting strategy with more code on the first line, or the extra width was

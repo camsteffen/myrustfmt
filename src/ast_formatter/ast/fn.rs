@@ -4,7 +4,7 @@ use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 
 use crate::ast_formatter::list::builder::list;
-use crate::constraints::MultiLineShape;
+use crate::constraints::VerticalShape;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
 use rustc_span::symbol::kw;
@@ -108,10 +108,9 @@ impl AstFormatter {
                 // add a block unless it fits on a single line
                 self.backtrack()
                     .next(|| {
-                        self.constraints()
-                            .with_multi_line_shape_min(MultiLineShape::BlockLike, || {
-                                self.expr_tail(body, tail)
-                            })
+                        self.with_vertical_shape_min(VerticalShape::BlockLike, || {
+                            self.expr_tail(body, tail)
+                        })
                     })
                     .otherwise(|| {
                         self.expr_add_block(body)?;
@@ -184,7 +183,7 @@ impl AstFormatter {
                 Ok(())
             })
         };
-        if self.out.constraints().multi_line.get() < MultiLineShape::Unrestricted {
+        if self.out.constraints().vertical.get() < VerticalShape::Unrestricted {
             return do_single_line();
         }
         // args and return type all on one line

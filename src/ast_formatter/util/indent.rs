@@ -1,24 +1,20 @@
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
-use crate::constraints::MultiLineShape;
+use crate::constraints::VerticalShape;
 use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
 
 impl AstFormatter {
     pub fn indented<T>(&self, format: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         let indent = self.out.indent.get() + INDENT_WIDTH;
-        self.out
-            .indent
-            .with_replaced(indent, || match self.constraints().multi_line.get() {
+        self.out.indent.with_replaced(indent, || {
+            match self.constraints().vertical.get() {
                 // SingleLine must be preserved
-                MultiLineShape::SingleLine | MultiLineShape::Unrestricted => format(),
+                VerticalShape::SingleLine | VerticalShape::Unrestricted => format(),
                 // For any other shape, indentation "resets" the shape to Unrestricted
                 // since the shape is only concerned with where code touches the left margin.
-                _ => {
-                    self.constraints()
-                        .multi_line
-                        .with_replaced(MultiLineShape::Unrestricted, format)
-                }
-            })
+                _ => self.constraints().vertical.with_replaced(VerticalShape::Unrestricted, format),
+            }
+        })
     }
 
     pub fn indented_optional(

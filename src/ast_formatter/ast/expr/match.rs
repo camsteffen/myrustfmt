@@ -2,7 +2,7 @@ use rustc_ast::ast;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
-use crate::constraints::MultiLineShape;
+use crate::constraints::VerticalShape;
 use crate::error::{FormatResult, FormatResultExt};
 
 impl AstFormatter {
@@ -140,10 +140,9 @@ impl AstFormatter {
                 // todo exclude comma for block-like expressions?
                 self.backtrack_from_checkpoint(checkpoint)
                     .next(|| {
-                        self.constraints()
-                            .with_multi_line_shape_min(MultiLineShape::List, || {
-                                self.expr_tail(body, &self.tail_fn(|af| af.out.token_insert(",")))
-                            })
+                        self.with_vertical_shape_min(VerticalShape::List, || {
+                            self.expr_tail(body, &self.tail_fn(|af| af.out.token_insert(",")))
+                        })
                     })
                     .otherwise(|| self.expr_add_block(body))?
             }

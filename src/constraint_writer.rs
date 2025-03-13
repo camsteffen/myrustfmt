@@ -1,4 +1,4 @@
-use crate::constraints::{MultiLineShape, Constraints};
+use crate::constraints::{VerticalShape, Constraints};
 use crate::error::{
     ConstraintError, ConstraintErrorKind, NewlineNotAllowedError, WidthLimitExceededError,
 };
@@ -211,7 +211,7 @@ impl ConstraintWriter {
     }
 
     pub fn newline(&self) -> Result<(), NewlineNotAllowedError> {
-        if matches!(self.constraints.multi_line.get(), MultiLineShape::SingleLine) {
+        if matches!(self.constraints.vertical.get(), VerticalShape::SingleLine) {
             return Err(NewlineNotAllowedError);
         }
         self.buffer.with_taken(|b| b.push('\n'));
