@@ -3,7 +3,7 @@ use rustc_ast::ast;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
 use crate::constraints::VerticalShape;
-use crate::error::{FormatResult, FormatResultExt, TryFormatResult};
+use crate::error::FormatResult;
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
@@ -106,11 +106,10 @@ impl AstFormatter {
             AddBlock,
             Normal,
         }
-        let result = self.out.with_enforce_max_width(|| -> TryFormatResult<_> {
+        let result = self.out.with_enforce_max_width(|| -> FormatResult<_> {
             // simulate having extra width if we had added a block
             let (used_extra_width, result) =
                 self.simulate_wrap_indent_first_line(|| self.expr(body));
-            let result = result.constraint_err_only()?;
             if used_extra_width {
                 // Formatting on the same line _might_ be possible,
                 // but adding a block allows for a longer first line.
@@ -122,7 +121,7 @@ impl AstFormatter {
                 return Ok(Next::Normal);
             }
             // it fits on one line, but now we need a comma (if we're not adding a block)
-            if self.out.token_insert(",").constraint_err_only()?.is_err() {
+            if self.out.token_insert(",").is_err() {
                 return Ok(Next::AddBlock);
             }
             Ok(Next::Done)

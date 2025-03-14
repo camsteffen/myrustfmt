@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::constraint_writer::ConstraintRecoveryMode;
-use crate::error::{FormatError, FormatResult};
+use crate::error::FormatResult;
 use crate::source_formatter::checkpoint::Checkpoint;
 
 impl AstFormatter {
@@ -42,7 +42,7 @@ pub struct Backtrack<'a, T = ()> {
 enum BacktrackState<'a, T> {
     Init,
     Incomplete(Checkpoint<'a>),
-    Done(FormatResult<T>),
+    Done(T),
 }
 
 impl<T> Backtrack<'_, T> {
@@ -73,9 +73,8 @@ impl<T> Backtrack<'_, T> {
             let result = self.af.out.with_constraint_recovery_mode_max(mode, strategy);
             match result {
                 // restore the checkpoint before continuing to the next formatting strategy
-                Err(FormatError::Constraint(_)) => self.af.out.restore_checkpoint(checkpoint),
-                // if Ok or an unrecoverable error, we're finished
-                result => self.state = BacktrackState::Done(result),
+                Err(_) => self.af.out.restore_checkpoint(checkpoint),
+                Ok(value) => self.state = BacktrackState::Done(value),
             }
         }
     }
@@ -99,7 +98,7 @@ impl<T> Backtrack<'_, T> {
     pub fn otherwise(self, strategy: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         match self.state {
             BacktrackState::Init | BacktrackState::Incomplete(_) => strategy(),
-            BacktrackState::Done(result) => result,
+            BacktrackState::Done(result) => Ok(result),
         }
     }
 }

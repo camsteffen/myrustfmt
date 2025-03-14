@@ -6,27 +6,14 @@ use std::fmt::{Display, Formatter};
 use std::path::Path;
 use crate::source_formatter::SourceFormatter;
 
-pub type FormatResult<T = ()> = Result<T, FormatError>;
-
-pub type TryFormatResult<T = ()> = Result<T, ParseError>;
+pub type FormatResult<T = ()> = Result<T, ConstraintError>;
 
 pub trait FormatResultExt<T> {
-    fn constraint_err_only(self) -> TryFormatResult<Result<T, ConstraintError>>;
-
     #[allow(unused)]
     fn debug_err(self, sf: &SourceFormatter) -> Self;
 }
 
 impl<T> FormatResultExt<T> for FormatResult<T> {
-    /// Use when you want to observe constraint errors and yeet other errors
-    fn constraint_err_only(self) -> TryFormatResult<Result<T, ConstraintError>> {
-        match self {
-            Err(FormatError::Parse(e)) => Err(e),
-            Err(FormatError::Constraint(e)) => Ok(Err(e)),
-            Ok(value) => Ok(Ok(value)),
-        }
-    }
-
     #[track_caller]
     fn debug_err(self, sf: &SourceFormatter) -> Self {
         if self.is_err() {
@@ -34,12 +21,6 @@ impl<T> FormatResultExt<T> for FormatResult<T> {
         }
         self
     }
-}
-
-#[derive(Debug)]
-pub enum FormatError {
-    Constraint(ConstraintError),
-    Parse(ParseError),
 }
 
 #[derive(Debug)]
@@ -80,117 +61,120 @@ pub struct NewlineNotAllowedError;
 #[derive(Clone, Copy, Debug)]
 pub struct WidthLimitExceededError;
 
-pub type ParseResult<T = ()> = Result<T, ParseError>;
-
-#[derive(Debug)]
-pub struct ParseError {
-    pub kind: ParseErrorKind,
-    pub backtrace: Box<Backtrace>,
+#[derive(Clone, Copy, Debug)]
+pub enum ParseError {
+    ExpectedPosition(BytePos),
+    ExpectedToken(&'static str),
 }
 
-impl ParseError {
-    #[cold]
-    pub fn new(kind: ParseErrorKind) -> Self {
-        ParseError {
-            kind,
-            backtrace: Box::new(Backtrace::capture()),
+fn write_error_formatting_at(
+    f: &mut Formatter,
+    source: &str,
+    pos: BytePos,
+    path: Option<&Path>,
+) -> std::fmt::Result {
+    let (line, col) = line_col(source, pos);
+    write!(f, "Error formatting at ")?;
+    if let Some(path) = path {
+        write!(f, "{}:", path.display())?
+    }
+    write!(f, "{line}:{col}, ")?;
+    Ok(())
+}
+
+fn write_error_end(
+    f: &mut Formatter,
+    source: &str,
+    backtrace: Option<&Backtrace>,
+    has_path: bool,
+) -> std::fmt::Result {
+    if cfg!(debug_assertions) && !has_path {
+        write!(f, "\nSource:\n{source}")?;
+    }
+    if let Some(backtrace) = backtrace {
+        write!(f, "\nformat error backtrace:\n{backtrace}")?;
+    }
+    Ok(())
+}
+
+fn write_constraint_error(
+    f: &mut Formatter,
+    e: &ConstraintError,
+    source: &str,
+    pos: BytePos,
+    path: Option<&Path>,
+) -> std::fmt::Result {
+    write_error_formatting_at(f, source, pos, path)?;
+    match e.kind {
+        ConstraintErrorKind::NextStrategy => write!(f, "unhandled NextStrategy error")?,
+        ConstraintErrorKind::NewlineNotAllowed => write!(f, "newline not allowed")?,
+        ConstraintErrorKind::WidthLimitExceeded => write!(f, "width limit exceeded")?,
+    }
+    write_error_end(f, source, e.backtrace(), path.is_some())?;
+    Ok(())
+}
+
+pub fn parse_error_display(
+    error: ParseError,
+    path: Option<&Path>,
+    source: &str,
+    pos: BytePos,
+) -> impl Display {
+    display_from_fn(move |f| write_parse_error(f, error, path, source, pos))
+}
+
+fn write_parse_error(
+    f: &mut Formatter,
+    error: ParseError,
+    path: Option<&Path>,
+    source: &str,
+    pos: BytePos,
+) -> std::fmt::Result {
+    write_error_formatting_at(f, source, pos, path)?;
+    let next_token = |f: &mut Formatter<'_>| {
+        let remaining = &source[pos.to_usize()..];
+        if let Some(token) = rustc_lexer::tokenize(remaining).next() {
+            let token_str = &remaining[..token.len.try_into().unwrap()];
+            write!(f, ". Next token is `{token_str}`")?;
+        } else {
+            write!(f, ". Reached end of file")?;
+        }
+        Ok(())
+    };
+    match error {
+        ParseError::ExpectedPosition(expected_pos) => {
+            write!(
+                f,
+                "expected position is {} bytes {}",
+                expected_pos.to_u32().abs_diff(pos.to_u32()),
+                if expected_pos > pos {
+                    "ahead"
+                } else {
+                    "behind"
+                }
+            )?;
+            next_token(f)?;
+        }
+        ParseError::ExpectedToken(ref token) => {
+            write!(f, "expected token: `{token}`")?;
+            next_token(f)?;
         }
     }
-}
-
-#[derive(Clone, Debug)]
-pub enum ParseErrorKind {
-    ExpectedPosition(BytePos),
-    ExpectedToken(String),
-}
-
-impl FormatError {
-    pub fn display(&self, source: &str, pos: BytePos, path: Option<&Path>) -> impl Display {
-        display_from_fn(move |f| {
-            let (line, col) = line_col(source, pos);
-            write!(f, "Error formatting at ")?;
-            if let Some(path) = path {
-                write!(f, "{}:", path.display())?
-            }
-            write!(f, "{line}:{col}, ")?;
-            let next_token = |f: &mut Formatter<'_>| {
-                let remaining = &source[pos.to_usize()..];
-                if let Some(token) = rustc_lexer::tokenize(remaining).next() {
-                    let token_str = &remaining[..token.len.try_into().unwrap()];
-                    write!(f, ". Next token is `{token_str}`")?;
-                } else {
-                    write!(f, ". Reached end of file")?;
-                }
-                Ok(())
-            };
-            let backtrace = match self {
-                FormatError::Constraint(e) => {
-                    match e.kind {
-                        ConstraintErrorKind::NextStrategy => {
-                            write!(f, "unhandled NextStrategy error")?
-                        }
-                        ConstraintErrorKind::NewlineNotAllowed => write!(f, "newline not allowed")?,
-                        ConstraintErrorKind::WidthLimitExceeded => {
-                            write!(f, "width limit exceeded")?
-                        }
-                    }
-                    e.backtrace()
-                }
-                FormatError::Parse(parse_error) => {
-                    match parse_error.kind {
-                        ParseErrorKind::ExpectedPosition(expected_pos) => {
-                            write!(
-                                f,
-                                "expected position is {} bytes {}",
-                                expected_pos.to_u32().abs_diff(pos.to_u32()),
-                                if expected_pos > pos {
-                                    "ahead"
-                                } else {
-                                    "behind"
-                                }
-                            )?;
-                            next_token(f)?;
-                        }
-                        ParseErrorKind::ExpectedToken(ref token) => {
-                            write!(f, "expected token: `{token}`")?;
-                            next_token(f)?;
-                        }
-                    }
-                    Some(&*parse_error.backtrace)
-                }
-            };
-            if cfg!(debug_assertions) && path.is_none() {
-                write!(f, "\nSource:\n{source}")?;
-            }
-            if let Some(backtrace) = backtrace {
-                write!(f, "\nformat error backtrace:\n{backtrace}")?;
-            }
-            Ok(())
-        })
+    if cfg!(debug_assertions) && path.is_none() {
+        write!(f, "\nSource:\n{source}")?;
     }
+    Ok(())
 }
 
-impl From<ConstraintError> for FormatError {
-    fn from(e: ConstraintError) -> Self {
-        FormatError::Constraint(e)
+impl ConstraintError {
+    pub fn display(&self, source: &str, pos: BytePos, path: Option<&Path>) -> impl Display {
+        display_from_fn(move |f| write_constraint_error(f, self, source, pos, path))
     }
 }
 
 impl From<ConstraintErrorKind> for ConstraintError {
     fn from(kind: ConstraintErrorKind) -> Self {
         ConstraintError::new(kind)
-    }
-}
-
-impl From<ConstraintErrorKind> for FormatError {
-    fn from(kind: ConstraintErrorKind) -> Self {
-        ConstraintError::from(kind).into()
-    }
-}
-
-impl From<ParseError> for FormatError {
-    fn from(e: ParseError) -> Self {
-        FormatError::Parse(e)
     }
 }
 
@@ -212,15 +196,9 @@ impl From<WidthLimitExceededError> for ConstraintErrorKind {
     }
 }
 
-impl From<NewlineNotAllowedError> for FormatError {
-    fn from(e: NewlineNotAllowedError) -> Self {
-        ConstraintError::from(ConstraintErrorKind::from(e)).into()
-    }
-}
-
-impl From<WidthLimitExceededError> for FormatError {
+impl From<WidthLimitExceededError> for ConstraintError {
     fn from(e: WidthLimitExceededError) -> Self {
-        FormatError::Constraint(ConstraintError::from(ConstraintErrorKind::from(e)))
+        ConstraintErrorKind::from(e).into()
     }
 }
 

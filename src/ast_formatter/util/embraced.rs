@@ -5,7 +5,7 @@ use crate::whitespace::VerticalWhitespaceMode;
 impl AstFormatter {
     // todo "embraced" is a weird name?
     /// Writes a closing brace. Allows for indented comments between braces.
-    pub fn embraced_empty_after_opening(&self, closing_brace: &str) -> FormatResult {
+    pub fn embraced_empty_after_opening(&self, closing_brace: &'static str) -> FormatResult {
         let first_line = self.out.line();
         self.indented(|| self.out.comments(VerticalWhitespaceMode::Break))?;
         if self.out.line() != first_line {
@@ -17,7 +17,7 @@ impl AstFormatter {
 
     pub fn embraced_after_opening(
         &self,
-        closing_brace: &str,
+        closing_brace: &'static str,
         contents: impl Fn() -> FormatResult,
     ) -> FormatResult {
         self.embraced_inside(contents)?;

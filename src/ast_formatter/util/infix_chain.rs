@@ -6,7 +6,7 @@ use crate::whitespace::VerticalWhitespaceMode;
 impl AstFormatter {
     pub fn simple_infix_chain<T>(
         &self,
-        token: &str,
+        token: &'static str,
         items: &[T],
         format_item: impl Fn(&T) -> FormatResult,
         should_indent: bool,

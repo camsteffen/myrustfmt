@@ -5,7 +5,7 @@ use crate::ast_formatter::list::list_item_context::ListItemContext;
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListRest, ListStrategy};
 use crate::ast_formatter::tail::Tail;
 use crate::constraints::VerticalShape;
-use crate::error::{FormatResult, FormatResultExt};
+use crate::error::FormatResult;
 use crate::num::HPos;
 
 pub trait FormatListItem<Item> {
@@ -202,13 +202,12 @@ where
             if self.list.iter().any(ItemConfig::item_requires_own_line) {
                 return Ok(HorizontalResult::Skip);
             }
-            let result = self.contents_horizontal(af);
-            if result.constraint_err_only()?.is_err() {
+            if self.contents_horizontal(af).is_err() {
                 return Ok(HorizontalResult::Fail);
             }
             // N.B. measure before writing the tail
             let height = af.out.line() - first_line + 1;
-            if af.tail(self.tail).constraint_err_only()?.is_err() {
+            if af.tail(self.tail).is_err() {
                 return Ok(HorizontalResult::Fail);
             }
             Ok(HorizontalResult::Ok { height })
@@ -235,8 +234,11 @@ where
                 let overflow_lookahead = af.out.capture_lookahead(&checkpoint);
 
                 // try vertical
-                let result = af.out.with_enforce_max_width(|| self.contents_vertical(af));
-                if result.constraint_err_only()?.is_err() {
+                if af
+                    .out
+                    .with_enforce_max_width(|| self.contents_vertical(af))
+                    .is_err()
+                {
                     // separate lines failed, so overflow it is!
                     af.out.restore_checkpoint(&checkpoint);
                     af.out.restore_lookahead(overflow_lookahead);

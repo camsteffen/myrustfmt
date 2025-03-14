@@ -278,7 +278,7 @@ impl AstFormatter {
 
     pub fn token_ident_generic_params(
         &self,
-        token: &str,
+        token: &'static str,
         ident: Ident,
         generics: &ast::Generics,
     ) -> FormatResult {

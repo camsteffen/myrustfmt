@@ -1,5 +1,5 @@
 use rustc_span::BytePos;
-use crate::constraint_writer::ConstraintWriterCheckpoint;
+use crate::constraint_writer::checkpoint::ConstraintWriterCheckpoint;
 use crate::error_emitter::Checkpoint as BufferedErrorEmitterCheckpoint;
 use crate::source_formatter::{SourceFormatter, Lookahead};
 use crate::util::cell_ext::CellNumberExt;

@@ -23,7 +23,7 @@ impl AstFormatter {
         len: usize,
         format_item: impl Fn(/*index: */ usize, &Tail) -> FormatResult,
         rest: ListRest<'_>,
-        close_brace: &str,
+        close_brace: &'static str,
         force_trailing_comma: bool,
         pad: bool,
         max_width: Option<HPos>,
@@ -88,7 +88,7 @@ impl AstFormatter {
     fn list_contents_wrap_to_fit(
         &self,
         len: usize,
-        close_brace: &str,
+        close_brace: &'static str,
         tail: &Tail,
         format_item: impl Fn(/*index: */ usize) -> FormatResult,
         item_requires_own_line: impl Fn(/*index: */ usize) -> bool,
@@ -145,7 +145,7 @@ impl AstFormatter {
         len: usize,
         format_item: impl Fn(/*index: */ usize, &Tail) -> FormatResult,
         rest: ListRest<'_>,
-        close_brace: &str,
+        close_brace: &'static str,
         tail: &Tail,
     ) -> FormatResult {
         let comma = self.tail_fn(|af| af.out.token_maybe_missing(","));

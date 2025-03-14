@@ -27,7 +27,7 @@ pub fn format_module(
 ) -> FormatModuleResult {
     let constraints = Constraints::new(config.max_width);
     let errors = Rc::new(BufferedErrorEmitter::new(ErrorEmitter::new(path.clone())));
-    let out = SourceFormatter::new(source, constraints, Rc::clone(&errors));
+    let out = SourceFormatter::new(path.clone(), source, constraints, Rc::clone(&errors));
     let formatter = AstFormatter { errors, out };
     formatter.module(module, path.as_deref())
 }

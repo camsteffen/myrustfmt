@@ -2,7 +2,7 @@ use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
 use crate::constraints::VerticalShape;
-use crate::error::{ConstraintErrorKind, FormatResult, FormatResultExt};
+use crate::error::{ConstraintErrorKind, FormatResult};
 use rustc_ast::ast;
 use crate::num::HPos;
 use crate::whitespace::VerticalWhitespaceMode;
@@ -105,18 +105,15 @@ impl AstFormatter {
         // todo share logic with match arm
         // todo should we check if the wrap allows a *longer* first line, like match arm?
         // todo account for having less width if the fallback will add a block
-        let result = self
-            .out
-            .with_enforce_max_width(|| {
-                self.indented(|| {
-                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                    self.postfix_item(overflowable)?;
-                    let height = self.out.line() - first_line + 1;
-                    self.tail(tail)?;
-                    Ok(height)
-                })
+        let result = self.out.with_enforce_max_width(|| {
+            self.indented(|| {
+                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                self.postfix_item(overflowable)?;
+                let height = self.out.line() - first_line + 1;
+                self.tail(tail)?;
+                Ok(height)
             })
-            .constraint_err_only()?;
+        });
 
         match result {
             Err(_) => {

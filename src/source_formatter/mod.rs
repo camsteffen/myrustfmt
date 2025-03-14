@@ -1,5 +1,10 @@
+pub mod checkpoint;
+mod source_reader;
+mod whitespace;
+
 use std::cell::Cell;
-use crate::constraint_writer::{ConstraintRecoveryMode, ConstraintWriter, ConstraintWriterLookahead};
+use std::path::PathBuf;
+use crate::constraint_writer::{ConstraintRecoveryMode, ConstraintWriter};
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::{BufferedErrorEmitter, Error};
@@ -7,11 +12,8 @@ use self::source_reader::SourceReader;
 use crate::util::chars::is_closer_char;
 use rustc_span::{BytePos, Pos, Span};
 use std::rc::Rc;
+use crate::constraint_writer::checkpoint::ConstraintWriterLookahead;
 use crate::num::HPos;
-
-mod whitespace;
-mod source_reader;
-pub mod checkpoint;
 
 #[derive(Debug)]
 pub struct Lookahead {
@@ -58,6 +60,7 @@ delegate_to_constraint_writer! {
 
 impl SourceFormatter {
     pub fn new(
+        path: Option<PathBuf>,
         source: Rc<String>,
         constraints: Constraints,
         error_emitter: Rc<BufferedErrorEmitter>,
@@ -67,7 +70,7 @@ impl SourceFormatter {
         SourceFormatter {
             checkpoint_count: Cell::new(0),
             error_emitter,
-            source: SourceReader::new(source),
+            source: SourceReader::new(path, source),
             out,
             indent: Cell::new(0),
         }
@@ -91,9 +94,9 @@ impl SourceFormatter {
         &self.source.source
     }
 
-    pub fn skip_token(&self, token: &str) -> FormatResult {
+    pub fn skip_token(&self, token: &'static str) -> FormatResult {
         self.horizontal_whitespace()?;
-        self.source.eat(token)?;
+        self.source.eat(token);
         Ok(())
     }
 
@@ -122,40 +125,39 @@ impl SourceFormatter {
     ///
     /// N.B. a token should not contain whitespace
     /// N.B. a token is indivisible (e.g. "::<" is two tokens since you can write it as "::  <")
-    pub fn token(&self, token: &str) -> FormatResult {
+    pub fn token(&self, token: &'static str) -> FormatResult {
         self.horizontal_whitespace()?;
-        self.source.eat(token)?;
+        self.source.eat(token);
         self.out.token(token)?;
         Ok(())
     }
 
     /// Inserts a token without consuming it from source
-    pub fn token_insert(&self, token: &str) -> FormatResult {
-        self.out.token(token)?;
-        Ok(())
+    pub fn token_insert(&self, token: &'static str) -> FormatResult {
+        self.out.token(token)
     }
 
-    pub fn token_space(&self, token: &str) -> FormatResult {
+    pub fn token_space(&self, token: &'static str) -> FormatResult {
         self.token(token)?;
         self.space()?;
         Ok(())
     }
 
-    pub fn space_token_space(&self, token: &str) -> FormatResult {
+    pub fn space_token_space(&self, token: &'static str) -> FormatResult {
         self.space()?;
         self.token(token)?;
         self.space()?;
         Ok(())
     }
 
-    pub fn space_token(&self, token: &str) -> FormatResult {
+    pub fn space_token(&self, token: &'static str) -> FormatResult {
         self.space()?;
         self.token(token)?;
         Ok(())
     }
 
     /// Write a token that might be missing from source
-    pub fn token_maybe_missing(&self, token: &str) -> FormatResult {
+    pub fn token_maybe_missing(&self, token: &'static str) -> FormatResult {
         self.skip_token_if_present(token)?;
         self.token_insert(token)?;
         Ok(())
@@ -164,7 +166,7 @@ impl SourceFormatter {
     /// Copy a token from source
     pub fn token_from_source(&self, span: Span) -> FormatResult {
         self.horizontal_whitespace()?;
-        self.source.expect_pos(span.lo())?;
+        self.source.expect_pos(span.lo());
         let token = self.source.get_span(span);
         self.token_unchecked(token)?;
         Ok(())
@@ -179,7 +181,7 @@ impl SourceFormatter {
 
     pub fn copy_span(&self, span: Span) -> FormatResult {
         self.horizontal_whitespace()?;
-        self.source.expect_pos(span.lo())?;
+        self.source.expect_pos(span.lo());
         self.copy(span.hi().to_u32() - span.lo().to_u32())?;
         Ok(())
     }

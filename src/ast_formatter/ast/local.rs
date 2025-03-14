@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::tail::Tail;
-use crate::error::{FormatResult, FormatResultExt};
+use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use crate::source_formatter::Lookahead;
@@ -107,8 +107,11 @@ impl AstFormatter {
         }
         // this block helps to drop checkpoint_after_space
         let next = 'next: {
-            let space_result = self.out.with_enforce_max_width(|| self.out.space());
-            if space_result.constraint_err_only()?.is_err() {
+            if self
+                .out
+                .with_enforce_max_width(|| self.out.space())
+                .is_err()
+            {
                 // comments forced a line break
                 break 'next Next::Wrap(None);
             }
@@ -118,7 +121,6 @@ impl AstFormatter {
             let (used_extra_width, result) = self.out.with_enforce_max_width(|| {
                 self.simulate_wrap_indent_first_line(|| self.expr_tail(expr, tail))
             });
-            let result = result.constraint_err_only()?;
             if used_extra_width {
                 let lookahead =
                     result.is_ok().then(|| self.out.capture_lookahead(&checkpoint_after_space));

@@ -1,3 +1,7 @@
+mod binary_expr;
+mod postfix_chain;
+mod r#match;
+
 use tracing::instrument;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext, ListStrategy};
@@ -14,10 +18,6 @@ use rustc_ast::ptr::P;
 use crate::constraint_writer::ConstraintRecoveryMode;
 use crate::ast_formatter::util::debug::expr_kind_name;
 use crate::whitespace::VerticalWhitespaceMode;
-
-mod binary_expr;
-mod postfix_chain;
-mod r#match;
 
 impl AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
@@ -308,7 +308,7 @@ impl AstFormatter {
     pub fn range(
         &self,
         start: Option<&ast::Expr>,
-        sigil: &str,
+        sigil: &'static str,
         end: Option<&ast::Expr>,
         tail: &Tail,
     ) -> FormatResult {
@@ -452,7 +452,11 @@ impl AstFormatter {
         self.backtrack().next_opt(single_line).otherwise(multi_line)
     }
 
-    pub fn token_expr_open_brace(&self, token: &str, expr: &ast::Expr) -> FormatResult<bool> {
+    pub fn token_expr_open_brace(
+        &self,
+        token: &'static str,
+        expr: &ast::Expr,
+    ) -> FormatResult<bool> {
         self.has_vertical_shape(VerticalShape::Unrestricted, || {
             let first_line = self.out.line();
             self.out.token_space(token)?;

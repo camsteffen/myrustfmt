@@ -19,6 +19,8 @@ pub struct Tail<'a>(Option<TailImpl<'a>>);
 
 struct TailImpl<'a> {
     func: Box<dyn Fn(&AstFormatter) -> FormatResult + 'a>,
+    // captured constraints
+    // todo would it be better to explicitly capture and apply constraints where needed?
     width_limit: Option<WidthLimit>,
     vertical_shape: VerticalShape,
 }
@@ -34,7 +36,7 @@ impl AstFormatter {
     }
 
     pub fn tail_token<'a>(&self, token: &'static str) -> Tail<'a> {
-        self.tail_fn(|af| af.out.token(token))
+        self.tail_fn(move |af| af.out.token(token))
     }
 }
 

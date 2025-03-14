@@ -2,7 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
 use crate::ast_formatter::list::builder::list;
 use crate::ast_utils::is_rustfmt_skip;
-use crate::error::{ConstraintErrorKind, FormatResult, FormatResultExt};
+use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use rustc_span::Span;
@@ -58,7 +58,7 @@ impl AstFormatter {
         let checkpoint = self.out.checkpoint_without_buffer_errors();
         #[cfg(debug_assertions)]
         let error_count_before = self.errors.error_count();
-        let Err(e) = format().constraint_err_only()? else {
+        let Err(e) = format() else {
             return Ok(());
         };
         match e.kind {
