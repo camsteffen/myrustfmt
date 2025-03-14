@@ -5,6 +5,15 @@ use rustc_lexer::TokenKind;
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl SourceFormatter {
+    /// Allows comments or nothing.
+    /// Not commonly used because comments come "free" with `newline` and `space`.
+    pub fn comments(&self, mode: VerticalWhitespaceMode) -> FormatResult {
+        self.whitespace_and_comments(WhitespaceMode::Flexible {
+            vertical_mode: mode,
+            space_if_horizontal: false,
+        })
+    }
+
     /// Skip over whitespace, allow horizontal comments, disallow newlines.
     /// In other words, usually do nothing but allow for comments.
     /// SourceFormatter is responsible for invoking this between tokens.
@@ -16,14 +25,6 @@ impl SourceFormatter {
     /// Write a newline, allow comments
     pub fn newline(&self, mode: VerticalWhitespaceMode) -> FormatResult {
         self.whitespace_and_comments(WhitespaceMode::Vertical(mode))
-    }
-
-    /// Allow either comments with newlines, horizontal comments, or nothing
-    pub fn newline_if_comments(&self, mode: VerticalWhitespaceMode) -> FormatResult {
-        self.whitespace_and_comments(WhitespaceMode::Flexible {
-            vertical_mode: mode,
-            space_if_horizontal: false,
-        })
     }
 
     /// Write a space, allow horizontal comments
