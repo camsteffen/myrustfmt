@@ -3,7 +3,6 @@ use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::constraints::{VerticalShape, WidthLimit};
 use crate::error::{FormatResult, WidthLimitExceededError};
 use crate::num::HPos;
-use crate::util::cell_ext::CellExt;
 
 macro_rules! delegate_to_constraints {
     ($($vis:vis fn $name:ident $(<$gen:tt>)?(&self $(, $arg:ident: $ty:ty)* $(,)?) $(-> $ret_ty:ty)? ;)*) => {
@@ -16,8 +15,18 @@ macro_rules! delegate_to_constraints {
 }
 
 delegate_to_constraints! {
+    // max width
+    pub fn with_replace_max_width<T>(&self, max_width: HPos, scope: impl FnOnce() -> T) -> T;
+    
+    // width limit
+    pub fn width_limit(&self) -> Option<WidthLimit>;
+    pub fn with_replace_width_limit<T>(&self, width_limit: Option<WidthLimit>, scope: impl FnOnce() -> T) -> T;
+    
+    // vertical shape
+    pub fn vertical_shape(&self) -> VerticalShape;
     pub fn with_single_line<T>(&self, format: impl FnOnce() -> T) -> T;
     pub fn with_single_line_opt<T>(&self, apply: bool, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
+    pub fn with_replace_vertical_shape<T>(&self, vertical_shape: VerticalShape, scope: impl FnOnce() -> T) -> T;
     pub fn with_vertical_shape_min<T>(&self, shape: VerticalShape, scope: impl FnOnce() -> T) -> T;
     pub fn has_vertical_shape<T>(&self, shape: VerticalShape, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
     pub fn has_vertical_shape_unless<T>(&self, shape: VerticalShape, condition: bool, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
@@ -127,8 +136,7 @@ impl AstFormatter {
         };
         let max_width_prev = self.out.current_max_width();
         let max_width = max_width_prev.saturating_add(extra_width);
-        let result =
-            self.with_single_line(|| self.constraints().max_width.with_replaced(max_width, scope));
+        let result = self.with_single_line(|| self.with_replace_max_width(max_width, scope));
         let used_extra_width = self.out.last_line_len() > max_width_prev;
         (used_extra_width, result)
     }

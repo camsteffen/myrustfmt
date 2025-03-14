@@ -13,7 +13,6 @@ use rustc_ast::ast;
 use rustc_ast::ptr::P;
 use crate::constraint_writer::ConstraintRecoveryMode;
 use crate::ast_formatter::util::debug::expr_kind_name;
-use crate::util::cell_ext::CellExt;
 
 mod binary_expr;
 mod postfix_chain;
@@ -25,9 +24,7 @@ impl AstFormatter {
     }
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
-        if self.constraints().vertical.get() < VerticalShape::HangingIndent
-            && !expr.attrs.is_empty()
-        {
+        if self.vertical_shape() < VerticalShape::HangingIndent && !expr.attrs.is_empty() {
             return Err(ConstraintErrorKind::NextStrategy.into());
         }
         self.with_attrs_tail(&expr.attrs, expr.span, tail, || {
@@ -202,7 +199,7 @@ impl AstFormatter {
         &self,
     ) -> impl Fn(&AstFormatter, &P<ast::Expr>, &Tail, ListItemContext) -> FormatResult {
         // todo kinda hacky
-        let vertical_outer = self.constraints().vertical.get();
+        let vertical_outer = self.vertical_shape();
 
         move |af, expr, tail, lcx| {
             af.skip_single_expr_blocks_tail(expr, tail, |expr, tail| {
@@ -220,7 +217,7 @@ impl AstFormatter {
                             VerticalShape::List
                         };
                         // todo avoid replace?
-                        af.constraints().vertical.with_replaced(shape, format)?;
+                        af.with_replace_vertical_shape(shape, format)?;
                         Ok(())
                     }
                     // on separate lines, enforce IndentMiddle by adding a block

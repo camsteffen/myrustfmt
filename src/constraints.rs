@@ -6,11 +6,11 @@ use crate::util::cell_ext::CellExt;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Constraints {
-    pub max_width: Cell<HPos>,
-    // The width limit behaves a lot like max width, but they are separate values because they may
-    // change independently of each other.
-    pub width_limit: Cell<Option<WidthLimit>>,
-    pub vertical: Cell<VerticalShape>,
+    max_width: Cell<HPos>,
+    // width limit and max width are very similar in effect, but they are separate values because
+    // they may change independently of each other
+    width_limit: Cell<Option<WidthLimit>>,
+    vertical_shape: Cell<VerticalShape>,
 }
 
 /// Applies a width limit to a specific scope
@@ -71,19 +71,35 @@ impl Constraints {
         Constraints {
             max_width: Cell::new(max_width),
             width_limit: Cell::new(None),
-            vertical: Cell::new(VerticalShape::Unrestricted),
+            vertical_shape: Cell::new(VerticalShape::Unrestricted),
         }
     }
 
+    // basic getters
+
+    pub fn max_width(&self) -> HPos {
+        self.max_width.get()
+    }
+
+    pub fn width_limit(&self) -> Option<WidthLimit> {
+        self.width_limit.get()
+    }
+
+    pub fn vertical_shape(&self) -> VerticalShape {
+        self.vertical_shape.get()
+    }
+
+    // more getters
+
     pub fn max_width_at(&self, line: u32) -> HPos {
         let Some(width_limit_end) = self.width_limit_end_at(line) else {
-            return self.max_width.get();
+            return self.max_width();
         };
-        self.max_width.get().min(width_limit_end)
+        self.max_width().min(width_limit_end)
     }
 
     fn width_limit_end_at(&self, line: u32) -> Option<HPos> {
-        let Some(width_limit) = self.width_limit.get() else {
+        let Some(width_limit) = self.width_limit() else {
             return None;
         };
         match width_limit {
@@ -91,12 +107,11 @@ impl Constraints {
             WidthLimit::FirstLine { end, line: l } => (l == line).then_some(end.into()),
         }
     }
-}
 
-// effects
-impl Constraints {
+    // effects
+
     pub fn with_single_line<T>(&self, format: impl FnOnce() -> T) -> T {
-        self.vertical.with_replaced(VerticalShape::SingleLine, format)
+        self.with_replace_vertical_shape(VerticalShape::SingleLine, format)
     }
 
     pub fn with_single_line_opt<T>(
@@ -112,24 +127,36 @@ impl Constraints {
 
     pub fn with_width_limit<T>(&self, width_limit: WidthLimit, scope: impl FnOnce() -> T) -> T {
         if matches!(width_limit, WidthLimit::SingleLine { .. }) {
-            debug_assert_eq!(self.vertical.get(), VerticalShape::SingleLine);
+            debug_assert_eq!(self.vertical_shape(), VerticalShape::SingleLine);
         }
         if self
-            .width_limit
-            .get()
+            .width_limit()
             .is_some_and(|current| current.end() <= width_limit.end())
         {
             return scope();
         }
-        self.width_limit.with_replaced(Some(width_limit), scope)
+        self.with_replace_width_limit(Some(width_limit), scope)
+    }
+
+    pub fn with_replace_max_width<T>(&self, max_width: HPos, scope: impl FnOnce() -> T) -> T {
+        self.max_width.with_replaced(max_width, scope)
+    }
+
+    /// Replace without regard to the current setting
+    pub fn with_replace_vertical_shape<T>(
+        &self,
+        vertical_shape: VerticalShape,
+        scope: impl FnOnce() -> T,
+    ) -> T {
+        self.vertical_shape.with_replaced(vertical_shape, scope)
     }
 
     /// Requires the given scope to conform to the given VerticalShape
     pub fn with_vertical_shape_min<T>(&self, shape: VerticalShape, scope: impl FnOnce() -> T) -> T {
-        if self.vertical.get() <= shape {
+        if self.vertical_shape() <= shape {
             return scope();
         }
-        self.vertical.with_replaced(shape, scope)
+        self.with_replace_vertical_shape(shape, scope)
     }
 
     /// Declares that the output in the given scope is known to have the given VerticalShape,
@@ -142,10 +169,10 @@ impl Constraints {
         shape: VerticalShape,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        if self.vertical.get() >= shape {
+        if self.vertical_shape() >= shape {
             return scope();
         }
-        self.vertical.with_replaced(VerticalShape::SingleLine, scope)
+        self.with_replace_vertical_shape(VerticalShape::SingleLine, scope)
     }
 
     pub fn has_vertical_shape_unless<T>(
@@ -158,5 +185,13 @@ impl Constraints {
             return scope();
         }
         self.has_vertical_shape(shape, scope)
+    }
+
+    pub fn with_replace_width_limit<T>(
+        &self,
+        width_limit: Option<WidthLimit>,
+        scope: impl FnOnce() -> T,
+    ) -> T {
+        self.width_limit.with_replaced(width_limit, scope)
     }
 }

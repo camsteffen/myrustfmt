@@ -211,7 +211,7 @@ impl ConstraintWriter {
     }
 
     pub fn newline(&self) -> Result<(), NewlineNotAllowedError> {
-        if matches!(self.constraints.vertical.get(), VerticalShape::SingleLine) {
+        if matches!(self.constraints.vertical_shape(), VerticalShape::SingleLine) {
             return Err(NewlineNotAllowedError);
         }
         self.buffer.with_taken(|b| b.push('\n'));

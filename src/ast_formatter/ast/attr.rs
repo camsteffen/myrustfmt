@@ -7,7 +7,6 @@ use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use rustc_span::Span;
 use crate::ast_formatter::tail::Tail;
-use crate::util::cell_ext::CellExt;
 
 impl AstFormatter {
     pub fn with_attrs(
@@ -34,9 +33,7 @@ impl AstFormatter {
         // todo make my own attribute? or comment?
         // handle #[rustfmt::skip]
         if attrs.iter().any(is_rustfmt_skip) {
-            self.constraints()
-                .width_limit
-                .with_replaced(None, || self.out.copy_span(span))?;
+            self.with_replace_width_limit(None, || self.out.copy_span(span))?;
             self.tail(tail)?;
         } else if !self.out.has_any_constraint_recovery() {
             // todo don't do this in expr list item, when max width is not enforced
@@ -80,9 +77,7 @@ impl AstFormatter {
         #[cfg(debug_assertions)]
         assert!(self.error_emitter.error_count() > error_count_before, "an error should be emitted before copy fallback\nstack trace:\n{}", e.backtrace);
         self.out.restore_checkpoint(&checkpoint);
-        self.constraints()
-            .width_limit
-            .with_replaced(None, || self.out.copy_span(span))?;
+        self.with_replace_width_limit(None, || self.out.copy_span(span))?;
         self.tail(tail)?;
         Ok(())
     }

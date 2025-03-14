@@ -2,7 +2,6 @@ use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::source_formatter::SourceFormatter;
 use rustc_lexer::Token;
 use rustc_lexer::TokenKind;
-use crate::util::cell_ext::CellExt;
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl SourceFormatter {
@@ -64,8 +63,7 @@ impl SourceFormatter {
                 WhitespaceAction::CopyComment => {
                     // width limits don't apply to comments
                     self.constraints()
-                        .width_limit
-                        .with_replaced(None, || self.copy(len))?;
+                        .with_replace_width_limit(None, || self.copy(len))?;
                 }
                 WhitespaceAction::EmitNewline { double, indent } => {
                     self.source.advance(len);

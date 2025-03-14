@@ -183,7 +183,7 @@ impl AstFormatter {
                 Ok(())
             })
         };
-        if self.out.constraints().vertical.get() < VerticalShape::Unrestricted {
+        if self.vertical_shape() < VerticalShape::Unrestricted {
             return do_single_line();
         }
         // args and return type all on one line
