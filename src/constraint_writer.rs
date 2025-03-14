@@ -106,6 +106,9 @@ impl ConstraintWriter {
     }
 
     pub fn is_enforcing_max_width(&self) -> bool {
+        if self.constraints.width_limit().is_some() {
+            return true;
+        }
         match self.constraint_recovery_mode.get() {
             ConstraintRecoveryMode::Nothing => false,
             ConstraintRecoveryMode::NewlineNotAllowed => false,

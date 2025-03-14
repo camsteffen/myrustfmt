@@ -8,19 +8,18 @@ use crate::source_formatter::SourceFormatter;
 
 pub type FormatResult<T = ()> = Result<T, FormatError>;
 
+pub type TryFormatResult<T = ()> = Result<T, ParseError>;
+
 pub trait FormatResultExt<T> {
-    fn constraint_err_only(self) -> Result<Result<T, ConstraintError>, ParseError>;
+    fn constraint_err_only(self) -> TryFormatResult<Result<T, ConstraintError>>;
 
     #[allow(unused)]
     fn debug_err(self, sf: &SourceFormatter) -> Self;
 }
 
 impl<T> FormatResultExt<T> for FormatResult<T> {
-    /// If self is Ok or Err with a ConstraintError, the result is returned wrapped in Ok.
-    /// If self is a non-constraint-error, it is returned in an Err (the outer Result).
-    /// This is often useful since constraint errors are used to trigger a fallback strategy, but
-    /// other errors indicate a critical bug, and so they are usually propagated (e.g. using `?`).
-    fn constraint_err_only(self) -> Result<Result<T, ConstraintError>, ParseError> {
+    /// Use when you want to observe constraint errors and yeet other errors
+    fn constraint_err_only(self) -> TryFormatResult<Result<T, ConstraintError>> {
         match self {
             Err(FormatError::Parse(e)) => Err(e),
             Err(FormatError::Constraint(e)) => Ok(Err(e)),

@@ -39,22 +39,7 @@ struct AstFormatter {
 
 impl AstFormatter {
     fn module(self, module: &AstModule, path: Option<&Path>) -> FormatModuleResult {
-        let result = (|| -> FormatResult {
-            self.out.comments(VerticalWhitespaceMode::Top)?;
-            self.with_attrs(&module.attrs, module.spans.inner_span, || {
-                if let [until_last @ .., last] = &module.items[..] {
-                    for item in until_last {
-                        self.item(item)?;
-                        self.out.newline_indent(VerticalWhitespaceMode::Between)?;
-                    }
-                    self.item(last)?;
-                    self.out.newline(VerticalWhitespaceMode::Bottom)?;
-                }
-                Ok(())
-            })?;
-            Ok(())
-        })();
-        match result {
+        match self.do_module(module) {
             Err(e) => {
                 // todo don't panic?
                 // todo make it possible to panic inside ErrorEmitter instead?
@@ -70,7 +55,19 @@ impl AstFormatter {
         }
     }
 
-    pub fn constraints(&self) -> &Constraints {
-        self.out.constraints()
+    fn do_module(&self, module: &AstModule) -> FormatResult {
+        self.out.comments(VerticalWhitespaceMode::Top)?;
+        self.with_attrs(&module.attrs, module.spans.inner_span, || {
+            if let [until_last @ .., last] = &module.items[..] {
+                for item in until_last {
+                    self.item(item)?;
+                    self.out.newline_indent(VerticalWhitespaceMode::Between)?;
+                }
+                self.item(last)?;
+                self.out.newline(VerticalWhitespaceMode::Bottom)?;
+            }
+            Ok(())
+        })?;
+        Ok(())
     }
 }

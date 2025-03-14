@@ -114,49 +114,53 @@ mod tests {
 
     #[test]
     fn test_submodules_non_relative() {
-        rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
-            let module = parse_module(
-                CrateSource::File(Path::new("tests/submodules_tests/non_relative/main.rs")),
-                None,
-            )
-            .unwrap();
-            let expected = &[
-                (
-                    "tests/submodules_tests/non_relative/inline/file.rs",
-                    Some("file"),
-                ),
-                (
-                    "tests/submodules_tests/non_relative/inline/folder/mod.rs",
+        rustc_span::create_session_globals_then(
+            Edition::Edition2024,
+            None,
+            || {
+                let module = parse_module(
+                    CrateSource::File(Path::new("tests/submodules_tests/non_relative/main.rs")),
                     None,
-                ),
-                ("tests/submodules_tests/non_relative/file.rs", Some("file")),
-                ("tests/submodules_tests/non_relative/folder/mod.rs", None),
-                (
-                    "tests/submodules_tests/non_relative/path_attr/test.rs",
-                    None,
-                ),
-                (
-                    "tests/submodules_tests/non_relative/inline_path_value/file.rs",
-                    Some("file"),
-                ),
-                (
-                    "tests/submodules_tests/non_relative/inline_path_value/folder/mod.rs",
-                    None,
-                ),
-                (
-                    "tests/submodules_tests/non_relative/inline_path_value/path_attr_inside_value.rs",
-                    None,
-                ),
-            ][..];
-            let actual = Vec::from_iter(module.submodules.iter().map(|submodule| {
-                (
-                    submodule.path.to_str().unwrap(),
-                    submodule.relative.as_ref().map(|i| i.as_str()),
                 )
-            }));
+                .unwrap();
+                let expected = &[
+                    (
+                        "tests/submodules_tests/non_relative/inline/file.rs",
+                        Some("file"),
+                    ),
+                    (
+                        "tests/submodules_tests/non_relative/inline/folder/mod.rs",
+                        None,
+                    ),
+                    ("tests/submodules_tests/non_relative/file.rs", Some("file")),
+                    ("tests/submodules_tests/non_relative/folder/mod.rs", None),
+                    (
+                        "tests/submodules_tests/non_relative/path_attr/test.rs",
+                        None,
+                    ),
+                    (
+                        "tests/submodules_tests/non_relative/inline_path_value/file.rs",
+                        Some("file"),
+                    ),
+                    (
+                        "tests/submodules_tests/non_relative/inline_path_value/folder/mod.rs",
+                        None,
+                    ),
+                    (
+                        "tests/submodules_tests/non_relative/inline_path_value/path_attr_inside_value.rs",
+                        None,
+                    ),
+                ][..];
+                let actual = Vec::from_iter(module.submodules.iter().map(|submodule| {
+                    (
+                        submodule.path.to_str().unwrap(),
+                        submodule.relative.as_ref().map(|i| i.as_str()),
+                    )
+                }));
 
-            assert_eq!(expected, &actual);
-        })
+                assert_eq!(expected, &actual);
+            },
+        )
     }
 
     #[test]

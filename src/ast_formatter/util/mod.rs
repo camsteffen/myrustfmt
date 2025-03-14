@@ -4,3 +4,4 @@ mod indent;
 mod infix_chain;
 mod take_while_within_margin;
 pub mod debug;
+mod simulate_wrap;

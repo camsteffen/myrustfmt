@@ -3,7 +3,7 @@ use rustc_ast::ast;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
 use crate::constraints::VerticalShape;
-use crate::error::{FormatResult, FormatResultExt};
+use crate::error::{FormatResult, FormatResultExt, TryFormatResult};
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
@@ -101,41 +101,39 @@ impl AstFormatter {
     // todo should we count lines or simply observe whether it's multi-line?
     fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
         let checkpoint = self.out.checkpoint();
-        enum ExtraWidthResult {
-            AddBlock,
-            SameLine,
+        enum Next {
             Done,
+            AddBlock,
+            Normal,
         }
-        let result = self.out.with_enforce_max_width(|| -> FormatResult<ExtraWidthResult> {
-            // simulate having extra width by wrapping a block
+        let result = self.out.with_enforce_max_width(|| -> TryFormatResult<_> {
+            // simulate having extra width if we had added a block
             let (used_extra_width, result) =
                 self.simulate_wrap_indent_first_line(|| self.expr(body));
             let result = result.constraint_err_only()?;
             if used_extra_width {
-                // adding a block allows more code to fit in the first line
-                return Ok(ExtraWidthResult::AddBlock);
+                // Formatting on the same line _might_ be possible,
+                // but adding a block allows for a longer first line.
+                return Ok(Next::AddBlock);
             }
             if result.is_err() {
-                // We did not use the extra width, but it did not fit on one line,
+                // We did not use the extra width, and it did not fit on one line,
                 // so try again to format on the same line without the extra width.
-                return Ok(ExtraWidthResult::SameLine);
+                return Ok(Next::Normal);
             }
-            // it fits on one line, but now we need a comma
-            match self.out.token_insert(",").constraint_err_only()? {
-                // welp the comma didn't fit,
-                // but the expression will fit on one line if we add a block
-                Err(_) => Ok(ExtraWidthResult::AddBlock),
-                // it all fits on one line!
-                Ok(()) => Ok(ExtraWidthResult::Done),
+            // it fits on one line, but now we need a comma (if we're not adding a block)
+            if self.out.token_insert(",").constraint_err_only()?.is_err() {
+                return Ok(Next::AddBlock);
             }
+            Ok(Next::Done)
         })?;
         match result {
-            ExtraWidthResult::Done => {}
-            ExtraWidthResult::AddBlock => {
+            Next::Done => {}
+            Next::AddBlock => {
                 self.out.restore_checkpoint(&checkpoint);
                 self.expr_add_block(body)?;
             }
-            ExtraWidthResult::SameLine => {
+            Next::Normal => {
                 self.out.restore_checkpoint(&checkpoint);
                 // todo closures and structs should have single-line headers
                 // todo exclude comma for block-like expressions?

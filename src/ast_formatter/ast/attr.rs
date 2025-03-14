@@ -55,9 +55,6 @@ impl AstFormatter {
         format: impl FnOnce() -> FormatResult,
         tail: &Tail,
     ) -> FormatResult {
-        // N.B. We're not using the typical `Checkpoint` here because we don't want to increment the
-        // checkpoint counter which is only incremented when there is a valid formatting strategy to
-        // fall back to.
         let checkpoint = self.out.checkpoint_without_buffer_errors();
         #[cfg(debug_assertions)]
         let error_count_before = self.errors.error_count();
