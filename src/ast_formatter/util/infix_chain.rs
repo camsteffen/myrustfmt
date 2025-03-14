@@ -1,6 +1,7 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
+use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn simple_infix_chain<T>(
@@ -28,7 +29,7 @@ impl AstFormatter {
                 format_item(first)?;
                 self.indented_optional(should_indent, || {
                     for item in rest {
-                        self.newline_break_indent()?;
+                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         self.out.token_space(token)?;
                         format_item(item)?;
                     }

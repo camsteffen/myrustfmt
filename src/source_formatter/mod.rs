@@ -170,10 +170,6 @@ impl SourceFormatter {
         Ok(())
     }
 
-    pub fn indent(&self) {
-        self.out.spaces(self.indent.get());
-    }
-
     fn copy(&self, len: u32) -> FormatResult {
         let segment = &self.source.remaining()[..len.try_into().unwrap()];
         self.out.write_possibly_multiline(segment)?;

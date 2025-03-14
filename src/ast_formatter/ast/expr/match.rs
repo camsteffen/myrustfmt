@@ -4,6 +4,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
 use crate::constraints::VerticalShape;
 use crate::error::{FormatResult, FormatResultExt};
+use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn match_(&self, scrutinee: &ast::Expr, arms: &[ast::Arm]) -> FormatResult {
@@ -53,13 +54,13 @@ impl AstFormatter {
 
     fn arm_guard_separate_line(&self, arm: &ast::Arm, guard: &ast::Expr) -> FormatResult {
         self.indented(|| {
-            self.newline_break_indent()?;
+            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
             self.arm_guard(guard)?;
             Ok(())
         })?;
         if let Some(body) = arm.body.as_deref() {
             self.out.space_token("=>")?;
-            self.newline_break_indent()?;
+            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
             // todo allow single line without block?
             self.arm_body_force_block(body)?;
         }

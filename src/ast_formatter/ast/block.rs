@@ -5,6 +5,7 @@ use crate::error::FormatResult;
 use crate::util::whitespace_utils::is_whitespace;
 use rustc_ast::ast;
 use rustc_span::Pos;
+use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn block_expr(
@@ -69,7 +70,7 @@ impl AstFormatter {
             [first, rest @ ..] => self.embraced_after_opening("}", || {
                 format_item(first)?;
                 for item in rest {
-                    self.newline_between_indent()?;
+                    self.out.newline_indent(VerticalWhitespaceMode::Between)?;
                     format_item(item)?;
                 }
                 Ok(())

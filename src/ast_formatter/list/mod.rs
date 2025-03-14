@@ -14,6 +14,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::num::HPos;
+use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     /* [item, item, item] */
@@ -121,7 +122,7 @@ impl AstFormatter {
                         Ok(())
                     })
                     .otherwise(|| {
-                        self.newline_break_indent()?;
+                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         item_comma()?;
                         Ok(())
                     })?;
@@ -155,14 +156,14 @@ impl AstFormatter {
                     for index in 0..len - 1 {
                         item_comma(index)?;
                         // todo should this be "between"?
-                        self.newline_break_indent()?;
+                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     }
                     item_comma(len - 1)?;
                 }
                 _ => {
                     for index in 0..len {
                         item_comma(index)?;
-                        self.newline_break_indent()?;
+                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     }
                     self.list_rest(rest, Tail::none())?;
                 }

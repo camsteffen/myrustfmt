@@ -5,6 +5,7 @@ use crate::error::FormatResult;
 use crate::ast_formatter::list::builder::list;
 use rustc_ast::ast;
 use crate::ast_formatter::tail::Tail;
+use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn generic_params(&self, params: &[ast::GenericParam]) -> FormatResult {
@@ -59,11 +60,11 @@ impl AstFormatter {
         if where_clause.is_empty() {
             return Ok(false);
         }
-        self.newline_break_indent()?;
+        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
         self.out.token("where")?;
         self.indented(|| {
             for (i, pred) in where_clause.predicates.iter().enumerate() {
-                self.newline_break_indent()?;
+                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 match &pred.kind {
                     ast::WherePredicateKind::BoundPredicate(pred) => {
                         self.ty(&pred.bounded_ty)?;
@@ -80,7 +81,7 @@ impl AstFormatter {
             Ok(())
         })?;
         if is_before_body {
-            self.newline_break_indent()?;
+            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
         }
         Ok(true)
     }

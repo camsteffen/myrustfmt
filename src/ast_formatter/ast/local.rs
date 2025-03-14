@@ -4,6 +4,7 @@ use crate::error::{FormatResult, FormatResultExt};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use crate::source_formatter::SourceFormatterLookahead;
+use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn local(&self, local: &ast::Local) -> FormatResult {
@@ -82,7 +83,7 @@ impl AstFormatter {
             Ok(())
         };
         let next_line_else = || -> FormatResult {
-            self.newline_break_indent()?;
+            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
             self.out.token_space("else")?;
             self.out.token("{")?;
             else_block_vertical()?;
@@ -141,14 +142,14 @@ impl AstFormatter {
             }
             Next::WrapIndent => {
                 self.indented(|| {
-                    self.newline_break_indent()?;
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     self.expr(expr)?;
                     self.tail(tail)?;
                     Ok(())
                 })?;
             }
             Next::WrapIndentLookahead(lookahead) => {
-                self.indented(|| self.newline_break_indent())?;
+                self.indented(|| self.out.newline_indent(VerticalWhitespaceMode::Break))?;
                 self.out.restore_lookahead(lookahead);
             }
         }

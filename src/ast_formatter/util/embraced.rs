@@ -1,14 +1,15 @@
 use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
+use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     // todo "embraced" is a weird name?
     /// Writes a closing brace. Allows for indented comments between braces.
     pub fn embraced_empty_after_opening(&self, closing_brace: &str) -> FormatResult {
         let first_line = self.out.line();
-        self.indented(|| self.comments_break())?;
+        self.indented(|| self.out.comments(VerticalWhitespaceMode::Break))?;
         if self.out.line() != first_line {
-            self.indent();
+            self.out.indent();
         }
         self.out.token(closing_brace)?;
         Ok(())
@@ -27,13 +28,13 @@ impl AstFormatter {
     /// Writes contents between braces with indentation
     pub fn embraced_inside(&self, contents: impl FnOnce() -> FormatResult) -> FormatResult {
         self.indented(|| {
-            self.newline_top()?;
-            self.indent();
+            self.out.newline(VerticalWhitespaceMode::Top)?;
+            self.out.indent();
             contents()?;
-            self.newline_bottom()?;
+            self.out.newline(VerticalWhitespaceMode::Bottom)?;
             Ok(())
         })?;
-        self.indent();
+        self.out.indent();
         Ok(())
     }
 }

@@ -6,6 +6,7 @@ use crate::constraints::VerticalShape;
 use rustc_ast::ast;
 use rustc_ast::util::parser::AssocOp;
 use rustc_span::source_map::Spanned;
+use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn binary_expr(
@@ -61,7 +62,7 @@ impl AstFormatter {
                     }
                     self.indented(|| {
                         for (op, expr) in iter {
-                            self.newline_break_indent()?;
+                            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                             self.out.token_space(op.as_str())?;
                             self.expr(expr)?;
                         }

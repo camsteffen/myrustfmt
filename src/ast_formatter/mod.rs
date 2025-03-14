@@ -9,13 +9,13 @@ use crate::source_formatter::SourceFormatter;
 use crate::error::FormatResult;
 use crate::FormatModuleResult;
 use crate::num::HPos;
+use crate::whitespace::VerticalWhitespaceMode;
 
 mod ast;
 mod util;
 mod list;
 pub mod tail;
 pub mod backtrack;
-mod whitespace;
 
 pub const INDENT_WIDTH: HPos = 4;
 
@@ -40,15 +40,15 @@ struct AstFormatter {
 impl AstFormatter {
     fn module(self, module: &AstModule, path: Option<&Path>) -> FormatModuleResult {
         let result = (|| -> FormatResult {
-            self.comments_top()?;
+            self.out.comments(VerticalWhitespaceMode::Top)?;
             self.with_attrs(&module.attrs, module.spans.inner_span, || {
                 if let [until_last @ .., last] = &module.items[..] {
                     for item in until_last {
                         self.item(item)?;
-                        self.newline_between_indent()?;
+                        self.out.newline_indent(VerticalWhitespaceMode::Between)?;
                     }
                     self.item(last)?;
-                    self.newline_bottom()?;
+                    self.out.newline(VerticalWhitespaceMode::Bottom)?;
                 }
                 Ok(())
             })?;

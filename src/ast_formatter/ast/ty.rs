@@ -5,6 +5,7 @@ use crate::ast_formatter::list::list_config::TupleListConfig;
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use rustc_ast::ast;
+use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn ty(&self, ty: &ast::Ty) -> FormatResult {
@@ -109,11 +110,11 @@ impl AstFormatter {
             })
             .otherwise(|| {
                 self.indented(|| {
-                    self.newline_break_indent()?;
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     self.generic_bounds(bounds, Tail::none())?;
                     Ok(())
                 })?;
-                self.newline_break_indent()?;
+                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 Ok(true)
             })
     }

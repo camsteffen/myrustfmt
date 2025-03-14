@@ -22,9 +22,20 @@ impl SourceFormatter {
         self.whitespace_and_comments(WhitespaceMode::Horizontal { space: false })
     }
 
+    pub fn indent(&self) {
+        self.out.spaces(self.indent.get());
+    }
+
     /// Write a newline, allow comments
     pub fn newline(&self, mode: VerticalWhitespaceMode) -> FormatResult {
         self.whitespace_and_comments(WhitespaceMode::Vertical(mode))
+    }
+
+    /// Write a newline, allow comments
+    pub fn newline_indent(&self, mode: VerticalWhitespaceMode) -> FormatResult {
+        self.newline(mode)?;
+        self.indent();
+        Ok(())
     }
 
     /// Write a space, allow horizontal comments

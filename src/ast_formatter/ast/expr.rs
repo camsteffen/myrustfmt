@@ -13,6 +13,7 @@ use rustc_ast::ast;
 use rustc_ast::ptr::P;
 use crate::constraint_writer::ConstraintRecoveryMode;
 use crate::ast_formatter::util::debug::expr_kind_name;
+use crate::whitespace::VerticalWhitespaceMode;
 
 mod binary_expr;
 mod postfix_chain;
@@ -276,7 +277,7 @@ impl AstFormatter {
             .otherwise(|| {
                 self.has_vertical_shape(VerticalShape::HangingIndent, || {
                     self.indented(|| {
-                        self.newline_break_indent()?;
+                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         self.out.token_space("as")?;
                         self.ty(ty)?;
                         self.tail(tail)?;
@@ -462,7 +463,7 @@ impl AstFormatter {
                     || self.with_single_line(|| self.out.space_token("{")),
                 )
                 .otherwise(|| {
-                    self.newline_break_indent()?;
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     self.out.token("{")?;
                     Ok(())
                 })?;

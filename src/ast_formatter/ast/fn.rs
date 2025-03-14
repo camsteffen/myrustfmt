@@ -8,6 +8,7 @@ use crate::constraints::VerticalShape;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
 use rustc_span::symbol::kw;
+use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn fn_<K>(&self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
@@ -39,7 +40,7 @@ impl AstFormatter {
                     self.backtrack()
                         .next(|| self.out.space_token("{"))
                         .otherwise(|| {
-                            self.newline_break_indent()?;
+                            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                             self.out.token("{")?;
                             Ok(())
                         })?;
@@ -253,7 +254,7 @@ impl AstFormatter {
                 self.backtrack()
                     .next(|| self.out.space_token_space("->"))
                     .otherwise(|| {
-                        self.newline_break_indent()?;
+                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         self.out.token_space("->")?;
                         Ok(())
                     })?;

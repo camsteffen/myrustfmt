@@ -9,6 +9,7 @@ use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
+use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn item(&self, item: &ast::Item) -> FormatResult {
@@ -195,7 +196,7 @@ impl AstFormatter {
                 })
                 .otherwise(|| {
                     self.indented(|| {
-                        self.newline_break_indent()?;
+                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         first_part()?;
                         Ok(true)
                     })
@@ -215,7 +216,7 @@ impl AstFormatter {
                 })
                 .otherwise(|| {
                     self.indented_optional(!indented, || {
-                        self.newline_break_indent()?;
+                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         self.out.token_space("for")?;
                         self.ty(&impl_.self_ty)?;
                         Ok(())
@@ -303,7 +304,7 @@ impl AstFormatter {
                     Ok(())
                 })
                 .otherwise(|| {
-                    self.newline_break_indent()?;
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     body()?;
                     Ok(())
                 })?;

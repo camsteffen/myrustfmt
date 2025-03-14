@@ -7,6 +7,7 @@ use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use rustc_span::Span;
 use crate::ast_formatter::tail::Tail;
+use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn with_attrs(
@@ -90,7 +91,7 @@ impl AstFormatter {
                 None => {
                     // todo do better, format key-value pairs
                     self.out.copy_span(attr.span)?;
-                    self.newline_break_indent()?;
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 }
                 Some(meta) => {
                     self.out.token("#")?;
@@ -104,10 +105,10 @@ impl AstFormatter {
                     self.meta_item(&meta)?;
                     self.out.token("]")?;
                     match attr.style {
-                        ast::AttrStyle::Inner => self.newline_between()?,
-                        ast::AttrStyle::Outer => self.newline_break()?,
+                        ast::AttrStyle::Inner => self.out.newline(VerticalWhitespaceMode::Between)?,
+                        ast::AttrStyle::Outer => self.out.newline(VerticalWhitespaceMode::Break)?,
                     }
-                    self.indent();
+                    self.out.indent();
                 }
             },
         }

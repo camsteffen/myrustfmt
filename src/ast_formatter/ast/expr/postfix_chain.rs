@@ -5,6 +5,7 @@ use crate::constraints::VerticalShape;
 use crate::error::{ConstraintErrorKind, FormatResult, FormatResultExt};
 use rustc_ast::ast;
 use crate::num::HPos;
+use crate::whitespace::VerticalWhitespaceMode;
 
 // In rustfmt, this is called chain_width, and is 60 by default
 const POSTFIX_CHAIN_MAX_WIDTH: HPos = 60;
@@ -108,7 +109,7 @@ impl AstFormatter {
             .out
             .with_enforce_max_width(|| {
                 self.indented(|| {
-                    self.newline_break_indent()?;
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     self.postfix_item(overflowable)?;
                     let height = self.out.line() - first_line + 1;
                     self.tail(tail)?;
@@ -140,7 +141,7 @@ impl AstFormatter {
 
     fn postfix_chain_vertical(&self, chain: &[PostfixItem<'_>], tail: &Tail) -> FormatResult {
         for item in chain {
-            self.newline_break_indent()?;
+            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
             self.postfix_item(item)?;
         }
         self.tail(tail)?;
