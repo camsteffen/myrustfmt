@@ -129,6 +129,7 @@ impl AstFormatter {
                 return Ok(());
             }
         };
+
         self.out.restore_checkpoint(&checkpoint_after_eq);
         match next {
             Next::SameLine => {

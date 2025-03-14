@@ -26,14 +26,14 @@ pub fn format_module(
     config: &Config,
 ) -> FormatModuleResult {
     let constraints = Constraints::new(config.max_width);
-    let error_emitter = Rc::new(BufferedErrorEmitter::new(ErrorEmitter::new(path.clone())));
-    let out = SourceFormatter::new(source, constraints, Rc::clone(&error_emitter));
-    let formatter = AstFormatter { error_emitter, out };
+    let errors = Rc::new(BufferedErrorEmitter::new(ErrorEmitter::new(path.clone())));
+    let out = SourceFormatter::new(source, constraints, Rc::clone(&errors));
+    let formatter = AstFormatter { errors, out };
     formatter.module(module, path.as_deref())
 }
 
 struct AstFormatter {
-    error_emitter: Rc<BufferedErrorEmitter>,
+    errors: Rc<BufferedErrorEmitter>,
     out: SourceFormatter,
 }
 
@@ -64,7 +64,7 @@ impl AstFormatter {
                 );
             }
             Ok(()) => FormatModuleResult {
-                error_count: self.error_emitter.error_count(),
+                error_count: self.errors.error_count(),
                 formatted: self.out.finish(),
             },
         }

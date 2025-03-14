@@ -60,7 +60,7 @@ impl AstFormatter {
         // fall back to.
         let checkpoint = self.out.checkpoint_without_buffer_errors();
         #[cfg(debug_assertions)]
-        let error_count_before = self.error_emitter.error_count();
+        let error_count_before = self.errors.error_count();
         let Err(e) = format().constraint_err_only()? else {
             return Ok(());
         };
@@ -68,7 +68,7 @@ impl AstFormatter {
             ConstraintErrorKind::NewlineNotAllowed => {
                 let (line, col) = self.out.line_col();
                 // todo emit a more appropriate error for bad comments
-                self.error_emitter.newline_not_allowed(line, col);
+                self.errors.newline_not_allowed(line, col);
             }
             // width limit errors are emitted before the error value is returned
             ConstraintErrorKind::WidthLimitExceeded => {}
@@ -76,7 +76,7 @@ impl AstFormatter {
             ConstraintErrorKind::NextStrategy => return Err(e.into()),
         }
         #[cfg(debug_assertions)]
-        assert!(self.error_emitter.error_count() > error_count_before, "an error should be emitted before copy fallback\nstack trace:\n{}", e.backtrace);
+        assert!(self.errors.error_count() > error_count_before, "an error should be emitted before copy fallback\nstack trace:\n{}", e.backtrace);
         self.out.restore_checkpoint(&checkpoint);
         self.with_replace_width_limit(None, || self.out.copy_span(span))?;
         self.tail(tail)?;
