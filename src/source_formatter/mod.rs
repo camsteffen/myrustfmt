@@ -14,7 +14,7 @@ mod source_reader;
 pub mod checkpoint;
 
 #[derive(Debug)]
-pub struct SourceFormatterLookahead {
+pub struct Lookahead {
     error_buffer: Vec<Error>,
     source_pos: BytePos,
     writer_lookahead: ConstraintWriterLookahead,

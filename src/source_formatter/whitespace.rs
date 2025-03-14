@@ -31,7 +31,6 @@ impl SourceFormatter {
         self.whitespace_and_comments(WhitespaceMode::Vertical(mode))
     }
 
-    /// Write a newline, allow comments
     pub fn newline_indent(&self, mode: VerticalWhitespaceMode) -> FormatResult {
         self.newline(mode)?;
         self.indent();

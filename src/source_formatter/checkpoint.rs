@@ -1,7 +1,7 @@
 use rustc_span::BytePos;
 use crate::constraint_writer::ConstraintWriterCheckpoint;
 use crate::error_emitter::Checkpoint as BufferedErrorEmitterCheckpoint;
-use crate::source_formatter::{SourceFormatter, SourceFormatterLookahead};
+use crate::source_formatter::{SourceFormatter, Lookahead};
 use crate::util::cell_ext::CellNumberExt;
 
 pub struct Checkpoint<'a> {
@@ -67,7 +67,7 @@ impl SourceFormatter {
         self.source.pos.set(source_pos);
     }
 
-    pub fn capture_lookahead(&self, from: &Checkpoint) -> SourceFormatterLookahead {
+    pub fn capture_lookahead(&self, from: &Checkpoint) -> Lookahead {
         self.assert_last_checkpoint(from);
         let error_buffer = match &from.error_emitter_checkpoint {
             Some(error_emitter_checkpoint) => {
@@ -79,15 +79,15 @@ impl SourceFormatter {
         let writer_lookahead = self.out.capture_lookahead(&from.writer_checkpoint);
         let source_pos = self.source.pos.get();
         self.source.pos.set(from.source_pos);
-        SourceFormatterLookahead {
+        Lookahead {
             error_buffer,
             source_pos,
             writer_lookahead,
         }
     }
 
-    pub fn restore_lookahead(&self, lookahead: SourceFormatterLookahead) {
-        let SourceFormatterLookahead {
+    pub fn restore_lookahead(&self, lookahead: Lookahead) {
+        let Lookahead {
             error_buffer,
             source_pos,
             writer_lookahead,

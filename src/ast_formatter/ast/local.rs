@@ -3,7 +3,7 @@ use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatResult, FormatResultExt};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
-use crate::source_formatter::SourceFormatterLookahead;
+use crate::source_formatter::Lookahead;
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
@@ -103,15 +103,14 @@ impl AstFormatter {
         let checkpoint_after_eq = self.out.checkpoint();
         enum Next {
             SameLine,
-            WrapIndent,
-            WrapIndentLookahead(SourceFormatterLookahead),
+            Wrap(Option<Lookahead>),
         }
         // this block helps to drop checkpoint_after_space
         let next = 'next: {
             let space_result = self.out.with_enforce_max_width(|| self.out.space());
             if space_result.constraint_err_only()?.is_err() {
                 // comments forced a line break
-                break 'next Next::WrapIndent;
+                break 'next Next::Wrap(None);
             }
             let checkpoint_after_space = self.out.checkpoint();
 
@@ -121,12 +120,9 @@ impl AstFormatter {
             });
             let result = result.constraint_err_only()?;
             if used_extra_width {
-                if result.is_ok() {
-                    let lookahead = self.out.capture_lookahead(&checkpoint_after_space);
-                    Next::WrapIndentLookahead(lookahead)
-                } else {
-                    Next::WrapIndent
-                }
+                let lookahead =
+                    result.is_ok().then(|| self.out.capture_lookahead(&checkpoint_after_space));
+                Next::Wrap(lookahead)
             } else if result.is_err() {
                 Next::SameLine
             } else {
@@ -140,17 +136,17 @@ impl AstFormatter {
                 self.expr(expr)?;
                 self.tail(tail)?;
             }
-            Next::WrapIndent => {
+            Next::Wrap(lookahead) => {
                 self.indented(|| {
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                    self.expr(expr)?;
-                    self.tail(tail)?;
+                    if let Some(lookahead) = lookahead {
+                        self.out.restore_lookahead(lookahead);
+                    } else {
+                        self.expr(expr)?;
+                        self.tail(tail)?;
+                    }
                     Ok(())
                 })?;
-            }
-            Next::WrapIndentLookahead(lookahead) => {
-                self.indented(|| self.out.newline_indent(VerticalWhitespaceMode::Break))?;
-                self.out.restore_lookahead(lookahead);
             }
         }
         Ok(())
