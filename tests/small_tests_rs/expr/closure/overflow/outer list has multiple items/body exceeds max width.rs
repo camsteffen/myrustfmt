@@ -1,7 +1,7 @@
 // test-kind: no-change
 
 fn test() {
-    |aaaa, bbbb, cccc| -> (AAAAA, BBBBB) {
+    foo(first_arg, |aaaa, bbbb, cccc| -> (AAAAA, BBBBB) {
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;
-    };
+    });
 }
