@@ -4,24 +4,9 @@ use crate::util::line_col::line_col;
 use std::backtrace::Backtrace;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
-use crate::source_formatter::SourceFormatter;
+use crate::util::display::display_from_fn;
 
 pub type FormatResult<T = ()> = Result<T, ConstraintError>;
-
-pub trait FormatResultExt<T> {
-    #[allow(unused)]
-    fn debug_err(self, sf: &SourceFormatter) -> Self;
-}
-
-impl<T> FormatResultExt<T> for FormatResult<T> {
-    #[track_caller]
-    fn debug_err(self, sf: &SourceFormatter) -> Self {
-        if self.is_err() {
-            sf.debug_buffer();
-        }
-        self
-    }
-}
 
 #[derive(Debug)]
 pub struct ConstraintError {
@@ -82,21 +67,6 @@ fn write_error_formatting_at(
     Ok(())
 }
 
-fn write_error_end(
-    f: &mut Formatter,
-    source: &str,
-    backtrace: Option<&Backtrace>,
-    has_path: bool,
-) -> std::fmt::Result {
-    if cfg!(debug_assertions) && !has_path {
-        write!(f, "\nSource:\n{source}")?;
-    }
-    if let Some(backtrace) = backtrace {
-        write!(f, "\nformat error backtrace:\n{backtrace}")?;
-    }
-    Ok(())
-}
-
 fn write_constraint_error(
     f: &mut Formatter,
     e: &ConstraintError,
@@ -110,7 +80,12 @@ fn write_constraint_error(
         ConstraintErrorKind::NewlineNotAllowed => write!(f, "newline not allowed")?,
         ConstraintErrorKind::WidthLimitExceeded => write!(f, "width limit exceeded")?,
     }
-    write_error_end(f, source, e.backtrace(), path.is_some())?;
+    if cfg!(debug_assertions) && path.is_none() {
+        write!(f, "\nSource:\n{source}")?;
+    }
+    if let Some(backtrace) = e.backtrace() {
+        write!(f, "\nformat error backtrace:\n{backtrace}")?;
+    }
     Ok(())
 }
 
@@ -200,17 +175,4 @@ impl From<WidthLimitExceededError> for ConstraintError {
     fn from(e: WidthLimitExceededError) -> Self {
         ConstraintErrorKind::from(e).into()
     }
-}
-
-fn display_from_fn(fmt: impl Fn(&mut Formatter<'_>) -> std::fmt::Result) -> impl Display {
-    struct Impl<F>(F);
-    impl<F> Display for Impl<F>
-    where
-        F: Fn(&mut Formatter<'_>) -> std::fmt::Result,
-    {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            self.0(f)
-        }
-    }
-    Impl(fmt)
 }

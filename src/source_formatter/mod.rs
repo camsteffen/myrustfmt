@@ -32,10 +32,10 @@ pub struct SourceFormatter {
 }
 
 macro_rules! delegate_to_constraint_writer {
-    ($($(#[$attr:meta])? $vis:vis fn $name:ident $(<$gen:tt>)?(&self $(, $arg:ident: $ty:ty)*) $(-> $ret_ty:ty)? ;)*) => {
+    ($($(#[$attr:meta])* $vis:vis fn $name:ident $(<$gen:tt>)?(&self $(, $arg:ident: $ty:ty)*) $(-> $ret_ty:ty)? ;)*) => {
         impl SourceFormatter {
             $(
-            $(#[$attr])?
+            $(#[$attr])*
             $vis fn $name $(<$gen>)? (&self $(, $arg: $ty)*) $(-> $ret_ty)? {
                 self.out.$name($($arg),*)
             })*
@@ -46,8 +46,6 @@ macro_rules! delegate_to_constraint_writer {
 delegate_to_constraint_writer! {
     pub fn constraints(&self) -> &Constraints;
     pub fn current_max_width(&self) -> HPos;
-    #[track_caller]
-    pub fn debug_buffer(&self);
     pub fn has_any_constraint_recovery(&self) -> bool;
     pub fn max_recovery_mode(&self) -> ConstraintRecoveryMode;
     pub fn with_constraint_recovery_mode_max<T>(&self, mode: ConstraintRecoveryMode, scope: impl FnOnce() -> T) -> T;
@@ -56,6 +54,10 @@ delegate_to_constraint_writer! {
     pub fn last_line_len(&self) -> HPos;
     pub fn line(&self) -> u32;
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T;
+
+    #[allow(unused)]
+    #[track_caller]
+    pub fn debug_buffer(&self);
 }
 
 impl SourceFormatter {

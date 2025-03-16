@@ -23,10 +23,17 @@ pub enum WidthLimit {
 }
 
 impl WidthLimit {
-    fn end(&self) -> HPos {
+    fn end(self) -> HPos {
         match self {
             WidthLimit::SingleLine { end } => end.get(),
             WidthLimit::FirstLine { end, .. } => end.get(),
+        }
+    }
+
+    pub fn is_applicable(self, at_line: u32) -> bool {
+        match self {
+            WidthLimit::SingleLine { .. } => true,
+            WidthLimit::FirstLine { line, .. } => line == at_line,
         }
     }
 }
@@ -169,7 +176,7 @@ impl Constraints {
         shape: VerticalShape,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        if self.vertical_shape() >= shape {
+        if shape == VerticalShape::SingleLine || self.vertical_shape() >= shape {
             return scope();
         }
         self.with_replace_vertical_shape(VerticalShape::SingleLine, scope)

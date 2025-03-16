@@ -32,14 +32,14 @@ pub struct ConstraintWriter {
 impl ConstraintWriter {
     pub fn new(
         constraints: Constraints,
-        error_emitter: Rc<BufferedErrorEmitter>,
+        errors: Rc<BufferedErrorEmitter>,
         capacity: usize,
     ) -> ConstraintWriter {
         ConstraintWriter {
             constraints,
             buffer: Cell::new(String::with_capacity(capacity)),
             constraint_recovery_mode: Cell::new(ConstraintRecoveryMode::Nothing),
-            errors: error_emitter,
+            errors,
             last_line_start: Cell::new(0),
             last_width_exceeded_line: Cell::new(None),
             line: Cell::new(0),
@@ -80,13 +80,18 @@ impl ConstraintWriter {
     pub fn has_any_constraint_recovery(&self) -> bool {
         match self.constraint_recovery_mode.get() {
             ConstraintRecoveryMode::Nothing => false,
+            // todo doesn't make sense
             ConstraintRecoveryMode::NewlineNotAllowed => true,
             ConstraintRecoveryMode::NewlineNotAllowedOrMaxWidthExceeded { .. } => true,
         }
     }
 
-    pub fn is_enforcing_max_width(&self) -> bool {
-        if self.constraints.width_limit().is_some() {
+    pub fn is_enforcing_width(&self) -> bool {
+        if self
+            .constraints
+            .width_limit()
+            .is_some_and(|limit| limit.is_applicable(self.line()))
+        {
             return true;
         }
         match self.constraint_recovery_mode.get() {
@@ -135,7 +140,7 @@ impl ConstraintWriter {
         }
         // If there is a fallback formatting strategy, then raise an error to trigger the
         // fallback. Otherwise, emit an error and keep going.
-        if self.is_enforcing_max_width() {
+        if self.is_enforcing_width() {
             Err(
                 ConstraintError::new(ConstraintErrorKind::WidthLimitExceeded),
             )
@@ -179,6 +184,7 @@ impl ConstraintWriter {
     }
 
     #[track_caller]
+    #[allow(unused)]
     pub fn debug_buffer(&self) {
         let location = Location::caller();
         self.with_taken_buffer(|b| {
