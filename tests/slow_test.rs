@@ -1,7 +1,7 @@
 #![feature(rustc_private)]
 
-use myrustfmt::format_str;
 use myrustfmt::config::Config;
+use myrustfmt::format_str;
 
 // https://github.com/rust-lang/rustfmt/issues/4867
 #[test]

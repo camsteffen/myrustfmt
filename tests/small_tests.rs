@@ -1,14 +1,14 @@
 #![feature(rustc_private)]
 #![feature(str_split_inclusive_remainder)]
 
-use std::error::Error;
+use myrustfmt::config::Config;
+use myrustfmt::format_str;
 use serde::Deserialize;
+use std::error::Error;
 use std::fs;
 use std::io::BufReader;
 use std::path::Path;
 use tracing_subscriber::EnvFilter;
-use myrustfmt::config::Config;
-use myrustfmt::format_str;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -78,10 +78,11 @@ fn small_test_file_rs(test_source_path: &Path) -> TestResult {
     }
     match lines_peekable.peek().copied() {
         Some("\n") => {}
-        next => return Err(
-            format!("expected a blank line after header comments, found {next:?}")
-                .into(),
-        ),
+        next => {
+            return Err(
+                format!("expected a blank line after header comments, found {next:?}").into(),
+            );
+        }
     }
     let Some(test_kind_raw) = test_kind else {
         return Err("expected test-kind".into());
@@ -207,9 +208,17 @@ enum TestKind {
     /// a max width that is just one character smaller than the width required for the "before"
     /// string. The result should equal the "after" string. Also, the "before" string is formatted
     /// with exactly a large enough max width to test that it is not changed.
-    Breakpoint { before: String, after: String },
-    NoChange { formatted: String },
-    BeforeAfter { before: String, after: String },
+    Breakpoint {
+        before: String,
+        after: String,
+    },
+    NoChange {
+        formatted: String,
+    },
+    BeforeAfter {
+        before: String,
+        after: String,
+    },
 }
 
 enum TestKindRaw {
@@ -292,15 +301,19 @@ fn format_in_block(stmt: &str, max_width: Option<u16>) -> TestResult<(String, u3
     let result = result.formatted;
     let lines = result
         .strip_prefix(prefix)
-        .unwrap_or_else(|| panic!(
-            "formatted output does not have expected prefix: {:?}",
-            result
-        ))
+        .unwrap_or_else(|| {
+            panic!(
+                "formatted output does not have expected prefix: {:?}",
+                result
+            )
+        })
         .strip_suffix(suffix)
-        .unwrap_or_else(|| panic!(
-            "formatted output does not have expected suffix: {:?}",
-            result
-        ))
+        .unwrap_or_else(|| {
+            panic!(
+                "formatted output does not have expected suffix: {:?}",
+                result
+            )
+        })
         .lines();
     let mut out = String::new();
     for (i, line) in lines.enumerate() {
@@ -325,8 +338,5 @@ fn expect_formatted_equals(formatted: &str, expected: &str, name: &str) -> TestR
             diff::Result::Both(s, _) => println!("  {s}"),
         }
     }
-    Err(
-        format!("\"{name}\" formatted does not match expected")
-            .into(),
-    )
+    Err(format!("\"{name}\" formatted does not match expected").into())
 }
