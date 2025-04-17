@@ -1,7 +1,7 @@
 use std::num::NonZero;
 use crate::ast_formatter::AstFormatter;
 use crate::constraints::{Constraints, VerticalShape, WidthLimit};
-use crate::error::{FormatResult, WidthLimitExceededError};
+use crate::error::{ConstraintErrorKind, FormatResult, WidthLimitExceededError};
 use crate::num::HPos;
 
 macro_rules! delegate_to_constraints {
@@ -24,10 +24,7 @@ delegate_to_constraints! {
     
     // vertical shape
     pub fn vertical_shape(&self) -> VerticalShape;
-    pub fn with_single_line<T>(&self, format: impl FnOnce() -> T) -> T;
-    pub fn with_single_line_opt<T>(&self, apply: bool, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
     pub fn with_replace_vertical_shape<T>(&self, vertical_shape: VerticalShape, scope: impl FnOnce() -> T) -> T;
-    pub fn with_vertical_shape_min<T>(&self, shape: VerticalShape, scope: impl FnOnce() -> T) -> T;
     pub fn has_vertical_shape<T>(&self, shape: VerticalShape, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
     pub fn has_vertical_shape_unless<T>(&self, shape: VerticalShape, condition: bool, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
 }
@@ -35,6 +32,41 @@ delegate_to_constraints! {
 impl AstFormatter {
     pub fn constraints(&self) -> &Constraints {
         self.out.constraints()
+    }
+    
+    pub fn with_single_line<T>(&self, format: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
+        match self.constraints().with_replace_vertical_shape(VerticalShape::SingleLine, format) {
+            Err(mut e) if e.kind == ConstraintErrorKind::NewlineNotAllowed => {
+                e.kind = ConstraintErrorKind::NextStrategy;
+                Err(e)
+            }
+            result => result,
+        }
+    }
+
+    pub fn with_single_line_opt<T>(
+        &self,
+        apply: bool,
+        scope: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
+        if !apply {
+            return scope();
+        }
+        self.with_single_line(scope)
+    }
+
+    /// Requires the given scope to conform to the given VerticalShape
+    pub fn with_vertical_shape_min<T>(&self, shape: VerticalShape, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
+        if self.vertical_shape() <= shape {
+            return scope();
+        }
+        match self.constraints().with_replace_vertical_shape(shape, scope) {
+            Err(mut e) if e.kind == ConstraintErrorKind::NewlineNotAllowed => {
+                e.kind = ConstraintErrorKind::NextStrategy;
+                Err(e)
+            }
+            result => result,
+        }
     }
 
     pub fn with_width_limit<T>(

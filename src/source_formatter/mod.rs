@@ -28,7 +28,7 @@ pub struct SourceFormatter {
     source: SourceReader,
     out: ConstraintWriter,
     /// The number of spaces for the current level of indentation
-    pub indent: Cell<HPos>,
+    pub total_indent: Cell<HPos>,
 }
 
 macro_rules! delegate_to_constraint_writer {
@@ -74,7 +74,7 @@ impl SourceFormatter {
             error_emitter,
             source: SourceReader::new(path, source),
             out,
-            indent: Cell::new(0),
+            total_indent: Cell::new(0),
         }
     }
 
@@ -197,7 +197,7 @@ impl SourceFormatter {
 
     pub fn last_line_is_closers(&self) -> bool {
         self.with_last_line(|line| {
-            let after_indent = &line[self.indent.get().try_into().unwrap()..];
+            let after_indent = &line[self.total_indent.get().try_into().unwrap()..];
             after_indent.chars().all(is_closer_char)
         })
     }

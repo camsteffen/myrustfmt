@@ -1,13 +1,32 @@
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::constraints::VerticalShape;
 use crate::error::FormatResult;
+use crate::source_formatter::SourceFormatter;
 use crate::util::cell_ext::CellExt;
 
+pub struct IndentGuard<'a> {
+    out: &'a SourceFormatter
+}
+
+impl Drop for IndentGuard<'_> {
+    fn drop(&mut self) {
+        if !std::thread::panicking() {
+            self.out.total_indent.set(self.out.total_indent.get() - INDENT_WIDTH);
+        }
+    }
+}
+
 impl AstFormatter {
+    pub fn begin_indent(&self) -> IndentGuard<'_> {
+        let out = &self.out;
+        out.total_indent.set(out.total_indent.get() + INDENT_WIDTH);
+        IndentGuard {out }
+    }
+    
     pub fn indented<T>(&self, format: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        let indent = self.out.indent.get() + INDENT_WIDTH;
+        let indent = self.out.total_indent.get() + INDENT_WIDTH;
         self.out
-            .indent
+            .total_indent
             .with_replaced(indent, || match self.vertical_shape() {
                 // SingleLine must be preserved
                 VerticalShape::SingleLine | VerticalShape::Unrestricted => format(),

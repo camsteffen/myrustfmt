@@ -36,7 +36,7 @@ impl AstFormatter {
         if attrs.iter().any(is_rustfmt_skip) {
             self.with_replace_width_limit(None, || self.out.copy_span(span))?;
             self.tail(tail)?;
-        } else if !self.out.has_any_constraint_recovery() {
+        } else if !self.out.has_any_constraint_recovery() || true {
             // todo don't do this in expr list item, when max width is not enforced
             self.with_copy_span_fallback(span, format, tail)?;
         } else {
@@ -62,15 +62,26 @@ impl AstFormatter {
             return Ok(());
         };
         match e.kind {
-            ConstraintErrorKind::NewlineNotAllowed => {
+            ConstraintErrorKind::LineCommentNotAllowed => {
                 let (line, col) = self.out.line_col();
                 // todo emit a more appropriate error for bad comments
-                self.errors.newline_not_allowed(line, col);
+                println!("{}", e.backtrace);
+                self.errors.line_comment_not_allowed(line, col);
+            }
+            ConstraintErrorKind::MultiLineCommentNotAllowed => {
+                let (line, col) = self.out.line_col();
+                // todo emit a more appropriate error for bad comments
+                self.errors.multi_line_comment_not_allowed(line, col);
+            }
+            ConstraintErrorKind::NewlineNotAllowed => {
+                return Err(e);
             }
             // width limit errors are emitted before the error value is returned
-            ConstraintErrorKind::WidthLimitExceeded => {}
+            ConstraintErrorKind::WidthLimitExceeded => {
+                return Err(e);
+            }
             // unexpected
-            ConstraintErrorKind::NextStrategy => return Err(e.into()),
+            ConstraintErrorKind::NextStrategy => return Err(e),
         }
         #[cfg(debug_assertions)]
         assert!(self.errors.error_count() > error_count_before, "an error should be emitted before copy fallback\nstack trace:\n{}", e.backtrace);

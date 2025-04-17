@@ -100,7 +100,7 @@ impl AstFormatter {
             }
             None => format_item(index),
         };
-        self.embraced_after_opening(close_brace, || {
+        self.enclosed_after_opening(close_brace, || {
             let (first, rest) = (0, 1..len);
             format_item(first)?;
             self.out.token_maybe_missing(",")?;
@@ -121,6 +121,7 @@ impl AstFormatter {
                         item_comma()?;
                         Ok(())
                     })
+                    .unless_too_wide()
                     .otherwise(|| {
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         item_comma()?;
@@ -150,7 +151,7 @@ impl AstFormatter {
     ) -> FormatResult {
         let comma = self.tail_fn(|af| af.out.token_maybe_missing(","));
         let item_comma = |index| format_item(index, &comma);
-        self.embraced_after_opening(close_brace, || {
+        self.enclosed_after_opening(close_brace, || {
             match rest {
                 ListRest::None => {
                     for index in 0..len - 1 {

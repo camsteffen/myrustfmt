@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::constraint_writer::ConstraintRecoveryMode;
-use crate::error::FormatResult;
+use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::source_formatter::checkpoint::Checkpoint;
 
 impl AstFormatter {
@@ -39,10 +39,12 @@ pub struct Backtrack<'a, T = ()> {
     state: BacktrackState<'a, T>,
 }
 
+#[derive(Default)]
 enum BacktrackState<'a, T> {
+    #[default]
     Init,
     Incomplete(Checkpoint<'a>),
-    Done(T),
+    Done(Checkpoint<'a>, FormatResult<T>),
 }
 
 impl<T> Backtrack<'_, T> {
@@ -66,15 +68,23 @@ impl<T> Backtrack<'_, T> {
         mode: ConstraintRecoveryMode,
         strategy: impl FnOnce() -> FormatResult<T>,
     ) {
-        if let BacktrackState::Init = self.state {
-            self.state = BacktrackState::Incomplete(self.af.out.checkpoint());
+        match self.state {
+            BacktrackState::Init => {
+                self.state = BacktrackState::Incomplete(self.af.out.checkpoint());
+            }
+            BacktrackState::Incomplete(ref checkpoint) => {
+                self.af.out.restore_checkpoint(checkpoint);
+            }
+            BacktrackState::Done(..) => return,
         }
-        if let BacktrackState::Incomplete(checkpoint) = &self.state {
-            let result = self.af.out.with_constraint_recovery_mode_max(mode, strategy);
-            match result {
-                // restore the checkpoint before continuing to the next formatting strategy
-                Err(_) => self.af.out.restore_checkpoint(checkpoint),
-                Ok(value) => self.state = BacktrackState::Done(value),
+        let result = self.af.out.with_constraint_recovery_mode_max(mode, strategy);
+        match result {
+            Err(e) if e.kind == ConstraintErrorKind::NextStrategy => {}
+            _ => {
+                let BacktrackState::Incomplete(checkpoint) = std::mem::take(&mut self.state) else {
+                    unreachable!()
+                };
+                self.state = BacktrackState::Done(checkpoint, result);
             }
         }
     }
@@ -97,8 +107,31 @@ impl<T> Backtrack<'_, T> {
     /// This is a required terminal operation.
     pub fn otherwise(self, strategy: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         match self.state {
-            BacktrackState::Init | BacktrackState::Incomplete(_) => strategy(),
-            BacktrackState::Done(result) => Ok(result),
+            BacktrackState::Init => strategy(),
+            BacktrackState::Incomplete(checkpoint) => {
+                self.af.out.restore_checkpoint(&checkpoint);
+                strategy()
+            }
+            BacktrackState::Done(_, result) => result,
         }
+    }
+
+    // todo handle bad block comments here?
+    pub fn unless_multi_line(self) -> Self {
+        self.filter_err_is(ConstraintErrorKind::NewlineNotAllowed)
+    }
+    
+    pub fn unless_too_wide(self) -> Self {
+        self.filter_err_is(ConstraintErrorKind::WidthLimitExceeded)
+    }
+    
+    fn filter_err_is(mut self, kind: ConstraintErrorKind) -> Self {
+        match self.state {
+            BacktrackState::Done(checkpoint, Err(e)) if e.kind == kind => {
+                self.state = BacktrackState::Incomplete(checkpoint);
+            }
+            _ => {}
+        }
+        self
     }
 }

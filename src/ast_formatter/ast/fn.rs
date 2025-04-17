@@ -113,6 +113,8 @@ impl AstFormatter {
                             self.expr_tail(body, tail)
                         })
                     })
+                    .unless_too_wide()
+                    .unless_multi_line()
                     .otherwise(|| {
                         self.expr_add_block(body)?;
                         self.tail(tail)?;
@@ -190,6 +192,7 @@ impl AstFormatter {
         // args and return type all on one line
         self.backtrack()
             .next(do_single_line)
+            .unless_too_wide()
             // args on separate lines
             .otherwise(|| {
                 params.format_vertical(self)?;

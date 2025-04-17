@@ -1,4 +1,4 @@
-use crate::error::FormatResult;
+use crate::error::{ConstraintErrorKind, FormatResult};
 use std::cell::Cell;
 use std::num::NonZero;
 use crate::num::HPos;
@@ -117,21 +117,6 @@ impl Constraints {
 
     // effects
 
-    pub fn with_single_line<T>(&self, format: impl FnOnce() -> T) -> T {
-        self.with_replace_vertical_shape(VerticalShape::SingleLine, format)
-    }
-
-    pub fn with_single_line_opt<T>(
-        &self,
-        apply: bool,
-        scope: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        if !apply {
-            return scope();
-        }
-        self.with_single_line(scope)
-    }
-
     pub fn with_width_limit<T>(&self, width_limit: WidthLimit, scope: impl FnOnce() -> T) -> T {
         if matches!(width_limit, WidthLimit::SingleLine { .. }) {
             debug_assert_eq!(self.vertical_shape(), VerticalShape::SingleLine);
@@ -156,14 +141,6 @@ impl Constraints {
         scope: impl FnOnce() -> T,
     ) -> T {
         self.vertical_shape.with_replaced(vertical_shape, scope)
-    }
-
-    /// Requires the given scope to conform to the given VerticalShape
-    pub fn with_vertical_shape_min<T>(&self, shape: VerticalShape, scope: impl FnOnce() -> T) -> T {
-        if self.vertical_shape() <= shape {
-            return scope();
-        }
-        self.with_replace_vertical_shape(shape, scope)
     }
 
     /// Declares that the output in the given scope is known to have the given VerticalShape,

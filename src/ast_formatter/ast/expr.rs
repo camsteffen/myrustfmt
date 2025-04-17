@@ -227,7 +227,7 @@ impl AstFormatter {
                             // If it's too wide, adding a block won't help.
                             // The block is only for ensuring a "hanging indent"-compliant shape.
                             .next_with_constraint_recovery_mode(
-                                ConstraintRecoveryMode::NewlineNotAllowed,
+                                ConstraintRecoveryMode::Newline,
                                 || af.with_vertical_shape_min(VerticalShape::HangingIndent, format),
                             )
                             .otherwise(|| {
@@ -274,6 +274,7 @@ impl AstFormatter {
                 self.tail(tail)?;
                 Ok(())
             })
+            .unless_too_wide()
             .otherwise(|| {
                 self.has_vertical_shape(VerticalShape::HangingIndent, || {
                     self.indented(|| {
@@ -297,8 +298,9 @@ impl AstFormatter {
                 self.tail(tail)?;
                 Ok(())
             })
+            .unless_too_wide()
             .otherwise(|| {
-                self.embraced_after_opening(")", || self.expr(inner))?;
+                self.enclosed_after_opening(")", || self.expr(inner))?;
                 self.tail(tail)?;
                 Ok(())
             })?;
@@ -367,11 +369,8 @@ impl AstFormatter {
 
     pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
         let mut list = self.expr_list(Braces::PARENS, args);
-        let width_limit_applies = match args {
-            [arg] => !matches!(arg.kind, ast::ExprKind::Closure(_)),
-            _ => true,
-        };
-        if width_limit_applies {
+        let is_only_closure = args.len() == 1 && matches!(args[0].kind, ast::ExprKind::Closure(_));
+        if !is_only_closure {
             list = list.single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
         }
         list.omit_open_brace().tail(tail).format(self)
@@ -449,7 +448,7 @@ impl AstFormatter {
             Ok(())
         };
 
-        self.backtrack().next_opt(single_line).otherwise(multi_line)
+        self.backtrack().next_opt(single_line).unless_too_wide().otherwise(multi_line)
     }
 
     pub fn token_expr_open_brace(

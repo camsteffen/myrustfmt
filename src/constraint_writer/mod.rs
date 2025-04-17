@@ -15,8 +15,9 @@ use crate::num::HPos;
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum ConstraintRecoveryMode {
     Nothing,
-    NewlineNotAllowed,
-    NewlineNotAllowedOrMaxWidthExceeded { line: u32 },
+    Newline,
+    MaxWidth { line: u32 },
+    // MultiLineComment,
 }
 
 pub struct ConstraintWriter {
@@ -81,8 +82,8 @@ impl ConstraintWriter {
         match self.constraint_recovery_mode.get() {
             ConstraintRecoveryMode::Nothing => false,
             // todo doesn't make sense
-            ConstraintRecoveryMode::NewlineNotAllowed => true,
-            ConstraintRecoveryMode::NewlineNotAllowedOrMaxWidthExceeded { .. } => true,
+            ConstraintRecoveryMode::Newline => true,
+            ConstraintRecoveryMode::MaxWidth { .. } => true,
         }
     }
 
@@ -96,8 +97,8 @@ impl ConstraintWriter {
         }
         match self.constraint_recovery_mode.get() {
             ConstraintRecoveryMode::Nothing => false,
-            ConstraintRecoveryMode::NewlineNotAllowed => false,
-            ConstraintRecoveryMode::NewlineNotAllowedOrMaxWidthExceeded { line } => {
+            ConstraintRecoveryMode::Newline => false,
+            ConstraintRecoveryMode::MaxWidth { line } => {
                 line == self.line()
             }
         }
@@ -148,7 +149,7 @@ impl ConstraintWriter {
             let line = self.line.get();
             if self.last_width_exceeded_line.get() != Some(line) {
                 self.last_width_exceeded_line.set(Some(line));
-                self.with_last_line(|line_str| self.errors.width_exceeded(line, line_str));
+                self.errors.max_width_exceeded(line);
             }
             Ok(())
         }
@@ -180,7 +181,7 @@ impl ConstraintWriter {
 
     // todo rename
     pub fn max_recovery_mode(&self) -> ConstraintRecoveryMode {
-        ConstraintRecoveryMode::NewlineNotAllowedOrMaxWidthExceeded { line: self.line() }
+        ConstraintRecoveryMode::MaxWidth { line: self.line() }
     }
 
     #[track_caller]

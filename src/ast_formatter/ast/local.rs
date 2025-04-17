@@ -79,6 +79,7 @@ impl AstFormatter {
             };
             self.backtrack()
                 .next_opt(else_block_horizontal)
+                .unless_too_wide()
                 .otherwise(else_block_vertical)?;
             Ok(())
         };
@@ -94,6 +95,7 @@ impl AstFormatter {
                 is_single_line_init || self.out.last_line_is_closers(),
                 same_line_else,
             )
+            .unless_too_wide()
             .otherwise(next_line_else)?;
         Ok(())
     }

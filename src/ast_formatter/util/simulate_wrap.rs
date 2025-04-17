@@ -1,4 +1,5 @@
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
+use crate::constraints::VerticalShape;
 
 impl AstFormatter {
     /// 1. Adds a single-line constraint.
@@ -22,14 +23,14 @@ impl AstFormatter {
     pub fn simulate_wrap_indent_first_line<T>(&self, scope: impl FnOnce() -> T) -> (bool, T) {
         let start = self.out.last_line_len();
         // the starting position if we wrapped to the next line and indented
-        let next_line_start = self.out.indent.get() + INDENT_WIDTH;
+        let next_line_start = self.out.total_indent.get() + INDENT_WIDTH;
         let Some(extra_width) = start.checked_sub(next_line_start).filter(|&w| w > 0) else {
-            let result = self.with_single_line(scope);
+            let result = self.with_replace_vertical_shape(VerticalShape::SingleLine, scope);
             return (false, result);
         };
         let max_width_prev = self.out.current_max_width();
         let max_width = max_width_prev.saturating_add(extra_width);
-        let result = self.with_single_line(|| self.with_replace_max_width(max_width, scope));
+        let result = self.with_replace_vertical_shape(VerticalShape::SingleLine, || self.with_replace_max_width(max_width, scope));
         let used_extra_width = self.out.last_line_len() > max_width_prev;
         (used_extra_width, result)
     }

@@ -101,22 +101,18 @@ impl AstFormatter {
             return Ok(false);
         }
         self.out.token(":")?;
-        self.backtrack()
-            .next(|| {
-                self.out.space()?;
-                // todo single line?
-                self.generic_bounds(bounds, Tail::none())?;
-                Ok(false)
-            })
-            .otherwise(|| {
-                self.indented(|| {
-                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                    self.generic_bounds(bounds, Tail::none())?;
-                    Ok(())
-                })?;
-                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                Ok(true)
-            })
+        let indent_guard = self.space_or_wrap_indent_then(|| {
+            // todo single line?
+            self.generic_bounds(bounds, Tail::none())?;
+            Ok(())
+        })?;
+        if let Some(indent_guard) = indent_guard {
+            drop(indent_guard);
+            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     pub fn generic_bounds(&self, bounds: &[ast::GenericBound], tail: &Tail) -> FormatResult {

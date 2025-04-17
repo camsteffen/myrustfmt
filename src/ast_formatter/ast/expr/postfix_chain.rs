@@ -29,7 +29,7 @@ impl AstFormatter {
 
         // items that start within the first indent-width on the first line
         let mut chain_iter = chain.iter();
-        let indent_margin = self.out.indent.get() + INDENT_WIDTH;
+        let indent_margin = self.out.total_indent.get() + INDENT_WIDTH;
         let multi_line_root = loop {
             let next = chain_iter.next().unwrap();
             if chain_iter.as_slice().is_empty() {
@@ -51,6 +51,7 @@ impl AstFormatter {
         } else {
             self.backtrack()
                 .next(|| self.postfix_chain_single_line_with_overflow(chain_rest, start_pos, tail))
+                .unless_too_wide()
                 .otherwise(|| {
                     self.has_vertical_shape(VerticalShape::HangingIndent, || {
                         self.indented(|| self.postfix_chain_vertical(chain_rest, tail))
@@ -222,8 +223,9 @@ impl AstFormatter {
                                 Ok(())
                             })
                         })
+                        .unless_too_wide()
                         .otherwise(|| {
-                            self.embraced_after_opening("]", || self.expr(index))?;
+                            self.enclosed_after_opening("]", || self.expr(index))?;
                             self.tail(tail)?;
                             Ok(())
                         })?;

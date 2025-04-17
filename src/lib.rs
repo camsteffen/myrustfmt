@@ -1,5 +1,7 @@
 #![feature(rustc_private)]
+#![feature(let_chains)]
 #![feature(precise_capturing_in_traits)]
+#![feature(slice_take)]
 #![feature(unqualified_local_imports)]
 // Uncomment to let clippy babble (with some overrides made below)
 // #![warn(clippy::pedantic)]
@@ -27,6 +29,7 @@ extern crate rustc_parse;
 extern crate rustc_session;
 extern crate rustc_span;
 extern crate thin_vec;
+extern crate core;
 
 mod ast_formatter;
 mod ast_module;

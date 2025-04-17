@@ -25,6 +25,7 @@ impl AstFormatter {
                 .next_if(self.out.line() == first_line, || {
                     self.arm_guard_same_line(arm, guard)
                 })
+                .unless_too_wide()
                 .otherwise(|| self.arm_guard_separate_line(arm, guard))?;
         } else if let Some(body) = arm.body.as_deref() {
             self.pat_tail(
@@ -106,26 +107,26 @@ impl AstFormatter {
             AddBlock,
             Normal,
         }
-        let result = self.out.with_enforce_max_width(|| -> FormatResult<_> {
+        let result = self.out.with_enforce_max_width(|| {
             // simulate having extra width if we had added a block
             let (used_extra_width, result) =
                 self.simulate_wrap_indent_first_line(|| self.expr(body));
             if used_extra_width {
                 // Formatting on the same line _might_ be possible,
                 // but adding a block allows for a longer first line.
-                return Ok(Next::AddBlock);
+                return Next::AddBlock;
             }
             if result.is_err() {
                 // We did not use the extra width, and it did not fit on one line,
                 // so try again to format on the same line without the extra width.
-                return Ok(Next::Normal);
+                return Next::Normal;
             }
             // it fits on one line, but now we need a comma (if we're not adding a block)
             if self.out.token_insert(",").is_err() {
-                return Ok(Next::AddBlock);
+                return Next::AddBlock;
             }
-            Ok(Next::Done)
-        })?;
+            Next::Done
+        });
         match result {
             Next::Done => {}
             Next::AddBlock => {
@@ -133,7 +134,6 @@ impl AstFormatter {
                 self.expr_add_block(body)?;
             }
             Next::Normal => {
-                self.out.restore_checkpoint(&checkpoint);
                 // todo closures and structs should have single-line headers
                 // todo exclude comma for block-like expressions?
                 self.backtrack_from_checkpoint(checkpoint)

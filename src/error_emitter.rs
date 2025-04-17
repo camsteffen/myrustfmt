@@ -5,8 +5,9 @@ use crate::util::cell_ext::{CellExt, CellNumberExt};
 
 #[derive(Debug)]
 pub enum Error {
-    NewlineNotAllowed { line: u32, col: HPos },
-    WidthLimitExceeded { line: u32, line_string: String },
+    LineCommentNotAllowed { line: u32, col: HPos },
+    MaxWidthExceeded { line: u32 },
+    MultiLineCommentNotAllowed { line: u32, col: HPos },
 }
 
 pub struct BufferedErrorEmitter {
@@ -78,25 +79,32 @@ impl BufferedErrorEmitter {
 
     // actual errors
 
-    pub fn newline_not_allowed(&self, line: u32, col: HPos) {
+    pub fn line_comment_not_allowed(&self, line: u32, col: HPos) {
         if self.is_buffering() {
-            self.buffer.with_taken(|b| b.push(Error::NewlineNotAllowed { line, col }));
+            self.buffer(Error::LineCommentNotAllowed { line, col });
         } else {
-            self.emitter.newline_not_allowed(line, col);
+            self.emitter.line_comment_not_allowed(line, col);
         }
     }
 
-    pub fn width_exceeded(&self, line: u32, line_str: &str) {
+    pub fn max_width_exceeded(&self, line: u32) {
         if self.is_buffering() {
-            self.buffer(Error::WidthLimitExceeded {
+            self.buffer(Error::MaxWidthExceeded {
                 line,
-                line_string: line_str.to_owned(),
             });
         } else {
-            self.emitter.width_exceeded(line, line_str);
+            self.emitter.width_exceeded(line);
         }
     }
-
+    
+    pub fn multi_line_comment_not_allowed(&self, line: u32, col: HPos) {
+        if self.is_buffering() {
+            self.buffer(Error::MultiLineCommentNotAllowed { line, col });
+        } else {
+            self.emitter.multi_line_comment_not_allowed(line, col);
+        }
+    }
+    
     // private
 
     #[track_caller]
@@ -114,10 +122,11 @@ impl BufferedErrorEmitter {
 
     fn emit(&self, error: Error) {
         match error {
-            Error::NewlineNotAllowed { line, col } => self.emitter.newline_not_allowed(line, col),
-            Error::WidthLimitExceeded { line, line_string } => {
-                self.emitter.width_exceeded(line, &line_string)
+            Error::LineCommentNotAllowed { line, col } => self.emitter.line_comment_not_allowed(line, col),
+            Error::MaxWidthExceeded { line, } => {
+                self.emitter.width_exceeded(line, )
             }
+            Error::MultiLineCommentNotAllowed { line, col } => self.emitter.multi_line_comment_not_allowed(line, col),
         }
     }
 
@@ -143,29 +152,36 @@ impl ErrorEmitter {
         }
     }
 
-    pub fn error_count(&self) -> u32 {
+    fn error_count(&self) -> u32 {
         self.error_count.get()
     }
 
-    pub fn newline_not_allowed(&self, line: u32, col: HPos) {
+    pub fn line_comment_not_allowed(&self, line: u32, col: HPos) {
         self.error_count.increment();
-        let (line, col) = (line + 1, col + 1);
-        eprint!("Newline character not allowed at ");
-        match &self.path {
-            None => eprintln!("{line}:{col}"),
-            Some(path) => eprintln!("{}:{line}:{col}", path.display()),
-        }
+        eprint!("Line comment not allowed");
+        self.at(line, col);
+    }
+        
+    pub fn multi_line_comment_not_allowed(&self, line: u32, col: HPos) {
+        self.error_count.increment();
+        eprint!("Multi-line comment not allowed");
+        self.at(line, col);
     }
 
-    pub fn width_exceeded(&self, line: u32, line_str: &str) {
+    fn width_exceeded(&self, line: u32) {
         self.error_count.increment();
         eprint!("Max width exceeded at ");
         match &self.path {
             None => eprintln!("line {line}"),
             Some(path) => eprintln!("{}:{line}", path.display()),
         }
-        if cfg!(debug_assertions) {
-            eprintln!("line: {line_str}");
+    }
+    
+    fn at(&self, line: u32, col: HPos) {
+        let (line, col) = (line + 1, col + 1);
+        match &self.path {
+            None => eprintln!(" at {line}:{col}"),
+            Some(path) => eprintln!(" at {}:{line}:{col}", path.display()),
         }
     }
 }

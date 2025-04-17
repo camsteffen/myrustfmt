@@ -13,6 +13,18 @@ impl SourceFormatter {
             space_if_horizontal: false,
         })
     }
+    
+    pub fn space_or_break(&self) -> FormatResult {
+        let first_line = self.line();
+        self.whitespace_and_comments(WhitespaceMode::Flexible {
+            vertical_mode: VerticalWhitespaceMode::Break,
+            space_if_horizontal: true,
+        })?;
+        if self.out.line() != first_line {
+            self.indent();
+        }
+        Ok(())
+    }
 
     /// Skip over whitespace, allow horizontal comments, disallow newlines.
     /// In other words, usually do nothing but allow for comments.
@@ -23,7 +35,7 @@ impl SourceFormatter {
     }
 
     pub fn indent(&self) {
-        self.out.spaces(self.indent.get());
+        self.out.spaces(self.total_indent.get());
     }
 
     /// Write a newline, allow comments
@@ -102,7 +114,10 @@ impl SourceFormatter {
                     return Err(ConstraintErrorKind::NewlineNotAllowed.into());
                 }
                 WhitespaceAction::LineCommentNotAllowed => {
-                    return Err(ConstraintErrorKind::NewlineNotAllowed.into());
+                    return Err(ConstraintErrorKind::LineCommentNotAllowed.into());
+                }
+                WhitespaceAction::MultiLineCommentNotAllowed => {
+                    return Err(ConstraintErrorKind::MultiLineCommentNotAllowed.into());
                 }
                 WhitespaceAction::Skip => self.source.advance(len),
             }
@@ -150,6 +165,7 @@ enum WhitespaceAction {
     EmitNewline { double: bool, indent: bool },
     EmitSpace,
     LineCommentNotAllowed,
+    MultiLineCommentNotAllowed,
     NewlineNotAllowed { distance: u32 },
     Skip,
 }
@@ -187,18 +203,18 @@ fn actions_from_tokens<'a>(
             TokenKind::Whitespace => (false, false),
             _ => unreachable!(),
         };
-        let action = if mode.is_horizontal() && is_line_comment {
-            WhitespaceAction::LineCommentNotAllowed
-        } else if is_comment {
-            let mut result = WhitespaceAction::CopyComment;
+        let action = if is_comment {
             if mode.is_horizontal() {
-                if let Some(pos) = token_str.find('\n') {
-                    result = WhitespaceAction::NewlineNotAllowed {
-                        distance: pos.try_into().unwrap(),
-                    }
+                if is_line_comment {
+                    WhitespaceAction::LineCommentNotAllowed
+                } else if token_str.contains('\n') {
+                    WhitespaceAction::MultiLineCommentNotAllowed
+                } else {
+                    WhitespaceAction::CopyComment
                 }
+            } else {
+                WhitespaceAction::CopyComment
             }
-            result
         } else {
             let is_comments_after = tokens.peek().is_some();
             let strategy = whitespace_token_strategy(mode, seen_comments, is_comments_after);

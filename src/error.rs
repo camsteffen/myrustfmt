@@ -34,6 +34,8 @@ impl ConstraintError {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ConstraintErrorKind {
+    LineCommentNotAllowed,
+    MultiLineCommentNotAllowed,
     /// Returned when we know that there is a fallback strategy that is preferred
     NextStrategy,
     NewlineNotAllowed,
@@ -76,6 +78,8 @@ fn write_constraint_error(
 ) -> std::fmt::Result {
     write_error_formatting_at(f, source, pos, path)?;
     match e.kind {
+        ConstraintErrorKind::LineCommentNotAllowed => write!(f, "line comment not allowed")?,
+        ConstraintErrorKind::MultiLineCommentNotAllowed => write!(f, "multi-line comment not allowed")?,
         ConstraintErrorKind::NextStrategy => write!(f, "unhandled NextStrategy error")?,
         ConstraintErrorKind::NewlineNotAllowed => write!(f, "newline not allowed")?,
         ConstraintErrorKind::WidthLimitExceeded => write!(f, "width limit exceeded")?,

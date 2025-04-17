@@ -12,10 +12,10 @@ use crate::num::HPos;
 use crate::whitespace::VerticalWhitespaceMode;
 
 mod ast;
-mod util;
+pub mod backtrack;
 mod list;
 pub mod tail;
-pub mod backtrack;
+mod util;
 
 pub const INDENT_WIDTH: HPos = 4;
 

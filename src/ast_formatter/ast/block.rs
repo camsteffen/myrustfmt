@@ -34,6 +34,7 @@ impl AstFormatter {
                             Ok(())
                         })
                     })
+                    .unless_too_wide()
                     .otherwise(|| {
                         self.block_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))?;
                         self.tail(tail)?;
@@ -66,8 +67,8 @@ impl AstFormatter {
         format_item: impl Fn(&T) -> FormatResult,
     ) -> FormatResult {
         match items {
-            [] => self.embraced_empty_after_opening("}"),
-            [first, rest @ ..] => self.embraced_after_opening("}", || {
+            [] => self.enclosed_empty_after_opening("}"),
+            [first, rest @ ..] => self.enclosed_after_opening("}", || {
                 format_item(first)?;
                 for item in rest {
                     self.out.newline_indent(VerticalWhitespaceMode::Between)?;
@@ -112,7 +113,7 @@ impl AstFormatter {
     /// Wraps an expression in a multi-line block
     pub fn expr_add_block(&self, expr: &ast::Expr) -> FormatResult {
         self.out.token_insert("{")?;
-        self.embraced_inside(|| self.expr(expr))?;
+        self.enclosed_contents(|| self.expr(expr))?;
         self.out.token_insert("}")?;
         Ok(())
     }

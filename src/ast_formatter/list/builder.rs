@@ -181,7 +181,7 @@ where
             af.out.token(self.braces.start)?;
         }
         if self.list.is_empty() && self.rest.is_none() {
-            af.embraced_empty_after_opening(self.braces.end)?;
+            af.enclosed_empty_after_opening(self.braces.end)?;
             af.tail(self.tail)?;
             return Ok(());
         }
@@ -202,7 +202,8 @@ where
             if self.list.iter().any(ItemConfig::item_requires_own_line) {
                 return Ok(HorizontalResult::Skip);
             }
-            if self.contents_horizontal(af).is_err() {
+            let result1 = self.contents_horizontal(af);
+            if result1.is_err() {
                 return Ok(HorizontalResult::Fail);
             }
             // N.B. measure before writing the tail
@@ -215,11 +216,9 @@ where
 
         match result {
             HorizontalResult::Skip | HorizontalResult::Fail => {
-                if matches!(result, HorizontalResult::Fail) {
-                    af.out.restore_checkpoint(&checkpoint);
-                }
                 af.backtrack_from_checkpoint(checkpoint)
                     .next_opt(self.contents_wrap_to_fit_fn_opt(af))
+                    .unless_too_wide()
                     .otherwise(|| self.contents_vertical(af))?;
             }
             HorizontalResult::Ok { height: 1 } => {}

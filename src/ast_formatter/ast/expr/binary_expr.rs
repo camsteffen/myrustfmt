@@ -1,12 +1,12 @@
-use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::error::FormatResult;
 
 use crate::constraints::VerticalShape;
+use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 use rustc_ast::util::parser::AssocOp;
 use rustc_span::source_map::Spanned;
-use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn binary_expr(
@@ -19,59 +19,54 @@ impl AstFormatter {
         let (first, chain) = collect_binary_expr_chain(left, right, op);
         let first_line = self.out.line();
         self.expr(first)?;
-        self.backtrack()
-            // format all on one line, only if the first item fits in one line
-            .next_if(self.out.line() == first_line, || {
-                self.with_single_line(|| {
-                    for (op, expr) in &chain {
-                        self.out.space_token_space(op.as_str())?;
+        self.has_vertical_shape(VerticalShape::HangingIndent, || {
+            let mut chain = chain.as_slice();
+            let indent_margin = self.out.total_indent.get() + INDENT_WIDTH;
+            let indent_guard = loop {
+                let (op, expr) = if self.out.last_line_len() < indent_margin
+                    && let Some(next) = chain.split_off_first()
+                {
+                    next
+                } else {
+                    break None;
+                };
+                let indent_guard = self.space_or_wrap_indent_then(|| {
+                    self.out.token_space(op.as_str())?;
+                    self.expr(expr)?;
+                    Ok(())
+                })?;
+                if let Some(indent_guard) = indent_guard {
+                    break Some(indent_guard);
+                }
+            };
+            if chain.is_empty() {
+                drop(indent_guard);
+                return self.tail(tail);
+            }
+            self.backtrack()
+                // format all on one line, only if the first item fits in one line
+                .next_if(self.out.line() == first_line, || {
+                    self.with_single_line(|| {
+                        for (op, expr) in chain {
+                            self.out.space_token_space(op.as_str())?;
+                            self.expr(expr)?;
+                        }
+                        self.tail(tail)?;
+                        Ok(())
+                    })
+                })
+                .unless_too_wide()
+                .otherwise(|| {
+                    let _indent_guard = indent_guard.unwrap_or_else(|| self.begin_indent());
+                    for (op, expr) in chain {
+                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                        self.out.token_space(op.as_str())?;
                         self.expr(expr)?;
                     }
                     self.tail(tail)?;
                     Ok(())
                 })
-            })
-            .otherwise(|| {
-                self.has_vertical_shape(VerticalShape::HangingIndent, || {
-                    let mut iter = chain.iter();
-                    let mut within_margin = self.take_while_within_margin(iter.by_ref());
-                    loop {
-                        let Some((op, expr)) = within_margin.next() else {
-                            drop(within_margin);
-                            break;
-                        };
-                        let success = self
-                            .backtrack()
-                            .next(|| {
-                                self.out.space_token_space(op.as_str())?;
-                                self.expr(expr)?;
-                                Ok(true)
-                            })
-                            .otherwise(|| Ok(false))?;
-                        if !success {
-                            drop(within_margin);
-                            // back up one for a redo
-                            let index = chain.len() - iter.len() - 1;
-                            iter = chain[index..].iter();
-                            break;
-                        }
-                    }
-                    if iter.as_slice().is_empty() {
-                        // don't indent the tail in this case
-                        return self.tail(tail);
-                    }
-                    self.indented(|| {
-                        for (op, expr) in iter {
-                            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                            self.out.token_space(op.as_str())?;
-                            self.expr(expr)?;
-                        }
-                        self.tail(tail)?;
-                        Ok(())
-                    })?;
-                    Ok(())
-                })
-            })
+        })
     }
 }
 
