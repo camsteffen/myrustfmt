@@ -1,11 +1,11 @@
-use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
 use crate::constraints::VerticalShape;
 use crate::error::{ConstraintErrorKind, FormatResult};
-use rustc_ast::ast;
 use crate::num::HPos;
 use crate::whitespace::VerticalWhitespaceMode;
+use rustc_ast::ast;
 
 // In rustfmt, this is called chain_width, and is 60 by default
 const POSTFIX_CHAIN_MAX_WIDTH: HPos = 60;
@@ -24,15 +24,21 @@ struct PostfixItem<'a> {
 impl AstFormatter {
     pub fn postfix_chain(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
         let chain = build_postfix_chain(expr);
+        let mut chain = chain.as_slice();
         let start_pos = self.out.last_line_len();
         let first_line = self.out.line();
 
         // items that start within the first indent-width on the first line
-        let mut chain_iter = chain.iter();
         let indent_margin = self.out.total_indent.get() + INDENT_WIDTH;
         let multi_line_root = loop {
-            let next = chain_iter.next().unwrap();
-            if chain_iter.as_slice().is_empty() {
+            // let line_before_comments = self.out.line();
+            // self.out.comments(VerticalWhitespaceMode::Break)?;
+            // if self.out.line() != first_line {
+            //     // todo test
+            //     break line_before_comments != first_line;
+            // }
+            let next = chain.split_off_first().unwrap();
+            if chain.is_empty() {
                 return self.postfix_item_tail(next, tail, false);
             }
             self.has_vertical_shape(VerticalShape::Unrestricted, || self.postfix_item(next))?;
@@ -43,18 +49,27 @@ impl AstFormatter {
                 break false;
             }
         };
-        let chain_rest = chain_iter.as_slice();
+
+        // todo comments in between ALL items
+        let do_comments = || {
+            // todo test vertical shape
+            self.has_vertical_shape(VerticalShape::HangingIndent, || {
+                self.out.comments(VerticalWhitespaceMode::Break)
+            })
+        };
 
         if multi_line_root {
+            // todo comments here
             // no indent
-            self.postfix_chain_vertical(chain_rest, tail)
+            self.postfix_chain_vertical(chain, tail)
         } else {
             self.backtrack()
-                .next(|| self.postfix_chain_single_line_with_overflow(chain_rest, start_pos, tail))
+                .next(|| self.postfix_chain_single_line_with_overflow(chain, start_pos, tail))
                 .unless_too_wide()
+                .unless_multi_line()
                 .otherwise(|| {
                     self.has_vertical_shape(VerticalShape::HangingIndent, || {
-                        self.indented(|| self.postfix_chain_vertical(chain_rest, tail))
+                        self.indented(|| self.postfix_chain_vertical(chain, tail))
                     })
                 })
         }

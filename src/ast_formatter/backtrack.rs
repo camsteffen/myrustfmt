@@ -88,7 +88,7 @@ impl<T> Backtrack<'_, T> {
             }
         }
         // todo this is an experiment
-        self.filter_err_is(ConstraintErrorKind::WidthLimitExceeded);
+        self.remove_err_if(|e| e == ConstraintErrorKind::WidthLimitExceeded);
     }
 
     pub fn next_if(mut self, condition: bool, strategy: impl Fn() -> FormatResult<T>) -> Self {
@@ -118,20 +118,21 @@ impl<T> Backtrack<'_, T> {
         }
     }
 
-    // todo handle bad block comments here?
+    // todo triggering a fallback strategy may or may not correct the error
     pub fn unless_multi_line(mut self) -> Self {
-        self.filter_err_is(ConstraintErrorKind::NewlineNotAllowed);
+        self.remove_err_if(|e| e.is_multi_line_err());
         self
     }
 
+    // todo this should be implied?
     pub fn unless_too_wide(mut self) -> Self {
-        self.filter_err_is(ConstraintErrorKind::WidthLimitExceeded);
+        self.remove_err_if(|e| e == ConstraintErrorKind::WidthLimitExceeded);
         self
     }
 
-    fn filter_err_is(&mut self, kind: ConstraintErrorKind) {
+    fn remove_err_if(&mut self, pred: impl Fn(ConstraintErrorKind) -> bool) {
         self.state = match std::mem::take(&mut self.state) {
-            BacktrackState::Done(checkpoint, Err(e)) if e.kind == kind => {
+            BacktrackState::Done(checkpoint, Err(e)) if pred(e.kind) => {
                 BacktrackState::Incomplete(checkpoint)
             }
             state => state,

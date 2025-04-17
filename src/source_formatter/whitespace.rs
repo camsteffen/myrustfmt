@@ -5,8 +5,9 @@ use rustc_lexer::TokenKind;
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl SourceFormatter {
-    /// Allows comments or nothing.
-    /// Not commonly used because comments come "free" with `newline` and `space`.
+    /// Allows any comments or nothing.
+    /// This is not very commonly used because comments come "free" with newline and space functions
+    /// (although spaces only allow single-line comments).
     pub fn comments(&self, mode: VerticalWhitespaceMode) -> FormatResult {
         self.whitespace_and_comments(WhitespaceMode::Flexible {
             vertical_mode: mode,
@@ -14,6 +15,7 @@ impl SourceFormatter {
         })
     }
 
+    /// Try to write a space but also allow a line break with some comments
     pub fn space_or_break(&self) -> FormatResult {
         let first_line = self.line();
         self.whitespace_and_comments(WhitespaceMode::Flexible {
