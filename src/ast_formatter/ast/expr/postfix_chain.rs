@@ -50,23 +50,12 @@ impl AstFormatter {
             }
         };
 
-        // todo comments in between ALL items
-        let do_comments = || {
-            // todo test vertical shape
-            self.has_vertical_shape(VerticalShape::HangingIndent, || {
-                self.out.comments(VerticalWhitespaceMode::Break)
-            })
-        };
-
         if multi_line_root {
-            // todo comments here
             // no indent
             self.postfix_chain_vertical(chain, tail)
         } else {
             self.backtrack()
                 .next(|| self.postfix_chain_single_line_with_overflow(chain, start_pos, tail))
-                .unless_too_wide()
-                .unless_multi_line()
                 .otherwise(|| {
                     self.has_vertical_shape(VerticalShape::HangingIndent, || {
                         self.indented(|| self.postfix_chain_vertical(chain, tail))
@@ -238,7 +227,6 @@ impl AstFormatter {
                                 Ok(())
                             })
                         })
-                        .unless_too_wide()
                         .otherwise(|| {
                             self.enclosed_after_opening("]", || self.expr(index))?;
                             self.tail(tail)?;

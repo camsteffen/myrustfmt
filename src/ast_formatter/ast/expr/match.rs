@@ -25,7 +25,6 @@ impl AstFormatter {
                 .next_if(self.out.line() == first_line, || {
                     self.arm_guard_same_line(arm, guard)
                 })
-                .unless_too_wide()
                 .otherwise(|| self.arm_guard_separate_line(arm, guard))?;
         } else if let Some(body) = arm.body.as_deref() {
             self.pat_tail(

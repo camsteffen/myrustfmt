@@ -7,7 +7,7 @@ use crate::ast_formatter::list::builder::list;
 use crate::ast_formatter::list::list_config::{ListConfig, ListWrapToFitConfig};
 use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext};
 use crate::ast_formatter::tail::Tail;
-use crate::error::{ConstraintErrorKind, FormatResult};
+use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::whitespace::VerticalWhitespaceMode;
 

@@ -55,7 +55,6 @@ impl AstFormatter {
                         Ok(())
                     })
                 })
-                .unless_too_wide()
                 .otherwise(|| {
                     let _indent_guard = indent_guard.unwrap_or_else(|| self.begin_indent());
                     for (op, expr) in chain {

@@ -34,7 +34,6 @@ impl AstFormatter {
                             Ok(())
                         })
                     })
-                    .unless_too_wide()
                     .otherwise(|| {
                         self.block_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))?;
                         self.tail(tail)?;

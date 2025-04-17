@@ -1,4 +1,4 @@
-use crate::error::{ConstraintErrorKind, FormatResult};
+use crate::error::FormatResult;
 use std::cell::Cell;
 use std::num::NonZero;
 use crate::num::HPos;

@@ -1,4 +1,4 @@
-use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
+use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::util::indent::IndentGuard;
 use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::whitespace::VerticalWhitespaceMode;

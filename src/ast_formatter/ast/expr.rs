@@ -222,7 +222,8 @@ impl AstFormatter {
                         Ok(())
                     }
                     // on separate lines, enforce IndentMiddle by adding a block
-                    ListStrategy::Vertical if lcx.len > 1 => af.backtrack()
+                    ListStrategy::Vertical if lcx.len > 1 => {
+                        af.backtrack()
                             // If it's too wide, adding a block won't help.
                             // The block is only for ensuring a "hanging indent"-compliant shape.
                             .next_with_constraint_recovery_mode(
@@ -233,7 +234,8 @@ impl AstFormatter {
                                 af.expr_add_block(expr)?;
                                 af.tail(tail)?;
                                 Ok(())
-                            }),
+                            })
+                    }
                     _ => format(),
                 }
             })?;
@@ -272,7 +274,6 @@ impl AstFormatter {
                 self.tail(tail)?;
                 Ok(())
             })
-            .unless_too_wide()
             .otherwise(|| {
                 self.has_vertical_shape(VerticalShape::HangingIndent, || {
                     self.indented(|| {
@@ -296,7 +297,6 @@ impl AstFormatter {
                 self.tail(tail)?;
                 Ok(())
             })
-            .unless_too_wide()
             .otherwise(|| {
                 self.enclosed_after_opening(")", || self.expr(inner))?;
                 self.tail(tail)?;
@@ -446,10 +446,7 @@ impl AstFormatter {
             Ok(())
         };
 
-        self.backtrack()
-            .next_opt(single_line)
-            .unless_too_wide()
-            .otherwise(multi_line)
+        self.backtrack().next_opt(single_line).otherwise(multi_line)
     }
 
     pub fn token_expr_open_brace(

@@ -218,7 +218,6 @@ where
             HorizontalResult::Skip | HorizontalResult::Fail => {
                 af.backtrack_from_checkpoint(checkpoint)
                     .next_opt(self.contents_wrap_to_fit_fn_opt(af))
-                    .unless_too_wide()
                     .otherwise(|| self.contents_vertical(af))?;
             }
             HorizontalResult::Ok { height: 1 } => {}

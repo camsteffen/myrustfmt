@@ -121,7 +121,6 @@ impl AstFormatter {
                         item_comma()?;
                         Ok(())
                     })
-                    .unless_too_wide()
                     .otherwise(|| {
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         item_comma()?;

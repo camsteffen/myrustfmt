@@ -30,9 +30,6 @@ impl AstFormatter {
 /// is chained with `otherwise`. If a strategy fails with a constraint error, it will restore a
 /// checkpoint before running the next strategy. If a strategy succeeds, it will hold the result
 /// until the end, and all subsequent strategies will be ignored.
-///
-/// Backtrack is a higher abstraction than using Checkpoint directly, and should be preferred for
-/// simple cases since it ensures that the Checkpoint is dropped at the right time.
 #[must_use]
 pub struct Backtrack<'a, T = ()> {
     af: &'a AstFormatter,
@@ -44,7 +41,7 @@ enum BacktrackState<'a, T> {
     #[default]
     Init,
     Incomplete(Checkpoint<'a>),
-    Done(Checkpoint<'a>, FormatResult<T>),
+    Done(FormatResult<T>),
 }
 
 impl<T> Backtrack<'_, T> {
@@ -78,17 +75,9 @@ impl<T> Backtrack<'_, T> {
             BacktrackState::Done(..) => return,
         }
         let result = self.af.out.with_constraint_recovery_mode_max(mode, strategy);
-        match result {
-            Err(e) if e.kind == ConstraintErrorKind::NextStrategy => {}
-            _ => {
-                let BacktrackState::Incomplete(checkpoint) = std::mem::take(&mut self.state) else {
-                    unreachable!()
-                };
-                self.state = BacktrackState::Done(checkpoint, result);
-            }
+        if result.is_ok() {
+            self.state = BacktrackState::Done(result);
         }
-        // todo this is an experiment
-        self.remove_err_if(|e| e == ConstraintErrorKind::WidthLimitExceeded);
     }
 
     pub fn next_if(mut self, condition: bool, strategy: impl Fn() -> FormatResult<T>) -> Self {
@@ -114,28 +103,7 @@ impl<T> Backtrack<'_, T> {
                 self.af.out.restore_checkpoint(&checkpoint);
                 strategy()
             }
-            BacktrackState::Done(_, result) => result,
+            BacktrackState::Done(result) => result,
         }
-    }
-
-    // todo triggering a fallback strategy may or may not correct the error
-    pub fn unless_multi_line(mut self) -> Self {
-        self.remove_err_if(|e| e.is_multi_line_err());
-        self
-    }
-
-    // todo this should be implied?
-    pub fn unless_too_wide(mut self) -> Self {
-        self.remove_err_if(|e| e == ConstraintErrorKind::WidthLimitExceeded);
-        self
-    }
-
-    fn remove_err_if(&mut self, pred: impl Fn(ConstraintErrorKind) -> bool) {
-        self.state = match std::mem::take(&mut self.state) {
-            BacktrackState::Done(checkpoint, Err(e)) if pred(e.kind) => {
-                BacktrackState::Incomplete(checkpoint)
-            }
-            state => state,
-        };
     }
 }
