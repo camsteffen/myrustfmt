@@ -98,9 +98,7 @@ impl ConstraintWriter {
         match self.constraint_recovery_mode.get() {
             ConstraintRecoveryMode::Nothing => false,
             ConstraintRecoveryMode::Newline => false,
-            ConstraintRecoveryMode::MaxWidth { line } => {
-                line == self.line()
-            }
+            ConstraintRecoveryMode::MaxWidth { line } => line == self.line(),
         }
     }
 

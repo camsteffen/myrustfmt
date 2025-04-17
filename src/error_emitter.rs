@@ -89,14 +89,12 @@ impl BufferedErrorEmitter {
 
     pub fn max_width_exceeded(&self, line: u32) {
         if self.is_buffering() {
-            self.buffer(Error::MaxWidthExceeded {
-                line,
-            });
+            self.buffer(Error::MaxWidthExceeded { line });
         } else {
             self.emitter.width_exceeded(line);
         }
     }
-    
+
     pub fn multi_line_comment_not_allowed(&self, line: u32, col: HPos) {
         if self.is_buffering() {
             self.buffer(Error::MultiLineCommentNotAllowed { line, col });
@@ -104,7 +102,7 @@ impl BufferedErrorEmitter {
             self.emitter.multi_line_comment_not_allowed(line, col);
         }
     }
-    
+
     // private
 
     #[track_caller]
@@ -122,11 +120,13 @@ impl BufferedErrorEmitter {
 
     fn emit(&self, error: Error) {
         match error {
-            Error::LineCommentNotAllowed { line, col } => self.emitter.line_comment_not_allowed(line, col),
-            Error::MaxWidthExceeded { line, } => {
-                self.emitter.width_exceeded(line, )
+            Error::LineCommentNotAllowed { line, col } => {
+                self.emitter.line_comment_not_allowed(line, col)
             }
-            Error::MultiLineCommentNotAllowed { line, col } => self.emitter.multi_line_comment_not_allowed(line, col),
+            Error::MaxWidthExceeded { line } => self.emitter.width_exceeded(line),
+            Error::MultiLineCommentNotAllowed { line, col } => {
+                self.emitter.multi_line_comment_not_allowed(line, col)
+            }
         }
     }
 
@@ -161,7 +161,7 @@ impl ErrorEmitter {
         eprint!("Line comment not allowed");
         self.at(line, col);
     }
-        
+
     pub fn multi_line_comment_not_allowed(&self, line: u32, col: HPos) {
         self.error_count.increment();
         eprint!("Multi-line comment not allowed");
@@ -176,7 +176,7 @@ impl ErrorEmitter {
             Some(path) => eprintln!("{}:{line}", path.display()),
         }
     }
-    
+
     fn at(&self, line: u32, col: HPos) {
         let (line, col) = (line + 1, col + 1);
         match &self.path {

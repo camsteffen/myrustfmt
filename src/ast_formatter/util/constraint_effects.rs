@@ -33,9 +33,12 @@ impl AstFormatter {
     pub fn constraints(&self) -> &Constraints {
         self.out.constraints()
     }
-    
+
     pub fn with_single_line<T>(&self, format: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        match self.constraints().with_replace_vertical_shape(VerticalShape::SingleLine, format) {
+        match self
+            .constraints()
+            .with_replace_vertical_shape(VerticalShape::SingleLine, format)
+        {
             Err(mut e) if e.kind == ConstraintErrorKind::NewlineNotAllowed => {
                 e.kind = ConstraintErrorKind::NextStrategy;
                 Err(e)
@@ -56,7 +59,11 @@ impl AstFormatter {
     }
 
     /// Requires the given scope to conform to the given VerticalShape
-    pub fn with_vertical_shape_min<T>(&self, shape: VerticalShape, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
+    pub fn with_vertical_shape_min<T>(
+        &self,
+        shape: VerticalShape,
+        scope: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
         if self.vertical_shape() <= shape {
             return scope();
         }

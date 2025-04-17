@@ -13,7 +13,7 @@ impl SourceFormatter {
             space_if_horizontal: false,
         })
     }
-    
+
     pub fn space_or_break(&self) -> FormatResult {
         let first_line = self.line();
         self.whitespace_and_comments(WhitespaceMode::Flexible {

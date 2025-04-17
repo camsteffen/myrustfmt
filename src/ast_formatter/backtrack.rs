@@ -87,6 +87,8 @@ impl<T> Backtrack<'_, T> {
                 self.state = BacktrackState::Done(checkpoint, result);
             }
         }
+        // todo this is an experiment
+        self.filter_err_is(ConstraintErrorKind::WidthLimitExceeded);
     }
 
     pub fn next_if(mut self, condition: bool, strategy: impl Fn() -> FormatResult<T>) -> Self {
@@ -117,21 +119,22 @@ impl<T> Backtrack<'_, T> {
     }
 
     // todo handle bad block comments here?
-    pub fn unless_multi_line(self) -> Self {
-        self.filter_err_is(ConstraintErrorKind::NewlineNotAllowed)
-    }
-    
-    pub fn unless_too_wide(self) -> Self {
-        self.filter_err_is(ConstraintErrorKind::WidthLimitExceeded)
-    }
-    
-    fn filter_err_is(mut self, kind: ConstraintErrorKind) -> Self {
-        match self.state {
-            BacktrackState::Done(checkpoint, Err(e)) if e.kind == kind => {
-                self.state = BacktrackState::Incomplete(checkpoint);
-            }
-            _ => {}
-        }
+    pub fn unless_multi_line(mut self) -> Self {
+        self.filter_err_is(ConstraintErrorKind::NewlineNotAllowed);
         self
+    }
+
+    pub fn unless_too_wide(mut self) -> Self {
+        self.filter_err_is(ConstraintErrorKind::WidthLimitExceeded);
+        self
+    }
+
+    fn filter_err_is(&mut self, kind: ConstraintErrorKind) {
+        self.state = match std::mem::take(&mut self.state) {
+            BacktrackState::Done(checkpoint, Err(e)) if e.kind == kind => {
+                BacktrackState::Incomplete(checkpoint)
+            }
+            state => state,
+        };
     }
 }

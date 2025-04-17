@@ -5,20 +5,25 @@ use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn space_or_wrap_then(&self, then: impl Fn() -> FormatResult) -> FormatResult {
-        let checkpoint= self.out.checkpoint();
+        let checkpoint = self.out.checkpoint();
         let first_line = self.out.line();
         self.out.space_or_break()?;
         let result = self.out.with_enforce_max_width(&then);
-        if self.out.line() == first_line && matches!(result, Err(e) if e.kind == ConstraintErrorKind::WidthLimitExceeded) {
+        if self.out.line() == first_line
+            && matches!(result, Err(e) if e.kind == ConstraintErrorKind::WidthLimitExceeded)
+        {
             self.out.restore_checkpoint(&checkpoint);
             self.out.newline_indent(VerticalWhitespaceMode::Break)?;
             then()?;
         }
         Ok(())
     }
-    
-    pub fn space_or_wrap_indent_then(&self, then: impl Fn() -> FormatResult) -> FormatResult<Option<IndentGuard>> {
-        let checkpoint= self.out.checkpoint();
+
+    pub fn space_or_wrap_indent_then(
+        &self,
+        then: impl Fn() -> FormatResult,
+    ) -> FormatResult<Option<IndentGuard>> {
+        let checkpoint = self.out.checkpoint();
         let first_line = self.out.line();
         let indent_guard = self.begin_indent();
         self.out.space_or_break()?;
@@ -35,7 +40,9 @@ impl AstFormatter {
             return Ok(Some(self.begin_indent()));
         }
         match result {
-            Err(e) if wrap_has_more_width && matches!(e.kind, ConstraintErrorKind::WidthLimitExceeded) => {
+            Err(e)
+                if wrap_has_more_width && matches!(e.kind, ConstraintErrorKind::WidthLimitExceeded) =>
+            {
                 self.out.restore_checkpoint(&checkpoint);
                 let indent_guard = self.begin_indent();
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;

@@ -30,7 +30,9 @@ impl AstFormatter {
         };
         let max_width_prev = self.out.current_max_width();
         let max_width = max_width_prev.saturating_add(extra_width);
-        let result = self.with_replace_vertical_shape(VerticalShape::SingleLine, || self.with_replace_max_width(max_width, scope));
+        let result = self.with_replace_vertical_shape(VerticalShape::SingleLine, || {
+            self.with_replace_max_width(max_width, scope)
+        });
         let used_extra_width = self.out.last_line_len() > max_width_prev;
         (used_extra_width, result)
     }
