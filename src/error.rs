@@ -42,12 +42,6 @@ pub enum ConstraintErrorKind {
     WidthLimitExceeded,
 }
 
-impl ConstraintErrorKind {
-    pub fn is_multi_line_err(self) -> bool {
-        matches!(self, ConstraintErrorKind::LineCommentNotAllowed | ConstraintErrorKind::MultiLineCommentNotAllowed | ConstraintErrorKind::NewlineNotAllowed)
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct NewlineNotAllowedError;
 

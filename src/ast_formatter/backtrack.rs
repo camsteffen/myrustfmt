@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::constraint_writer::ConstraintRecoveryMode;
-use crate::error::{ConstraintErrorKind, FormatResult};
+use crate::error::FormatResult;
 use crate::source_formatter::checkpoint::Checkpoint;
 
 impl AstFormatter {

@@ -3,18 +3,15 @@
 
 use myrustfmt::config::Config;
 use myrustfmt::format_str;
-use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs;
-use std::io::BufReader;
 use std::path::Path;
 use tracing_subscriber::EnvFilter;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 datatest_stable::harness! {
-    { test = small_test_file, root = "tests/small_tests", pattern = r".yaml" },
-    { test = small_test_file_rs, root = "tests/small_tests_rs", pattern = r".rs" },
+    { test = small_test_file, root = "tests/small_tests", pattern = r".rs" },
 }
 
 fn init_tracing() {
@@ -24,48 +21,6 @@ fn init_tracing() {
 }
 
 fn small_test_file(test_source_path: &Path) -> TestResult {
-    init_tracing();
-    let file = fs::File::open(test_source_path).unwrap();
-    let reader = BufReader::new(file);
-    let tests: Vec<Test> = serde_yaml::from_reader(reader).unwrap();
-    let has_focus = tests.iter().any(|t| t.focus);
-    for test in &tests {
-        if !has_focus || test.focus {
-            small_test(test)?;
-        }
-
-        let mut out_path = Path::new("newtest").join(test_source_path);
-        out_path.set_extension("");
-        out_path.push(&test.name);
-        out_path.set_extension("rs");
-        let (kind, one, two) = match &test.kind {
-            TestKind::Breakpoint { before, after } => ("breakpoint", before, Some(after)),
-            TestKind::NoChange { formatted } => ("no-change", formatted, None),
-            TestKind::BeforeAfter { before, after } => ("before-after", before, Some(after)),
-        };
-        let indent = |s: &str| {
-            return format!("fn test() {{\n{}}}\n", String::from_iter(s.lines().map(|l| if l.is_empty() { String::new() } else {format!("    {l}\n")})));
-        };
-        let (one, two) = if test.in_block {
-            (indent(one), two.map(|s| indent(s)))
-        } else {
-            (one.to_string(), two.cloned())
-        };
-        let content = format!(
-            "// test-kind: {kind}\n\n{one}{}",
-            two.map(|s| format!("\n// :after:\n\n{s}"))
-                .unwrap_or_default(),
-        );
-        fs::create_dir_all(out_path.parent().unwrap()).unwrap();
-        fs::write(out_path, content).unwrap();
-    }
-    if has_focus {
-        return Err("a test has focus: true".into());
-    }
-    Ok(())
-}
-
-fn small_test_file_rs(test_source_path: &Path) -> TestResult {
     init_tracing();
     let string = fs::read_to_string(test_source_path)?;
     let mut lines = string.split_inclusive('\n');
@@ -147,9 +102,7 @@ fn small_test_file_rs(test_source_path: &Path) -> TestResult {
             .to_str()
             .unwrap()
             .to_owned(),
-        focus: false,
         kind,
-        in_block: false,
         max_width: None,
         expect_errors,
     };
@@ -173,7 +126,7 @@ fn small_test(test: &Test) -> TestResult {
         TestKind::Breakpoint { before, after } => {
             assert!(!test.expect_errors);
             assert!(test.max_width.is_none());
-            breakpoint_test(before, after, test.in_block)?
+            breakpoint_test(before, after)?
         }
         TestKind::NoChange { formatted } => {
             let formatted = formatted.trim();
@@ -182,7 +135,6 @@ fn small_test(test: &Test) -> TestResult {
                 test.max_width,
                 formatted,
                 "formatted",
-                test.in_block,
                 test.expect_errors,
             )?;
         }
@@ -194,7 +146,6 @@ fn small_test(test: &Test) -> TestResult {
                 test.max_width,
                 after,
                 "before -> after",
-                test.in_block,
                 test.expect_errors,
             )?;
             format_max_width_expected(
@@ -202,7 +153,6 @@ fn small_test(test: &Test) -> TestResult {
                 test.max_width,
                 after,
                 "after (idempotency)",
-                test.in_block,
                 false,
             )?;
         }
@@ -210,22 +160,13 @@ fn small_test(test: &Test) -> TestResult {
     Ok(())
 }
 
-#[derive(Deserialize)]
 struct Test {
     name: String,
-    #[serde(default)]
-    focus: bool,
-    #[serde(flatten)]
     kind: TestKind,
-    #[serde(default)]
     expect_errors: bool,
-    #[serde(default)]
-    in_block: bool,
     max_width: Option<u16>,
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "type")]
 enum TestKind {
     /// A breakpoint test is for testing how formatting changes when the max width is constrained.
     /// The "before" and "after" code snippets should contain the exact same code, but the "after"
@@ -246,24 +187,13 @@ enum TestKind {
     },
 }
 
-#[derive(Serialize)]
 enum TestKindRaw {
     BeforeAfter,
     Breakpoint,
     NoChange,
 }
 
-impl TestKind {
-    fn to_raw(&self) -> TestKindRaw {
-        match self {
-            TestKind::Breakpoint { .. } => TestKindRaw::Breakpoint,
-            TestKind::NoChange { .. } => TestKindRaw::NoChange,
-            TestKind::BeforeAfter { .. } => TestKindRaw::BeforeAfter,
-        }
-    }
-}
-
-fn breakpoint_test(before: &str, after: &str, in_block: bool) -> TestResult {
+fn breakpoint_test(before: &str, after: &str) -> TestResult {
     let before = before.trim();
     let after = after.trim();
     let initial_used_width = before.lines().map(|line| line.len() as u16).max().unwrap();
@@ -272,7 +202,6 @@ fn breakpoint_test(before: &str, after: &str, in_block: bool) -> TestResult {
         Some(initial_used_width),
         before,
         "before max width reduction",
-        in_block,
         false,
     )?;
     println!("after width reduction...");
@@ -281,7 +210,6 @@ fn breakpoint_test(before: &str, after: &str, in_block: bool) -> TestResult {
         Some(initial_used_width - 1),
         after,
         "after max width reduction",
-        in_block,
         false,
     )?;
     Ok(())
@@ -292,22 +220,16 @@ fn format_max_width_expected(
     max_width: Option<u16>,
     expected: &str,
     name: &str,
-    in_block: bool,
     expect_errors: bool,
 ) -> TestResult {
-    let (formatted, error_count) = if in_block {
-        format_in_block(source, max_width)?
-    } else {
-        let mut config = Config::default();
-        if let Some(max_width) = max_width {
-            config = config.max_width(max_width)
-        }
-        let result = format_str(source, config).unwrap();
-        (result.formatted, result.error_count)
-    };
+    let mut config = Config::default();
+    if let Some(max_width) = max_width {
+        config = config.max_width(max_width)
+    }
+    let result = format_str(source, config).unwrap();
     let expected = format!("{expected}\n");
-    expect_formatted_equals(&formatted, &expected, name)?;
-    handle_format_errors(error_count, expect_errors)?;
+    expect_formatted_equals(&result.formatted, &expected, name)?;
+    handle_format_errors(result.error_count, expect_errors)?;
     Ok(())
 }
 
@@ -317,50 +239,6 @@ fn handle_format_errors(error_count: u32, expect_errors: bool) -> TestResult {
         1.. if !expect_errors => Err("errors occurred".into()),
         _ => Ok(()),
     }
-}
-
-fn format_in_block(stmt: &str, max_width: Option<u16>) -> TestResult<(String, u32)> {
-    let (prefix, indent, suffix) = ("fn test() {\n", "    ", "}\n");
-    let stmt = String::from_iter(stmt.lines().map(|s| format!("{indent}{s}\n")));
-    let module_source = format!("{prefix}{stmt}{suffix}");
-    let mut config = Config::default();
-    if let Some(max_width) = max_width {
-        let max_width = max_width + indent.len() as u16;
-        let min_max_width = "fn test() {".len() as u16;
-        if max_width < min_max_width {
-            panic!("max width must be at least {min_max_width}");
-        }
-        config = config.max_width(max_width);
-    }
-    let result = format_str(&module_source, config).unwrap();
-    let error_count = result.error_count;
-    let result = result.formatted;
-    let lines = result
-        .strip_prefix(prefix)
-        .unwrap_or_else(|| {
-            panic!(
-                "formatted output does not have expected prefix: {:?}",
-                result
-            )
-        })
-        .strip_suffix(suffix)
-        .unwrap_or_else(|| {
-            panic!(
-                "formatted output does not have expected suffix: {:?}",
-                result
-            )
-        })
-        .lines();
-    let mut out = String::new();
-    for (i, line) in lines.enumerate() {
-        if !line.is_empty() {
-            out.push_str(line.strip_prefix("    ").unwrap_or_else(|| {
-                panic!("line {i} is not indented\nLine: {line}\nOutput:\n{result}")
-            }));
-        }
-        out.push('\n');
-    }
-    Ok((out, error_count))
 }
 
 fn expect_formatted_equals(formatted: &str, expected: &str, name: &str) -> TestResult {
