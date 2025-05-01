@@ -1,8 +1,0 @@
-- name: declaration breakpoint on type
-  type: breakpoint
-  before: |
-    const X: (Type,);
-  after: |
-    const X: (
-        Type,
-    );

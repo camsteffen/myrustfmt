@@ -1,0 +1,17 @@
+// test-kind: no-change
+
+fn test() {
+    match x {
+        TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+            if CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC =>
+        {
+            x
+        }
+        TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+            if CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC =>
+        {
+            let x;
+            x
+        }
+    }
+}

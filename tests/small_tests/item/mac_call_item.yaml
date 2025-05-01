@@ -1,8 +1,0 @@
-- name: macro call item braces
-  type: no_change
-  formatted: |
-    macro_call! {}
-- name: macro call item parentheses
-  type: no_change
-  formatted: |
-    macro_call!();

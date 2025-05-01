@@ -3,7 +3,7 @@
 
 use myrustfmt::config::Config;
 use myrustfmt::format_str;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs;
 use std::io::BufReader;
@@ -33,6 +33,31 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
         if !has_focus || test.focus {
             small_test(test)?;
         }
+
+        let mut out_path = Path::new("newtest").join(test_source_path);
+        out_path.set_extension("");
+        out_path.push(&test.name);
+        out_path.set_extension("rs");
+        let (kind, one, two) = match &test.kind {
+            TestKind::Breakpoint { before, after } => ("breakpoint", before, Some(after)),
+            TestKind::NoChange { formatted } => ("no-change", formatted, None),
+            TestKind::BeforeAfter { before, after } => ("before-after", before, Some(after)),
+        };
+        let indent = |s: &str| {
+            return format!("fn test() {{\n{}}}\n", String::from_iter(s.lines().map(|l| if l.is_empty() { String::new() } else {format!("    {l}\n")})));
+        };
+        let (one, two) = if test.in_block {
+            (indent(one), two.map(|s| indent(s)))
+        } else {
+            (one.to_string(), two.cloned())
+        };
+        let content = format!(
+            "// test-kind: {kind}\n\n{one}{}",
+            two.map(|s| format!("\n// :after:\n\n{s}"))
+                .unwrap_or_default(),
+        );
+        fs::create_dir_all(out_path.parent().unwrap()).unwrap();
+        fs::write(out_path, content).unwrap();
     }
     if has_focus {
         return Err("a test has focus: true".into());
@@ -221,10 +246,21 @@ enum TestKind {
     },
 }
 
+#[derive(Serialize)]
 enum TestKindRaw {
     BeforeAfter,
     Breakpoint,
     NoChange,
+}
+
+impl TestKind {
+    fn to_raw(&self) -> TestKindRaw {
+        match self {
+            TestKind::Breakpoint { .. } => TestKindRaw::Breakpoint,
+            TestKind::NoChange { .. } => TestKindRaw::NoChange,
+            TestKind::BeforeAfter { .. } => TestKindRaw::BeforeAfter,
+        }
+    }
 }
 
 fn breakpoint_test(before: &str, after: &str, in_block: bool) -> TestResult {
