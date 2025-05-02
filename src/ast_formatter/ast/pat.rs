@@ -3,8 +3,8 @@ use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::ListRest;
-use crate::ast_formatter::list::builder::list;
 use crate::ast_formatter::list::{Braces, ListItemContext};
+use crate::ast_formatter::list::options::list_opt;
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -45,18 +45,23 @@ impl AstFormatter {
             }
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 self.qpath(qself, path, false)?;
-                list(Braces::PARENS, fields, Self::pat_list_item)
-                    .tail(take_tail())
-                    .format(self)?
+                self.list(
+                    Braces::Parens,
+                    fields,
+                    Self::pat_list_item,
+                    list_opt()
+                        .tail(take_tail()),
+                )?;
             }
             ast::PatKind::Or(ref pats) => {
                 self.simple_infix_chain("|", pats, |pat| self.pat(pat), false, take_tail())?
             }
             ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false)?,
             ast::PatKind::Tuple(ref fields) => {
-                list(Braces::PARENS, fields, Self::pat_list_item)
-                    .tail(take_tail())
-                    .format(self)?
+                self.list(Braces::Parens, fields,
+                          Self::pat_list_item,
+                          list_opt()
+                    .tail(take_tail()))?
             }
             ast::PatKind::Box(_) => todo!(),
             ast::PatKind::Deref(_) => todo!(),
@@ -74,9 +79,9 @@ impl AstFormatter {
                 self.range(start.as_deref(), sigil, end.as_deref(), take_tail())?;
             }
             ast::PatKind::Slice(ref elements) => {
-                list(Braces::SQUARE, elements, Self::pat_list_item)
-                    .tail(take_tail())
-                    .format(self)?
+                self.list(Braces::Square, elements, Self::pat_list_item
+                          , list_opt()
+                    .tail(take_tail()))?
             }
             ast::PatKind::Rest => self.out.token("..")?,
             ast::PatKind::Never => todo!(),
@@ -106,11 +111,11 @@ impl AstFormatter {
     ) -> FormatResult {
         self.qpath(qself, path, false)?;
         self.out.space()?;
-        list(Braces::CURLY, fields, Self::pat_field)
+        self.list(Braces::Curly, fields, Self::pat_field
+                  , list_opt()
             .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
             .rest(ListRest::from(rest))
-            .tail(tail)
-            .format(self)
+            .tail(tail))
     }
 
     fn pat_field(

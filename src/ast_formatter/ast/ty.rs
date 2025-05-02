@@ -1,11 +1,10 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
-use crate::ast_formatter::list::builder::list;
-use crate::ast_formatter::list::list_config::TupleListConfig;
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
-use rustc_ast::ast;
 use crate::whitespace::VerticalWhitespaceMode;
+use rustc_ast::ast;
+use crate::ast_formatter::list::options::list_opt;
 
 impl AstFormatter {
     pub fn ty(&self, ty: &ast::Ty) -> FormatResult {
@@ -40,16 +39,14 @@ impl AstFormatter {
             ast::TyKind::PinnedRef(_lifetime, _mut_ty) => todo!(),
             ast::TyKind::BareFn(bare_fn_ty) => self.bare_fn_ty(bare_fn_ty)?,
             ast::TyKind::Never => self.out.token("!")?,
-            ast::TyKind::Tup(elements) => {
-                list(Braces::PARENS, elements, |af, ty, tail, _lcx| {
-                    af.ty_tail(ty, tail)
-                })
-                .config(TupleListConfig {
-                    len: elements.len(),
-                })
-                .tail(take_tail())
-                .format(self)?
-            }
+            ast::TyKind::Tup(elements) => self.list(
+                Braces::Parens,
+                elements,
+                |af, ty, tail, _lcx| af.ty_tail(ty, tail),
+                list_opt()
+                    .force_trailing_comma(elements.len() == 1)
+                    .tail(take_tail()),
+            )?,
             ast::TyKind::Path(qself, path) => self.qpath(qself, path, false)?,
             ast::TyKind::TraitObject(bounds, syntax) => {
                 match syntax {

@@ -1,50 +1,195 @@
 mod braces;
-pub mod builder;
-pub mod list_config;
-mod list_item_config;
 mod list_item_context;
+pub mod options;
 mod rest;
 
 pub use self::braces::Braces;
-pub use self::list_item_config::ListItemConfig;
 pub use self::list_item_context::{ListItemContext, ListStrategy};
 pub use self::rest::ListRest;
 
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::list::options::{ListOptions, ListShape, ListWrapToFit};
 use crate::ast_formatter::tail::Tail;
+use crate::constraints::VerticalShape;
 use crate::error::FormatResult;
 use crate::num::HPos;
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
-    /* [item, item, item] */
-    fn list_contents_horizontal(
+    pub fn list<'ast, Item>(
         &self,
-        len: usize,
-        format_item: impl Fn(/*index: */ usize, &Tail) -> FormatResult,
-        rest: ListRest<'_>,
-        close_brace: &'static str,
-        force_trailing_comma: bool,
-        pad: bool,
-        max_width: Option<HPos>,
+        braces: Braces,
+        list: &'ast [Item],
+        format_item: impl Fn(&AstFormatter, &Item, &Tail, ListItemContext) -> FormatResult,
+        options: ListOptions<'ast, '_, Item>,
     ) -> FormatResult {
-        let do_pad = |af: &Self| -> FormatResult {
-            if pad {
+        ListContext {
+            af: self,
+            opt: options,
+            format_item,
+            braces,
+            list,
+        }
+        .format()
+    }
+}
+
+struct ListContext<'af, 'ast, 'tail, Item, FormatItem> {
+    pub af: &'af AstFormatter,
+    pub opt: ListOptions<'ast, 'tail, Item>,
+    pub braces: Braces,
+    pub list: &'ast [Item],
+    pub format_item: FormatItem,
+}
+
+impl<'af, 'ast, 'tail, Item, FormatItem> ListContext<'af, 'ast, 'tail, Item, FormatItem>
+where
+    FormatItem: Fn(&AstFormatter, &Item, &Tail, ListItemContext) -> FormatResult,
+{
+    fn format(&self) -> FormatResult {
+        let is_flexible = self.opt.shape == ListShape::Flexible;
+        self.af
+            .has_vertical_shape_if(is_flexible, VerticalShape::List, || {
+                if !self.opt.omit_open_brace {
+                    self.af.out.token(self.braces.start())?;
+                }
+                if self.list.is_empty() && self.opt.rest.is_none() {
+                    self.af.enclosed_empty_after_opening(self.braces.end())?;
+                    self.af.tail(self.opt.tail)?;
+                    return Ok(());
+                }
+                match self.opt.shape {
+                    ListShape::Flexible => self.contents_flexible(),
+                    ListShape::Horizontal => self.contents_horizontal(),
+                    ListShape::Vertical => self.contents_vertical(),
+                }
+            })
+    }
+
+    fn contents_flexible(&self) -> FormatResult {
+        let first_line = self.af.out.line();
+        let checkpoint = self.af.out.checkpoint();
+        #[derive(Debug)]
+        enum HorizontalResult {
+            Skip,
+            Fail,
+            Ok { height: u32 },
+        }
+        let result = self.af.out.with_enforce_max_width(|| -> FormatResult<_> {
+            if self.list.iter().any(&self.opt.item_requires_own_line) {
+                return Ok(HorizontalResult::Skip);
+            }
+            if self.contents_horizontal().is_err() {
+                return Ok(HorizontalResult::Fail);
+            }
+            // N.B. measure before writing the tail
+            let height = self.af.out.line() - first_line + 1;
+            if self.af.tail(self.opt.tail).is_err() {
+                return Ok(HorizontalResult::Fail);
+            }
+            Ok(HorizontalResult::Ok { height })
+        })?;
+
+        match result {
+            HorizontalResult::Skip | HorizontalResult::Fail => {
+                self.af
+                    .backtrack_from_checkpoint(checkpoint)
+                    .next_opt(self.contents_wrap_to_fit_fn_opt())
+                    .otherwise(|| self.contents_vertical())?;
+            }
+            HorizontalResult::Ok { height: 1 } => {}
+            HorizontalResult::Ok { .. }
+                if self.opt.rest.is_none()
+                    && (self.opt.item_prefers_overflow)(self.list.last().unwrap()) => {}
+            HorizontalResult::Ok {
+                height: overflow_height,
+            } => {
+                // todo don't lookahead if there isn't any width gained by wrapping
+                let overflow_lookahead = self.af.out.capture_lookahead(&checkpoint);
+
+                // try vertical
+                if self
+                    .af
+                    .out
+                    .with_enforce_max_width(|| self.contents_vertical())
+                    .is_err()
+                {
+                    // separate lines failed, so overflow it is!
+                    self.af.out.restore_checkpoint(&checkpoint);
+                    self.af.out.restore_lookahead(overflow_lookahead);
+                    return Ok(());
+                }
+
+                // choose between separate lines and overflow
+                let vertical_height = self.af.out.line() - first_line + 1;
+                if overflow_height < vertical_height {
+                    self.af.out.restore_checkpoint(&checkpoint);
+                    self.af.out.restore_lookahead(overflow_lookahead);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn contents_wrap_to_fit_fn_opt(&self) -> Option<impl Fn() -> FormatResult> {
+        if self.list.len() <= 1 && self.opt.rest.is_none() {
+            return None;
+        }
+        match self.opt.wrap_to_fit {
+            ListWrapToFit::Yes { max_element_width } => {
+                assert!(
+                    self.opt.rest.is_none(),
+                    "rest cannot be used with wrap-to-fit"
+                );
+                Some(move || self.contents_wrap_to_fit(max_element_width))
+            }
+            ListWrapToFit::No => None,
+        }
+    }
+
+    fn contents_horizontal(&self) -> FormatResult {
+        let Self {
+            af,
+            opt,
+            braces,
+            list,
+            format_item,
+            ..
+        } = self;
+        let rest = opt.rest;
+
+        let len = list.len();
+
+        let format_index = |index, tail: &_| {
+            format_item(
+                af,
+                &list[index],
+                tail,
+                ListItemContext {
+                    len,
+                    index,
+                    strategy: ListStrategy::Horizontal,
+                },
+            )
+        };
+
+        let do_pad = |af: &AstFormatter| -> FormatResult {
+            if braces.pad() {
                 af.out.space()?;
             }
             Ok(())
         };
-        self.with_single_line(|| {
-            do_pad(self)?;
-            let close = |af: &Self| {
+        af.with_single_line(|| {
+            do_pad(af)?;
+            let close = |af: &AstFormatter| {
                 do_pad(af)?;
-                af.out.token(close_brace)?;
+                af.out.token(braces.end())?;
                 Ok(())
             };
             // N.B. tails are created outside of width limit
-            let close_tail = self.tail_fn(close);
-            let last_tail = self.tail_fn(|af| {
-                if !rest.is_none() || force_trailing_comma {
+            let close_tail = af.tail_fn(close);
+            let last_tail = af.tail_fn(move |af| {
+                if !rest.is_none() || opt.force_trailing_comma {
                     af.out.token(",")?;
                 } else {
                     af.out.skip_token_if_present(",")?;
@@ -54,24 +199,24 @@ impl AstFormatter {
                 }
                 Ok(())
             });
-            self.with_width_limit_first_line_opt(max_width, || {
+            af.with_width_limit_first_line_opt(opt.single_line_max_contents_width, move || {
                 if len == 0 {
                     if !rest.is_none() {
-                        self.list_rest(rest, &close_tail)?;
+                        list_rest(af, rest, &close_tail)?;
                     }
                     return Ok(());
                 }
                 let (until_last, last) = (0..(len - 1), len - 1);
                 for index in until_last {
-                    format_item(index, Tail::none())?;
-                    self.out.token_maybe_missing(",")?;
-                    self.out.space()?;
+                    format_index(index, Tail::none())?;
+                    af.out.token_maybe_missing(",")?;
+                    af.out.space()?;
                 }
                 // A tail is only necessary with the last item since it may overflow
-                format_item(last, &last_tail)?;
+                format_index(last, &last_tail)?;
                 if !rest.is_none() {
-                    self.out.space()?;
-                    self.list_rest(rest, &close_tail)?;
+                    af.out.space()?;
+                    list_rest(af, rest, &close_tail)?;
                 }
                 Ok(())
             })
@@ -85,102 +230,107 @@ impl AstFormatter {
     ]
     */
     // todo how does this behave with comments between items - forcing newlines?
-    fn list_contents_wrap_to_fit(
-        &self,
-        len: usize,
-        close_brace: &'static str,
-        tail: &Tail,
-        format_item: impl Fn(/*index: */ usize) -> FormatResult,
-        item_requires_own_line: impl Fn(/*index: */ usize) -> bool,
-        max_element_width: Option<HPos>,
-    ) -> FormatResult {
+    fn contents_wrap_to_fit(&self, max_element_width: Option<HPos>) -> FormatResult {
+        let Self { af, opt, braces, list, .. } = self;
+        let len = list.len();
+        let format_index = |index| {
+            (self.format_item)(
+                self.af,
+                &self.list[index],
+                Tail::none(),
+                ListItemContext {
+                    len,
+                    index,
+                    strategy: ListStrategy::WrapToFit,
+                },
+            )
+        };
+        let format_item = format_index;
         let format_item = |index| match max_element_width {
             Some(max_width) => {
-                self.with_single_line(|| self.with_width_limit(max_width, || format_item(index)))
+                af.with_single_line(|| af.with_width_limit(max_width, || format_item(index)))
             }
             None => format_item(index),
         };
-        self.enclosed_after_opening(close_brace, || {
+        af.enclosed_after_opening(braces.end(), || {
             let (first, rest) = (0, 1..len);
             format_item(first)?;
-            self.out.token_maybe_missing(",")?;
+            af.out.token_maybe_missing(",")?;
             let mut prev_must_have_own_line = false;
             for index in rest {
                 let item_comma = || -> FormatResult {
                     format_item(index)?;
-                    self.out.token_maybe_missing(",")?;
+                    af.out.token_maybe_missing(",")?;
                     Ok(())
                 };
-                let is_own_line = prev_must_have_own_line || item_requires_own_line(index);
+                let is_own_line = prev_must_have_own_line || (opt.item_requires_own_line)(&list[index]);
                 if is_own_line {
                     prev_must_have_own_line = !prev_must_have_own_line;
                 }
-                self.backtrack()
+                af.backtrack()
                     .next_if(!is_own_line, || {
-                        self.out.space()?;
+                        af.out.space()?;
                         item_comma()?;
                         Ok(())
                     })
                     .otherwise(|| {
-                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                        af.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         item_comma()?;
                         Ok(())
                     })?;
             }
             Ok(())
         })?;
-        self.tail(tail)?;
+        af.tail(opt.tail)?;
         Ok(())
     }
 
-    /*
-    [
-        item,
-        item,
-        item,
-    ]
-    */
-    fn list_contents_vertical(
-        &self,
-        len: usize,
-        format_item: impl Fn(/*index: */ usize, &Tail) -> FormatResult,
-        rest: ListRest<'_>,
-        close_brace: &'static str,
-        tail: &Tail,
-    ) -> FormatResult {
-        let comma = self.tail_fn(|af| af.out.token_maybe_missing(","));
-        let item_comma = |index| format_item(index, &comma);
-        self.enclosed_after_opening(close_brace, || {
-            match rest {
+    fn contents_vertical(&self) -> FormatResult {
+        let Self { af, opt, braces, list, .. } = self;
+        let len = list.len();
+        let item_comma = |index| {
+            (self.format_item)(
+                af,
+                &list[index],
+                &af.tail_fn(|af| af.out.token_maybe_missing(",")),
+                ListItemContext {
+                    len,
+                    index,
+                    strategy: ListStrategy::Vertical,
+                },
+            )
+        };
+        af.enclosed_after_opening(braces.end(), || {
+            match opt.rest {
                 ListRest::None => {
                     for index in 0..len - 1 {
                         item_comma(index)?;
                         // todo should this be "between"?
-                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                        af.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     }
                     item_comma(len - 1)?;
                 }
                 _ => {
                     for index in 0..len {
                         item_comma(index)?;
-                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                        af.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     }
-                    self.list_rest(rest, Tail::none())?;
+                    list_rest(af, opt.rest, Tail::none())?;
                 }
             }
             Ok(())
         })?;
-        self.tail(tail)?;
+        af.tail(opt.tail)?;
         Ok(())
     }
+}
 
-    fn list_rest(&self, rest: ListRest<'_>, tail: &Tail) -> FormatResult {
-        self.out.token("..")?;
-        if let ListRest::Base(expr) = rest {
-            self.expr_tail(expr, tail)?;
-        } else {
-            self.tail(tail)?;
-        }
-        Ok(())
+fn list_rest(af: &AstFormatter, rest: ListRest<'_>, tail: &Tail) -> FormatResult {
+    af.out.token("..")?;
+    if let ListRest::Base(expr) = rest {
+        af.expr_tail(expr, tail)?;
+    } else {
+        af.tail(tail)?;
     }
+    Ok(())
 }

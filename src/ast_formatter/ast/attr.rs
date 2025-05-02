@@ -1,13 +1,13 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
-use crate::ast_formatter::list::builder::list;
+use crate::ast_formatter::list::options::list_opt;
+use crate::ast_formatter::tail::Tail;
 use crate::ast_utils::is_rustfmt_skip;
 use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
+use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 use rustc_span::Span;
-use crate::ast_formatter::tail::Tail;
-use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn with_attrs(
@@ -84,7 +84,11 @@ impl AstFormatter {
             ConstraintErrorKind::NextStrategy => return Err(e),
         }
         #[cfg(debug_assertions)]
-        assert!(self.errors.error_count() > error_count_before, "an error should be emitted before copy fallback\nstack trace:\n{}", e.backtrace);
+        assert!(
+            self.errors.error_count() > error_count_before,
+            "an error should be emitted before copy fallback\nstack trace:\n{}",
+            e.backtrace
+        );
         self.out.restore_checkpoint(&checkpoint);
         self.with_replace_width_limit(None, || self.out.copy_span(span))?;
         self.tail(tail)?;
@@ -113,7 +117,9 @@ impl AstFormatter {
                     self.meta_item(&meta)?;
                     self.out.token("]")?;
                     match attr.style {
-                        ast::AttrStyle::Inner => self.out.newline(VerticalWhitespaceMode::Between)?,
+                        ast::AttrStyle::Inner => {
+                            self.out.newline(VerticalWhitespaceMode::Between)?
+                        }
                         ast::AttrStyle::Outer => self.out.newline(VerticalWhitespaceMode::Break)?,
                     }
                     self.out.indent();
@@ -128,18 +134,20 @@ impl AstFormatter {
         self.path(&meta.path, false)?;
         match &meta.kind {
             ast::MetaItemKind::Word => {}
-            ast::MetaItemKind::List(items) => {
-                list(Braces::PARENS, items, |af, item, tail, _lcx| {
+            ast::MetaItemKind::List(items) => self.list(
+                Braces::Parens,
+                items,
+                |af, item, tail, _lcx| {
                     match item {
                         ast::MetaItemInner::MetaItem(item) => af.meta_item(item)?,
                         ast::MetaItemInner::Lit(lit) => af.meta_item_lit(lit)?,
                     }
                     af.tail(tail)?;
                     Ok(())
-                })
-                .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width)
-                .format(self)?
-            }
+                },
+                list_opt()
+                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
+            )?,
             ast::MetaItemKind::NameValue(lit) => {
                 self.out.space_token_space("=")?;
                 self.meta_item_lit(lit)?;

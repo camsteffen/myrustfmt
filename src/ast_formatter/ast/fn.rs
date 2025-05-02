@@ -1,13 +1,13 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{Braces, ListItemContext};
+use crate::ast_formatter::list::{Braces, ListItemContext, };
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 
-use crate::ast_formatter::list::builder::list;
 use crate::constraints::VerticalShape;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
 use rustc_span::symbol::kw;
+use crate::ast_formatter::list::options::{list_opt, ListShape};
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
@@ -21,11 +21,11 @@ impl AstFormatter {
         self.fn_header(&sig.header)?;
         self.token_ident_generic_params("fn", item.ident, generics)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
-        let param_list = list(Braces::PARENS, &sig.decl.inputs, Self::param);
+        let params = |shape| self.list(Braces::Parens, &sig.decl.inputs, Self::param, list_opt().shape(shape));
         self.backtrack()
             .next(|| {
                 self.with_single_line(|| {
-                    param_list.format_single_line(self)?;
+                    params(ListShape::Horizontal)?;
                     self.fn_ret_ty(&sig.decl.output)?;
                     if is_block_after_decl {
                         self.out.space_token("{")?;
@@ -34,7 +34,7 @@ impl AstFormatter {
                 })
             })
             .otherwise(|| {
-                param_list.format_vertical(self)?;
+                params(ListShape::Vertical)?;
                 self.fn_ret_ty(&sig.decl.output)?;
                 if is_block_after_decl {
                     self.backtrack()
@@ -87,7 +87,7 @@ impl AstFormatter {
         }
         self.fn_decl(
             fn_decl,
-            Braces::PIPE,
+            Braces::Pipe,
             &self.tail_fn(|af| {
                 af.out.space()?;
                 let can_remove_block = matches!(fn_decl.output, ast::FnRetTy::Default(_));
@@ -130,7 +130,7 @@ impl AstFormatter {
         // self.extern_(&bare_fn_ty.ext)?;
         // self.generic_params(&bare_fn_ty.generic_params)?;
         self.out.token("fn")?;
-        self.fn_decl(&bare_fn_ty.decl, Braces::PARENS, Tail::none())?;
+        self.fn_decl(&bare_fn_ty.decl, Braces::Parens, Tail::none())?;
         Ok(())
     }
 
@@ -143,13 +143,11 @@ impl AstFormatter {
             ast::FnRetTy::Default(_) => (tail, Tail::none()),
             ast::FnRetTy::Ty(_) => (Tail::none(), tail),
         };
-        list(
-            Braces::PARENS,
+        self.list(
+            Braces::Parens,
             &parenthesized_args.inputs,
             |af, ty, tail, _lcx| af.ty_tail(ty, tail),
-        )
-        .tail(list_tail)
-        .format(self)?;
+            list_opt().tail(list_tail),)?;
         self.fn_ret_ty(&parenthesized_args.output)?;
         // todo pass tail to ret ty?
         self.tail(final_tail)?;
@@ -174,11 +172,11 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn fn_decl(&self, fn_decl: &ast::FnDecl, braces: &'static Braces, tail: &Tail) -> FormatResult {
-        let params = list(braces, &fn_decl.inputs, Self::param);
+    fn fn_decl(&self, fn_decl: &ast::FnDecl, braces: Braces, tail: &Tail) -> FormatResult {
+        let params = |shape| self.list(braces, &fn_decl.inputs, Self::param, list_opt().shape(shape));
         let do_single_line = || {
             self.with_single_line(|| {
-                params.format_single_line(self)?;
+                params(ListShape::Horizontal)?;
                 self.fn_ret_ty(&fn_decl.output)?;
                 self.tail(tail)?;
                 Ok(())
@@ -192,7 +190,7 @@ impl AstFormatter {
             .next(do_single_line)
             // args on separate lines
             .otherwise(|| {
-                params.format_vertical(self)?;
+                params(ListShape::Vertical)?;
                 self.fn_ret_ty(&fn_decl.output)?;
                 self.tail(tail)?;
                 Ok(())

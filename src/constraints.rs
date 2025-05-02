@@ -159,16 +159,17 @@ impl Constraints {
         self.with_replace_vertical_shape(VerticalShape::SingleLine, scope)
     }
 
-    pub fn has_vertical_shape_unless<T>(
+    pub fn has_vertical_shape_if<T>(
         &self,
-        shape: VerticalShape,
         condition: bool,
+        shape: VerticalShape,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         if condition {
-            return scope();
+            self.has_vertical_shape(shape, scope)
+        } else {
+            scope()
         }
-        self.has_vertical_shape(shape, scope)
     }
 
     pub fn with_replace_width_limit<T>(

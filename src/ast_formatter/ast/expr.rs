@@ -1,23 +1,22 @@
 mod binary_expr;
-mod postfix_chain;
 mod r#match;
+mod postfix_chain;
 
-use tracing::instrument;
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext, ListStrategy};
+use crate::ast_formatter::list::ListRest;
+use crate::ast_formatter::list::options::{ListOptions, ListWrapToFit, list_opt};
+use crate::ast_formatter::list::{Braces, ListItemContext, ListStrategy};
 use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::util::debug::expr_kind_name;
+use crate::ast_utils::postfix_expr_kind;
+use crate::constraint_writer::ConstraintRecoveryMode;
+use crate::constraints::VerticalShape;
 use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
-use crate::ast_formatter::list::ListRest;
-use crate::ast_formatter::list::builder::{list, FormatListItem, ListBuilder};
-use crate::ast_formatter::list::list_config::{ArrayListConfig, ListConfig, TupleListConfig};
-use crate::ast_utils::postfix_expr_kind;
-use crate::constraints::VerticalShape;
+use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
-use crate::constraint_writer::ConstraintRecoveryMode;
-use crate::ast_formatter::util::debug::expr_kind_name;
-use crate::whitespace::VerticalWhitespaceMode;
+use tracing::instrument;
 
 impl AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
@@ -38,26 +37,34 @@ impl AstFormatter {
         let mut tail_opt = Some(tail);
         let mut take_tail = || tail_opt.take().unwrap();
         match expr.kind {
-            ast::ExprKind::Array(ref items) => {
-                self.expr_list(Braces::SQUARE, items)
-                    .config(ArrayListConfig)
+            ast::ExprKind::Array(ref items) => self.list(
+                Braces::Square,
+                items,
+                self.expr_list_item(),
+                expr_list_opt()
                     .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.array_width)
-                    .tail(take_tail())
-                    .format(self)?
-            }
+                    .wrap_to_fit(ListWrapToFit::Yes {
+                        max_element_width: Some(
+                            RUSTFMT_CONFIG_DEFAULTS.short_array_element_width_threshold,
+                        ),
+                    })
+                    .tail(take_tail()),
+            )?,
             ast::ExprKind::ConstBlock(ref anon_const) => {
                 self.out.token_space("const")?;
                 self.anon_const_tail(anon_const, take_tail())?;
             }
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, take_tail())?,
             postfix_expr_kind!() => self.postfix_chain(expr, take_tail())?,
-            ast::ExprKind::Tup(ref items) => {
-                self.expr_list(Braces::PARENS, items)
-                    .config(TupleListConfig { len: items.len() })
+            ast::ExprKind::Tup(ref items) => self.list(
+                Braces::Parens,
+                items,
+                self.expr_list_item(),
+                expr_list_opt()
+                    .force_trailing_comma(items.len() == 1)
                     .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
-                    .tail(take_tail())
-                    .format(self)?
-            }
+                    .tail(take_tail()),
+            )?,
             ast::ExprKind::Binary(op, ref left, ref right) => {
                 self.binary_expr(left, right, op, take_tail())?
             }
@@ -170,30 +177,6 @@ impl AstFormatter {
             self.tail(tail)?;
         }
         Ok(())
-    }
-
-    pub fn expr_list<'ast>(
-        &self,
-        braces: &'static Braces,
-        expr_list: &'ast [P<ast::Expr>],
-    ) -> ListBuilder<
-        'ast,
-        '_,
-        P<ast::Expr>,
-        impl FormatListItem<P<ast::Expr>>,
-        impl ListConfig,
-        impl ListItemConfig<Item = P<ast::Expr>>,
-    > {
-        struct ExprListItemConfig;
-        impl ListItemConfig for ExprListItemConfig {
-            type Item = P<ast::Expr>;
-
-            fn last_item_prefers_overflow(expr: &Self::Item) -> bool {
-                matches!(expr.kind, ast::ExprKind::Closure(_))
-            }
-        }
-        list(braces, expr_list, self.expr_list_item())
-            .item_config(ExprListItemConfig)
     }
 
     pub fn expr_list_item(
@@ -357,21 +340,27 @@ impl AstFormatter {
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
         let first_line = self.out.line();
         self.expr_tail(func, &self.tail_token("("))?;
-        self.has_vertical_shape_unless(
+        self.has_vertical_shape_if(
+            self.out.line() != first_line,
             VerticalShape::Unrestricted,
-            self.out.line() == first_line,
             || self.call_args_after_open_paren(args, tail),
         )?;
         Ok(())
     }
 
     pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
-        let mut list = self.expr_list(Braces::PARENS, args);
+        let mut list_opt = expr_list_opt();
         let is_only_closure = args.len() == 1 && matches!(args[0].kind, ast::ExprKind::Closure(_));
         if !is_only_closure {
-            list = list.single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
+            list_opt =
+                list_opt.single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
         }
-        list.omit_open_brace().tail(tail).format(self)
+        self.list(
+            Braces::Parens,
+            args,
+            self.expr_list_item(),
+            list_opt.omit_open_brace().tail(tail),
+        )
     }
 
     fn delim_args(&self, delim_args: &ast::DelimArgs) -> FormatResult {
@@ -422,7 +411,7 @@ impl AstFormatter {
         let multi_line = || {
             // todo this is failing earlier than "indent middle" is really violated;
             //   do we need to revise the guidelines in VerticalShape docs?
-            self.has_vertical_shape_unless(VerticalShape::Unrestricted, else_.is_none(), || {
+            self.has_vertical_shape_if(else_.is_some(), VerticalShape::Unrestricted, || {
                 self.block_expr_vertical_after_open_brace(block)
             })?;
             let mut else_ = else_;
@@ -482,12 +471,16 @@ impl AstFormatter {
         self.qpath(&struct_.qself, &struct_.path, true)?;
         self.out.space()?;
         // todo indent middle and multi-line qpath?
-        list(Braces::CURLY, &struct_.fields, Self::expr_field)
-            // todo not wide enough?
-            .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
-            .rest(ListRest::from(&struct_.rest))
-            .tail(tail)
-            .format(self)?;
+        self.list(
+            Braces::Curly,
+            &struct_.fields,
+            Self::expr_field,
+            list_opt()
+                // todo not wide enough?
+                .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
+                .rest(ListRest::from(&struct_.rest))
+                .tail(tail),
+        )?;
         Ok(())
     }
 
@@ -514,4 +507,9 @@ impl AstFormatter {
         self.block_expr_vertical_after_open_brace(block)?;
         Ok(())
     }
+}
+
+pub fn expr_list_opt<'ast, 'tail>() -> ListOptions<'ast, 'tail, P<ast::Expr>> {
+    list_opt::<P<ast::Expr>>()
+        .item_prefers_overflow(|expr| matches!(expr.kind, ast::ExprKind::Closure(_)))
 }

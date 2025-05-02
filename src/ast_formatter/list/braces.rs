@@ -1,18 +1,37 @@
-pub struct Braces {
-    pub start: &'static str,
-    pub end: &'static str,
-    pub pad: bool,
+macro_rules! define_braces {
+    ($($name:ident($start:literal, $end:literal, $pad:literal),)*) => {
+        #[derive(Clone, Copy)]
+        pub enum Braces {
+            $($name,)*
+        }
+        
+        impl Braces {
+            pub fn start(self) -> &'static str {
+                match self {
+                    $(Self::$name => $start,)*
+                }
+            }
+            
+            pub fn end(self) -> &'static str {
+                match self {
+                    $(Self::$name => $end,)*
+                }
+            }
+            
+            pub fn pad(self) -> bool {
+                match self {
+                    $(Self::$name => $pad,)*
+                }
+            }
+        }
+    };
 }
 
-impl Braces {
-    pub const ANGLE: &'static Braces = &Braces::new("<", ">", false);
-    pub const CURLY: &'static Braces = &Braces::new("{", "}", true);
-    pub const CURLY_NO_PAD: &'static Braces = &Braces::new("{", "}", false);
-    pub const PARENS: &'static Braces = &Braces::new("(", ")", false);
-    pub const PIPE: &'static Braces = &Braces::new("|", "|", false);
-    pub const SQUARE: &'static Braces = &Braces::new("[", "]", false);
-
-    const fn new(start: &'static str, end: &'static str, pad: bool) -> Braces {
-        Braces { start, end, pad }
-    }
+define_braces! {
+    Angle("<", ">", false),
+    Curly("{", "}", true),
+    CurlyNoPad("{", "}", false),
+    Parens("(", ")", false),
+    Pipe("|", "|", false),
+    Square("[", "]", false),
 }

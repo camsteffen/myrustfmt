@@ -26,7 +26,7 @@ delegate_to_constraints! {
     pub fn vertical_shape(&self) -> VerticalShape;
     pub fn with_replace_vertical_shape<T>(&self, vertical_shape: VerticalShape, scope: impl FnOnce() -> T) -> T;
     pub fn has_vertical_shape<T>(&self, shape: VerticalShape, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
-    pub fn has_vertical_shape_unless<T>(&self, shape: VerticalShape, condition: bool, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
+    pub fn has_vertical_shape_if<T>(&self, condition: bool, shape: VerticalShape, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
 }
 
 impl AstFormatter {

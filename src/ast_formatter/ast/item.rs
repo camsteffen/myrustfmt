@@ -1,11 +1,10 @@
 use rustc_ast::ast;
-use rustc_span::symbol::Ident;
 use rustc_span::Symbol;
+use rustc_span::symbol::Ident;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::builder::list;
-use crate::ast_formatter::list::list_config::{ListConfig, ListWrapToFitConfig};
-use crate::ast_formatter::list::{Braces, ListItemConfig, ListItemContext};
+use crate::ast_formatter::list::{Braces, ListItemContext};
+use crate::ast_formatter::list::options::{list_opt, ListShape, ListWrapToFit};
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -126,8 +125,7 @@ impl AstFormatter {
     ) -> FormatResult {
         self.token_ident_generic_params("enum", item.ident, generics)?;
         self.out.space()?;
-        list(Braces::CURLY, variants, Self::variant)
-            .format_vertical(self)?;
+        self.list(Braces::Curly, variants, Self::variant, list_opt().shape(ListShape::Vertical))?;
         Ok(())
     }
 
@@ -313,17 +311,24 @@ impl AstFormatter {
                 if is_same_line {
                     self.out.space()?;
                 }
-                let list = list(Braces::CURLY, fields, Self::field_def)
-                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width);
-                if is_enum {
-                    list.format(self)?;
-                } else {
-                    list.format_vertical(self)?;
-                }
+                self.list(
+                    Braces::Curly,
+                    fields,
+                    Self::field_def,
+                    list_opt()
+                        .shape(if is_enum {
+                            ListShape::Flexible
+                        } else {
+                            ListShape::Vertical
+                        })
+                        .single_line_max_contents_width(
+                            RUSTFMT_CONFIG_DEFAULTS.struct_variant_width,
+                        ),
+                )?;
                 Ok(())
             }
             ast::VariantData::Tuple(fields, _) => {
-                list(Braces::PARENS, fields, Self::field_def).format(self)
+                self.list(Braces::Parens, fields, Self::field_def, list_opt())
             }
             ast::VariantData::Unit(_) => Ok(()),
         }
@@ -365,15 +370,17 @@ impl AstFormatter {
                         }),
                     )?;
                 } else {
-                    list(
-                        Braces::CURLY_NO_PAD,
+                    self.list(
+                        Braces::CurlyNoPad,
                         items,
                         |af, (use_tree, _), tail, _lcx| af.use_tree(use_tree, tail),
-                    )
-                    .config(UseTreeListConfig)
-                    .item_config(UseTreeListItemConfig)
-                    .tail(tail)
-                    .format(self)?;
+                        list_opt()
+                            .item_requires_own_line(|(use_tree, _): &(ast::UseTree, _)| {
+                                matches!(use_tree.kind, ast::UseTreeKind::Nested { .. })
+                            })
+                            .wrap_to_fit(ListWrapToFit::Yes { max_element_width: None })
+                            .tail(tail),
+                    )?;
                 }
             }
             ast::UseTreeKind::Glob => {
@@ -383,24 +390,5 @@ impl AstFormatter {
             }
         }
         Ok(())
-    }
-}
-
-struct UseTreeListConfig;
-
-impl ListConfig for UseTreeListConfig {
-    fn wrap_to_fit() -> ListWrapToFitConfig {
-        ListWrapToFitConfig::Yes {
-            max_element_width: None,
-        }
-    }
-}
-
-struct UseTreeListItemConfig;
-impl ListItemConfig for UseTreeListItemConfig {
-    type Item = (ast::UseTree, ast::NodeId);
-
-    fn item_requires_own_line((item, _): &Self::Item) -> bool {
-        matches!(item.kind, ast::UseTreeKind::Nested { .. })
     }
 }
