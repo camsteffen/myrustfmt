@@ -1,50 +1,44 @@
+use derive_where::derive_where;
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::tail::Tail;
 use crate::num::HPos;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Default, PartialEq)]
 pub enum ListShape {
+    #[default]
     Flexible,
     Horizontal,
     Vertical,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub enum ListWrapToFit {
+    #[default]
     No,
     Yes { max_element_width: Option<HPos> },
 }
 
 pub fn list_opt<'ast, 'tail, Item>() -> ListOptions<'ast, 'tail, Item> {
-    ListOptions {
-        shape: ListShape::Flexible,
-        rest: ListRest::None,
-        tail: Tail::none(),
-        item_prefers_overflow: Box::new(|_| false),
-        item_requires_own_line: Box::new(|_| false),
-        force_trailing_comma: false,
-        omit_open_brace: false,
-        single_line_max_contents_width: None,
-        wrap_to_fit: ListWrapToFit::No,
-    }
+    ListOptions::default()
 }
 
+#[derive_where(Default)]
 pub struct ListOptions<'ast, 'tail, Item> {
-    pub rest: ListRest<'ast>,
+    pub rest: Option<ListRest<'ast>>,
     pub shape: ListShape,
     pub tail: &'tail Tail<'ast>,
+    pub force_trailing_comma: bool,
     /// Called with the last item in the list. Returns true if that item always prefers overflow
     /// to being wrapped to the next line.
-    pub item_prefers_overflow: Box<dyn Fn(&Item) -> bool>,
-    pub item_requires_own_line: Box<dyn Fn(&Item) -> bool>,
-    pub force_trailing_comma: bool,
+    pub item_prefers_overflow: Option<Box<dyn Fn(&Item) -> bool>>,
+    pub item_requires_own_line: Option<Box<dyn Fn(&Item) -> bool>>,
     pub omit_open_brace: bool,
     pub single_line_max_contents_width: Option<HPos>,
     pub wrap_to_fit: ListWrapToFit,
 }
 
 impl<'ast, 'tail, Item> ListOptions<'ast, 'tail, Item> {
-    pub fn rest(self, rest: ListRest<'ast>) -> Self {
+    pub fn rest(self, rest: Option<ListRest<'ast>>) -> Self {
         ListOptions { rest, ..self }
     }
 
@@ -68,7 +62,7 @@ impl<'ast, 'tail, Item> ListOptions<'ast, 'tail, Item> {
         item_prefers_overflow: impl Fn(&Item) -> bool + 'static,
     ) -> Self {
         Self {
-            item_prefers_overflow: Box::new(item_prefers_overflow),
+            item_prefers_overflow: Some(Box::new(item_prefers_overflow)),
             ..self
         }
     }
@@ -78,7 +72,7 @@ impl<'ast, 'tail, Item> ListOptions<'ast, 'tail, Item> {
         item_requires_own_line: impl Fn(&Item) -> bool + 'static,
     ) -> Self {
         Self {
-            item_requires_own_line: Box::new(item_requires_own_line),
+            item_requires_own_line: Some(Box::new(item_requires_own_line)),
             ..self
         }
     }

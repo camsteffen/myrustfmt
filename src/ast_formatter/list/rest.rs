@@ -1,34 +1,24 @@
 use rustc_ast::ast;
 
 #[derive(Clone, Copy)]
-pub enum ListRest<'a> {
-    None,
-    Rest,
-    Base(&'a ast::Expr),
+pub struct ListRest<'a> {
+    pub base: Option<&'a ast::Expr>,
 }
 
-impl ListRest<'_> {
-    pub fn is_none(self) -> bool {
-        matches!(self, ListRest::None)
-    }
-}
-
-impl From<ast::PatFieldsRest> for ListRest<'static> {
-    fn from(rest: ast::PatFieldsRest) -> Self {
+impl<'a> ListRest<'a> {
+    pub fn from_pat_fields_rest(rest: ast::PatFieldsRest) -> Option<Self> {
         match rest {
-            ast::PatFieldsRest::None => ListRest::None,
-            ast::PatFieldsRest::Rest => ListRest::Rest,
+            ast::PatFieldsRest::None => None,
+            ast::PatFieldsRest::Rest => Some(ListRest { base: None }),
             ast::PatFieldsRest::Recovered(_) => todo!(),
         }
     }
-}
-
-impl<'a> From<&'a ast::StructRest> for ListRest<'a> {
-    fn from(rest: &'a ast::StructRest) -> Self {
+    
+    pub fn from_struct_rest(rest: &'a ast::StructRest) -> Option<Self> {
         match rest {
-            ast::StructRest::None => ListRest::None,
-            ast::StructRest::Rest(_) => ListRest::Rest,
-            ast::StructRest::Base(expr) => ListRest::Base(expr),
+            ast::StructRest::None => None,
+            ast::StructRest::Rest(_) => Some(ListRest { base: None }),
+            ast::StructRest::Base(expr) => Some(ListRest { base: Some(expr) }),
         }
     }
 }

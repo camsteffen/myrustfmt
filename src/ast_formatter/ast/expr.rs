@@ -478,7 +478,7 @@ impl AstFormatter {
             list_opt()
                 // todo not wide enough?
                 .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
-                .rest(ListRest::from(&struct_.rest))
+                .rest(ListRest::from_struct_rest(&struct_.rest))
                 .tail(tail),
         )?;
         Ok(())

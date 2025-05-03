@@ -5,6 +5,7 @@ edition = "2024"
 #build = "build.rs"
 
 [dependencies]
+derive-where = "1.4.0"
 tracing = "0.1.35"
 thiserror = "2.0.8"
 serde = { version = "1.0.217", features = ["derive"] }

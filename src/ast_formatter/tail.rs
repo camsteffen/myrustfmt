@@ -15,7 +15,14 @@ use crate::error::FormatResult;
 /// restored when the Tail is rendered.
 ///
 /// As a general rule, ONLY add a Tail argument to a function if it affects the formatting strategy.
+// todo use type alias?
 pub struct Tail<'a>(Option<TailImpl<'a>>);
+
+impl Default for &Tail<'_> {
+    fn default() -> Self {
+        Tail::none()
+    }
+}
 
 struct TailImpl<'a> {
     func: Box<dyn Fn(&AstFormatter) -> FormatResult + 'a>,

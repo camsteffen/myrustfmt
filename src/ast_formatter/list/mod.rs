@@ -76,7 +76,7 @@ where
             Ok { height: u32 },
         }
         let result = self.af.out.with_enforce_max_width(|| -> FormatResult<_> {
-            if self.list.iter().any(&self.opt.item_requires_own_line) {
+            if self.opt.item_requires_own_line.as_ref().is_some_and(|f| self.list.iter().any(f)) {
                 return Ok(HorizontalResult::Skip);
             }
             if self.contents_horizontal().is_err() {
@@ -100,7 +100,7 @@ where
             HorizontalResult::Ok { height: 1 } => {}
             HorizontalResult::Ok { .. }
                 if self.opt.rest.is_none()
-                    && (self.opt.item_prefers_overflow)(self.list.last().unwrap()) => {}
+                    && self.opt.item_prefers_overflow.as_ref().is_some_and(|f| f(self.list.last().unwrap())) => {}
             HorizontalResult::Ok {
                 height: overflow_height,
             } => {
@@ -201,7 +201,7 @@ where
             });
             af.with_width_limit_first_line_opt(opt.single_line_max_contents_width, move || {
                 if len == 0 {
-                    if !rest.is_none() {
+                    if let Some(rest) = rest {
                         list_rest(af, rest, &close_tail)?;
                     }
                     return Ok(());
@@ -214,7 +214,7 @@ where
                 }
                 // A tail is only necessary with the last item since it may overflow
                 format_index(last, &last_tail)?;
-                if !rest.is_none() {
+                if let Some(rest) = rest {
                     af.out.space()?;
                     list_rest(af, rest, &close_tail)?;
                 }
@@ -263,7 +263,7 @@ where
                     af.out.token_maybe_missing(",")?;
                     Ok(())
                 };
-                let is_own_line = prev_must_have_own_line || (opt.item_requires_own_line)(&list[index]);
+                let is_own_line = prev_must_have_own_line || opt.item_requires_own_line.as_ref().is_some_and(|f| f(&list[index]));
                 if is_own_line {
                     prev_must_have_own_line = !prev_must_have_own_line;
                 }
@@ -302,7 +302,7 @@ where
         };
         af.enclosed_after_opening(braces.end(), || {
             match opt.rest {
-                ListRest::None => {
+                None => {
                     for index in 0..len - 1 {
                         item_comma(index)?;
                         // todo should this be "between"?
@@ -310,12 +310,12 @@ where
                     }
                     item_comma(len - 1)?;
                 }
-                _ => {
+                Some(rest) => {
                     for index in 0..len {
                         item_comma(index)?;
                         af.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     }
-                    list_rest(af, opt.rest, Tail::none())?;
+                    list_rest(af, rest, Tail::none())?;
                 }
             }
             Ok(())
@@ -327,7 +327,7 @@ where
 
 fn list_rest(af: &AstFormatter, rest: ListRest<'_>, tail: &Tail) -> FormatResult {
     af.out.token("..")?;
-    if let ListRest::Base(expr) = rest {
+    if let Some(expr) = rest.base {
         af.expr_tail(expr, tail)?;
     } else {
         af.tail(tail)?;

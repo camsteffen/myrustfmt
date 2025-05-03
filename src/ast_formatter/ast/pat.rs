@@ -114,7 +114,7 @@ impl AstFormatter {
         self.list(Braces::Curly, fields, Self::pat_field
                   , list_opt()
             .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
-            .rest(ListRest::from(rest))
+            .rest(ListRest::from_pat_fields_rest(rest))
             .tail(tail))
     }
 

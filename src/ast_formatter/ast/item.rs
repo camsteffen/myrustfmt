@@ -399,7 +399,7 @@ impl AstFormatter {
 
 fn use_tree_order(a: &ast::UseTree, b: &ast::UseTree) -> Ordering {
     cmp_iter_by_key(&a.prefix.segments, &b.prefix.segments, |s| s.ident.as_str())
-        .then_with(|| cmp_by_key(a, b, |use_tree| {
+        .then_with(|| cmp_by_key(a, b, |use_tree| -> u8 {
             match use_tree.kind {
                 ast::UseTreeKind::Simple(_) => 0,
                 ast::UseTreeKind::Glob => 1,
@@ -408,13 +408,13 @@ fn use_tree_order(a: &ast::UseTree, b: &ast::UseTree) -> Ordering {
         }))
         .then_with(|| {
             match (&a.kind, &b.kind) {
+                // y'all imported the same thing twice!
+                (ast::UseTreeKind::Simple(_), ast::UseTreeKind::Simple(_)) => Ordering::Equal,
                 (ast::UseTreeKind::Glob, ast::UseTreeKind::Glob) => Ordering::Equal,
                 (
                     ast::UseTreeKind::Nested { items: a, .. },
                     ast::UseTreeKind::Nested { items: b, .. },
                 ) => cmp_iter_by(a, b, |(a, _), (b, _)| use_tree_order(a, b)),
-                // importing the same thing twice - don't sort
-                (ast::UseTreeKind::Simple(_), ast::UseTreeKind::Simple(_)) => Ordering::Equal,
                 _ => unreachable!(),
             }
         })
