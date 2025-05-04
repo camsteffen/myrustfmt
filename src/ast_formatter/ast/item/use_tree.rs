@@ -12,6 +12,7 @@ use crate::util::cmp::{cmp_by_key, cmp_iter_by};
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
+    /// A contiguous group of `use` declarations that can be sorted
     pub fn use_tree_group(&self, group: &[P<ast::Item>]) -> FormatResult {
         fn get_use_tree(item: &ast::Item) -> &ast::UseTree {
             match &item.kind {
