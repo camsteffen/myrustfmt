@@ -1,4 +1,4 @@
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VerticalWhitespaceMode {
     /// "between items" where a blank line is allowed (e.g. between statements or items)
     Between,
@@ -9,6 +9,8 @@ pub enum VerticalWhitespaceMode {
     /// a line break where blank lines should be removed, usually breaking a construct into
     /// multiple lines that could have been on one line
     Break,
+    /// Stop after one newline even if there is more whitespace or comments
+    SingleNewline,
 }
 
 impl VerticalWhitespaceMode {
@@ -18,6 +20,7 @@ impl VerticalWhitespaceMode {
             VerticalWhitespaceMode::Top => is_comments_before,
             VerticalWhitespaceMode::Bottom => is_comments_after,
             VerticalWhitespaceMode::Break => is_comments_before && is_comments_after,
+            VerticalWhitespaceMode::SingleNewline => false,
         }
     }
 }

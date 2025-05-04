@@ -23,7 +23,7 @@ impl AstFormatter {
             self.out.source_reader.goto(item.span.lo());
             self.item(item)?;
             if i < group.len() - 1 {
-                self.out.newline_indent(VerticalWhitespaceMode::Between)?;
+                self.out.newline_indent(VerticalWhitespaceMode::SingleNewline)?;
             }
         }
         // todo consider comments

@@ -75,6 +75,14 @@ impl WhitespaceMode {
     pub fn is_horizontal(self) -> bool {
         matches!(self, WhitespaceMode::Horizontal { .. })
     }
+    
+    pub fn vertical_mode(self) -> Option<VerticalWhitespaceMode> {
+        match self {
+            WhitespaceMode::Horizontal {..}=> None,
+            WhitespaceMode::Vertical(mode) => Some(mode),
+            WhitespaceMode::Flexible { vertical_mode, .. } => Some(vertical_mode),
+        }
+    }
 }
 
 impl SourceFormatter {
@@ -179,10 +187,14 @@ fn actions_from_tokens<'a>(
     source: &'a str,
 ) -> impl Iterator<Item = (WhitespaceAction, u32)> + 'a {
     let mut tokens = tokens.peekable();
+    let mut emitted_newline = false;
     let mut seen_comments = false;
     let mut last_is_line_comment = false;
     let mut remaining = source;
     std::iter::from_fn(move || {
+        if mode.vertical_mode() == Some(VerticalWhitespaceMode::SingleNewline) && emitted_newline {
+            return None;
+        }
         let Some(token) = tokens.next() else {
             if last_is_line_comment {
                 last_is_line_comment = false;
@@ -222,6 +234,7 @@ fn actions_from_tokens<'a>(
             let strategy = whitespace_token_strategy(mode, seen_comments, is_comments_after);
             whitespace_token_action(token_str, token.len, strategy, is_comments_after)
         };
+        emitted_newline |= matches!(action, WhitespaceAction::EmitNewline {..});
         seen_comments |= is_comment;
         last_is_line_comment = is_line_comment;
         Some((action, token.len))
