@@ -1,15 +1,15 @@
+mod use_tree;
+
 use rustc_ast::ast;
-use rustc_span::Symbol;
+use rustc_span::{Symbol};
 use rustc_span::symbol::Ident;
-use std::cmp::Ordering;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{Braces, ListItemContext};
-use crate::ast_formatter::list::options::{list_opt, ListShape, ListWrapToFit};
+use crate::ast_formatter::list::options::{list_opt, ListShape, };
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
-use crate::util::cmp::{cmp_by_key, cmp_iter_by, cmp_iter_by_key};
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
@@ -32,10 +32,7 @@ impl AstFormatter {
     pub fn item_kind(&self, kind: &ast::ItemKind, item: &ast::Item) -> FormatResult {
         match *kind {
             ast::ItemKind::ExternCrate(name) => self.extern_crate(name, item)?,
-            ast::ItemKind::Use(ref use_tree) => {
-                self.out.token_space("use")?;
-                self.use_tree(use_tree, &self.tail_token(";"))?;
-            }
+            ast::ItemKind::Use(ref use_tree) => self.use_declaration(use_tree)?,
             ast::ItemKind::Static(ref static_item) => {
                 self.out.token_space("static")?;
                 self.ident(item.ident)?;
@@ -347,75 +344,4 @@ impl AstFormatter {
             Ok(())
         })
     }
-
-    fn use_tree<'a>(&self, use_tree: &'a ast::UseTree, tail: &Tail) -> FormatResult {
-        self.path(&use_tree.prefix, false)?;
-        match use_tree.kind {
-            ast::UseTreeKind::Glob => {
-                self.out.token("::")?;
-                self.out.token("*")?;
-                self.tail(tail)?;
-            }
-            ast::UseTreeKind::Nested { ref items, span: _ } => {
-                self.out.token("::")?;
-                if let [(item, _)] = &items[..] {
-                    self.out.skip_token("{")?;
-                    self.use_tree(
-                        item,
-                        &self.tail_fn(|af| {
-                            af.out.skip_token_if_present(",")?;
-                            af.out.skip_token("}")?;
-                            af.tail(tail)?;
-                            Ok(())
-                        }),
-                    )?;
-                } else {
-                    let mut sorted = Vec::from_iter(items.iter().map(|(ut, _)| ut));
-                    sorted.sort_by(|&a, &b| use_tree_order(a, b));
-                    self.list(
-                        Braces::CurlyNoPad,
-                        &sorted,
-                        |af, use_tree, tail, _lcx| af.use_tree(use_tree, tail),
-                        list_opt()
-                            .item_requires_own_line(|use_tree: &&ast::UseTree| {
-                                matches!(use_tree.kind, ast::UseTreeKind::Nested { .. })
-                            })
-                            .wrap_to_fit(ListWrapToFit::Yes { max_element_width: None })
-                            .tail(tail),
-                    )?;
-                }
-            }
-            ast::UseTreeKind::Simple(rename) => {
-                if let Some(rename) = rename {
-                    self.out.space_token_space("as")?;
-                    self.ident(rename)?;
-                }
-                self.tail(tail)?;
-            }
-        }
-        Ok(())
-    }
-}
-
-fn use_tree_order(a: &ast::UseTree, b: &ast::UseTree) -> Ordering {
-    cmp_iter_by_key(&a.prefix.segments, &b.prefix.segments, |s| s.ident.as_str())
-        .then_with(|| cmp_by_key(a, b, |use_tree| -> u8 {
-            match use_tree.kind {
-                ast::UseTreeKind::Simple(_) => 0,
-                ast::UseTreeKind::Glob => 1,
-                ast::UseTreeKind::Nested { .. } => 2,
-            }
-        }))
-        .then_with(|| {
-            match (&a.kind, &b.kind) {
-                // y'all imported the same thing twice!
-                (ast::UseTreeKind::Simple(_), ast::UseTreeKind::Simple(_)) => Ordering::Equal,
-                (ast::UseTreeKind::Glob, ast::UseTreeKind::Glob) => Ordering::Equal,
-                (
-                    ast::UseTreeKind::Nested { items: a, .. },
-                    ast::UseTreeKind::Nested { items: b, .. },
-                ) => cmp_iter_by(a, b, |(a, _), (b, _)| use_tree_order(a, b)),
-                _ => unreachable!(),
-            }
-        })
 }

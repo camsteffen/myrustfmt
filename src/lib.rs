@@ -47,6 +47,7 @@ mod submodules;
 mod util;
 mod whitespace;
 
+use std::sync::Arc;
 use crate::ast_formatter::format_module;
 use crate::config::Config;
 use crate::parse::{ParseModuleResult, parse_module};
@@ -211,13 +212,13 @@ fn format_module_file(
         .map_err(|ErrorGuaranteed { .. }| ())?;
     let ParseModuleResult {
         module,
-        source,
+        source_file,
         submodules,
     } = result;
-    let source = Rc::new(source);
+    let source = Arc::clone(source_file.src.as_ref().expect("the SourceFile should have src"));
     let result = format_module(
         &module,
-        Rc::clone(&source),
+        source_file,
         Some(path.to_path_buf()),
         config,
     );
@@ -231,9 +232,9 @@ pub fn format_str(source: &str, config: Config) -> Result<FormatModuleResult, Er
     rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
         let ParseModuleResult {
             module,
-            source,
+            source_file,
             submodules: _,
         } = parse_module(CrateSource::Source(source), None)?;
-        Ok(format_module(&module, Rc::new(source), None, &config))
+        Ok(format_module(&module, source_file, None, &config))
     })
 }

@@ -80,7 +80,7 @@ impl WhitespaceMode {
 impl SourceFormatter {
     fn whitespace_and_comments(&self, mode: WhitespaceMode) -> FormatResult {
         let mut is_required_whitespace_emitted = false;
-        let source = self.source.remaining();
+        let source = self.source_reader.remaining();
         let tokens = tokenize(source);
         let actions = actions_from_tokens(tokens, mode, source);
         for (action, len) in actions {
@@ -91,7 +91,7 @@ impl SourceFormatter {
                         .with_replace_width_limit(None, || self.copy(len))?;
                 }
                 WhitespaceAction::EmitNewline { double, indent } => {
-                    self.source.advance(len);
+                    self.source_reader.advance(len);
                     self.out.newline()?;
                     if double {
                         self.out.newline()?;
@@ -102,7 +102,7 @@ impl SourceFormatter {
                     is_required_whitespace_emitted = true;
                 }
                 WhitespaceAction::EmitSpace => {
-                    self.source.advance(len);
+                    self.source_reader.advance(len);
                     self.out.token(" ")?;
                     match mode {
                         WhitespaceMode::Horizontal { .. } | WhitespaceMode::Flexible { .. } => {
@@ -112,7 +112,7 @@ impl SourceFormatter {
                     }
                 }
                 WhitespaceAction::NewlineNotAllowed { distance } => {
-                    self.source.advance(distance);
+                    self.source_reader.advance(distance);
                     return Err(ConstraintErrorKind::NewlineNotAllowed.into());
                 }
                 WhitespaceAction::LineCommentNotAllowed => {
@@ -121,7 +121,7 @@ impl SourceFormatter {
                 WhitespaceAction::MultiLineCommentNotAllowed => {
                     return Err(ConstraintErrorKind::MultiLineCommentNotAllowed.into());
                 }
-                WhitespaceAction::Skip => self.source.advance(len),
+                WhitespaceAction::Skip => self.source_reader.advance(len),
             }
         }
         if !is_required_whitespace_emitted {

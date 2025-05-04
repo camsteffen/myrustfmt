@@ -26,14 +26,3 @@ pub fn cmp_iter_by<T>(
         }
     }
 }
-
-pub fn cmp_iter_by_key<T, U>(
-    a: impl IntoIterator<Item = T>,
-    b: impl IntoIterator<Item = T>,
-    f: impl Fn(T) -> U,
-) -> Ordering
-where
-    U: Ord,
-{
-    cmp_iter_by(a, b, |a, b| cmp_by_key(a, b, &f))
-}

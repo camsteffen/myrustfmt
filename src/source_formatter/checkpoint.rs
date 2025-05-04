@@ -41,7 +41,7 @@ impl SourceFormatter {
             error_emitter_checkpoint,
             index,
             owner: self,
-            source_pos: self.source.pos.get(),
+            source_pos: self.source_reader.pos.get(),
             writer_checkpoint: self.out.checkpoint(),
         }
     }
@@ -64,7 +64,7 @@ impl SourceFormatter {
                 .restore_checkpoint(error_emitter_checkpoint);
         }
         self.out.restore_checkpoint(writer_checkpoint);
-        self.source.pos.set(source_pos);
+        self.source_reader.pos.set(source_pos);
     }
 
     pub fn capture_lookahead(&self, from: &Checkpoint) -> Lookahead {
@@ -77,8 +77,8 @@ impl SourceFormatter {
             None => Vec::new(),
         };
         let writer_lookahead = self.out.capture_lookahead(&from.writer_checkpoint);
-        let source_pos = self.source.pos.get();
-        self.source.pos.set(from.source_pos);
+        let source_pos = self.source_reader.pos.get();
+        self.source_reader.pos.set(from.source_pos);
         Lookahead {
             error_buffer,
             source_pos,
@@ -94,6 +94,6 @@ impl SourceFormatter {
         } = lookahead;
         self.error_emitter.push_vec(error_buffer);
         self.out.restore_lookahead(writer_lookahead);
-        self.source.pos.set(source_pos);
+        self.source_reader.pos.set(source_pos);
     }
 }

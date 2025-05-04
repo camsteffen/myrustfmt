@@ -9,15 +9,14 @@ use rustc_errors::emitter::stderr_destination;
 use rustc_parse::parser::ExpTokenPair;
 use rustc_parse::parser::Parser;
 use rustc_session::parse::ParseSess;
-use rustc_span::FileName;
-use rustc_span::source_map::FilePathMapping;
-use rustc_span::source_map::SourceMap;
+use rustc_span::{SourceFile,FileName};
+use rustc_span::source_map::{FilePathMapping, SourceMap};
 use rustc_span::symbol::Ident;
 use std::sync::Arc;
 
 pub struct ParseModuleResult {
     pub module: AstModule,
-    pub source: String,
+    pub source_file: SourceFile,
     pub submodules: Vec<Submodule>,
 }
 
@@ -25,56 +24,50 @@ pub fn parse_module(
     crate_source: CrateSource,
     relative: Option<Ident>,
 ) -> Result<ParseModuleResult, ErrorGuaranteed> {
-    // We don't share a ParseSess across crates because its SourceMap would hold every
-    // crate's contents in memory with no way to clear it
-    let psess = build_parse_sess();
-
-    let mut parser = build_parser(&psess, crate_source);
-
-    let source = {
-        // the SourceMap entry is inserted when the parser is created above
-        let [file] = &psess.source_map().files()[..] else {
-            panic!("the SourceMap should have exactly one file");
+    let module;
+    let submodules;
+    let source_file;
+    // This block ensures we have a unique reference to the SourceFile at the end.
+    {
+        // Create a fresh SourceMap, ParseSess, etc. for every file to avoid unnecessarily
+        // accumulating files in memory.
+        let source_map = Arc::new(SourceMap::new(FilePathMapping::empty()));
+        
+        let dcx = build_diag_ctxt(Arc::clone(&source_map));
+        let psess = ParseSess::with_dcx(dcx, Arc::clone(&source_map));
+        
+        let mut parser = build_parser(&psess, crate_source);
+        let (attrs, items, spans) = parser
+            .parse_mod(ExpTokenPair {
+                tok: &rustc_ast::token::Eof,
+                token_type: rustc_parse::parser::token_type::TokenType::Eof,
+            })
+            .map_err(|err| err.emit())?;
+        if let Some(error) = psess.dcx().has_errors() {
+            return Err(error);
+        }
+        
+        module = AstModule { attrs, items, spans };
+        
+        submodules = match crate_source {
+            CrateSource::File(path) => get_submodules(&psess, &module, path, relative),
+            CrateSource::Source(_) => Vec::new(),
         };
-        Arc::clone(file.src.as_ref().expect("the SourceFile should have src"))
-    };
 
-    let (attrs, items, spans) = parser
-        .parse_mod(ExpTokenPair {
-            tok: &rustc_ast::token::Eof,
-            token_type: rustc_parse::parser::token_type::TokenType::Eof,
-        })
-        .map_err(|err| err.emit())?;
-    let module = AstModule {
-        attrs,
-        items,
-        spans,
-    };
-    if let Some(error) = psess.dcx().has_errors() {
-        return Err(error);
+        source_file = match source_map.files().as_slice() {
+            [file] => Arc::clone(file),
+            _ => panic!("the SourceMap should have exactly one SourceFile"),
+        };
     }
-
-    let submodules = match crate_source {
-        CrateSource::File(path) => get_submodules(&psess, &module, path, relative),
-        CrateSource::Source(_) => Vec::new(),
-    };
-
-    // drop ParseSess so that `source` is a single reference, then unwrap it
-    drop(psess);
-    let source = Arc::into_inner(source)
-        .expect("there should be no references to source");
+    
+    let source_file = Arc::into_inner(source_file)
+        .expect("should have a unique reference to the SourceFile");
 
     Ok(ParseModuleResult {
         module,
-        source,
+        source_file,
         submodules,
     })
-}
-
-fn build_parse_sess() -> ParseSess {
-    let source_map = Arc::new(SourceMap::new(FilePathMapping::empty()));
-    let dcx = build_diag_ctxt(source_map.clone());
-    ParseSess::with_dcx(dcx, source_map)
 }
 
 fn build_diag_ctxt(source_map: Arc<SourceMap>) -> DiagCtxt {

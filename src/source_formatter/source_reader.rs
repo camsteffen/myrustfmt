@@ -1,35 +1,43 @@
 use crate::error::{parse_error_display, ParseError};
-use rustc_span::{BytePos, Pos, Span};
+use rustc_span::{SourceFile,BytePos, Pos, Span};
 use std::cell::Cell;
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct SourceReader {
     path: Option<PathBuf>,
     pub pos: Cell<BytePos>,
-    pub source: Rc<String>,
+    pub source_file: Arc<SourceFile>,
 }
 
 impl SourceReader {
-    pub fn new(path: Option<PathBuf>, source: Rc<String>) -> SourceReader {
+    pub fn new(path: Option<PathBuf>, source_file: Arc<SourceFile>) -> SourceReader {
         SourceReader {
             path,
-            source,
+            source_file,
             pos: Cell::new(BytePos(0)),
         }
     }
 
     pub fn finish(self) {
-        if self.pos.get().to_usize() != self.source.len() {
+        if self.pos.get().to_usize() != self.source().len() {
             // todo don't panic?
             panic!(
                 "Failed to reach end of file. Next char: {:?}",
-                self.source[self.pos.get().to_usize()..]
+                self.source()[self.pos.get().to_usize()..]
                     .chars()
                     .next()
                     .unwrap()
             );
         }
+    }
+    
+    pub fn pos(&self) -> BytePos {
+        self.pos.get()
+    }
+    
+    pub fn source(&self) -> &str {
+        self.source_file.src.as_ref().expect("SourceFile should have src")
     }
 
     pub fn advance(&self, len: u32) {
@@ -62,20 +70,24 @@ impl SourceReader {
         self.advance(token.len);
         &self.remaining()[..token.len.try_into().unwrap()]
     }
+    
+    pub fn goto(&self, pos: BytePos) {
+        self.pos.set(pos);
+    }
 
     fn next_token(&self) -> rustc_lexer::Token {
         rustc_lexer::tokenize(self.remaining()).next().unwrap()
     }
 
     pub fn remaining(&self) -> &str {
-        &self.source[self.pos.get().to_usize()..]
+        &self.source()[self.pos.get().to_usize()..]
     }
 
     pub fn get_span(&self, span: Span) -> &str {
-        &self.source[span.lo().to_usize()..span.hi().to_usize()]
+        &self.source()[span.lo().to_usize()..span.hi().to_usize()]
     }
 
     fn parse_error(&self, error: ParseError) -> ! {
-        panic!("{}", parse_error_display(error, self.path.as_deref(), &self.source, self.pos.get()));
+        panic!("{}", parse_error_display(error, self.path.as_deref(), self.source(), self.pos.get()));
     }
 }

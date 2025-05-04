@@ -10,8 +10,9 @@ use crate::error::FormatResult;
 use crate::error_emitter::{BufferedErrorEmitter, Error};
 use self::source_reader::SourceReader;
 use crate::util::chars::is_closer_char;
-use rustc_span::{BytePos, Pos, Span};
+use rustc_span::{SourceFile,BytePos, Pos, Span};
 use std::rc::Rc;
+use std::sync::Arc;
 use crate::constraint_writer::checkpoint::ConstraintWriterLookahead;
 use crate::num::HPos;
 
@@ -25,7 +26,8 @@ pub struct Lookahead {
 pub struct SourceFormatter {
     checkpoint_count: Cell<u32>,
     error_emitter: Rc<BufferedErrorEmitter>,
-    source: SourceReader,
+    // This should be encapsulated, but we break that rule sometimes
+    pub source_reader: SourceReader,
     out: ConstraintWriter,
     /// The number of spaces for the current level of indentation
     pub total_indent: Cell<HPos>,
@@ -63,16 +65,17 @@ delegate_to_constraint_writer! {
 impl SourceFormatter {
     pub fn new(
         path: Option<PathBuf>,
-        source: Rc<String>,
+        source_file: Arc<SourceFile>,
         constraints: Constraints,
         error_emitter: Rc<BufferedErrorEmitter>,
     ) -> SourceFormatter {
-        let capacity = source.len() * 2;
+        let source_reader = SourceReader::new(path, source_file);
+        let capacity = source_reader.source().len() * 2;
         let out = ConstraintWriter::new(constraints, Rc::clone(&error_emitter), capacity);
         SourceFormatter {
             checkpoint_count: Cell::new(0),
             error_emitter,
-            source: SourceReader::new(path, source),
+            source_reader,
             out,
             total_indent: Cell::new(0),
         }
@@ -80,7 +83,7 @@ impl SourceFormatter {
 
     pub fn finish(self) -> String {
         assert_eq!(self.checkpoint_count.get(), 0);
-        self.source.finish();
+        self.source_reader.finish();
         self.out.finish()
     }
 
@@ -88,17 +91,9 @@ impl SourceFormatter {
         (self.out.line(), self.out.last_line_len())
     }
 
-    pub fn source_pos(&self) -> BytePos {
-        self.source.pos.get()
-    }
-
-    pub fn source(&self) -> &str {
-        &self.source.source
-    }
-
     pub fn skip_token(&self, token: &'static str) -> FormatResult {
         self.horizontal_whitespace()?;
-        self.source.eat(token);
+        self.source_reader.eat(token);
         Ok(())
     }
 
@@ -106,9 +101,9 @@ impl SourceFormatter {
         // todo is this checkpoint avoidable?
         let checkpoint = self.checkpoint();
         let ws_result = self.horizontal_whitespace();
-        if self.source.remaining().starts_with(token) {
+        if self.source_reader.remaining().starts_with(token) {
             ws_result?;
-            self.source.advance(token.len().try_into().unwrap());
+            self.source_reader.advance(token.len().try_into().unwrap());
             Ok(true)
         } else {
             self.restore_checkpoint(&checkpoint);
@@ -118,7 +113,7 @@ impl SourceFormatter {
 
     pub fn copy_next_token(&self) -> FormatResult {
         self.horizontal_whitespace()?;
-        let token = self.source.eat_next_token();
+        let token = self.source_reader.eat_next_token();
         self.out.token(token)?;
         Ok(())
     }
@@ -129,7 +124,7 @@ impl SourceFormatter {
     /// N.B. a token is indivisible (e.g. "::<" is two tokens since you can write it as "::  <")
     pub fn token(&self, token: &'static str) -> FormatResult {
         self.horizontal_whitespace()?;
-        self.source.eat(token);
+        self.source_reader.eat(token);
         self.out.token(token)?;
         Ok(())
     }
@@ -168,22 +163,22 @@ impl SourceFormatter {
     /// Copy a token from source
     pub fn token_from_source(&self, span: Span) -> FormatResult {
         self.horizontal_whitespace()?;
-        self.source.expect_pos(span.lo());
-        let token = self.source.get_span(span);
+        self.source_reader.expect_pos(span.lo());
+        let token = self.source_reader.get_span(span);
         self.token_unchecked(token)?;
         Ok(())
     }
 
     fn copy(&self, len: u32) -> FormatResult {
-        let segment = &self.source.remaining()[..len.try_into().unwrap()];
+        let segment = &self.source_reader.remaining()[..len.try_into().unwrap()];
         self.out.write_possibly_multiline(segment)?;
-        self.source.advance(len);
+        self.source_reader.advance(len);
         Ok(())
     }
 
     pub fn copy_span(&self, span: Span) -> FormatResult {
         self.horizontal_whitespace()?;
-        self.source.expect_pos(span.lo());
+        self.source_reader.expect_pos(span.lo());
         self.copy(span.hi().to_u32() - span.lo().to_u32())?;
         Ok(())
     }
@@ -191,7 +186,7 @@ impl SourceFormatter {
     /** Write a token assuming it is next in source */
     fn token_unchecked(&self, token: &str) -> FormatResult {
         self.out.token(token)?;
-        self.source.advance(token.len().try_into().unwrap());
+        self.source_reader.advance(token.len().try_into().unwrap());
         Ok(())
     }
 

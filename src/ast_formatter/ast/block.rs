@@ -178,7 +178,7 @@ impl AstFormatter {
         if !expr.attrs.is_empty() {
             return None;
         }
-        let source = self.out.source();
+        let source = self.out.source_reader.source();
         let before_expr = &source[block.span.lo().to_usize() + 1..expr.span.lo().to_usize()];
         let after_expr = &source[expr.span.hi().to_usize()..block.span.hi().to_usize() - 1];
         if !(is_whitespace(before_expr) && is_whitespace(after_expr)) {

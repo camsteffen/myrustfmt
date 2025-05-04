@@ -1,14 +1,16 @@
+use rustc_span::SourceFile;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::Arc;
 
+use crate::FormatModuleResult;
 use crate::ast_module::AstModule;
 use crate::config::Config;
 use crate::constraints::Constraints;
-use crate::error_emitter::{BufferedErrorEmitter, ErrorEmitter};
-use crate::source_formatter::SourceFormatter;
 use crate::error::FormatResult;
-use crate::FormatModuleResult;
+use crate::error_emitter::{BufferedErrorEmitter, ErrorEmitter};
 use crate::num::HPos;
+use crate::source_formatter::SourceFormatter;
 use crate::whitespace::VerticalWhitespaceMode;
 
 mod ast;
@@ -21,13 +23,19 @@ pub const INDENT_WIDTH: HPos = 4;
 
 pub fn format_module(
     module: &AstModule,
-    source: Rc<String>,
+    source_file: SourceFile,
     path: Option<PathBuf>,
     config: &Config,
 ) -> FormatModuleResult {
     let constraints = Constraints::new(config.max_width);
     let errors = Rc::new(BufferedErrorEmitter::new(ErrorEmitter::new(path.clone())));
-    let out = SourceFormatter::new(path.clone(), source, constraints, Rc::clone(&errors));
+    // todo need Arc?
+    let out = SourceFormatter::new(
+        path.clone(),
+        Arc::new(source_file),
+        constraints,
+        Rc::clone(&errors),
+    );
     let formatter = AstFormatter { errors, out };
     formatter.module(module, path.as_deref())
 }
@@ -45,7 +53,11 @@ impl AstFormatter {
                 // todo make it possible to panic inside ErrorEmitter instead?
                 panic!(
                     "This is a bug :(\n{}",
-                    e.display(self.out.source(), self.out.source_pos(), path)
+                    e.display(
+                        self.out.source_reader.source(),
+                        self.out.source_reader.pos(),
+                        path
+                    )
                 );
             }
             Ok(()) => FormatModuleResult {
@@ -56,15 +68,35 @@ impl AstFormatter {
     }
 
     fn do_module(&self, module: &AstModule) -> FormatResult {
+        let source_file = &self.out.source_reader.source_file;
         self.out.comments(VerticalWhitespaceMode::Top)?;
         self.with_attrs(&module.attrs, module.spans.inner_span, || {
-            if let [until_last @ .., last] = &module.items[..] {
-                for item in until_last {
-                    self.item(item)?;
+            let mut remaining = module.items.as_slice();
+            loop {
+                let Some(first) = remaining.first() else { break };
+                if matches!(first.kind, rustc_ast::ItemKind::Use(_)) {
+                    let mut line_hi =
+                        source_file.lookup_line(source_file.relative_position(first.span.hi())).unwrap();
+                    let more_count = remaining[1..]
+                        .iter()
+                        .take_while(|item| {
+                            if !matches!(item.kind, rustc_ast::ItemKind::Use(_)) { return false }
+                            let next_lo = source_file.lookup_line(source_file.relative_position(first.span.lo())).unwrap();
+                            if next_lo - line_hi > 1 { return false }
+                            line_hi = source_file.lookup_line(source_file.relative_position(first.span.hi())).unwrap();
+                            true
+                        })
+                        .count();
+                    let group = remaining.split_off(..more_count + 1).unwrap();
+                    self.use_tree_group(group)?;
+                } else {
+                    self.item(remaining.split_off_first().unwrap())?;
+                }
+                if remaining.is_empty() {
+                    self.out.newline(VerticalWhitespaceMode::Bottom)?;
+                } else {
                     self.out.newline_indent(VerticalWhitespaceMode::Between)?;
                 }
-                self.item(last)?;
-                self.out.newline(VerticalWhitespaceMode::Bottom)?;
             }
             Ok(())
         })?;
