@@ -81,13 +81,13 @@ impl AstFormatter {
                         .iter()
                         .take_while(|item| {
                             if !matches!(item.kind, rustc_ast::ItemKind::Use(_)) { return false }
-                            let next_lo = source_file.lookup_line(source_file.relative_position(first.span.lo())).unwrap();
+                            let next_lo = source_file.lookup_line(source_file.relative_position(item.span.lo())).unwrap();
                             if next_lo - line_hi > 1 { return false }
-                            line_hi = source_file.lookup_line(source_file.relative_position(first.span.hi())).unwrap();
+                            line_hi = source_file.lookup_line(source_file.relative_position(item.span.hi())).unwrap();
                             true
                         })
                         .count();
-                    let group = remaining.split_off(..more_count + 1).unwrap();
+                    let group = remaining.split_off(..1 + more_count).unwrap();
                     self.use_tree_group(group)?;
                 } else {
                     self.item(remaining.split_off_first().unwrap())?;
