@@ -13,7 +13,7 @@ impl<'a> ListRest<'a> {
             ast::PatFieldsRest::Recovered(_) => todo!(),
         }
     }
-    
+
     pub fn from_struct_rest(rest: &'a ast::StructRest) -> Option<Self> {
         match rest {
             ast::StructRest::None => None,

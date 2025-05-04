@@ -1,10 +1,10 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
+use crate::ast_formatter::list::options::list_opt;
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
-use crate::ast_formatter::list::options::list_opt;
 
 impl AstFormatter {
     pub fn ty(&self, ty: &ast::Ty) -> FormatResult {

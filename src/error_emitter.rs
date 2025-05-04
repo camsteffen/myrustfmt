@@ -1,7 +1,7 @@
-use std::cell::Cell;
-use std::path::PathBuf;
 use crate::num::HPos;
 use crate::util::cell_ext::{CellExt, CellNumberExt};
+use std::cell::Cell;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum Error {

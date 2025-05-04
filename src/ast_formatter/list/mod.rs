@@ -48,22 +48,21 @@ where
 {
     fn format(&self) -> FormatResult {
         let is_flexible = self.opt.shape == ListShape::Flexible;
-        self.af
-            .has_vertical_shape_if(is_flexible, VerticalShape::List, || {
-                if !self.opt.omit_open_brace {
-                    self.af.out.token(self.braces.start())?;
-                }
-                if self.list.is_empty() && self.opt.rest.is_none() {
-                    self.af.enclosed_empty_after_opening(self.braces.end())?;
-                    self.af.tail(self.opt.tail)?;
-                    return Ok(());
-                }
-                match self.opt.shape {
-                    ListShape::Flexible => self.contents_flexible(),
-                    ListShape::Horizontal => self.contents_horizontal(),
-                    ListShape::Vertical => self.contents_vertical(),
-                }
-            })
+        self.af.has_vertical_shape_if(is_flexible, VerticalShape::List, || {
+            if !self.opt.omit_open_brace {
+                self.af.out.token(self.braces.start())?;
+            }
+            if self.list.is_empty() && self.opt.rest.is_none() {
+                self.af.enclosed_empty_after_opening(self.braces.end())?;
+                self.af.tail(self.opt.tail)?;
+                return Ok(());
+            }
+            match self.opt.shape {
+                ListShape::Flexible => self.contents_flexible(),
+                ListShape::Horizontal => self.contents_horizontal(),
+                ListShape::Vertical => self.contents_vertical(),
+            }
+        })
     }
 
     fn contents_flexible(&self) -> FormatResult {
@@ -76,7 +75,12 @@ where
             Ok { height: u32 },
         }
         let result = self.af.out.with_enforce_max_width(|| -> FormatResult<_> {
-            if self.opt.item_requires_own_line.as_ref().is_some_and(|f| self.list.iter().any(f)) {
+            if self
+                .opt
+                .item_requires_own_line
+                .as_ref()
+                .is_some_and(|f| self.list.iter().any(f))
+            {
                 return Ok(HorizontalResult::Skip);
             }
             if self.contents_horizontal().is_err() {
@@ -100,7 +104,12 @@ where
             HorizontalResult::Ok { height: 1 } => {}
             HorizontalResult::Ok { .. }
                 if self.opt.rest.is_none()
-                    && self.opt.item_prefers_overflow.as_ref().is_some_and(|f| f(self.list.last().unwrap())) => {}
+                    && self
+                        .opt
+                        .item_prefers_overflow
+                        .as_ref()
+                        .is_some_and(|f| f(self.list.last().unwrap())) =>
+            {}
             HorizontalResult::Ok {
                 height: overflow_height,
             } => {
@@ -231,7 +240,13 @@ where
     */
     // todo how does this behave with comments between items - forcing newlines?
     fn contents_wrap_to_fit(&self, max_element_width: Option<HPos>) -> FormatResult {
-        let Self { af, opt, braces, list, .. } = self;
+        let Self {
+            af,
+            opt,
+            braces,
+            list,
+            ..
+        } = self;
         let len = list.len();
         let format_index = |index| {
             (self.format_item)(
@@ -263,7 +278,11 @@ where
                     af.out.token_maybe_missing(",")?;
                     Ok(())
                 };
-                let is_own_line = prev_must_have_own_line || opt.item_requires_own_line.as_ref().is_some_and(|f| f(&list[index]));
+                let is_own_line = prev_must_have_own_line
+                    || opt
+                        .item_requires_own_line
+                        .as_ref()
+                        .is_some_and(|f| f(&list[index]));
                 if is_own_line {
                     prev_must_have_own_line = !prev_must_have_own_line;
                 }
@@ -286,7 +305,13 @@ where
     }
 
     fn contents_vertical(&self) -> FormatResult {
-        let Self { af, opt, braces, list, .. } = self;
+        let Self {
+            af,
+            opt,
+            braces,
+            list,
+            ..
+        } = self;
         let len = list.len();
         let item_comma = |index| {
             (self.format_item)(

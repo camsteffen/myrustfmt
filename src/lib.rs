@@ -47,7 +47,6 @@ mod submodules;
 mod util;
 mod whitespace;
 
-use std::sync::Arc;
 use crate::ast_formatter::format_module;
 use crate::config::Config;
 use crate::parse::{ParseModuleResult, parse_module};
@@ -63,6 +62,7 @@ use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct FormatModuleResult {
@@ -215,13 +215,13 @@ fn format_module_file(
         source_file,
         submodules,
     } = result;
-    let source = Arc::clone(source_file.src.as_ref().expect("the SourceFile should have src"));
-    let result = format_module(
-        &module,
-        source_file,
-        Some(path.to_path_buf()),
-        config,
+    let source = Arc::clone(
+        source_file
+            .src
+            .as_ref()
+            .expect("the SourceFile should have src"),
     );
+    let result = format_module(&module, source_file, Some(path.to_path_buf()), config);
     match on_format_module.on_format_module(path, result, &source) {
         ControlFlow::Continue(()) => Ok(submodules),
         ControlFlow::Break(()) => Err(()),

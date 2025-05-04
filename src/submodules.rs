@@ -1,7 +1,7 @@
 use crate::ast_module::AstModule;
 use rustc_ast::ModKind;
 use rustc_ast::ast;
-use rustc_ast::visit::{self, Visitor};
+use rustc_ast::visit::{Visitor, self};
 use rustc_expand::module::DirOwnership;
 use rustc_expand::module::ModError;
 use rustc_expand::module::default_submod_path;

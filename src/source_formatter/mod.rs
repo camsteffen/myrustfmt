@@ -2,19 +2,19 @@ pub mod checkpoint;
 mod source_reader;
 mod whitespace;
 
-use std::cell::Cell;
-use std::path::PathBuf;
+use crate::constraint_writer::checkpoint::ConstraintWriterLookahead;
 use crate::constraint_writer::{ConstraintRecoveryMode, ConstraintWriter};
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::{BufferedErrorEmitter, Error};
-use self::source_reader::SourceReader;
+use crate::num::HPos;
 use crate::util::chars::is_closer_char;
-use rustc_span::{SourceFile,BytePos, Pos, Span};
+use rustc_span::{BytePos, Pos, SourceFile, Span};
+use self::source_reader::SourceReader;
+use std::cell::Cell;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
-use crate::constraint_writer::checkpoint::ConstraintWriterLookahead;
-use crate::num::HPos;
 
 #[derive(Debug)]
 pub struct Lookahead {

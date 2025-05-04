@@ -73,17 +73,28 @@ impl AstFormatter {
         self.with_attrs(&module.attrs, module.spans.inner_span, || {
             let mut remaining = module.items.as_slice();
             loop {
-                let Some(first) = remaining.first() else { break };
+                let Some(first) = remaining.first() else {
+                    break;
+                };
                 if matches!(first.kind, rustc_ast::ItemKind::Use(_)) {
-                    let mut line_hi =
-                        source_file.lookup_line(source_file.relative_position(first.span.hi())).unwrap();
+                    let mut line_hi = source_file
+                        .lookup_line(source_file.relative_position(first.span.hi()))
+                        .unwrap();
                     let more_count = remaining[1..]
                         .iter()
                         .take_while(|item| {
-                            if !matches!(item.kind, rustc_ast::ItemKind::Use(_)) { return false }
-                            let next_lo = source_file.lookup_line(source_file.relative_position(item.span.lo())).unwrap();
-                            if next_lo - line_hi > 1 { return false }
-                            line_hi = source_file.lookup_line(source_file.relative_position(item.span.hi())).unwrap();
+                            if !matches!(item.kind, rustc_ast::ItemKind::Use(_)) {
+                                return false;
+                            }
+                            let next_lo = source_file
+                                .lookup_line(source_file.relative_position(item.span.lo()))
+                                .unwrap();
+                            if next_lo - line_hi > 1 {
+                                return false;
+                            }
+                            line_hi = source_file
+                                .lookup_line(source_file.relative_position(item.span.hi()))
+                                .unwrap();
                             true
                         })
                         .count();

@@ -2,9 +2,9 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
-use rustc_ast::ast;
 use crate::source_formatter::Lookahead;
 use crate::whitespace::VerticalWhitespaceMode;
+use rustc_ast::ast;
 
 impl AstFormatter {
     pub fn local(&self, local: &ast::Local) -> FormatResult {

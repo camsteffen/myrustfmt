@@ -1,10 +1,10 @@
-use rustc_span::BytePos;
 use crate::rustc_span::Pos;
+use crate::util::display::display_from_fn;
 use crate::util::line_col::line_col;
+use rustc_span::BytePos;
 use std::backtrace::Backtrace;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
-use crate::util::display::display_from_fn;
 
 pub type FormatResult<T = ()> = Result<T, ConstraintError>;
 

@@ -117,9 +117,7 @@ impl AstFormatter {
                     self.meta_item(&meta)?;
                     self.out.token("]")?;
                     match attr.style {
-                        ast::AttrStyle::Inner => {
-                            self.out.newline(VerticalWhitespaceMode::Between)?
-                        }
+                        ast::AttrStyle::Inner => self.out.newline(VerticalWhitespaceMode::Between)?,
                         ast::AttrStyle::Outer => self.out.newline(VerticalWhitespaceMode::Break)?,
                     }
                     self.out.indent();

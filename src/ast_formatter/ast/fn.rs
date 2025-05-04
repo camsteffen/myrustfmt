@@ -1,14 +1,14 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{Braces, ListItemContext, };
+use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 
+use crate::ast_formatter::list::options::{ListShape, list_opt};
 use crate::constraints::VerticalShape;
+use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
 use rustc_span::symbol::kw;
-use crate::ast_formatter::list::options::{list_opt, ListShape};
-use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn fn_<K>(&self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
@@ -21,7 +21,14 @@ impl AstFormatter {
         self.fn_header(&sig.header)?;
         self.token_ident_generic_params("fn", item.ident, generics)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
-        let params = |shape| self.list(Braces::Parens, &sig.decl.inputs, Self::param, list_opt().shape(shape));
+        let params = |shape| {
+            self.list(
+                Braces::Parens,
+                &sig.decl.inputs,
+                Self::param,
+                list_opt().shape(shape),
+            )
+        };
         self.backtrack()
             .next(|| {
                 self.with_single_line(|| {
@@ -147,7 +154,8 @@ impl AstFormatter {
             Braces::Parens,
             &parenthesized_args.inputs,
             |af, ty, tail, _lcx| af.ty_tail(ty, tail),
-            list_opt().tail(list_tail),)?;
+            list_opt().tail(list_tail),
+        )?;
         self.fn_ret_ty(&parenthesized_args.output)?;
         // todo pass tail to ret ty?
         self.tail(final_tail)?;
@@ -173,7 +181,14 @@ impl AstFormatter {
     }
 
     fn fn_decl(&self, fn_decl: &ast::FnDecl, braces: Braces, tail: &Tail) -> FormatResult {
-        let params = |shape| self.list(braces, &fn_decl.inputs, Self::param, list_opt().shape(shape));
+        let params = |shape| {
+            self.list(
+                braces,
+                &fn_decl.inputs,
+                Self::param,
+                list_opt().shape(shape),
+            )
+        };
         let do_single_line = || {
             self.with_single_line(|| {
                 params(ListShape::Horizontal)?;

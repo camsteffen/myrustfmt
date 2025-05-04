@@ -1,16 +1,16 @@
 pub mod checkpoint;
 
-use crate::constraints::{VerticalShape, Constraints};
+use crate::constraints::{Constraints, VerticalShape};
 use crate::error::{
     ConstraintError, ConstraintErrorKind, FormatResult, NewlineNotAllowedError,
     WidthLimitExceededError,
 };
 use crate::error_emitter::BufferedErrorEmitter;
+use crate::num::HPos;
 use crate::util::cell_ext::{CellExt, CellNumberExt};
 use std::cell::Cell;
 use std::panic::Location;
 use std::rc::Rc;
-use crate::num::HPos;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum ConstraintRecoveryMode {

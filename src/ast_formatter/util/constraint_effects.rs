@@ -1,8 +1,8 @@
-use std::num::NonZero;
 use crate::ast_formatter::AstFormatter;
 use crate::constraints::{Constraints, VerticalShape, WidthLimit};
 use crate::error::{ConstraintErrorKind, FormatResult, WidthLimitExceededError};
 use crate::num::HPos;
+use std::num::NonZero;
 
 macro_rules! delegate_to_constraints {
     ($($vis:vis fn $name:ident $(<$gen:tt>)?(&self $(, $arg:ident: $ty:ty)* $(,)?) $(-> $ret_ty:ty)? ;)*) => {

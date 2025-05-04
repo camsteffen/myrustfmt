@@ -1,7 +1,7 @@
-use derive_where::derive_where;
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::tail::Tail;
 use crate::num::HPos;
+use derive_where::derive_where;
 
 #[derive(Clone, Copy, Default, PartialEq)]
 pub enum ListShape {

@@ -16,6 +16,7 @@
 * Large expressions in an index operator are broken into a separate line
 * Large expressions in parentheses are broken into a separate line
 * A match arm with a guard on a separate line may have its body on one line without a block
+* A multi-line if/else in a call argument is wrapped instead of continuing after the parenthesis
 
 Chains
 * Chains may include index operators

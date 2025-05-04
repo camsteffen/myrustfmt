@@ -1,8 +1,8 @@
 use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::source_formatter::SourceFormatter;
+use crate::whitespace::VerticalWhitespaceMode;
 use rustc_lexer::Token;
 use rustc_lexer::TokenKind;
-use crate::whitespace::VerticalWhitespaceMode;
 
 impl SourceFormatter {
     /// Allows any comments or nothing.
@@ -75,10 +75,10 @@ impl WhitespaceMode {
     pub fn is_horizontal(self) -> bool {
         matches!(self, WhitespaceMode::Horizontal { .. })
     }
-    
+
     pub fn vertical_mode(self) -> Option<VerticalWhitespaceMode> {
         match self {
-            WhitespaceMode::Horizontal {..}=> None,
+            WhitespaceMode::Horizontal { .. } => None,
             WhitespaceMode::Vertical(mode) => Some(mode),
             WhitespaceMode::Flexible { vertical_mode, .. } => Some(vertical_mode),
         }

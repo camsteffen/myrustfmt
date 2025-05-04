@@ -3,9 +3,9 @@ use crate::ast_formatter::tail::Tail;
 use crate::ast_utils::{control_flow_expr_kind, plain_block};
 use crate::error::FormatResult;
 use crate::util::whitespace_utils::is_whitespace;
+use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 use rustc_span::Pos;
-use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     pub fn block_expr(

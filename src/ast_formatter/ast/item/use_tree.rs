@@ -1,23 +1,21 @@
-use rustc_ast::ptr::P;
-use rustc_lexer::TokenKind;
-use rustc_span::{Pos, BytePos, Symbol};
-use rustc_ast::{ast, NodeId};
-use std::cmp::Ordering;
-use crate::ast_formatter::{AstFormatter};
 use crate::ast_formatter::list::Braces;
-use crate::ast_formatter::list::options::{list_opt, ListWrapToFit};
+use crate::ast_formatter::list::options::{ListWrapToFit, list_opt};
 use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 use crate::util::cmp::{cmp_by_key, cmp_iter_by};
 use crate::whitespace::VerticalWhitespaceMode;
+use rustc_ast::ptr::P;
+use rustc_ast::{NodeId, ast};
+use rustc_lexer::TokenKind;
+use rustc_span::{BytePos, Pos, Symbol};
+use std::cmp::Ordering;
 
 impl AstFormatter {
     /// A contiguous group of `use` declarations that can be sorted
     pub fn use_tree_group(&self, group: &[P<ast::Item>]) -> FormatResult {
         let mut sorted = Vec::from_iter(group.iter());
-        sorted.sort_by(|a, b| {
-            use_tree_order(expect_use_tree(a), expect_use_tree(b))
-        });
+        sorted.sort_by(|a, b| use_tree_order(expect_use_tree(a), expect_use_tree(b)));
         for (i, item) in sorted.into_iter().enumerate() {
             // todo consider comments
             self.out.source_reader.goto(item.span.lo());
@@ -30,7 +28,7 @@ impl AstFormatter {
         self.out.source_reader.goto(group.last().unwrap().span.hi());
         Ok(())
     }
-    
+
     pub fn use_tree<'a>(&self, use_tree: &'a ast::UseTree, tail: &Tail) -> FormatResult {
         self.path(&use_tree.prefix, false)?;
         match use_tree.kind {
@@ -85,7 +83,9 @@ impl AstFormatter {
                             .item_requires_own_line(|(use_tree, _): &(&ast::UseTree, _)| {
                                 matches!(use_tree.kind, ast::UseTreeKind::Nested { .. })
                             })
-                            .wrap_to_fit(ListWrapToFit::Yes { max_element_width: None })
+                            .wrap_to_fit(ListWrapToFit::Yes {
+                                max_element_width: None,
+                            })
                             .tail(tail),
                     )?;
                 }
@@ -101,25 +101,22 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn nested_item_preceding_comma(&self, items: &[(ast::UseTree, ast::NodeId)], index: usize) -> BytePos {
+    fn nested_item_preceding_comma(
+        &self,
+        items: &[(ast::UseTree, ast::NodeId)],
+        index: usize,
+    ) -> BytePos {
         let prev_item_end = items[index - 1].0.span.hi();
-        let distance_to_comma = rustc_lexer::tokenize(
-            &self.out.source_reader.source()[prev_item_end.to_usize()..]
-        ).map_while(|token| {
-            match token.kind {
-                TokenKind::BlockComment { .. }
-                | TokenKind::LineComment { .. }
-                | TokenKind::Whitespace =>  {
-                    Some(token.len)
-                }
-                TokenKind::Comma => {
-                    None
-                }
-                _ => {
-                    panic!("Could not find preceding comma in nested use tree")
-                }
-            }
-        }).sum::<u32>();
+        let distance_to_comma =
+            rustc_lexer::tokenize(&self.out.source_reader.source()[prev_item_end.to_usize()..])
+                .map_while(|token| match token.kind {
+                    TokenKind::BlockComment { .. }
+                    | TokenKind::LineComment { .. }
+                    | TokenKind::Whitespace => Some(token.len),
+                    TokenKind::Comma => None,
+                    _ => panic!("Could not find preceding comma in nested use tree"),
+                })
+                .sum::<u32>();
         BytePos(prev_item_end.to_u32() + distance_to_comma)
     }
 }
@@ -136,7 +133,7 @@ fn use_tree_order(a: &ast::UseTree, b: &ast::UseTree) -> Ordering {
     enum Element<'a> {
         Segment(Symbol),
         Glob,
-        Nested(&'a [(ast::UseTree, NodeId)])
+        Nested(&'a [(ast::UseTree, NodeId)]),
     }
     fn iter(use_tree: &ast::UseTree) -> impl Iterator<Item = Element<'_>> {
         let tail = match &use_tree.kind {
@@ -144,7 +141,12 @@ fn use_tree_order(a: &ast::UseTree, b: &ast::UseTree) -> Ordering {
             ast::UseTreeKind::Glob => Some(Element::Glob),
             ast::UseTreeKind::Nested { items, .. } => Some(Element::Nested(items)),
         };
-        use_tree.prefix.segments.iter().map(|s| Element::Segment(s.ident.name)).chain(tail)
+        use_tree
+            .prefix
+            .segments
+            .iter()
+            .map(|s| Element::Segment(s.ident.name))
+            .chain(tail)
     }
     cmp_iter_by(iter(a), iter(b), |a, b| {
         cmp_by_key(a, b, |e| match e {
@@ -152,21 +154,19 @@ fn use_tree_order(a: &ast::UseTree, b: &ast::UseTree) -> Ordering {
             Element::Glob => 1,
             Element::Nested(_) => 2,
         })
-            .then_with(|| {
-                match (a, b) {
-                    (Element::Segment(a), Element::Segment(b)) => a.as_str().cmp(b.as_str()),
-                    (Element::Glob, Element::Glob) => Ordering::Equal,
-                    (Element::Nested(a), Element::Nested(b)) => {
-                        // todo cache sorting
-                        // todo reuse sorting between ordering and formatting
-                        let mut a = Vec::from_iter(a.iter().map(|(use_tree, _)| use_tree));
-                        let mut b = Vec::from_iter(b.iter().map(|(use_tree, _)| use_tree));
-                        a.sort_by(|a, b| use_tree_order(a, b));
-                        b.sort_by(|a, b| use_tree_order(a, b));
-                        cmp_iter_by(a, b, use_tree_order)
-                    },
-                    _ => unreachable!(),
-                }
-            })
+        .then_with(|| match (a, b) {
+            (Element::Segment(a), Element::Segment(b)) => a.as_str().cmp(b.as_str()),
+            (Element::Glob, Element::Glob) => Ordering::Equal,
+            (Element::Nested(a), Element::Nested(b)) => {
+                // todo cache sorting
+                // todo reuse sorting between ordering and formatting
+                let mut a = Vec::from_iter(a.iter().map(|(use_tree, _)| use_tree));
+                let mut b = Vec::from_iter(b.iter().map(|(use_tree, _)| use_tree));
+                a.sort_by(|a, b| use_tree_order(a, b));
+                b.sort_by(|a, b| use_tree_order(a, b));
+                cmp_iter_by(a, b, use_tree_order)
+            }
+            _ => unreachable!(),
+        })
     })
 }

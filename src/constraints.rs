@@ -1,8 +1,8 @@
 use crate::error::FormatResult;
-use std::cell::Cell;
-use std::num::NonZero;
 use crate::num::HPos;
 use crate::util::cell_ext::CellExt;
+use std::cell::Cell;
+use std::num::NonZero;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Constraints {

@@ -1,5 +1,5 @@
-use crate::error::{parse_error_display, ParseError};
-use rustc_span::{SourceFile,BytePos, Pos, Span};
+use crate::error::{ParseError, parse_error_display};
+use rustc_span::{BytePos, Pos, SourceFile, Span};
 use std::cell::Cell;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -31,13 +31,16 @@ impl SourceReader {
             );
         }
     }
-    
+
     pub fn pos(&self) -> BytePos {
         self.pos.get()
     }
-    
+
     pub fn source(&self) -> &str {
-        self.source_file.src.as_ref().expect("SourceFile should have src")
+        self.source_file
+            .src
+            .as_ref()
+            .expect("SourceFile should have src")
     }
 
     pub fn advance(&self, len: u32) {
@@ -70,7 +73,7 @@ impl SourceReader {
         self.advance(token.len);
         &self.remaining()[..token.len.try_into().unwrap()]
     }
-    
+
     pub fn goto(&self, pos: BytePos) {
         self.pos.set(pos);
     }

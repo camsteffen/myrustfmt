@@ -1,11 +1,11 @@
 use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 
+use crate::ast_formatter::list::options::list_opt;
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
-use crate::ast_formatter::list::options::list_opt;
 
 impl AstFormatter {
     pub fn qpath(
@@ -83,10 +83,10 @@ impl AstFormatter {
                     self.out.token("::")?;
                 }
                 self.list(
-                    Braces::Angle, &args.args,
+                    Braces::Angle,
+                    &args.args,
                     Self::angle_bracketed_arg,
-                    list_opt()
-                        .tail(tail)
+                    list_opt().tail(tail),
                 )?;
             }
             // (A, B) -> C

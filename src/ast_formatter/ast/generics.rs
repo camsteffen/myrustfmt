@@ -2,10 +2,10 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::error::FormatResult;
 
-use rustc_ast::ast;
 use crate::ast_formatter::list::options::list_opt;
 use crate::ast_formatter::tail::Tail;
 use crate::whitespace::VerticalWhitespaceMode;
+use rustc_ast::ast;
 
 impl AstFormatter {
     pub fn generic_params(&self, params: &[ast::GenericParam]) -> FormatResult {

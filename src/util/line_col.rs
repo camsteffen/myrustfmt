@@ -1,5 +1,5 @@
-use rustc_span::BytePos;
 use crate::rustc_span::Pos;
+use rustc_span::BytePos;
 
 pub fn line_col(str: &str, pos: BytePos) -> (u32, u32) {
     let mut line = 1;

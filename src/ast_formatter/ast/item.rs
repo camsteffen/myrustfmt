@@ -1,12 +1,12 @@
 mod use_tree;
 
 use rustc_ast::ast;
-use rustc_span::{Symbol};
 use rustc_span::symbol::Ident;
+use rustc_span::Symbol;
 
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::list::options::{ListShape, list_opt};
 use crate::ast_formatter::list::{Braces, ListItemContext};
-use crate::ast_formatter::list::options::{list_opt, ListShape, };
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -35,7 +35,7 @@ impl AstFormatter {
             ast::ItemKind::Use(ref use_tree) => {
                 self.out.token_space("use")?;
                 self.use_tree(use_tree, &self.tail_token(";"))?;
-            },
+            }
             ast::ItemKind::Static(ref static_item) => {
                 self.out.token_space("static")?;
                 self.ident(item.ident)?;
@@ -127,7 +127,12 @@ impl AstFormatter {
     ) -> FormatResult {
         self.token_ident_generic_params("enum", item.ident, generics)?;
         self.out.space()?;
-        self.list(Braces::Curly, variants, Self::variant, list_opt().shape(ListShape::Vertical))?;
+        self.list(
+            Braces::Curly,
+            variants,
+            Self::variant,
+            list_opt().shape(ListShape::Vertical),
+        )?;
         Ok(())
     }
 
@@ -318,11 +323,13 @@ impl AstFormatter {
                     fields,
                     Self::field_def,
                     list_opt()
-                        .shape(if is_enum {
-                            ListShape::Flexible
-                        } else {
-                            ListShape::Vertical
-                        })
+                        .shape(
+                            if is_enum {
+                                ListShape::Flexible
+                            } else {
+                                ListShape::Vertical
+                            },
+                        )
                         .single_line_max_contents_width(
                             RUSTFMT_CONFIG_DEFAULTS.struct_variant_width,
                         ),

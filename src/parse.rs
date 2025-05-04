@@ -9,9 +9,9 @@ use rustc_errors::emitter::stderr_destination;
 use rustc_parse::parser::ExpTokenPair;
 use rustc_parse::parser::Parser;
 use rustc_session::parse::ParseSess;
-use rustc_span::{SourceFile,FileName};
 use rustc_span::source_map::{FilePathMapping, SourceMap};
 use rustc_span::symbol::Ident;
+use rustc_span::{FileName, SourceFile};
 use std::sync::Arc;
 
 pub struct ParseModuleResult {
@@ -32,10 +32,10 @@ pub fn parse_module(
         // Create a fresh SourceMap, ParseSess, etc. for every file to avoid unnecessarily
         // accumulating files in memory.
         let source_map = Arc::new(SourceMap::new(FilePathMapping::empty()));
-        
+
         let dcx = build_diag_ctxt(Arc::clone(&source_map));
         let psess = ParseSess::with_dcx(dcx, Arc::clone(&source_map));
-        
+
         let mut parser = build_parser(&psess, crate_source);
         let (attrs, items, spans) = parser
             .parse_mod(ExpTokenPair {
@@ -46,9 +46,13 @@ pub fn parse_module(
         if let Some(error) = psess.dcx().has_errors() {
             return Err(error);
         }
-        
-        module = AstModule { attrs, items, spans };
-        
+
+        module = AstModule {
+            attrs,
+            items,
+            spans,
+        };
+
         submodules = match crate_source {
             CrateSource::File(path) => get_submodules(&psess, &module, path, relative),
             CrateSource::Source(_) => Vec::new(),
@@ -59,7 +63,7 @@ pub fn parse_module(
             _ => panic!("the SourceMap should have exactly one SourceFile"),
         };
     }
-    
+
     let source_file = Arc::into_inner(source_file)
         .expect("should have a unique reference to the SourceFile");
 

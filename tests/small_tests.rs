@@ -60,7 +60,8 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
         Some("\n") => {}
         next => {
             return Err(
-                format!("expected a blank line after header comments, found {next:?}").into(),
+                format!("expected a blank line after header comments, found {next:?}")
+                    .into(),
             );
         }
     }
@@ -148,13 +149,7 @@ fn small_test(test: &Test) -> TestResult {
                 "before -> after",
                 test.expect_errors,
             )?;
-            format_max_width_expected(
-                after,
-                test.max_width,
-                after,
-                "after (idempotency)",
-                false,
-            )?;
+            format_max_width_expected(after, test.max_width, after, "after (idempotency)", false)?;
         }
     }
     Ok(())
@@ -174,17 +169,9 @@ enum TestKind {
     /// a max width that is just one character smaller than the width required for the "before"
     /// string. The result should equal the "after" string. Also, the "before" string is formatted
     /// with exactly a large enough max width to test that it is not changed.
-    Breakpoint {
-        before: String,
-        after: String,
-    },
-    NoChange {
-        formatted: String,
-    },
-    BeforeAfter {
-        before: String,
-        after: String,
-    },
+    Breakpoint { before: String, after: String },
+    NoChange { formatted: String },
+    BeforeAfter { before: String, after: String },
 }
 
 enum TestKindRaw {
@@ -252,5 +239,8 @@ fn expect_formatted_equals(formatted: &str, expected: &str, name: &str) -> TestR
             diff::Result::Both(s, _) => println!("  {s}"),
         }
     }
-    Err(format!("\"{name}\" formatted does not match expected").into())
+    Err(
+        format!("\"{name}\" formatted does not match expected")
+            .into(),
+    )
 }
