@@ -14,32 +14,20 @@ use crate::whitespace::VerticalWhitespaceMode;
 impl AstFormatter {
     /// A contiguous group of `use` declarations that can be sorted
     pub fn use_tree_group(&self, group: &[P<ast::Item>]) -> FormatResult {
-        fn get_use_tree(item: &ast::Item) -> &ast::UseTree {
-            match &item.kind {
-                ast::ItemKind::Use(use_tree) => use_tree,
-                _ => unreachable!(),
-            }
-        }
         let mut sorted = Vec::from_iter(group.iter());
         sorted.sort_by(|a, b| {
-            use_tree_order(get_use_tree(a), get_use_tree(b))
+            use_tree_order(expect_use_tree(a), expect_use_tree(b))
         });
         for (i, item) in sorted.into_iter().enumerate() {
             // todo consider comments
             self.out.source_reader.goto(item.span.lo());
-            self.use_declaration(get_use_tree(item))?;
+            self.item(item)?;
             if i < group.len() - 1 {
                 self.out.newline_indent(VerticalWhitespaceMode::Between)?;
             }
         }
         // todo consider comments
         self.out.source_reader.goto(group.last().unwrap().span.hi());
-        Ok(())
-    }
-    
-    pub fn use_declaration(&self, use_tree: &ast::UseTree) -> FormatResult {
-        self.out.token_space("use")?;
-        self.use_tree(use_tree, &self.tail_token(";"))?;
         Ok(())
     }
     
@@ -133,6 +121,13 @@ impl AstFormatter {
             }
         }).sum::<u32>();
         BytePos(prev_item_end.to_u32() + distance_to_comma)
+    }
+}
+
+fn expect_use_tree(item: &ast::Item) -> &ast::UseTree {
+    match &item.kind {
+        ast::ItemKind::Use(use_tree) => use_tree,
+        _ => unreachable!(),
     }
 }
 

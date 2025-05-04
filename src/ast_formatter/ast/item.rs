@@ -32,7 +32,10 @@ impl AstFormatter {
     pub fn item_kind(&self, kind: &ast::ItemKind, item: &ast::Item) -> FormatResult {
         match *kind {
             ast::ItemKind::ExternCrate(name) => self.extern_crate(name, item)?,
-            ast::ItemKind::Use(ref use_tree) => self.use_declaration(use_tree)?,
+            ast::ItemKind::Use(ref use_tree) => {
+                self.out.token_space("use")?;
+                self.use_tree(use_tree, &self.tail_token(";"))?;
+            },
             ast::ItemKind::Static(ref static_item) => {
                 self.out.token_space("static")?;
                 self.ident(item.ident)?;
