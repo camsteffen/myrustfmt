@@ -131,32 +131,44 @@ fn expect_use_tree(item: &ast::Item) -> &ast::UseTree {
 fn use_tree_order(a: &ast::UseTree, b: &ast::UseTree) -> Ordering {
     #[derive(Clone, Copy)]
     enum Element<'a> {
+        Self_,
+        Super,
+        Crate,
         Segment(Symbol),
         Glob,
         Nested(&'a [(ast::UseTree, NodeId)]),
     }
     fn iter(use_tree: &ast::UseTree) -> impl Iterator<Item = Element<'_>> {
-        let tail = match &use_tree.kind {
-            ast::UseTreeKind::Simple(_) => None,
-            ast::UseTreeKind::Glob => Some(Element::Glob),
-            ast::UseTreeKind::Nested { items, .. } => Some(Element::Nested(items)),
-        };
         use_tree
             .prefix
             .segments
             .iter()
-            .map(|s| Element::Segment(s.ident.name))
-            .chain(tail)
+            .map(|s| match s.ident.name {
+                kw::crate_ => Element::Crate,
+                kw::self_ => Element::Self_,
+                kw::super_ => Element::Super,
+                _ => Element::Segment(s.ident.name)
+            })
+            .chain(std::iter::once(()).filter_map(|()| {
+                match &use_tree.kind {
+                    ast::UseTreeKind::Simple(_) => None,
+                    ast::UseTreeKind::Glob => Some(Element::Glob),
+                    ast::UseTreeKind::Nested { items, .. } => Some(Element::Nested(items)),
+                }
+            }))
     }
     cmp_iter_by(iter(a), iter(b), |a, b| {
         cmp_by_key(a, b, |e| match e {
-            Element::Segment(_) => 0,
-            Element::Glob => 1,
-            Element::Nested(_) => 2,
+            Element::Self_ => 0,
+            Element::Super => 1,
+            Element::Crate => 2,
+            Element::Segment(_) => 3,
+            Element::Glob => 4,
+            Element::Nested(_) => 5,
         })
         .then_with(|| match (a, b) {
+            (Element::Self_ | Element::Super | Element::Crate | Element::Glob, _) => Ordering::Equal,
             (Element::Segment(a), Element::Segment(b)) => a.as_str().cmp(b.as_str()),
-            (Element::Glob, Element::Glob) => Ordering::Equal,
             (Element::Nested(a), Element::Nested(b)) => {
                 // todo cache sorting
                 // todo reuse sorting between ordering and formatting
