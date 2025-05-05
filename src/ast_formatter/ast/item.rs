@@ -2,8 +2,8 @@ mod use_tree;
 
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
-use rustc_span::symbol::Ident;
 use rustc_span::Symbol;
+use rustc_span::symbol::Ident;
 use std::cmp::Ordering;
 
 use crate::ast_formatter::AstFormatter;

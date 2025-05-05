@@ -20,6 +20,7 @@
 )]
 
 // these crates are loaded from the sysroot, so they need extern crate.
+extern crate core;
 extern crate rustc_ast;
 extern crate rustc_driver;
 extern crate rustc_errors;
@@ -29,7 +30,6 @@ extern crate rustc_parse;
 extern crate rustc_session;
 extern crate rustc_span;
 extern crate thin_vec;
-extern crate core;
 
 mod ast_formatter;
 mod ast_module;
@@ -90,7 +90,11 @@ impl FormatModuleResult {
             error_count,
             formatted,
         } = self;
-        assert_eq!(error_count, 0, "Some errors occurred. Formatted:\n{}", formatted);
+        assert_eq!(
+            error_count, 0,
+            "Some errors occurred. Formatted:\n{}",
+            formatted
+        );
         formatted
     }
 }

@@ -39,14 +39,14 @@ impl WidthLimit {
 }
 
 /// Specifies what kind of multi-line shapes are allowed.
-/// 
+///
 /// Each variant is a superset of all preceding variants.
 ///
 /// It is generally enforced in two ways:
 ///  1. The SingleLine variant causes an error to be raised upon attempting to write a newline.
 ///  2. Other variants are "downgraded" to the SingleLine variant at times when it is known that
 ///     a newline character would violate the original constraint.
-/// 
+///
 /// A couple of reasons for this approach:
 ///  * It simplifies the implementation since we can simply "decorate" code paths with what shape it
 ///    has or requires.

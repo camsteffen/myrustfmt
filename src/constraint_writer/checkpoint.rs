@@ -78,7 +78,10 @@ impl ConstraintWriter {
         } = *checkpoint;
         #[cfg(debug_assertions)]
         {
-            assert_eq!(self.constraint_recovery_mode.get(), constraint_recovery_mode);
+            assert_eq!(
+                self.constraint_recovery_mode.get(),
+                constraint_recovery_mode
+            );
             assert_eq!(&self.constraints, constraints);
         }
         self.last_line_start.set(last_line_start);

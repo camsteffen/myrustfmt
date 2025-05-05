@@ -234,7 +234,7 @@ fn actions_from_tokens<'a>(
             let strategy = whitespace_token_strategy(mode, seen_comments, is_comments_after);
             whitespace_token_action(token_str, token.len, strategy, is_comments_after)
         };
-        emitted_newline |= matches!(action, WhitespaceAction::EmitNewline {..});
+        emitted_newline |= matches!(action, WhitespaceAction::EmitNewline { .. });
         seen_comments |= is_comment;
         last_is_line_comment = is_line_comment;
         Some((action, token.len))

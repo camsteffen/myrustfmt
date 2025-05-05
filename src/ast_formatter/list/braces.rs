@@ -4,20 +4,20 @@ macro_rules! define_braces {
         pub enum Braces {
             $($name,)*
         }
-        
+
         impl Braces {
             pub fn start(self) -> &'static str {
                 match self {
                     $(Self::$name => $start,)*
                 }
             }
-            
+
             pub fn end(self) -> &'static str {
                 match self {
                     $(Self::$name => $end,)*
                 }
             }
-            
+
             pub fn pad(self) -> bool {
                 match self {
                     $(Self::$name => $pad,)*

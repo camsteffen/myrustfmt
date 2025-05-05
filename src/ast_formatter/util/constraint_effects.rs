@@ -17,11 +17,11 @@ macro_rules! delegate_to_constraints {
 delegate_to_constraints! {
     // max width
     pub fn with_replace_max_width<T>(&self, max_width: HPos, scope: impl FnOnce() -> T) -> T;
-    
+
     // width limit
     pub fn width_limit(&self) -> Option<WidthLimit>;
     pub fn with_replace_width_limit<T>(&self, width_limit: Option<WidthLimit>, scope: impl FnOnce() -> T) -> T;
-    
+
     // vertical shape
     pub fn vertical_shape(&self) -> VerticalShape;
     pub fn with_replace_vertical_shape<T>(&self, vertical_shape: VerticalShape, scope: impl FnOnce() -> T) -> T;

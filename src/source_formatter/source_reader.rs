@@ -91,6 +91,9 @@ impl SourceReader {
     }
 
     fn parse_error(&self, error: ParseError) -> ! {
-        panic!("{}", parse_error_display(error, self.path.as_deref(), self.source(), self.pos.get()));
+        panic!(
+            "{}",
+            parse_error_display(error, self.path.as_deref(), self.source(), self.pos.get())
+        );
     }
 }
