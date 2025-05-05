@@ -1,5 +1,5 @@
-use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::AstFormatter;
 use crate::ast_utils::{control_flow_expr_kind, plain_block};
 use crate::error::FormatResult;
 use crate::util::whitespace_utils::is_whitespace;
@@ -155,6 +155,15 @@ impl AstFormatter {
                 Ok(())
             }
         }
+    }
+
+    pub fn is_block_empty(&self, block: &ast::Block) -> bool {
+        if !block.stmts.is_empty() {
+            return false;
+        }
+        let source = self.out.source_reader.source();
+        let inside = &source[block.span.lo().to_usize() + 1..block.span.hi().to_usize() - 1];
+        is_whitespace(inside)
     }
 }
 

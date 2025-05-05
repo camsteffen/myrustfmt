@@ -108,8 +108,7 @@ where
                         .opt
                         .item_prefers_overflow
                         .as_ref()
-                        .is_some_and(|f| f(self.list.last().unwrap())) =>
-            {}
+                        .is_some_and(|f| f(self.list.last().unwrap())) => {}
             HorizontalResult::Ok {
                 height: overflow_height,
             } => {

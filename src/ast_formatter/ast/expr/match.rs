@@ -60,9 +60,16 @@ impl AstFormatter {
         })?;
         if let Some(body) = arm.body.as_deref() {
             self.out.space_token("=>")?;
-            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-            // todo allow single line without block?
-            self.arm_body_force_block(body)?;
+            if plain_block(body)
+                .is_some_and(|block| self.is_block_empty(block))
+            {
+                self.out.space()?;
+                self.expr(body)?;
+            } else {
+                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                // todo allow single line without block?
+                self.arm_body_force_block(body)?;
+            }
         }
         Ok(())
     }
