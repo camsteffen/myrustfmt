@@ -1,8 +1,8 @@
 mod use_tree;
 
 use rustc_ast::ast;
-use rustc_span::symbol::Ident;
 use rustc_span::Symbol;
+use rustc_span::symbol::Ident;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::options::{ListShape, list_opt};
