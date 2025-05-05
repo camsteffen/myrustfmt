@@ -1,18 +1,109 @@
 mod use_tree;
 
 use rustc_ast::ast;
+use rustc_ast::ptr::P;
 use rustc_span::Symbol;
 use rustc_span::symbol::Ident;
+use std::cmp::Ordering;
 
-use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::ast::item::use_tree::order::use_tree_order;
 use crate::ast_formatter::list::options::{ListShape, list_opt};
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
+    pub fn item_list(&self, items: &[P<ast::Item>]) -> FormatResult {
+        let mut remaining = items;
+        loop {
+            let Some(first) = remaining.first() else {
+                break;
+            };
+            match first.kind {
+                ast::ItemKind::Mod(..) => {
+                    let group = self.split_off_contiguous_item_group(&mut remaining, |k| {
+                        matches!(k, ast::ItemKind::Mod(_, ast::ModKind::Unloaded))
+                    });
+                    self.sorted_item_group(group, |a, b| a.ident.as_str().cmp(b.ident.as_str()))?;
+                }
+                ast::ItemKind::Use(_) => {
+                    fn expect_use_tree(item: &ast::Item) -> &ast::UseTree {
+                        match &item.kind {
+                            ast::ItemKind::Use(use_tree) => use_tree,
+                            _ => unreachable!(),
+                        }
+                    }
+                    let group = self.split_off_contiguous_item_group(&mut remaining, |k| {
+                        matches!(k, ast::ItemKind::Use(_))
+                    });
+                    self.sorted_item_group(group, |a, b| {
+                        use_tree_order(expect_use_tree(a), expect_use_tree(b))
+                    })?;
+                }
+                _ => self.item(remaining.split_off_first().unwrap())?,
+            }
+            if !remaining.is_empty() {
+                self.out.newline_indent(VerticalWhitespaceMode::Between)?;
+            }
+        }
+        self.out.newline(VerticalWhitespaceMode::Bottom)?;
+        Ok(())
+    }
+
+    // todo account for item attributes
+    fn split_off_contiguous_item_group<'a>(
+        &self,
+        remaining: &mut &'a [P<ast::Item>],
+        f: impl Fn(&ast::ItemKind) -> bool,
+    ) -> &'a [P<ast::Item>] {
+        let first = remaining.first().unwrap();
+        let source_file = &self.out.source_reader.source_file;
+        let mut line_hi = source_file
+            .lookup_line(source_file.relative_position(first.span.hi()))
+            .unwrap();
+        let more_count = remaining[1..]
+            .iter()
+            .take_while(|item| {
+                if !f(&item.kind) {
+                    return false;
+                }
+                let next_lo = source_file
+                    .lookup_line(source_file.relative_position(item.span.lo()))
+                    .unwrap();
+                if next_lo - line_hi > 1 {
+                    return false;
+                }
+                line_hi = source_file
+                    .lookup_line(source_file.relative_position(item.span.hi()))
+                    .unwrap();
+                true
+            })
+            .count();
+        remaining.split_off(..1 + more_count).unwrap()
+    }
+
+    pub fn sorted_item_group(
+        &self,
+        group: &[P<ast::Item>],
+        compare: impl Fn(&ast::Item, &ast::Item) -> Ordering,
+    ) -> FormatResult {
+        let mut sorted = Vec::from_iter(group.iter().map(|item| &**item));
+        sorted.sort_by(|a, b| compare(a, b));
+        for (i, item) in sorted.into_iter().enumerate() {
+            let start = item.attrs.first().map_or(item.span, |a| a.span).lo();
+            self.out.source_reader.goto(start);
+            self.item(item)?;
+            if i < group.len() - 1 {
+                self.out.newline_indent(VerticalWhitespaceMode::SingleNewline)?;
+            }
+        }
+        self.out.source_reader.goto(group.last().unwrap().span.hi());
+        Ok(())
+    }
+
     pub fn item(&self, item: &ast::Item) -> FormatResult {
         self.item_generic(item, |kind| self.item_kind(kind, item))
     }

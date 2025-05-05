@@ -1,4 +1,4 @@
-mod order;
+pub mod order;
 
 use self::order::use_tree_order;
 use crate::ast_formatter::AstFormatter;
@@ -6,30 +6,11 @@ use crate::ast_formatter::list::Braces;
 use crate::ast_formatter::list::options::{ListWrapToFit, list_opt};
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
-use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
-use rustc_ast::ptr::P;
 use rustc_lexer::TokenKind;
 use rustc_span::{BytePos, Pos};
 
 impl AstFormatter {
-    /// A contiguous group of `use` declarations that can be sorted
-    pub fn use_tree_group(&self, group: &[P<ast::Item>]) -> FormatResult {
-        let mut sorted = Vec::from_iter(group.iter());
-        sorted.sort_by(|a, b| use_tree_order(expect_use_tree(a), expect_use_tree(b)));
-        for (i, item) in sorted.into_iter().enumerate() {
-            // todo consider comments
-            self.out.source_reader.goto(item.span.lo());
-            self.item(item)?;
-            if i < group.len() - 1 {
-                self.out.newline_indent(VerticalWhitespaceMode::SingleNewline)?;
-            }
-        }
-        // todo consider comments
-        self.out.source_reader.goto(group.last().unwrap().span.hi());
-        Ok(())
-    }
-
     pub fn use_tree<'a>(&self, use_tree: &'a ast::UseTree, tail: &Tail) -> FormatResult {
         self.path(&use_tree.prefix, false)?;
         match use_tree.kind {
@@ -119,12 +100,5 @@ impl AstFormatter {
                 })
                 .sum::<u32>();
         BytePos(prev_item_end.to_u32() + distance_to_comma)
-    }
-}
-
-fn expect_use_tree(item: &ast::Item) -> &ast::UseTree {
-    match &item.kind {
-        ast::ItemKind::Use(use_tree) => use_tree,
-        _ => unreachable!(),
     }
 }

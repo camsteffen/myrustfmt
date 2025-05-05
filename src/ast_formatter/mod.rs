@@ -68,48 +68,9 @@ impl AstFormatter {
     }
 
     fn do_module(&self, module: &AstModule) -> FormatResult {
-        let source_file = &self.out.source_reader.source_file;
         self.out.comments(VerticalWhitespaceMode::Top)?;
         self.with_attrs(&module.attrs, module.spans.inner_span, || {
-            let mut remaining = module.items.as_slice();
-            loop {
-                let Some(first) = remaining.first() else {
-                    break;
-                };
-                if matches!(first.kind, rustc_ast::ItemKind::Use(_)) {
-                    let mut line_hi = source_file
-                        .lookup_line(source_file.relative_position(first.span.hi()))
-                        .unwrap();
-                    let more_count = remaining[1..]
-                        .iter()
-                        .take_while(|item| {
-                            if !matches!(item.kind, rustc_ast::ItemKind::Use(_)) {
-                                return false;
-                            }
-                            let next_lo = source_file
-                                .lookup_line(source_file.relative_position(item.span.lo()))
-                                .unwrap();
-                            if next_lo - line_hi > 1 {
-                                return false;
-                            }
-                            line_hi = source_file
-                                .lookup_line(source_file.relative_position(item.span.hi()))
-                                .unwrap();
-                            true
-                        })
-                        .count();
-                    let group = remaining.split_off(..1 + more_count).unwrap();
-                    self.use_tree_group(group)?;
-                } else {
-                    self.item(remaining.split_off_first().unwrap())?;
-                }
-                if remaining.is_empty() {
-                    self.out.newline(VerticalWhitespaceMode::Bottom)?;
-                } else {
-                    self.out.newline_indent(VerticalWhitespaceMode::Between)?;
-                }
-            }
-            Ok(())
+            self.item_list(&module.items)
         })?;
         Ok(())
     }
