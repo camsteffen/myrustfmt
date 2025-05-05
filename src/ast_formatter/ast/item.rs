@@ -2,15 +2,16 @@ mod use_tree;
 
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
-use rustc_span::Symbol;
 use rustc_span::symbol::Ident;
+use rustc_span::Symbol;
 use std::cmp::Ordering;
 
+use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::ast::item::use_tree::order::use_tree_order;
 use crate::ast_formatter::list::options::{ListShape, list_opt};
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
-use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::util::ast::item_lo_with_attrs;
 use crate::error::FormatResult;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::whitespace::VerticalWhitespaceMode;
@@ -57,7 +58,7 @@ impl AstFormatter {
     fn split_off_contiguous_item_group<'a>(
         &self,
         remaining: &mut &'a [P<ast::Item>],
-        f: impl Fn(&ast::ItemKind) -> bool,
+        filter: impl Fn(&ast::ItemKind) -> bool,
     ) -> &'a [P<ast::Item>] {
         let first = remaining.first().unwrap();
         let source_file = &self.out.source_reader.source_file;
@@ -67,11 +68,11 @@ impl AstFormatter {
         let more_count = remaining[1..]
             .iter()
             .take_while(|item| {
-                if !f(&item.kind) {
+                if !filter(&item.kind) {
                     return false;
                 }
                 let next_lo = source_file
-                    .lookup_line(source_file.relative_position(item.span.lo()))
+                    .lookup_line(source_file.relative_position(item_lo_with_attrs(item)))
                     .unwrap();
                 if next_lo - line_hi > 1 {
                     return false;
@@ -93,8 +94,7 @@ impl AstFormatter {
         let mut sorted = Vec::from_iter(group.iter().map(|item| &**item));
         sorted.sort_by(|a, b| compare(a, b));
         for (i, item) in sorted.into_iter().enumerate() {
-            let start = item.attrs.first().map_or(item.span, |a| a.span).lo();
-            self.out.source_reader.goto(start);
+            self.out.source_reader.goto(item_lo_with_attrs(item));
             self.item(item)?;
             if i < group.len() - 1 {
                 self.out.newline_indent(VerticalWhitespaceMode::SingleNewline)?;

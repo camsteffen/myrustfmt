@@ -8,6 +8,7 @@ use crate::a;
 use super::a;
 use self::a;
 use a::{aa, c, b};
+#[cfg(true)]
 use a::{b, a};
 use ::a;
 use a::*;
@@ -22,6 +23,7 @@ use a;
 use a::a;
 use a::b;
 use a::*;
+#[cfg(true)]
 use a::{a, b};
 use a::{aa, b, c};
 use b;
