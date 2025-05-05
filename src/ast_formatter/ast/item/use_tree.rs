@@ -9,6 +9,7 @@ use rustc_ast::ptr::P;
 use rustc_ast::{NodeId, ast};
 use rustc_lexer::TokenKind;
 use rustc_span::{BytePos, Pos, Symbol};
+use rustc_span::symbol::kw;
 use std::cmp::Ordering;
 
 impl AstFormatter {
@@ -144,9 +145,9 @@ fn use_tree_order(a: &ast::UseTree, b: &ast::UseTree) -> Ordering {
             .segments
             .iter()
             .map(|s| match s.ident.name {
-                kw::crate_ => Element::Crate,
-                kw::self_ => Element::Self_,
-                kw::super_ => Element::Super,
+                kw::Crate => Element::Crate,
+                kw::SelfLower => Element::Self_,
+                kw::Super => Element::Super,
                 _ => Element::Segment(s.ident.name)
             })
             .chain(std::iter::once(()).filter_map(|()| {
