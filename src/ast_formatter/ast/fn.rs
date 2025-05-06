@@ -222,8 +222,7 @@ impl AstFormatter {
         };
         if let ast::PatKind::Ident(BindingMode(_, mutbl), ident, _) = param.pat.kind {
             match ident.name {
-                // kw::Empty => return self.ty_tail(&param.ty, tail),
-                kw::Empty => panic!(),
+                kw::Empty => return self.ty_tail(&param.ty, tail),
                 kw::SelfLower => {
                     match param.ty.kind {
                         ast::TyKind::ImplicitSelf => {

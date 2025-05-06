@@ -1,5 +1,5 @@
 use rustc_span::SourceFile;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -7,7 +7,7 @@ use crate::FormatModuleResult;
 use crate::ast_module::AstModule;
 use crate::config::Config;
 use crate::constraints::Constraints;
-use crate::error::FormatResult;
+use crate::error::{FormatResult, error_formatting_at};
 use crate::error_emitter::{BufferedErrorEmitter, ErrorEmitter};
 use crate::num::HPos;
 use crate::source_formatter::SourceFormatter;
@@ -30,14 +30,9 @@ pub fn format_module(
     let constraints = Constraints::new(config.max_width);
     let errors = Rc::new(BufferedErrorEmitter::new(ErrorEmitter::new(path.clone())));
     // todo need Arc?
-    let out = SourceFormatter::new(
-        path.clone(),
-        Arc::new(source_file),
-        constraints,
-        Rc::clone(&errors),
-    );
+    let out = SourceFormatter::new(path, Arc::new(source_file), constraints, Rc::clone(&errors));
     let formatter = AstFormatter { errors, out };
-    formatter.module(module, path.as_deref())
+    formatter.module(module)
 }
 
 struct AstFormatter {
@@ -46,7 +41,7 @@ struct AstFormatter {
 }
 
 impl AstFormatter {
-    fn module(self, module: &AstModule, path: Option<&Path>) -> FormatModuleResult {
+    fn module(self, module: &AstModule) -> FormatModuleResult {
         match self.do_module(module) {
             Err(e) => {
                 // todo don't panic?
@@ -56,7 +51,7 @@ impl AstFormatter {
                     e.display(
                         self.out.source_reader.source(),
                         self.out.source_reader.pos(),
-                        path
+                        self.out.source_reader.path.as_deref(),
                     )
                 );
             }
@@ -75,5 +70,19 @@ impl AstFormatter {
         })?;
         self.out.newline(VerticalWhitespaceMode::Bottom)?;
         Ok(())
+    }
+
+    // todo use or delete
+    // todo make it a macro? looks innocuous
+    #[allow(unused)]
+    fn bug(&self) -> ! {
+        panic!(
+            "{}",
+            error_formatting_at(
+                self.out.source_reader.source(),
+                self.out.source_reader.pos(),
+                self.out.source_reader.path.as_deref(),
+            )
+        );
     }
 }

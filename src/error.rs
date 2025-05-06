@@ -55,19 +55,12 @@ pub enum ParseError {
     UnexpectedEof,
 }
 
-fn write_error_formatting_at(
-    f: &mut Formatter,
-    source: &str,
-    pos: BytePos,
-    path: Option<&Path>,
-) -> std::fmt::Result {
+pub fn error_formatting_at(source: &str, pos: BytePos, path: Option<&Path>) -> String {
+    let path_str = path
+        .map(|p| format!("{}:", p.display()))
+        .unwrap_or_default();
     let (line, col) = line_col(source, pos);
-    write!(f, "Error formatting at ")?;
-    if let Some(path) = path {
-        write!(f, "{}:", path.display())?
-    }
-    write!(f, "{line}:{col}, ")?;
-    Ok(())
+    format!("Error formatting at {path_str}{line}:{col}")
 }
 
 fn write_constraint_error(
@@ -77,7 +70,7 @@ fn write_constraint_error(
     pos: BytePos,
     path: Option<&Path>,
 ) -> std::fmt::Result {
-    write_error_formatting_at(f, source, pos, path)?;
+    write!(f, "{}, ", error_formatting_at(source, pos, path))?;
     match e.kind {
         ConstraintErrorKind::LineCommentNotAllowed => write!(f, "line comment not allowed")?,
         ConstraintErrorKind::MultiLineCommentNotAllowed => {
@@ -109,7 +102,7 @@ fn write_parse_error(
     source: &str,
     pos: BytePos,
 ) -> std::fmt::Result {
-    write_error_formatting_at(f, source, pos, path)?;
+    write!(f, "{}, ", error_formatting_at(source, pos, path))?;
     let next_token = |f: &mut Formatter<'_>| {
         let remaining = &source[pos.to_usize()..];
         if let Some(token) = rustc_lexer::tokenize(remaining).next() {

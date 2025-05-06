@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 pub struct SourceReader {
-    path: Option<PathBuf>,
+    pub path: Option<PathBuf>,
     pub pos: Cell<BytePos>,
     pub source_file: Arc<SourceFile>,
 }
