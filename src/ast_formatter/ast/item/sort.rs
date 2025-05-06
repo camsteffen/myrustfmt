@@ -6,7 +6,6 @@ use crate::ast_formatter::util::sort::version_sort;
 use crate::error::FormatResult;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
-use rustc_span::BytePos;
 use std::cmp::Ordering;
 
 enum NodeOrSortableItemGroup<'a, T> {
@@ -84,53 +83,39 @@ impl AstFormatter {
         })
     }
 
-    fn split_off_contiguous_maybe_item<'a, T>(
+    fn split_off_contiguous_maybe_item<'a, T: MaybeItem>(
         &self,
         slice: &mut &'a [T],
-        filter: impl Fn(&ast::Item) -> bool,
+        filter: fn(&ast::Item) -> bool,
     ) -> &'a [T]
-    where
-        T: MaybeItem,
     {
-        self.split_off_contiguous_group(
-            slice,
-            |t| t.as_item().is_some_and(&filter),
-            |t| item_lo_with_attrs(t.as_item().unwrap()),
-            |t| t.as_item().unwrap().span.hi(),
-        )
-    }
-
-    fn split_off_contiguous_group<'a, T>(
-        &self,
-        remaining: &mut &'a [T],
-        filter: impl Fn(&T) -> bool,
-        get_lo: impl Fn(&T) -> BytePos,
-        get_hi: impl Fn(&T) -> BytePos,
-    ) -> &'a [T] {
-        let first = remaining.first().unwrap();
+        let first = slice.first().unwrap().as_item().unwrap();
         let source_file = &self.out.source_reader.source_file;
         let mut line_hi = source_file
-            .lookup_line(source_file.relative_position(get_hi(first)))
+            .lookup_line(source_file.relative_position(first.span.hi()))
             .unwrap();
-        let more_count = remaining[1..]
+        let more_count = slice[1..]
             .iter()
             .take_while(|item| {
+                let Some(item) = item.as_item() else {
+                    return false;
+                };
                 if !filter(item) {
                     return false;
                 }
                 let next_lo = source_file
-                    .lookup_line(source_file.relative_position(get_lo(item)))
+                    .lookup_line(source_file.relative_position(item_lo_with_attrs(item)))
                     .unwrap();
                 if next_lo - line_hi > 1 {
                     return false;
                 }
                 line_hi = source_file
-                    .lookup_line(source_file.relative_position(get_hi(item)))
+                    .lookup_line(source_file.relative_position(item.span.hi()))
                     .unwrap();
                 true
             })
             .count();
-        remaining.split_off(..1 + more_count).unwrap()
+        slice.split_off(..1 + more_count).unwrap()
     }
 
     fn sortable_item_group<T: MaybeItem>(
