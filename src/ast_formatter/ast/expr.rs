@@ -100,12 +100,12 @@ impl AstFormatter {
                 self.out.space_token_space("in")?;
                 self.expr(iter)?;
                 self.out.space()?;
-                self.block_expr(body)?;
+                self.block_expr(false, body)?;
             }
             ast::ExprKind::Loop(ref block, label, _) => {
                 self.label(label, true)?;
                 self.out.token_space("loop")?;
-                self.block_expr(block)?;
+                self.block_expr(false, block)?;
             }
             ast::ExprKind::Match(ref scrutinee, ref arms, match_kind) => match match_kind {
                 ast::MatchKind::Postfix => todo!(),
@@ -414,7 +414,7 @@ impl AstFormatter {
             // todo this is failing earlier than "indent middle" is really violated;
             //   do we need to revise the guidelines in VerticalShape docs?
             self.has_vertical_shape_if(else_.is_some(), VerticalShape::Unrestricted, || {
-                self.block_expr_after_open_brace(block)
+                self.block_expr(true, block)
             })?;
             let mut else_ = else_;
             loop {
@@ -422,12 +422,12 @@ impl AstFormatter {
                 self.out.space_token_space("else")?;
                 match &else_expr.kind {
                     ast::ExprKind::Block(block, _) => {
-                        self.block_expr(block)?;
+                        self.block_expr(false, block)?;
                         break;
                     }
                     ast::ExprKind::If(condition, next_block, next_else) => {
                         self.token_expr_open_brace("if", condition)?;
-                        self.block_expr_after_open_brace(next_block)?;
+                        self.block_expr(true, next_block)?;
                         else_ = next_else.as_deref();
                     }
                     _ => unreachable!(),
@@ -506,7 +506,7 @@ impl AstFormatter {
 
     pub fn while_(&self, condition: &ast::Expr, block: &ast::Block) -> FormatResult {
         self.token_expr_open_brace("while", condition)?;
-        self.block_expr_after_open_brace(block)?;
+        self.block_expr(true, block)?;
         Ok(())
     }
 }

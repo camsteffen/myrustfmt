@@ -56,11 +56,7 @@ impl AstFormatter {
             })?;
         self.where_clause(&generics.where_clause, body.is_some())?;
         if let Some(body) = body {
-            if is_block_after_decl {
-                self.block_expr_after_open_brace(body)?;
-            } else {
-                self.block_expr(body)?;
-            }
+            self.block_expr(is_block_after_decl, body)?;
         } else {
             self.out.token(";")?;
         }

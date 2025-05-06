@@ -9,14 +9,8 @@ use rustc_ast::ast;
 use rustc_span::Pos;
 
 impl AstFormatter {
-    pub fn block_expr(&self, block: &ast::Block) -> FormatResult {
-        self.out.token("{")?;
-        self.block_expr_after_open_brace(block)?;
-        Ok(())
-    }
-
-    pub fn block_expr_after_open_brace(&self, block: &ast::Block) -> FormatResult {
-        self.block_with_items(true, &block.stmts, |stmt| self.stmt(stmt))
+    pub fn block_expr(&self, omit_open_brace: bool, block: &ast::Block) -> FormatResult {
+        self.block_with_items(omit_open_brace, &block.stmts, |stmt| self.stmt(stmt))
     }
 
     pub fn block_expr_allow_horizontal(
@@ -33,7 +27,7 @@ impl AstFormatter {
         self.out.token("{")?;
         match self.try_into_expr_only_block(block) {
             None => {
-                self.block_expr_after_open_brace(block)?;
+                self.block_expr(true, block)?;
                 self.tail(tail)?;
             }
             Some(expr_only_block) => {
@@ -46,7 +40,7 @@ impl AstFormatter {
                         })
                     })
                     .otherwise(|| {
-                        self.block_expr_after_open_brace(block)?;
+                        self.block_expr(true, block)?;
                         self.tail(tail)?;
                         Ok(())
                     })?
