@@ -1,5 +1,5 @@
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
-use crate::constraints::VerticalShape;
+use crate::constraints::Shape;
 use crate::error::FormatResult;
 use crate::source_formatter::SourceFormatter;
 use crate::util::cell_ext::CellExt;
@@ -29,12 +29,12 @@ impl AstFormatter {
         let indent = self.out.total_indent.get() + INDENT_WIDTH;
         self.out
             .total_indent
-            .with_replaced(indent, || match self.vertical_shape() {
+            .with_replaced(indent, || match self.shape() {
                 // SingleLine must be preserved
-                VerticalShape::SingleLine | VerticalShape::Unrestricted => format(),
+                Shape::SingleLine | Shape::Any => format(),
                 // For any other shape, indentation "resets" the shape to Unrestricted
                 // since the shape is only concerned with where code touches the left margin.
-                _ => self.with_replace_vertical_shape(VerticalShape::Unrestricted, format),
+                _ => self.with_replace_shape(Shape::Any, format),
             })
     }
 

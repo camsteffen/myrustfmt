@@ -1,6 +1,6 @@
 pub mod checkpoint;
 
-use crate::constraints::{Constraints, VerticalShape};
+use crate::constraints::{Constraints, Shape};
 use crate::error::{
     ConstraintError, ConstraintErrorKind, FormatResult, NewlineNotAllowedError,
     WidthLimitExceededError,
@@ -120,7 +120,7 @@ impl ConstraintWriter {
     }
 
     pub fn newline(&self) -> Result<(), NewlineNotAllowedError> {
-        if matches!(self.constraints.vertical_shape(), VerticalShape::SingleLine) {
+        if matches!(self.constraints.shape(), Shape::SingleLine) {
             return Err(NewlineNotAllowedError);
         }
         self.buffer.with_taken(|b| b.push('\n'));

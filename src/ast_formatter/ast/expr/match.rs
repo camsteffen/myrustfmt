@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
-use crate::constraints::VerticalShape;
+use crate::constraints::Shape;
 use crate::error::FormatResult;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -143,7 +143,7 @@ impl AstFormatter {
                 // todo exclude comma for block-like expressions?
                 self.backtrack_from_checkpoint(checkpoint)
                     .next(|| {
-                        self.with_vertical_shape_min(VerticalShape::List, || {
+                        self.with_restrict_shape(Shape::List, || {
                             self.expr_tail(body, &self.tail_fn(|af| af.out.token_insert(",")))
                         })
                     })

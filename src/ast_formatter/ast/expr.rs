@@ -10,7 +10,7 @@ use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
 use crate::ast_utils::postfix_expr_kind;
 use crate::constraint_writer::ConstraintRecoveryMode;
-use crate::constraints::VerticalShape;
+use crate::constraints::Shape;
 use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::whitespace::VerticalWhitespaceMode;
@@ -24,7 +24,7 @@ impl AstFormatter {
     }
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
-        if self.vertical_shape() < VerticalShape::HangingIndent && !expr.attrs.is_empty() {
+        if self.shape() < Shape::HangingIndent && !expr.attrs.is_empty() {
             return Err(ConstraintErrorKind::NextStrategy.into());
         }
         self.with_attrs_tail(&expr.attrs, expr.span, tail, || {
@@ -185,25 +185,23 @@ impl AstFormatter {
         &self,
     ) -> impl Fn(&AstFormatter, &P<ast::Expr>, &Tail, ListItemContext) -> FormatResult {
         // todo kinda hacky
-        let vertical_outer = self.vertical_shape();
+        let shape_outer = self.shape();
 
         move |af, expr, tail, lcx| {
             af.skip_single_expr_blocks_tail(expr, tail, |expr, tail| {
                 let format = || af.expr_tail(expr, tail);
                 match lcx.strategy {
                     // overflow last item
-                    ListStrategy::Horizontal
-                        if vertical_outer >= VerticalShape::List && lcx.is_last() =>
-                    {
+                    ListStrategy::Horizontal if shape_outer >= Shape::List && lcx.is_last() => {
                         // override the multi-line shape to be less strict than SingleLine
                         let shape = if lcx.len > 1 {
                             // don't overflow nested lists when the outer list has multiple items
-                            VerticalShape::BlockLike
+                            Shape::BlockLike
                         } else {
-                            VerticalShape::List
+                            Shape::List
                         };
                         // todo avoid replace?
-                        af.with_replace_vertical_shape(shape, format)?;
+                        af.with_replace_shape(shape, format)?;
                         Ok(())
                     }
                     // on separate lines, enforce IndentMiddle by adding a block
@@ -213,7 +211,7 @@ impl AstFormatter {
                             // The block is only for ensuring a "hanging indent"-compliant shape.
                             .next_with_constraint_recovery_mode(
                                 ConstraintRecoveryMode::Newline,
-                                || af.with_vertical_shape_min(VerticalShape::HangingIndent, format),
+                                || af.with_restrict_shape(Shape::HangingIndent, format),
                             )
                             .otherwise(|| {
                                 af.expr_add_block(expr)?;
@@ -260,7 +258,7 @@ impl AstFormatter {
                 Ok(())
             })
             .otherwise(|| {
-                self.has_vertical_shape(VerticalShape::HangingIndent, || {
+                self.has_shape(Shape::HangingIndent, || {
                     self.indented(|| {
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         self.out.token_space("as")?;
@@ -277,7 +275,7 @@ impl AstFormatter {
         self.out.token("(")?;
         self.backtrack()
             .next(|| {
-                self.with_vertical_shape_min(VerticalShape::List, || self.expr(inner))?;
+                self.with_restrict_shape(Shape::List, || self.expr(inner))?;
                 self.out.token(")")?;
                 self.tail(tail)?;
                 Ok(())
@@ -309,9 +307,7 @@ impl AstFormatter {
                     if af.out.line() == first_line {
                         af.expr_tail(end, tail)?;
                     } else {
-                        self.has_vertical_shape(VerticalShape::Unrestricted, || {
-                            af.expr_tail(end, tail)
-                        })?;
+                        self.has_shape(Shape::Any, || af.expr_tail(end, tail))?;
                     }
                     Ok(())
                 }),
@@ -342,11 +338,9 @@ impl AstFormatter {
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
         let first_line = self.out.line();
         self.expr_tail(func, &self.tail_token("("))?;
-        self.has_vertical_shape_if(
-            self.out.line() != first_line,
-            VerticalShape::Unrestricted,
-            || self.call_args_after_open_paren(args, tail),
-        )?;
+        self.has_shape_if(self.out.line() != first_line, Shape::Any, || {
+            self.call_args_after_open_paren(args, tail)
+        })?;
         Ok(())
     }
 
@@ -412,10 +406,8 @@ impl AstFormatter {
 
         let multi_line = || {
             // todo this is failing earlier than "indent middle" is really violated;
-            //   do we need to revise the guidelines in VerticalShape docs?
-            self.has_vertical_shape_if(else_.is_some(), VerticalShape::Unrestricted, || {
-                self.block_expr(true, block)
-            })?;
+            //   do we need to revise the guidelines in Shape docs?
+            self.has_shape_if(else_.is_some(), Shape::Any, || self.block_expr(true, block))?;
             let mut else_ = else_;
             loop {
                 let Some(else_expr) = else_ else { break };
@@ -445,15 +437,14 @@ impl AstFormatter {
         token: &'static str,
         expr: &ast::Expr,
     ) -> FormatResult<bool> {
-        self.has_vertical_shape(VerticalShape::Unrestricted, || {
+        self.has_shape(Shape::Any, || {
             let first_line = self.out.line();
             self.out.token_space(token)?;
             self.expr(expr)?;
             self.backtrack()
-                .next_if(
-                    self.out.line() == first_line || self.out.last_line_is_closers(),
-                    || self.with_single_line(|| self.out.space_token("{")),
-                )
+                .next_if(self.out.line() == first_line || self.out.last_line_is_closers(), || {
+                    self.with_single_line(|| self.out.space_token("{"))
+                })
                 .otherwise(|| {
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     self.out.token("{")?;

@@ -1,7 +1,7 @@
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
-use crate::constraints::VerticalShape;
+use crate::constraints::Shape;
 use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::num::HPos;
 use crate::whitespace::VerticalWhitespaceMode;
@@ -41,7 +41,7 @@ impl AstFormatter {
             if chain.is_empty() {
                 return self.postfix_item_tail(next, tail, false);
             }
-            self.has_vertical_shape(VerticalShape::Unrestricted, || self.postfix_item(next))?;
+            self.has_shape(Shape::Any, || self.postfix_item(next))?;
             if self.out.line() != first_line {
                 break true;
             }
@@ -57,7 +57,7 @@ impl AstFormatter {
             self.backtrack()
                 .next(|| self.postfix_chain_single_line_with_overflow(chain, start_pos, tail))
                 .otherwise(|| {
-                    self.has_vertical_shape(VerticalShape::HangingIndent, || {
+                    self.has_shape(Shape::HangingIndent, || {
                         self.indented(|| self.postfix_chain_vertical(chain, tail))
                     })
                 })

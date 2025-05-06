@@ -7,10 +7,10 @@ use std::num::NonZero;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Constraints {
     max_width: Cell<HPos>,
+    shape: Cell<Shape>,
     // width limit and max width are very similar in effect, but they are separate values because
-    // they may change independently of each other
+    // they have different scopes and may change independently of each other
     width_limit: Cell<Option<WidthLimit>>,
-    vertical_shape: Cell<VerticalShape>,
 }
 
 /// Applies a width limit to a specific scope
@@ -38,9 +38,8 @@ impl WidthLimit {
     }
 }
 
-/// Specifies what kind of multi-line shapes are allowed.
-///
-/// Each variant is a superset of all preceding variants.
+/// Specifies a set of code formatting shapes, used to restrict what formatting strategies may be
+/// used in a given context. Each variant is a superset of all preceding variants.
 ///
 /// It is generally enforced in two ways:
 ///  1. The SingleLine variant causes an error to be raised upon attempting to write a newline.
@@ -55,22 +54,23 @@ impl WidthLimit {
 ///    output _would_ be if a more permissive shape were enabled.
 // todo using SingleLine to measure the width of the first line should ignore trailing line comments
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
-pub enum VerticalShape {
-    /// No newline characters allowed
+pub enum Shape {
+    /// No newline characters
     SingleLine,
-    /// Generally allows nodes with curly braces like a block or loop/if/match, etc.
+    /// Generally includes nodes with curly braces like a block or loop/if/match, etc.
     /// All lines between the first and last lines must be indented (e.g. no if/else).
-    /// Does not include struct literals since they are counted as lists in this context.
+    /// Does not include struct literals; they are counted as lists in this context.
     BlockLike,
-    /// Allows lists in any form including overflow.
-    /// This should include anything that is indented through the middle lines.
+    /// Includes lists of all shapes including overflow of the last element.
+    /// At a high level, this variant includes shapes that are indented between the first and last
+    /// lines.
     List,
-    /// Allows "hanging indent" such as a wrapped chain where lines after the first are indented.
-    /// Also allows attributes.
+    /// Includes "hanging indent" shapes (where lines after the first line are indented) such as
+    /// long dot chains or infix chains. Also includes attributes above the node.
     HangingIndent,
-    /// Allows everything else
+    /// Anything!
     #[default]
-    Unrestricted,
+    Any,
 }
 
 impl Constraints {
@@ -78,7 +78,7 @@ impl Constraints {
         Constraints {
             max_width: Cell::new(max_width),
             width_limit: Cell::new(None),
-            vertical_shape: Cell::new(VerticalShape::Unrestricted),
+            shape: Cell::new(Shape::Any),
         }
     }
 
@@ -92,8 +92,8 @@ impl Constraints {
         self.width_limit.get()
     }
 
-    pub fn vertical_shape(&self) -> VerticalShape {
-        self.vertical_shape.get()
+    pub fn shape(&self) -> Shape {
+        self.shape.get()
     }
 
     // more getters
@@ -119,7 +119,7 @@ impl Constraints {
 
     pub fn with_width_limit<T>(&self, width_limit: WidthLimit, scope: impl FnOnce() -> T) -> T {
         if matches!(width_limit, WidthLimit::SingleLine { .. }) {
-            debug_assert_eq!(self.vertical_shape(), VerticalShape::SingleLine);
+            debug_assert_eq!(self.shape(), Shape::SingleLine);
         }
         if self
             .width_limit()
@@ -135,38 +135,34 @@ impl Constraints {
     }
 
     /// Replace without regard to the current setting
-    pub fn with_replace_vertical_shape<T>(
-        &self,
-        vertical_shape: VerticalShape,
-        scope: impl FnOnce() -> T,
-    ) -> T {
-        self.vertical_shape.with_replaced(vertical_shape, scope)
+    pub fn with_replace_shape<T>(&self, shape: Shape, scope: impl FnOnce() -> T) -> T {
+        self.shape.with_replaced(shape, scope)
     }
 
-    /// Declares that the output in the given scope is known to have the given VerticalShape,
+    /// Declares that the output in the given scope is known to have the given Shape,
     /// but only if the output actually has multiple lines (or starts with a newline).
     ///
-    /// If the given VerticalShape is currently allowed, continues normally.
-    /// If not, then the required VerticalShape is set to SingleLine for the given scope.
-    pub fn has_vertical_shape<T>(
+    /// If the given Shape is currently allowed, continues normally.
+    /// If not, then the required Shape is set to SingleLine for the given scope.
+    pub fn has_shape<T>(
         &self,
-        shape: VerticalShape,
+        shape: Shape,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        if shape == VerticalShape::SingleLine || self.vertical_shape() >= shape {
+        if shape == Shape::SingleLine || self.shape() >= shape {
             return scope();
         }
-        self.with_replace_vertical_shape(VerticalShape::SingleLine, scope)
+        self.with_replace_shape(Shape::SingleLine, scope)
     }
 
-    pub fn has_vertical_shape_if<T>(
+    pub fn has_shape_if<T>(
         &self,
         condition: bool,
-        shape: VerticalShape,
+        shape: Shape,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         if condition {
-            self.has_vertical_shape(shape, scope)
+            self.has_shape(shape, scope)
         } else {
             scope()
         }

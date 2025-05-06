@@ -4,7 +4,7 @@ use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 
 use crate::ast_formatter::list::options::{ListShape, list_opt};
-use crate::constraints::VerticalShape;
+use crate::constraints::Shape;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
@@ -112,9 +112,7 @@ impl AstFormatter {
                 // add a block unless it fits on a single line
                 self.backtrack()
                     .next(|| {
-                        self.with_vertical_shape_min(VerticalShape::BlockLike, || {
-                            self.expr_tail(body, tail)
-                        })
+                        self.with_restrict_shape(Shape::BlockLike, || self.expr_tail(body, tail))
                     })
                     .otherwise(|| {
                         self.expr_add_block(body)?;
@@ -197,7 +195,7 @@ impl AstFormatter {
             })
             // args on separate lines
             .otherwise(|| {
-                self.has_vertical_shape(VerticalShape::Unrestricted, || {
+                self.has_shape(Shape::Any, || {
                     params(ListShape::Vertical)?;
                     self.fn_ret_ty(&fn_decl.output)?;
                     self.tail(tail)?;

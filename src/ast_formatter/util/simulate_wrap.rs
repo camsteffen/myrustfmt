@@ -1,5 +1,5 @@
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
-use crate::constraints::VerticalShape;
+use crate::constraints::Shape;
 
 impl AstFormatter {
     /// 1. Adds a single-line constraint.
@@ -13,7 +13,7 @@ impl AstFormatter {
     /// If formatting fails with a newline-not-allowed error, it is still useful to observe the
     /// boolean to know whether the first line of code (the code emitted leading up to the error)
     /// used the extra width. (This does assume that downstream formatting will emit the entire
-    /// first line without short-circuiting. See also `VerticalShape`.)
+    /// first line without short-circuiting. See also `Shape`.)
     ///
     /// When the extra width is used, this means one of two things: either the extra width allowed
     /// for a different formatting strategy with more code on the first line, or the extra width was
@@ -25,12 +25,12 @@ impl AstFormatter {
         // the starting position if we wrapped to the next line and indented
         let next_line_start = self.out.total_indent.get() + INDENT_WIDTH;
         let Some(extra_width) = start.checked_sub(next_line_start).filter(|&w| w > 0) else {
-            let result = self.with_replace_vertical_shape(VerticalShape::SingleLine, scope);
+            let result = self.with_replace_shape(Shape::SingleLine, scope);
             return (false, result);
         };
         let max_width_prev = self.out.current_max_width();
         let max_width = max_width_prev.saturating_add(extra_width);
-        let result = self.with_replace_vertical_shape(VerticalShape::SingleLine, || {
+        let result = self.with_replace_shape(Shape::SingleLine, || {
             self.with_replace_max_width(max_width, scope)
         });
         let used_extra_width = self.out.last_line_len() > max_width_prev;

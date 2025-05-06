@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::{VerticalShape, WidthLimit};
+use crate::constraints::{Shape, WidthLimit};
 use crate::error::FormatResult;
 
 /// A Tail squeezes the code before it leftward to make room for itself.
@@ -29,7 +29,7 @@ struct TailImpl<'a> {
     // captured constraints
     // todo would it be better to explicitly capture and apply constraints where needed?
     width_limit: Option<WidthLimit>,
-    vertical_shape: VerticalShape,
+    shape: Shape,
 }
 
 // Tail creation
@@ -38,7 +38,7 @@ impl AstFormatter {
         Tail(Some(TailImpl {
             func: Box::new(tail),
             width_limit: self.width_limit(),
-            vertical_shape: self.vertical_shape(),
+            shape: self.shape(),
         }))
     }
 
@@ -56,7 +56,7 @@ impl Tail<'_> {
 impl AstFormatter {
     pub fn tail(&self, tail: &Tail) -> FormatResult {
         let Some(tail) = &tail.0 else { return Ok(()) };
-        self.with_replace_vertical_shape(tail.vertical_shape, || {
+        self.with_replace_shape(tail.shape, || {
             self.with_replace_width_limit(tail.width_limit, || (tail.func)(self))
         })
     }

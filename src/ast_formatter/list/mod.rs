@@ -10,7 +10,7 @@ pub use self::rest::ListRest;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::options::{ListOptions, ListShape, ListWrapToFit};
 use crate::ast_formatter::tail::Tail;
-use crate::constraints::VerticalShape;
+use crate::constraints::Shape;
 use crate::error::FormatResult;
 use crate::num::HPos;
 use crate::whitespace::VerticalWhitespaceMode;
@@ -48,7 +48,7 @@ where
 {
     fn format(&self) -> FormatResult {
         let is_flexible = self.opt.shape == ListShape::Flexible;
-        self.af.has_vertical_shape_if(is_flexible, VerticalShape::List, || {
+        self.af.has_shape_if(is_flexible, Shape::List, || {
             if !self.opt.omit_open_brace {
                 self.af.out.token(self.braces.start())?;
             }
