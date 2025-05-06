@@ -47,7 +47,7 @@ impl AstFormatter {
         self.local_init(init, Tail::none())?;
         let is_single_line_init = self.out.line() == first_line;
         let else_block_vertical = || {
-            self.block_expr_vertical_after_open_brace(else_)?;
+            self.block_expr_after_open_brace(else_)?;
             self.out.token(";")?;
             Ok(())
         };

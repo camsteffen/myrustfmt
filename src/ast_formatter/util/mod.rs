@@ -5,4 +5,5 @@ mod enclosed;
 mod indent;
 mod infix_chain;
 mod simulate_wrap;
+pub mod sort;
 mod wrapping;

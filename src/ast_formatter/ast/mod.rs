@@ -4,7 +4,7 @@ mod common;
 mod expr;
 mod r#fn;
 mod generics;
-mod item;
+pub mod item;
 mod local;
 mod pat;
 mod path;

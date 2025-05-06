@@ -17,7 +17,7 @@ impl AstFormatter {
     pub fn enclosed_after_opening(
         &self,
         closing_brace: &'static str,
-        contents: impl Fn() -> FormatResult,
+        contents: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
         self.enclosed_contents(contents)?;
         self.out.token(closing_brace)?;

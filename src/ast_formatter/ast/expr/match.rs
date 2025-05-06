@@ -96,7 +96,7 @@ impl AstFormatter {
 
     fn arm_body_force_block(&self, body: &ast::Expr) -> FormatResult {
         if let Some(block) = plain_block(body) {
-            self.block_expr_vertical(block)?;
+            self.block_expr(block)?;
         } else {
             self.expr_add_block(body)?;
         }

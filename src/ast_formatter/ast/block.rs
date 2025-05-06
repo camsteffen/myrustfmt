@@ -8,7 +8,7 @@ use rustc_ast::ast;
 use rustc_span::Pos;
 
 impl AstFormatter {
-    pub fn block_expr(
+    pub fn block_expr_allow_horizontal(
         &self,
         label: Option<ast::Label>,
         block: &ast::Block,
@@ -22,7 +22,7 @@ impl AstFormatter {
         self.out.token("{")?;
         match self.try_into_expr_only_block(block) {
             None => {
-                self.block_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))?;
+                self.block_expr_after_open_brace(block)?;
                 self.tail(tail)?;
             }
             Some(expr_only_block) => {
@@ -35,7 +35,7 @@ impl AstFormatter {
                         })
                     })
                     .otherwise(|| {
-                        self.block_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))?;
+                        self.block_expr_after_open_brace(block)?;
                         self.tail(tail)?;
                         Ok(())
                     })?
@@ -44,14 +44,17 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn block_expr_vertical(&self, block: &ast::Block) -> FormatResult {
+    pub fn block_expr(&self, block: &ast::Block) -> FormatResult {
         self.out.token("{")?;
-        self.block_expr_vertical_after_open_brace(block)?;
+        self.block_expr_after_open_brace(block)?;
         Ok(())
     }
 
-    pub fn block_expr_vertical_after_open_brace(&self, block: &ast::Block) -> FormatResult {
-        self.block_after_open_brace(&block.stmts, |stmt| self.stmt(stmt))
+    pub fn block_expr_after_open_brace(&self, block: &ast::Block) -> FormatResult {
+        let contents = (!block.stmts.is_empty())
+            .then_some(|| self.list_with_items(&block.stmts, |stmt| self.stmt(stmt)));
+        self.block_after_open_brace_with(contents)?;
+        Ok(())
     }
 
     pub fn block<T>(&self, items: &[T], format_item: impl Fn(&T) -> FormatResult) -> FormatResult {
@@ -65,17 +68,26 @@ impl AstFormatter {
         items: &[T],
         format_item: impl Fn(&T) -> FormatResult,
     ) -> FormatResult {
-        match items {
-            [] => self.enclosed_empty_after_opening("}"),
-            [first, rest @ ..] => self.enclosed_after_opening("}", || {
-                format_item(first)?;
-                for item in rest {
-                    self.out.newline_indent(VerticalWhitespaceMode::Between)?;
-                    format_item(item)?;
-                }
-                Ok(())
-            }),
+        let contents = items.split_first().map(|(first, rest)| move || {
+            format_item(first)?;
+            for item in rest {
+                self.out.newline_indent(VerticalWhitespaceMode::Between)?;
+                format_item(item)?;
+            }
+            Ok(())
+        });
+        self.block_after_open_brace_with(contents)
+    }
+
+    pub fn block_after_open_brace_with(
+        &self,
+        contents: Option<impl FnOnce() -> FormatResult>,
+    ) -> FormatResult {
+        match contents {
+            None => self.enclosed_empty_after_opening("}")?,
+            Some(contents) => self.enclosed_after_opening("}", contents)?,
         }
+        Ok(())
     }
 
     pub fn stmt(&self, stmt: &ast::Stmt) -> FormatResult {

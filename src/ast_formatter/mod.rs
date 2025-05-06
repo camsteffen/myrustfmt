@@ -70,7 +70,9 @@ impl AstFormatter {
     fn do_module(&self, module: &AstModule) -> FormatResult {
         self.out.comments(VerticalWhitespaceMode::Top)?;
         self.with_attrs(&module.attrs, module.spans.inner_span, || {
-            self.item_list(&module.items)
+            self.list_with_items(&module.items, |item| self.item(item))?;
+            self.out.newline(VerticalWhitespaceMode::Bottom)?;
+            Ok(())
         })?;
         Ok(())
     }
