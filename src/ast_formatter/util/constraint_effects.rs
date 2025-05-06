@@ -66,13 +66,7 @@ impl AstFormatter {
         if self.shape() <= shape {
             return scope();
         }
-        match self.constraints().with_replace_shape(shape, scope) {
-            Err(mut e) if e.kind == ConstraintErrorKind::NewlineNotAllowed => {
-                e.kind = ConstraintErrorKind::NextStrategy;
-                Err(e)
-            }
-            result => result,
-        }
+        self.constraints().with_replace_shape(shape, scope)
     }
 
     pub fn with_width_limit<T>(
