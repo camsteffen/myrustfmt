@@ -241,6 +241,7 @@ fn actions_from_tokens<'a>(
     })
 }
 
+/// Describes how to handle a whitespace token without yet knowing its contents
 #[derive(Debug)]
 enum WhitespaceTokenStrategy {
     /// Coerce into horizontal space
@@ -254,8 +255,6 @@ enum WhitespaceTokenStrategy {
     },
 }
 
-/// Computes the strategy for handling a whitespace token based on the mode and the presence of
-/// surrounding comments
 fn whitespace_token_strategy(
     mode: WhitespaceMode,
     is_comments_before: bool,
@@ -286,7 +285,7 @@ fn whitespace_token_strategy(
                 WhitespaceTokenStrategy::Flexible {
                     allow_blank_line: vertical_mode
                         .allow_blank_line(is_comments_before, is_comments_after),
-                    space_if_horizontal: space_if_horizontal || is_by_comments,
+                    space_if_horizontal: true,
                 }
             } else {
                 WhitespaceTokenStrategy::Horizontal {

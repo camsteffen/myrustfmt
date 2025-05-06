@@ -4,6 +4,7 @@ use std::cell::Cell;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+// todo encapsulate more - AstFormatter probably shouldn't be accessing fields
 pub struct SourceReader {
     pub path: Option<PathBuf>,
     pub pos: Cell<BytePos>,
