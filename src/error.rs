@@ -52,6 +52,7 @@ pub struct WidthLimitExceededError;
 pub enum ParseError {
     ExpectedPosition(BytePos),
     ExpectedToken(&'static str),
+    UnexpectedEof,
 }
 
 fn write_error_formatting_at(
@@ -95,13 +96,10 @@ fn write_constraint_error(
     Ok(())
 }
 
-pub fn parse_error_display(
-    error: ParseError,
-    path: Option<&Path>,
-    source: &str,
-    pos: BytePos,
-) -> impl Display {
-    display_from_fn(move |f| write_parse_error(f, error, path, source, pos))
+pub fn panic_parse_error(error: ParseError, path: Option<&Path>, source: &str, pos: BytePos) -> ! {
+    panic!("{}",
+           display_from_fn(move |f| write_parse_error(f, error, path, source, pos))
+    )
 }
 
 fn write_parse_error(
@@ -138,6 +136,10 @@ fn write_parse_error(
         }
         ParseError::ExpectedToken(ref token) => {
             write!(f, "expected token: `{token}`")?;
+            next_token(f)?;
+        }
+        ParseError::UnexpectedEof => {
+            write!(f, "unexpected EOF")?;
             next_token(f)?;
         }
     }

@@ -1,4 +1,4 @@
-use crate::error::{ParseError, parse_error_display};
+use crate::error::{ParseError, panic_parse_error};
 use rustc_span::{BytePos, Pos, SourceFile, Span};
 use std::cell::Cell;
 use std::path::PathBuf;
@@ -21,14 +21,12 @@ impl SourceReader {
 
     pub fn finish(self) {
         if self.pos.get().to_usize() != self.source().len() {
-            // todo don't panic?
-            panic!(
-                "Failed to reach end of file. Next char: {:?}",
-                self.source()[self.pos.get().to_usize()..]
-                    .chars()
-                    .next()
-                    .unwrap()
-            );
+            panic_parse_error(
+                ParseError::UnexpectedEof,
+                self.path.as_deref(),
+                self.source(),
+                self.pos.get(),
+            )
         }
     }
 
@@ -91,9 +89,6 @@ impl SourceReader {
     }
 
     fn parse_error(&self, error: ParseError) -> ! {
-        panic!(
-            "{}",
-            parse_error_display(error, self.path.as_deref(), self.source(), self.pos.get())
-        );
+        panic_parse_error(error, self.path.as_deref(), self.source(), self.pos.get())
     }
 }

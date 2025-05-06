@@ -69,11 +69,11 @@ impl AstFormatter {
 
     fn do_module(&self, module: &AstModule) -> FormatResult {
         self.out.comments(VerticalWhitespaceMode::Top)?;
+        // todo skip the whole file if there's a skip attribute?
         self.with_attrs(&module.attrs, module.spans.inner_span, || {
-            self.list_with_items(&module.items, |item| self.item(item))?;
-            self.out.newline(VerticalWhitespaceMode::Bottom)?;
-            Ok(())
+            self.list_with_item_sorting(&module.items, |item| self.item(item))
         })?;
+        self.out.newline(VerticalWhitespaceMode::Bottom)?;
         Ok(())
     }
 }

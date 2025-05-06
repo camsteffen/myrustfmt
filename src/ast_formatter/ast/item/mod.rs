@@ -1,21 +1,17 @@
+mod sort;
 pub mod use_tree;
 
+use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::list::options::{ListShape, list_opt};
+use crate::ast_formatter::list::{Braces, ListItemContext};
+use crate::ast_formatter::tail::Tail;
+use crate::error::FormatResult;
+use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
+use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 use rustc_span::Symbol;
 use rustc_span::symbol::Ident;
-use std::cmp::Ordering;
-
-use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::ast::item::use_tree::order::use_tree_order;
-use crate::ast_formatter::list::options::{ListShape, list_opt};
-use crate::ast_formatter::list::{Braces, ListItemContext};
-use crate::ast_formatter::tail::Tail;
-use crate::ast_formatter::util::ast::item_lo_with_attrs;
-use crate::ast_formatter::util::sort::version_sort;
-use crate::error::FormatResult;
-use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
-use crate::whitespace::VerticalWhitespaceMode;
 
 pub trait MaybeItem {
     fn as_item(&self) -> Option<&ast::Item>;
@@ -37,111 +33,6 @@ impl MaybeItem for ast::Stmt {
 }
 
 impl AstFormatter {
-    pub fn list_with_items<T: MaybeItem>(
-        &self,
-        items: &[T],
-        format: impl Fn(&T) -> FormatResult,
-    ) -> FormatResult {
-        let mut remaining = items;
-        loop {
-            if remaining.is_empty() {
-                break;
-            }
-            if self.try_next_sortable_group(&mut remaining, &format)? {
-                // ya good
-            } else {
-                format(remaining.split_off_first().unwrap())?;
-            }
-            if !remaining.is_empty() {
-                self.out.newline_indent(VerticalWhitespaceMode::Between)?;
-            }
-        }
-        Ok(())
-    }
-
-    pub fn try_next_sortable_group<T>(
-        &self,
-        items: &mut &[T],
-        format: impl Fn(&T) -> FormatResult,
-    ) -> FormatResult<bool>
-    where
-        T: MaybeItem,
-    {
-        let is_external_mod =
-            |item: &ast::Item| matches!(item.kind, ast::ItemKind::Mod(_, ast::ModKind::Unloaded));
-        let is_use = |item: &ast::Item| matches!(item.kind, ast::ItemKind::Use(_));
-        let Some(first) = items.first().and_then(T::as_item) else {
-            return Ok(false);
-        };
-        if is_external_mod(first) {
-            let group = self.split_off_contiguous_maybe_item(items, is_external_mod);
-            self.sorted_maybe_item_group(
-                group,
-                |a, b| version_sort(a.ident.as_str(), b.ident.as_str()),
-                format,
-            )?;
-            Ok(true)
-        } else if is_use(first) {
-            fn expect_use_tree(item: &ast::Item) -> &ast::UseTree {
-                match &item.kind {
-                    ast::ItemKind::Use(use_tree) => use_tree,
-                    _ => unreachable!(),
-                }
-            }
-            let group = self.split_off_contiguous_maybe_item(items, is_use);
-            self.sorted_maybe_item_group(
-                group,
-                |a, b| use_tree_order(expect_use_tree(a), expect_use_tree(b)),
-                format,
-            )?;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    pub fn split_off_contiguous_maybe_item<'a, T>(
-        &self,
-        slice: &mut &'a [T],
-        filter: impl Fn(&ast::Item) -> bool,
-    ) -> &'a [T]
-    where
-        T: MaybeItem,
-    {
-        self.split_off_contiguous_group(
-            slice,
-            |t| t.as_item().is_some_and(&filter),
-            |t| item_lo_with_attrs(t.as_item().unwrap()),
-            |t| t.as_item().unwrap().span.hi(),
-        )
-    }
-
-    pub fn sorted_maybe_item_group<T>(
-        &self,
-        group: &[T],
-        compare: impl Fn(&ast::Item, &ast::Item) -> Ordering,
-        format: impl Fn(&T) -> FormatResult,
-    ) -> FormatResult
-    where
-        T: MaybeItem,
-    {
-        let mut sorted = Vec::from_iter(group);
-        sorted.sort_by(|a, b| compare(a.as_item().unwrap(), b.as_item().unwrap()));
-        for (i, t) in sorted.into_iter().enumerate() {
-            self.out
-                .source_reader
-                .goto(item_lo_with_attrs(t.as_item().unwrap()));
-            format(t)?;
-            if i < group.len() - 1 {
-                self.out.newline_indent(VerticalWhitespaceMode::SingleNewline)?;
-            }
-        }
-        self.out
-            .source_reader
-            .goto(group.last().unwrap().as_item().unwrap().span.hi());
-        Ok(())
-    }
-
     pub fn item(&self, item: &ast::Item) -> FormatResult {
         self.item_generic(item, |kind| self.item_kind(kind, item))
     }
@@ -289,8 +180,7 @@ impl AstFormatter {
         match mod_kind {
             ast::ModKind::Loaded(items, ast::Inline::Yes, ..) => {
                 self.out.space()?;
-                // todo sorting
-                self.block(items, |item| self.item(item))?;
+                self.block_with_items(false, items, |item| self.item(item))?;
             }
             ast::ModKind::Loaded(_, ast::Inline::No, ..) | ast::ModKind::Unloaded => {
                 self.out.token(";")?;
@@ -361,7 +251,7 @@ impl AstFormatter {
         if !self.where_clause(&impl_.generics.where_clause, true)? {
             self.out.space()?;
         }
-        self.block(&impl_.items, |item| self.assoc_item(item))?;
+        self.block(false, &impl_.items, |item| self.assoc_item(item))?;
         Ok(())
     }
 
@@ -428,7 +318,7 @@ impl AstFormatter {
         let wrapped_bounds = self.generic_bounds_optional(&trait_.bounds)?;
         // todo share this code with other constructs
         let has_where = self.where_clause(&trait_.generics.where_clause, true)?;
-        let body = || self.block(&trait_.items, |item| self.assoc_item(item));
+        let body = || self.block(false, &trait_.items, |item| self.assoc_item(item));
         if wrapped_bounds || has_where {
             body()?;
         } else {

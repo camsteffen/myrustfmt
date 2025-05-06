@@ -1,4 +1,5 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::ast::item::MaybeItem;
 use crate::ast_formatter::tail::Tail;
 use crate::ast_utils::{control_flow_expr_kind, plain_block};
 use crate::error::FormatResult;
@@ -8,6 +9,16 @@ use rustc_ast::ast;
 use rustc_span::Pos;
 
 impl AstFormatter {
+    pub fn block_expr(&self, block: &ast::Block) -> FormatResult {
+        self.out.token("{")?;
+        self.block_expr_after_open_brace(block)?;
+        Ok(())
+    }
+
+    pub fn block_expr_after_open_brace(&self, block: &ast::Block) -> FormatResult {
+        self.block_with_items(true, &block.stmts, |stmt| self.stmt(stmt))
+    }
+
     pub fn block_expr_allow_horizontal(
         &self,
         label: Option<ast::Label>,
@@ -44,45 +55,46 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn block_expr(&self, block: &ast::Block) -> FormatResult {
-        self.out.token("{")?;
-        self.block_expr_after_open_brace(block)?;
-        Ok(())
-    }
-
-    pub fn block_expr_after_open_brace(&self, block: &ast::Block) -> FormatResult {
-        let contents = (!block.stmts.is_empty())
-            .then_some(|| self.list_with_items(&block.stmts, |stmt| self.stmt(stmt)));
-        self.block_after_open_brace_with(contents)?;
-        Ok(())
-    }
-
-    pub fn block<T>(&self, items: &[T], format_item: impl Fn(&T) -> FormatResult) -> FormatResult {
-        self.out.token("{")?;
-        self.block_after_open_brace(items, format_item)?;
-        Ok(())
-    }
-
-    pub fn block_after_open_brace<T>(
+    pub fn block<T>(
         &self,
-        items: &[T],
-        format_item: impl Fn(&T) -> FormatResult,
+        omit_open_brace: bool,
+        list: &[T],
+        format: impl Fn(&T) -> FormatResult,
     ) -> FormatResult {
-        let contents = items.split_first().map(|(first, rest)| move || {
-            format_item(first)?;
-            for item in rest {
-                self.out.newline_indent(VerticalWhitespaceMode::Between)?;
-                format_item(item)?;
-            }
-            Ok(())
-        });
-        self.block_after_open_brace_with(contents)
+        self.do_block(
+            omit_open_brace,
+            list.split_first().map(|(first, rest)| move || {
+                format(first)?;
+                for item in rest {
+                    self.out.newline_indent(VerticalWhitespaceMode::Between)?;
+                    format(item)?;
+                }
+                Ok(())
+            }),
+        )
     }
 
-    pub fn block_after_open_brace_with(
+    pub fn block_with_items<T: MaybeItem>(
         &self,
+        omit_open_brace: bool,
+        list: &[T],
+        format: impl Fn(&T) -> FormatResult,
+    ) -> FormatResult {
+        self.do_block(
+            omit_open_brace,
+            (!list.is_empty())
+                .then_some(|| self.list_with_item_sorting(list, format)),
+        )
+    }
+
+    fn do_block(
+        &self,
+        omit_open_brace: bool,
         contents: Option<impl FnOnce() -> FormatResult>,
     ) -> FormatResult {
+        if !omit_open_brace {
+            self.out.token("{")?;
+        }
         match contents {
             None => self.enclosed_empty_after_opening("}")?,
             Some(contents) => self.enclosed_after_opening("}", contents)?,

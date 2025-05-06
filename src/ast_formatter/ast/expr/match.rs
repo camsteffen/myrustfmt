@@ -1,15 +1,14 @@
-use rustc_ast::ast;
-
 use crate::ast_formatter::AstFormatter;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
 use crate::constraints::VerticalShape;
 use crate::error::FormatResult;
 use crate::whitespace::VerticalWhitespaceMode;
+use rustc_ast::ast;
 
 impl AstFormatter {
     pub fn match_(&self, scrutinee: &ast::Expr, arms: &[ast::Arm]) -> FormatResult {
         self.token_expr_open_brace("match", scrutinee)?;
-        self.block_after_open_brace(arms, |arm| self.arm(arm))?;
+        self.block(true, arms, |arm| self.arm(arm))?;
         Ok(())
     }
 
