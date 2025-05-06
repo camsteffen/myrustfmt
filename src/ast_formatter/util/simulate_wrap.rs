@@ -12,7 +12,7 @@ impl AstFormatter {
     ///
     /// If formatting fails with a newline-not-allowed error, it is still useful to observe the
     /// boolean to know whether the first line of code (the code emitted leading up to the error)
-    /// used the extra width. (This does assume that downstream formatting will emit all of the
+    /// used the extra width. (This does assume that downstream formatting will emit the entire
     /// first line without short-circuiting. See also `VerticalShape`.)
     ///
     /// When the extra width is used, this means one of two things: either the extra width allowed

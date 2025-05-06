@@ -105,16 +105,14 @@ impl AstFormatter {
             SameLine,
             Wrap(Option<Lookahead>),
         }
-        // this block helps to drop checkpoint_after_space
-        let next = 'next: {
-            if self
-                .out
-                .with_enforce_max_width(|| self.out.space())
-                .is_err()
-            {
-                // comments forced a line break
-                break 'next Next::Wrap(None);
-            }
+        let next = if self
+            .out
+            .with_enforce_max_width(|| self.out.space())
+            .is_err()
+        {
+            // comments forced a line break
+            Next::Wrap(None)
+        } else {
             let checkpoint_after_space = self.out.checkpoint();
 
             // simulate extra width from wrap-indent

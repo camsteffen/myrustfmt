@@ -17,6 +17,9 @@
 * Large expressions in parentheses are broken into a separate line
 * A match arm with a guard on a separate line may have its body on one line without a block
 * A multi-line if/else in a call argument is wrapped instead of continuing after the parenthesis
+* Closures can be directly nested in closures without wrapping the nested closure in a block.
+  Rustfmt wraps the nested closure in a block if the nested closure is multiple lines and the outer closure args fit in a single line.
+* Closure arguments on multiple lines are formatted like other lists, not with visual style.
 
 Chains
 * Chains may include index operators

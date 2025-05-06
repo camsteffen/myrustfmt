@@ -36,9 +36,7 @@ pub struct Backtrack<'a, T = ()> {
     state: BacktrackState<'a, T>,
 }
 
-#[derive(Default)]
 enum BacktrackState<'a, T> {
-    #[default]
     Init,
     Incomplete(Checkpoint<'a>),
     Done(FormatResult<T>),

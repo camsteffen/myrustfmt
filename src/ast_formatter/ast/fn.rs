@@ -185,26 +185,24 @@ impl AstFormatter {
                 list_opt().shape(shape),
             )
         };
-        let do_single_line = || {
-            self.with_single_line(|| {
-                params(ListShape::Horizontal)?;
-                self.fn_ret_ty(&fn_decl.output)?;
-                self.tail(tail)?;
-                Ok(())
-            })
-        };
-        if self.vertical_shape() < VerticalShape::Unrestricted {
-            return do_single_line();
-        }
         // args and return type all on one line
         self.backtrack()
-            .next(do_single_line)
+            .next(|| {
+                self.with_single_line(|| {
+                    params(ListShape::Horizontal)?;
+                    self.fn_ret_ty(&fn_decl.output)?;
+                    self.tail(tail)?;
+                    Ok(())
+                })
+            })
             // args on separate lines
             .otherwise(|| {
-                params(ListShape::Vertical)?;
-                self.fn_ret_ty(&fn_decl.output)?;
-                self.tail(tail)?;
-                Ok(())
+                self.has_vertical_shape(VerticalShape::Unrestricted, || {
+                    params(ListShape::Vertical)?;
+                    self.fn_ret_ty(&fn_decl.output)?;
+                    self.tail(tail)?;
+                    Ok(())
+                })
             })
     }
 
