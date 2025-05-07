@@ -6,10 +6,9 @@ use std::sync::Arc;
 use crate::FormatModuleResult;
 use crate::ast_module::AstModule;
 use crate::config::Config;
-use crate::constraints::Constraints;
 use crate::error::{FormatResult, error_formatting_at};
 use crate::error_emitter::{BufferedErrorEmitter, ErrorEmitter};
-use crate::num::HPos;
+use crate::num::HSize;
 use crate::source_formatter::SourceFormatter;
 use crate::whitespace::VerticalWhitespaceMode;
 
@@ -19,7 +18,7 @@ mod list;
 pub mod tail;
 mod util;
 
-pub const INDENT_WIDTH: HPos = 4;
+pub const INDENT_WIDTH: HSize = 4;
 
 pub fn format_module(
     module: &AstModule,
@@ -27,10 +26,14 @@ pub fn format_module(
     path: Option<PathBuf>,
     config: &Config,
 ) -> FormatModuleResult {
-    let constraints = Constraints::new(config.max_width);
     let errors = Rc::new(BufferedErrorEmitter::new(ErrorEmitter::new(path.clone())));
     // todo need Arc?
-    let out = SourceFormatter::new(path, Arc::new(source_file), constraints, Rc::clone(&errors));
+    let out = SourceFormatter::new(
+        path,
+        Arc::new(source_file),
+        Rc::clone(&errors),
+        config.max_width,
+    );
     let formatter = AstFormatter { errors, out };
     formatter.module(module)
 }

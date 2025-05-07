@@ -3,15 +3,15 @@ use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
 use crate::constraints::Shape;
 use crate::error::{ConstraintErrorKind, FormatResult};
-use crate::num::HPos;
+use crate::num::HSize;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 
 // In rustfmt, this is called chain_width, and is 60 by default
-const POSTFIX_CHAIN_MAX_WIDTH: HPos = 60;
+const POSTFIX_CHAIN_MAX_WIDTH: HSize = 60;
 /// Don't apply chain max width unless the chain item's distance from the start
 /// of the chain is at least this much.
-const POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH: HPos = 15;
+const POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH: HSize = 15;
 
 struct PostfixItem<'a> {
     /// The first item in the chain has the root expression, which is not a postfix expression.
@@ -25,8 +25,7 @@ impl AstFormatter {
     pub fn postfix_chain(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
         let chain = build_postfix_chain(expr);
         let mut chain = chain.as_slice();
-        let start_pos = self.out.last_line_len();
-        let first_line = self.out.line();
+        let (start_line, start_col) = self.out.line_col();
 
         // items that start within the first indent-width on the first line
         let indent_margin = self.out.total_indent.get() + INDENT_WIDTH;
@@ -42,10 +41,10 @@ impl AstFormatter {
                 return self.postfix_item_tail(next, tail, false);
             }
             self.has_shape(Shape::Any, || self.postfix_item(next))?;
-            if self.out.line() != first_line {
+            if self.out.line() != start_line {
                 break true;
             }
-            if self.out.last_line_len() > indent_margin {
+            if self.out.col() > indent_margin {
                 break false;
             }
         };
@@ -55,7 +54,7 @@ impl AstFormatter {
             self.postfix_chain_vertical(chain, tail)
         } else {
             self.backtrack()
-                .next(|| self.postfix_chain_single_line_with_overflow(chain, start_pos, tail))
+                .next(|| self.postfix_chain_single_line_with_overflow(chain, start_col, tail))
                 .otherwise(|| {
                     self.has_shape(Shape::HangingIndent, || {
                         self.indented(|| self.postfix_chain_vertical(chain, tail))
@@ -67,32 +66,32 @@ impl AstFormatter {
     fn postfix_chain_single_line_with_overflow(
         &self,
         chain: &[PostfixItem<'_>],
-        start_pos: HPos,
+        start_col: HSize,
         tail: &Tail,
     ) -> FormatResult {
         let last = chain.last().unwrap();
         if !matches!(last.root_or_dot_item.kind, ast::ExprKind::MethodCall(_)) {
             // this chain is not overflowable, so simply format it on one line
-            self.with_single_line(|| self.postfix_items(chain, start_pos))?;
+            self.with_single_line(|| self.postfix_items(chain, start_col))?;
             self.tail(tail)?;
             return Ok(());
         }
         let (overflowable, before_overflow) = chain.split_last().unwrap();
-        self.with_single_line(|| self.postfix_items(before_overflow, start_pos))?;
-        self.postfix_chain_overflow(overflowable, start_pos, tail)?;
+        self.with_single_line(|| self.postfix_items(before_overflow, start_col))?;
+        self.postfix_chain_overflow(overflowable, start_col, tail)?;
         Ok(())
     }
 
     fn postfix_chain_overflow(
         &self,
         overflowable: &PostfixItem<'_>,
-        start_pos: HPos,
+        start_col: HSize,
         tail: &Tail,
     ) -> FormatResult {
         let first_line = self.out.line();
         let checkpoint = self.out.checkpoint();
         let overflow_height = self.out.with_enforce_max_width(|| -> FormatResult<_> {
-            self.with_chain_item_max_width(start_pos, || {
+            self.with_chain_item_max_width(start_col, || {
                 self.postfix_item_tail(overflowable, Tail::none(), true)
             })?;
             // todo can we prove that the overflow is so long that a separate line won't be shorter?
@@ -152,13 +151,13 @@ impl AstFormatter {
 
     fn with_chain_item_max_width(
         &self,
-        start_pos: HPos,
+        start_col: HSize,
         format: impl Fn() -> FormatResult,
     ) -> FormatResult {
-        let offset = self.out.last_line_len() - start_pos;
+        let offset = self.out.col() - start_col;
         let limit = (offset >= POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH)
             .then_some(POSTFIX_CHAIN_MAX_WIDTH);
-        self.with_width_limit_from_start_first_line_opt(start_pos, limit, format)
+        self.with_width_limit_from_start_first_line_opt(start_col, limit, format)
     }
 
     fn postfix_item(&self, item: &PostfixItem<'_>) -> FormatResult {
@@ -202,9 +201,9 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn postfix_items(&self, items: &[PostfixItem<'_>], start_pos: HPos) -> FormatResult {
+    fn postfix_items(&self, items: &[PostfixItem<'_>], start_col: HSize) -> FormatResult {
         items.iter().try_for_each(|item| {
-            self.with_chain_item_max_width(start_pos, || self.postfix_item(item))
+            self.with_chain_item_max_width(start_col, || self.postfix_item(item))
         })
     }
 

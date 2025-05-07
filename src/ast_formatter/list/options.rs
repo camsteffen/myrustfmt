@@ -1,6 +1,6 @@
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::tail::Tail;
-use crate::num::HPos;
+use crate::num::HSize;
 use derive_where::derive_where;
 
 #[derive(Clone, Copy, Default, PartialEq)]
@@ -15,7 +15,7 @@ pub enum ListShape {
 pub enum ListWrapToFit {
     #[default]
     No,
-    Yes { max_element_width: Option<HPos> },
+    Yes { max_element_width: Option<HSize> },
 }
 
 #[derive_where(Default)]
@@ -29,7 +29,7 @@ pub struct ListOptions<'ast, 'tail, Item> {
     pub(super) item_prefers_overflow: Option<Box<dyn Fn(&Item) -> bool>>,
     pub(super) item_requires_own_line: Option<Box<dyn Fn(&Item) -> bool>>,
     pub(super) omit_open_brace: bool,
-    pub(super) single_line_max_contents_width: Option<HPos>,
+    pub(super) single_line_max_contents_width: Option<HSize>,
     pub(super) wrap_to_fit: ListWrapToFit,
 }
 
@@ -84,7 +84,7 @@ impl<'ast, 'tail, Item> ListOptions<'ast, 'tail, Item> {
         }
     }
 
-    pub fn single_line_max_contents_width(self, width: HPos) -> Self {
+    pub fn single_line_max_contents_width(self, width: HSize) -> Self {
         ListOptions {
             single_line_max_contents_width: Some(width),
             ..self

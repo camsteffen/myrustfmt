@@ -1,13 +1,13 @@
-use crate::num::HPos;
+use crate::num::HSize;
 use crate::util::cell_ext::{CellExt, CellNumberExt};
 use std::cell::Cell;
 use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum Error {
-    LineCommentNotAllowed { line: u32, col: HPos },
+    LineCommentNotAllowed { line: u32, col: HSize },
     MaxWidthExceeded { line: u32 },
-    MultiLineCommentNotAllowed { line: u32, col: HPos },
+    MultiLineCommentNotAllowed { line: u32, col: HSize },
 }
 
 pub struct BufferedErrorEmitter {
@@ -79,7 +79,7 @@ impl BufferedErrorEmitter {
 
     // actual errors
 
-    pub fn line_comment_not_allowed(&self, line: u32, col: HPos) {
+    pub fn line_comment_not_allowed(&self, line: u32, col: HSize) {
         if self.is_buffering() {
             self.buffer(Error::LineCommentNotAllowed { line, col });
         } else {
@@ -95,7 +95,7 @@ impl BufferedErrorEmitter {
         }
     }
 
-    pub fn multi_line_comment_not_allowed(&self, line: u32, col: HPos) {
+    pub fn multi_line_comment_not_allowed(&self, line: u32, col: HSize) {
         if self.is_buffering() {
             self.buffer(Error::MultiLineCommentNotAllowed { line, col });
         } else {
@@ -156,13 +156,13 @@ impl ErrorEmitter {
         self.error_count.get()
     }
 
-    pub fn line_comment_not_allowed(&self, line: u32, col: HPos) {
+    pub fn line_comment_not_allowed(&self, line: u32, col: HSize) {
         self.error_count.increment();
         eprint!("Line comment not allowed");
         self.at(line, col);
     }
 
-    pub fn multi_line_comment_not_allowed(&self, line: u32, col: HPos) {
+    pub fn multi_line_comment_not_allowed(&self, line: u32, col: HSize) {
         self.error_count.increment();
         eprint!("Multi-line comment not allowed");
         self.at(line, col);
@@ -177,7 +177,7 @@ impl ErrorEmitter {
         }
     }
 
-    fn at(&self, line: u32, col: HPos) {
+    fn at(&self, line: u32, col: HSize) {
         let (line, col) = (line + 1, col + 1);
         match &self.path {
             None => eprintln!(" at {line}:{col}"),

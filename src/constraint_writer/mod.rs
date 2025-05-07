@@ -6,7 +6,7 @@ use crate::error::{
     WidthLimitExceededError,
 };
 use crate::error_emitter::BufferedErrorEmitter;
-use crate::num::HPos;
+use crate::num::HSize;
 use crate::util::cell_ext::{CellExt, CellNumberExt};
 use std::cell::Cell;
 use std::panic::Location;
@@ -32,12 +32,12 @@ pub struct ConstraintWriter {
 
 impl ConstraintWriter {
     pub fn new(
-        constraints: Constraints,
+        max_width: HSize,
         errors: Rc<BufferedErrorEmitter>,
         capacity: usize,
     ) -> ConstraintWriter {
         ConstraintWriter {
-            constraints,
+            constraints: Constraints::new(max_width),
             buffer: Cell::new(String::with_capacity(capacity)),
             constraint_recovery_mode: Cell::new(ConstraintRecoveryMode::Nothing),
             errors,
@@ -61,6 +61,17 @@ impl ConstraintWriter {
 
     pub fn line(&self) -> u32 {
         self.line.get()
+    }
+
+    // todo make sure any math using two values of this are guaranteed to be on the same line
+    pub fn col(&self) -> HSize {
+        (self.len() - self.last_line_start.get())
+            .try_into()
+            .expect("line length exceeds HSize::MAX")
+    }
+
+    pub fn line_col(&self) -> (u32, HSize) {
+        (self.line(), self.col())
     }
 
     pub fn with_constraint_recovery_mode_max<T>(
@@ -129,7 +140,7 @@ impl ConstraintWriter {
         Ok(())
     }
 
-    pub fn spaces(&self, count: HPos) {
+    pub fn spaces(&self, count: HSize) {
         self.buffer.with_taken(|b| b.extend((0..count).map(|_| ' ')));
     }
 
@@ -153,24 +164,18 @@ impl ConstraintWriter {
         }
     }
 
-    pub fn current_max_width(&self) -> HPos {
+    pub fn current_max_width(&self) -> HSize {
         self.constraints.max_width_at(self.line())
     }
 
-    pub fn remaining_width(&self) -> Result<HPos, WidthLimitExceededError> {
+    pub fn remaining_width(&self) -> Result<HSize, WidthLimitExceededError> {
         self.current_max_width()
-            .checked_sub(self.last_line_len().try_into().unwrap())
+            .checked_sub(self.col().try_into().unwrap())
             .ok_or(WidthLimitExceededError)
     }
 
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T {
         self.buffer.with_taken(|b| f(&b[self.last_line_start.get()..]))
-    }
-
-    pub fn last_line_len(&self) -> HPos {
-        (self.len() - self.last_line_start.get())
-            .try_into()
-            .expect("line length exceeds HPos::MAX")
     }
 
     pub fn with_taken_buffer(&self, f: impl FnOnce(&mut String)) {

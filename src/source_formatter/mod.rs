@@ -8,7 +8,7 @@ use crate::constraint_writer::{ConstraintRecoveryMode, ConstraintWriter};
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::{BufferedErrorEmitter, Error};
-use crate::num::HPos;
+use crate::num::HSize;
 use crate::util::chars::is_closer_char;
 use rustc_span::{BytePos, Pos, SourceFile, Span};
 use std::cell::Cell;
@@ -30,7 +30,7 @@ pub struct SourceFormatter {
     pub source_reader: SourceReader,
     out: ConstraintWriter,
     /// The number of spaces for the current level of indentation
-    pub total_indent: Cell<HPos>,
+    pub total_indent: Cell<HSize>,
 }
 
 macro_rules! delegate_to_constraint_writer {
@@ -47,14 +47,14 @@ macro_rules! delegate_to_constraint_writer {
 
 delegate_to_constraint_writer! {
     pub fn constraints(&self) -> &Constraints;
-    pub fn current_max_width(&self) -> HPos;
+    pub fn current_max_width(&self) -> HSize;
     pub fn has_any_constraint_recovery(&self) -> bool;
     pub fn max_recovery_mode(&self) -> ConstraintRecoveryMode;
     pub fn with_constraint_recovery_mode_max<T>(&self, mode: ConstraintRecoveryMode, scope: impl FnOnce() -> T) -> T;
     pub fn with_enforce_max_width<T>(&self, scope: impl FnOnce() -> T) -> T;
-    // todo make sure any math using two values of this are guaranteed to be on the same line
-    pub fn last_line_len(&self) -> HPos;
     pub fn line(&self) -> u32;
+    pub fn col(&self) -> HSize;
+    pub fn line_col(&self) -> (u32, HSize);
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T;
 
     #[allow(unused)]
@@ -66,12 +66,12 @@ impl SourceFormatter {
     pub fn new(
         path: Option<PathBuf>,
         source_file: Arc<SourceFile>,
-        constraints: Constraints,
         error_emitter: Rc<BufferedErrorEmitter>,
+        max_width: HSize,
     ) -> SourceFormatter {
         let source_reader = SourceReader::new(path, source_file);
         let capacity = source_reader.source().len() * 2;
-        let out = ConstraintWriter::new(constraints, Rc::clone(&error_emitter), capacity);
+        let out = ConstraintWriter::new(max_width, Rc::clone(&error_emitter), capacity);
         SourceFormatter {
             checkpoint_count: Cell::new(0),
             error_emitter,
@@ -85,10 +85,6 @@ impl SourceFormatter {
         assert_eq!(self.checkpoint_count.get(), 0);
         self.source_reader.finish();
         self.out.finish()
-    }
-
-    pub fn line_col(&self) -> (u32, HPos) {
-        (self.out.line(), self.out.last_line_len())
     }
 
     pub fn skip_token(&self, token: &'static str) -> FormatResult {
@@ -129,7 +125,7 @@ impl SourceFormatter {
         Ok(())
     }
 
-    /// Inserts a token without consuming it from source
+    /// Inserts a token without expecting it in the source
     pub fn token_insert(&self, token: &'static str) -> FormatResult {
         self.out.token(token)
     }

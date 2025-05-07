@@ -13,8 +13,7 @@ impl AstFormatter {
 
     fn local_after_attrs(&self, local: &ast::Local) -> FormatResult {
         let ast::Local { pat, kind, ty, .. } = local;
-        let first_line = self.out.line();
-        let start = self.out.last_line_len();
+        let (first_line, start_col) = self.out.line_col();
         self.out.token_space("let")?;
         let Some((init, else_)) = kind.init_else_opt() else {
             let Some(ty) = ty else {
@@ -66,7 +65,7 @@ impl AstFormatter {
                 Some(move || {
                     self.with_single_line(|| {
                         self.with_width_limit_from_start(
-                            start,
+                            start_col,
                             RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
                             || {
                                 self.expr_only_block_after_open_brace(expr_only_else)?;

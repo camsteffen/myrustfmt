@@ -1,2 +1,2 @@
-/// Horizontal position
-pub type HPos = u16;
+/// Horizontal position or length
+pub type HSize = u16;

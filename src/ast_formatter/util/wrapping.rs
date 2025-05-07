@@ -33,7 +33,7 @@ impl AstFormatter {
         }
         let start_if_wrap = self.out.total_indent.get();
         drop(indent_guard);
-        let wrap_has_more_width = self.out.last_line_len() > start_if_wrap;
+        let wrap_has_more_width = self.out.col() > start_if_wrap;
         let result = self.out.with_enforce_max_width(&then);
         if self.out.line() != first_line {
             result?;

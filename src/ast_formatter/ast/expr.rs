@@ -373,7 +373,7 @@ impl AstFormatter {
         else_: Option<&'a ast::Expr>,
         tail: &Tail,
     ) -> FormatResult {
-        let start_pos = self.out.last_line_len();
+        let start_col = self.out.col();
         let is_head_single_line = self.token_expr_open_brace("if", condition)?;
 
         let single_line = (|| {
@@ -390,7 +390,7 @@ impl AstFormatter {
             Some(move || {
                 self.with_single_line(|| {
                     self.with_width_limit_from_start(
-                        start_pos,
+                        start_col,
                         RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
                         || {
                             self.expr_only_block_after_open_brace(block_expr)?;

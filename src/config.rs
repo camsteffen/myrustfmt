@@ -1,4 +1,4 @@
-use crate::num::HPos;
+use crate::num::HSize;
 
 macro_rules! config {
     ($($name:ident: $ty:ty = $default:expr,)*) => {
@@ -30,5 +30,5 @@ macro_rules! config {
 }
 
 config! {
-    max_width: HPos = 100,
+    max_width: HSize = 100,
 }

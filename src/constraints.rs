@@ -1,29 +1,34 @@
 use crate::error::FormatResult;
-use crate::num::HPos;
+use crate::num::HSize;
 use crate::util::cell_ext::CellExt;
 use std::cell::Cell;
 use std::num::NonZero;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Constraints {
-    max_width: Cell<HPos>,
+    // max_width and width_limit are very similar in effect, but they need to be separate values for
+    // a couple reasons:
+    //  1. width_limit can fall out of scope, and then the max_width is used as a fallback.
+    //  2. Sometimes we change max_width as an experiment to simulate starting from a different
+    //     horizontal position. The width_limit must be left unchanged for these experiments
+    //     since it represents limits that are independent of the global limit.
+    /// The global maximum width
+    max_width: Cell<HSize>,
     shape: Cell<Shape>,
-    // width limit and max width are very similar in effect, but they are separate values because
-    // they have different scopes and may change independently of each other
     width_limit: Cell<Option<WidthLimit>>,
 }
 
-/// Applies a width limit to a specific scope
+/// Width limit imposed on a specific node or range as part of formatting logic.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum WidthLimit {
     /// Used where a single-line constraint is active
-    SingleLine { end: NonZero<HPos> },
+    SingleLine { end: NonZero<HSize> },
     /// Applies a width limit to the first line, then falls out of scope
-    FirstLine { end: NonZero<HPos>, line: u32 },
+    FirstLine { end: NonZero<HSize>, line: u32 },
 }
 
 impl WidthLimit {
-    fn end(self) -> HPos {
+    fn end(self) -> HSize {
         match self {
             WidthLimit::SingleLine { end } => end.get(),
             WidthLimit::FirstLine { end, .. } => end.get(),
@@ -74,7 +79,7 @@ pub enum Shape {
 }
 
 impl Constraints {
-    pub fn new(max_width: HPos) -> Constraints {
+    pub fn new(max_width: HSize) -> Constraints {
         Constraints {
             max_width: Cell::new(max_width),
             width_limit: Cell::new(None),
@@ -84,7 +89,7 @@ impl Constraints {
 
     // basic getters
 
-    pub fn max_width(&self) -> HPos {
+    pub fn max_width(&self) -> HSize {
         self.max_width.get()
     }
 
@@ -98,14 +103,14 @@ impl Constraints {
 
     // more getters
 
-    pub fn max_width_at(&self, line: u32) -> HPos {
+    pub fn max_width_at(&self, line: u32) -> HSize {
         let Some(width_limit_end) = self.width_limit_end_at(line) else {
             return self.max_width();
         };
         self.max_width().min(width_limit_end)
     }
 
-    fn width_limit_end_at(&self, line: u32) -> Option<HPos> {
+    fn width_limit_end_at(&self, line: u32) -> Option<HSize> {
         let Some(width_limit) = self.width_limit() else {
             return None;
         };
@@ -130,20 +135,23 @@ impl Constraints {
         self.with_replace_width_limit(Some(width_limit), scope)
     }
 
-    pub fn with_replace_max_width<T>(&self, max_width: HPos, scope: impl FnOnce() -> T) -> T {
+    pub fn with_replace_max_width<T>(&self, max_width: HSize, scope: impl FnOnce() -> T) -> T {
         self.max_width.with_replaced(max_width, scope)
     }
 
     /// Replace without regard to the current setting
-    pub fn with_replace_shape<T>(&self, shape: Shape, scope: impl FnOnce() -> T) -> T {
+    pub fn with_replace_shape<T>(
+        &self,
+        shape: Shape,
+        scope: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
         self.shape.with_replaced(shape, scope)
     }
 
-    /// Declares that the output in the given scope is known to have the given Shape,
-    /// but only if the output actually has multiple lines (or starts with a newline).
-    ///
-    /// If the given Shape is currently allowed, continues normally.
-    /// If not, then the required Shape is set to SingleLine for the given scope.
+    /// Declares that the output in the given scope has the given Shape.
+    /// 
+    /// If this shape is not allowed, then an error will be raised upon emitting a newline.
+    /// (This also means that, if no newline is emitted, there will not be an error.)
     pub fn has_shape<T>(
         &self,
         shape: Shape,

@@ -23,13 +23,12 @@ impl AstFormatter {
             let mut chain = chain.as_slice();
             let indent_margin = self.out.total_indent.get() + INDENT_WIDTH;
             let indent_guard = loop {
-                let (op, expr) = if self.out.last_line_len() < indent_margin
-                    && let Some(next) = chain.split_off_first()
-                {
-                    next
-                } else {
-                    break None;
-                };
+                let (op, expr) =
+                    if self.out.col() < indent_margin && let Some(next) = chain.split_off_first() {
+                        next
+                    } else {
+                        break None;
+                    };
                 let indent_guard = self.space_or_wrap_indent_then(|| {
                     self.out.token_space(op.as_str())?;
                     self.expr(expr)?;

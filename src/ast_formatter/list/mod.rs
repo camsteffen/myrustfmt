@@ -12,7 +12,7 @@ use crate::ast_formatter::list::options::{ListOptions, ListShape, ListWrapToFit}
 use crate::ast_formatter::tail::Tail;
 use crate::constraints::Shape;
 use crate::error::FormatResult;
-use crate::num::HPos;
+use crate::num::HSize;
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
@@ -238,7 +238,7 @@ where
     ]
     */
     // todo how does this behave with comments between items - forcing newlines?
-    fn contents_wrap_to_fit(&self, max_element_width: Option<HPos>) -> FormatResult {
+    fn contents_wrap_to_fit(&self, max_element_width: Option<HSize>) -> FormatResult {
         let Self {
             af,
             opt,
