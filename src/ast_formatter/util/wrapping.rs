@@ -9,12 +9,12 @@ impl AstFormatter {
         let first_line = self.out.line();
         self.out.space_or_break()?;
         let result = self.out.with_enforce_max_width(&then);
-        if self.out.line() == first_line
-            && matches!(result, Err(e) if e.kind == ConstraintErrorKind::WidthLimitExceeded)
-        {
+        if self.out.line() == first_line && result.is_err() {
             self.out.restore_checkpoint(&checkpoint);
             self.out.newline_indent(VerticalWhitespaceMode::Break)?;
             then()?;
+        } else {
+            result?;
         }
         Ok(())
     }

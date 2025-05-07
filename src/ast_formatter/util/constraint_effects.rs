@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::constraints::{Constraints, Shape, WidthLimit};
-use crate::error::{ConstraintErrorKind, FormatResult, WidthLimitExceededError};
+use crate::error::{FormatResult, WidthLimitExceededError};
 use crate::num::HPos;
 use std::num::NonZero;
 
@@ -35,16 +35,8 @@ impl AstFormatter {
     }
 
     pub fn with_single_line<T>(&self, format: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        match self
-            .constraints()
+        self.constraints()
             .with_replace_shape(Shape::SingleLine, format)
-        {
-            Err(mut e) if e.kind == ConstraintErrorKind::NewlineNotAllowed => {
-                e.kind = ConstraintErrorKind::NextStrategy;
-                Err(e)
-            }
-            result => result,
-        }
     }
 
     pub fn with_single_line_opt<T>(
@@ -63,7 +55,7 @@ impl AstFormatter {
         shape: Shape,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        if self.shape() <= shape {
+        if shape >= self.shape() {
             return scope();
         }
         self.constraints().with_replace_shape(shape, scope)
