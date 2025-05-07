@@ -4,7 +4,7 @@ mod postfix_chain;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::ListRest;
-use crate::ast_formatter::list::options::{ListOptions, ListWrapToFit, list_opt};
+use crate::ast_formatter::list::options::{ListOptions, ListWrapToFit};
 use crate::ast_formatter::list::{Braces, ListItemContext, ListStrategy};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
@@ -468,7 +468,7 @@ impl AstFormatter {
             Braces::Curly,
             &struct_.fields,
             Self::expr_field,
-            list_opt()
+            ListOptions::new()
                 // todo not wide enough?
                 .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
                 .rest(ListRest::from_struct_rest(&struct_.rest))
@@ -503,6 +503,6 @@ impl AstFormatter {
 }
 
 pub fn expr_list_opt<'ast, 'tail>() -> ListOptions<'ast, 'tail, P<ast::Expr>> {
-    list_opt::<P<ast::Expr>>()
+    ListOptions::<P<ast::Expr>>::new()
         .item_prefers_overflow(|expr| matches!(expr.kind, ast::ExprKind::Closure(_)))
 }

@@ -18,26 +18,26 @@ pub enum ListWrapToFit {
     Yes { max_element_width: Option<HPos> },
 }
 
-pub fn list_opt<'ast, 'tail, Item>() -> ListOptions<'ast, 'tail, Item> {
-    ListOptions::default()
-}
-
 #[derive_where(Default)]
 pub struct ListOptions<'ast, 'tail, Item> {
-    pub rest: Option<ListRest<'ast>>,
-    pub shape: ListShape,
-    pub tail: &'tail Tail<'ast>,
-    pub force_trailing_comma: bool,
+    pub(super) rest: Option<ListRest<'ast>>,
+    pub(super) shape: ListShape,
+    pub(super) tail: &'tail Tail<'ast>,
+    pub(super) force_trailing_comma: bool,
     /// Called with the last item in the list. Returns true if that item always prefers overflow
     /// to being wrapped to the next line.
-    pub item_prefers_overflow: Option<Box<dyn Fn(&Item) -> bool>>,
-    pub item_requires_own_line: Option<Box<dyn Fn(&Item) -> bool>>,
-    pub omit_open_brace: bool,
-    pub single_line_max_contents_width: Option<HPos>,
-    pub wrap_to_fit: ListWrapToFit,
+    pub(super) item_prefers_overflow: Option<Box<dyn Fn(&Item) -> bool>>,
+    pub(super) item_requires_own_line: Option<Box<dyn Fn(&Item) -> bool>>,
+    pub(super) omit_open_brace: bool,
+    pub(super) single_line_max_contents_width: Option<HPos>,
+    pub(super) wrap_to_fit: ListWrapToFit,
 }
 
 impl<'ast, 'tail, Item> ListOptions<'ast, 'tail, Item> {
+    pub fn new() -> Self {
+        ListOptions::default()
+    }
+
     pub fn rest(self, rest: Option<ListRest<'ast>>) -> Self {
         ListOptions { rest, ..self }
     }

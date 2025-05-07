@@ -3,7 +3,7 @@ use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::ListRest;
-use crate::ast_formatter::list::options::list_opt;
+use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
@@ -49,7 +49,7 @@ impl AstFormatter {
                     Braces::Parens,
                     fields,
                     Self::pat_list_item,
-                    list_opt().tail(take_tail()),
+                    ListOptions::new().tail(take_tail()),
                 )?;
             }
             ast::PatKind::Or(ref pats) => {
@@ -60,7 +60,7 @@ impl AstFormatter {
                 Braces::Parens,
                 fields,
                 Self::pat_list_item,
-                list_opt().tail(take_tail()),
+                ListOptions::new().tail(take_tail()),
             )?,
             ast::PatKind::Box(_) => todo!(),
             ast::PatKind::Deref(_) => todo!(),
@@ -81,7 +81,7 @@ impl AstFormatter {
                 Braces::Square,
                 elements,
                 Self::pat_list_item,
-                list_opt().tail(take_tail()),
+                ListOptions::new().tail(take_tail()),
             )?,
             ast::PatKind::Rest => self.out.token("..")?,
             ast::PatKind::Never => todo!(),
@@ -115,7 +115,7 @@ impl AstFormatter {
             Braces::Curly,
             fields,
             Self::pat_field,
-            list_opt()
+            ListOptions::new()
                 .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
                 .rest(ListRest::from_pat_fields_rest(rest))
                 .tail(tail),

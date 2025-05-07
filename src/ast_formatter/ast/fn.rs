@@ -3,7 +3,7 @@ use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 
-use crate::ast_formatter::list::options::{ListShape, list_opt};
+use crate::ast_formatter::list::options::{ListOptions, ListShape};
 use crate::constraints::Shape;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::BindingMode;
@@ -26,7 +26,7 @@ impl AstFormatter {
                 Braces::Parens,
                 &sig.decl.inputs,
                 Self::param,
-                list_opt().shape(shape),
+                ListOptions::new().shape(shape),
             )
         };
         self.backtrack()
@@ -148,7 +148,7 @@ impl AstFormatter {
             Braces::Parens,
             &parenthesized_args.inputs,
             |af, ty, tail, _lcx| af.ty_tail(ty, tail),
-            list_opt().tail(list_tail),
+            ListOptions::new().tail(list_tail),
         )?;
         self.fn_ret_ty(&parenthesized_args.output)?;
         // todo pass tail to ret ty?
@@ -180,7 +180,7 @@ impl AstFormatter {
                 braces,
                 &fn_decl.inputs,
                 Self::param,
-                list_opt().shape(shape),
+                ListOptions::new().shape(shape),
             )
         };
         // args and return type all on one line

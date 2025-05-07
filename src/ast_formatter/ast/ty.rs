@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
-use crate::ast_formatter::list::options::list_opt;
+use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::whitespace::VerticalWhitespaceMode;
@@ -43,7 +43,7 @@ impl AstFormatter {
                 Braces::Parens,
                 elements,
                 |af, ty, tail, _lcx| af.ty_tail(ty, tail),
-                list_opt()
+                ListOptions::new()
                     .force_trailing_comma(elements.len() == 1)
                     .tail(take_tail()),
             )?,

@@ -1,9 +1,8 @@
 use crate::ast_formatter::AstFormatter;
-use crate::error::FormatResult;
-
-use crate::ast_formatter::list::options::list_opt;
+use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
+use crate::error::FormatResult;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
@@ -86,7 +85,7 @@ impl AstFormatter {
                     Braces::Angle,
                     &args.args,
                     Self::angle_bracketed_arg,
-                    list_opt().tail(tail),
+                    ListOptions::new().tail(tail),
                 )?;
             }
             // (A, B) -> C

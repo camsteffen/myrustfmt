@@ -3,7 +3,7 @@ pub mod order;
 use self::order::use_tree_order;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
-use crate::ast_formatter::list::options::{ListWrapToFit, list_opt};
+use crate::ast_formatter::list::options::{ListOptions, ListWrapToFit};
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use rustc_ast::ast;
@@ -60,7 +60,7 @@ impl AstFormatter {
                             af.use_tree(use_tree, tail)?;
                             Ok(())
                         },
-                        list_opt()
+                        ListOptions::new()
                             .omit_open_brace()
                             .item_requires_own_line(|(use_tree, _): &(&ast::UseTree, _)| {
                                 matches!(use_tree.kind, ast::UseTreeKind::Nested { .. })

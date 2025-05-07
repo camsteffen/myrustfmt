@@ -2,7 +2,7 @@ mod sort;
 pub mod use_tree;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::options::{ListShape, list_opt};
+use crate::ast_formatter::list::options::{ListOptions, ListShape};
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
@@ -151,7 +151,7 @@ impl AstFormatter {
             Braces::Curly,
             variants,
             Self::variant,
-            list_opt().shape(ListShape::Vertical),
+            ListOptions::new().shape(ListShape::Vertical),
         )?;
         Ok(())
     }
@@ -342,7 +342,7 @@ impl AstFormatter {
                     Braces::Curly,
                     fields,
                     Self::field_def,
-                    list_opt()
+                    ListOptions::new()
                         .shape(
                             if is_enum {
                                 ListShape::Flexible
@@ -357,7 +357,7 @@ impl AstFormatter {
                 Ok(())
             }
             ast::VariantData::Tuple(fields, _) => {
-                self.list(Braces::Parens, fields, Self::field_def, list_opt())
+                self.list(Braces::Parens, fields, Self::field_def, ListOptions::new())
             }
             ast::VariantData::Unit(_) => Ok(()),
         }

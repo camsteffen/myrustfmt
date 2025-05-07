@@ -1,9 +1,8 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::list::{Braces, ListItemContext};
-use crate::error::FormatResult;
-
-use crate::ast_formatter::list::options::list_opt;
 use crate::ast_formatter::tail::Tail;
+use crate::error::FormatResult;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 
@@ -15,7 +14,12 @@ impl AstFormatter {
             }
             return Ok(());
         }
-        self.list(Braces::Angle, params, Self::generic_param, list_opt())
+        self.list(
+            Braces::Angle,
+            params,
+            Self::generic_param,
+            ListOptions::new(),
+        )
     }
 
     fn generic_param(

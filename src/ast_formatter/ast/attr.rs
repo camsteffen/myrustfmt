@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
-use crate::ast_formatter::list::options::list_opt;
+use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::tail::Tail;
 use crate::ast_utils::is_rustfmt_skip;
 use crate::error::{ConstraintErrorKind, FormatResult};
@@ -143,7 +143,7 @@ impl AstFormatter {
                     af.tail(tail)?;
                     Ok(())
                 },
-                list_opt()
+                ListOptions::new()
                     .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
             )?,
             ast::MetaItemKind::NameValue(lit) => {
