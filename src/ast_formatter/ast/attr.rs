@@ -16,7 +16,7 @@ impl AstFormatter {
         span: Span,
         format: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
-        self.with_attrs_tail(attrs, span, Tail::none(), format)
+        self.with_attrs_tail(attrs, span, &None, format)
     }
 
     // todo test usages

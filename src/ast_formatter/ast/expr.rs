@@ -20,7 +20,7 @@ use tracing::instrument;
 
 impl AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
-        self.expr_tail(expr, Tail::none())
+        self.expr_tail(expr, &None)
     }
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {

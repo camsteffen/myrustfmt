@@ -216,7 +216,7 @@ where
                 }
                 let (until_last, last) = (0..(len - 1), len - 1);
                 for index in until_last {
-                    format_index(index, Tail::none())?;
+                    format_index(index, &None)?;
                     af.out.token_maybe_missing(",")?;
                     af.out.space()?;
                 }
@@ -251,7 +251,7 @@ where
             (self.format_item)(
                 self.af,
                 &self.list[index],
-                Tail::none(),
+                &None,
                 ListItemContext {
                     len,
                     index,
@@ -339,7 +339,7 @@ where
                         item_comma(index)?;
                         af.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     }
-                    list_rest(af, rest, Tail::none())?;
+                    list_rest(af, rest, &None)?;
                 }
             }
             Ok(())

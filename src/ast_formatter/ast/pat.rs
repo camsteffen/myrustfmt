@@ -11,7 +11,7 @@ use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 impl AstFormatter {
     pub fn pat(&self, pat: &ast::Pat) -> FormatResult {
-        self.pat_tail(pat, Tail::none())
+        self.pat_tail(pat, &None)
     }
 
     pub fn pat_tail(&self, pat: &ast::Pat, tail: &Tail) -> FormatResult {

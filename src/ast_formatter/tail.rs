@@ -2,6 +2,10 @@ use crate::ast_formatter::AstFormatter;
 use crate::constraints::{Shape, WidthLimit};
 use crate::error::FormatResult;
 
+// Tail is usually passed by reference. We don't put the reference inside the Option because we
+// wouldn't be able to have functions that create and return Tail.
+pub type Tail<'a> = Option<TailS<'a>>;
+
 /// A Tail squeezes the code before it leftward to make room for itself.
 ///
 /// Used to dynamically specify code that should appear immediately after the primary output
@@ -15,16 +19,7 @@ use crate::error::FormatResult;
 /// restored when the Tail is rendered.
 ///
 /// As a general rule, ONLY add a Tail argument to a function if it affects the formatting strategy.
-// todo use type alias?
-pub struct Tail<'a>(Option<TailImpl<'a>>);
-
-impl Default for &Tail<'_> {
-    fn default() -> Self {
-        Tail::none()
-    }
-}
-
-struct TailImpl<'a> {
+pub struct TailS<'a> {
     func: Box<dyn Fn(&AstFormatter) -> FormatResult + 'a>,
     // captured constraints
     // todo would it be better to explicitly capture and apply constraints where needed?
@@ -35,31 +30,32 @@ struct TailImpl<'a> {
 // Tail creation
 impl AstFormatter {
     pub fn tail_fn<'a>(&self, tail: impl Fn(&AstFormatter) -> FormatResult + 'a) -> Tail<'a> {
-        Tail(Some(TailImpl {
+        Some(self.tail_fn_inner(tail))
+    }
+
+    pub fn tail_fn_inner<'a>(
+        &self,
+        tail: impl Fn(&AstFormatter) -> FormatResult + 'a,
+    ) -> TailS<'a> {
+        TailS {
             func: Box::new(tail),
             width_limit: self.width_limit(),
             shape: self.shape(),
-        }))
+        }
     }
 
     pub fn tail_token<'a>(&self, token: &'static str) -> Tail<'a> {
-        self.tail_fn(move |af| af.out.token(token))
-    }
-}
-
-impl Tail<'_> {
-    pub const fn none() -> &'static Tail<'static> {
-        const { &Tail(None) }
+        Some(self.tail_token_inner(token))
     }
 
-    pub fn none_if(&self, condition: bool) -> &Self {
-        if condition { Tail::none() } else { self }
+    pub fn tail_token_inner<'a>(&self, token: &'static str) -> TailS<'a> {
+        self.tail_fn_inner(move |af| af.out.token(token))
     }
 }
 
 impl AstFormatter {
     pub fn tail(&self, tail: &Tail) -> FormatResult {
-        let Some(tail) = &tail.0 else { return Ok(()) };
+        let Some(tail) = tail else { return Ok(()) };
         self.with_replace_shape(tail.shape, || {
             self.with_replace_width_limit(tail.width_limit, || (tail.func)(self))
         })

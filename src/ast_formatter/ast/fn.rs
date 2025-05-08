@@ -131,7 +131,7 @@ impl AstFormatter {
         // self.extern_(&bare_fn_ty.ext)?;
         // self.generic_params(&bare_fn_ty.generic_params)?;
         self.out.token("fn")?;
-        self.fn_decl(&bare_fn_ty.decl, Braces::Parens, Tail::none())?;
+        self.fn_decl(&bare_fn_ty.decl, Braces::Parens, &None)?;
         Ok(())
     }
 
@@ -141,8 +141,8 @@ impl AstFormatter {
         tail: &Tail,
     ) -> FormatResult {
         let (list_tail, final_tail) = match parenthesized_args.output {
-            ast::FnRetTy::Default(_) => (tail, Tail::none()),
-            ast::FnRetTy::Ty(_) => (Tail::none(), tail),
+            ast::FnRetTy::Default(_) => (tail, &None),
+            ast::FnRetTy::Ty(_) => (&None, tail),
         };
         self.list(
             Braces::Parens,

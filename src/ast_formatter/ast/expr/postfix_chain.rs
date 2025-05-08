@@ -92,7 +92,7 @@ impl AstFormatter {
         let checkpoint = self.out.checkpoint();
         let overflow_height = self.out.with_enforce_max_width(|| -> FormatResult<_> {
             self.with_chain_item_max_width(start_col, || {
-                self.postfix_item_tail(overflowable, Tail::none(), true)
+                self.postfix_item_tail(overflowable, &None, true)
             })?;
             // todo can we prove that the overflow is so long that a separate line won't be shorter?
             let overflow_height = self.out.line() - first_line + 1;
@@ -161,7 +161,7 @@ impl AstFormatter {
     }
 
     fn postfix_item(&self, item: &PostfixItem<'_>) -> FormatResult {
-        self.postfix_item_tail(item, Tail::none(), false)
+        self.postfix_item_tail(item, &None, false)
     }
 
     fn postfix_item_tail(
@@ -213,7 +213,7 @@ impl AstFormatter {
         }
         for (i, expr) in postfix_tail.iter().enumerate() {
             let is_last = i == postfix_tail.len() - 1;
-            let tail = if is_last { tail } else { Tail::none() };
+            let tail = if is_last { tail } else { &None };
             match expr.kind {
                 ast::ExprKind::Index(_, ref index, _) => {
                     self.out.token("[")?;

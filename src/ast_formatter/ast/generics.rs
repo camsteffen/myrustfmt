@@ -72,7 +72,7 @@ impl AstFormatter {
                     ast::WherePredicateKind::BoundPredicate(pred) => {
                         self.ty(&pred.bounded_ty)?;
                         self.out.token_space(":")?;
-                        self.generic_bounds(&pred.bounds, Tail::none())?;
+                        self.generic_bounds(&pred.bounds, &None)?;
                     }
                     ast::WherePredicateKind::RegionPredicate(_) => todo!(),
                     ast::WherePredicateKind::EqPredicate(_) => todo!(),

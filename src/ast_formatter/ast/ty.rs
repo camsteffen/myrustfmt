@@ -8,7 +8,7 @@ use rustc_ast::ast;
 
 impl AstFormatter {
     pub fn ty(&self, ty: &ast::Ty) -> FormatResult {
-        self.ty_tail(ty, Tail::none())
+        self.ty_tail(ty, &None)
     }
 
     pub fn ty_tail(&self, ty: &ast::Ty, tail: &Tail) -> FormatResult {
@@ -100,7 +100,7 @@ impl AstFormatter {
         self.out.token(":")?;
         let indent_guard = self.space_or_wrap_indent_then(|| {
             // todo single line?
-            self.generic_bounds(bounds, Tail::none())?;
+            self.generic_bounds(bounds, &None)?;
             Ok(())
         })?;
         if let Some(indent_guard) = indent_guard {

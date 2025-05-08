@@ -103,7 +103,7 @@ impl AstFormatter {
             ast::StmtKind::Expr(expr) => {
                 let tail = match expr.kind {
                     control_flow_expr_kind!() => &self.tail_fn(|af| af.out.token_insert(";")),
-                    _ => Tail::none(),
+                    _ => &None,
                 };
                 self.expr_tail(expr, tail)
             }
@@ -141,7 +141,7 @@ impl AstFormatter {
         expr: &ast::Expr,
         format: impl FnOnce(&ast::Expr) -> FormatResult,
     ) -> FormatResult {
-        self.skip_single_expr_blocks_tail(expr, Tail::none(), |e, tail| {
+        self.skip_single_expr_blocks_tail(expr, &None, |e, tail| {
             format(e)?;
             self.tail(tail)?;
             Ok(())
