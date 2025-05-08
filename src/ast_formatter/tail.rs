@@ -51,6 +51,10 @@ impl Tail<'_> {
     pub const fn none() -> &'static Tail<'static> {
         const { &Tail(None) }
     }
+
+    pub fn none_if(&self, condition: bool) -> &Self {
+        if condition { Tail::none() } else { self }
+    }
 }
 
 impl AstFormatter {

@@ -66,6 +66,7 @@ impl AstFormatter {
         width_limit: HSize,
         format: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
+        // todo assert there is a checkpoint since width limits enable max width enforcement
         let end = NonZero::new(self.out.col() + width_limit)
             .expect("width limit should not end at column zero");
         self.constraints()
