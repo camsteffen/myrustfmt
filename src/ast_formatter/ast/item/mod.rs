@@ -189,7 +189,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn variant(&self, variant: &ast::Variant, tail: &Tail, _lcx: ListItemContext) -> FormatResult {
+    fn variant(&self, variant: &ast::Variant, tail: Tail, _lcx: ListItemContext) -> FormatResult {
         self.with_attrs(&variant.attrs, variant.span, || {
             self.vis(&variant.vis)?;
             self.ident(variant.ident)?;
@@ -363,7 +363,7 @@ impl AstFormatter {
         }
     }
 
-    fn field_def(&self, field: &ast::FieldDef, tail: &Tail, _lcx: ListItemContext) -> FormatResult {
+    fn field_def(&self, field: &ast::FieldDef, tail: Tail, _lcx: ListItemContext) -> FormatResult {
         self.with_attrs_tail(&field.attrs, field.span, tail, || {
             self.vis(&field.vis)?;
             if let Some(ident) = field.ident {

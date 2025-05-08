@@ -14,7 +14,7 @@ impl AstFormatter {
         left: &ast::Expr,
         right: &ast::Expr,
         op: Spanned<ast::BinOpKind>,
-        tail: &Tail,
+        tail: Tail,
     ) -> FormatResult {
         let (first, chain) = collect_binary_expr_chain(left, right, op);
         let first_line = self.out.line();

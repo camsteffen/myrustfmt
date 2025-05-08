@@ -17,7 +17,7 @@ impl AstFormatter {
         &self,
         label: Option<ast::Label>,
         block: &ast::Block,
-        tail: &Tail,
+        tail: Tail,
     ) -> FormatResult {
         self.label(label, true)?;
         match block.rules {
@@ -152,8 +152,8 @@ impl AstFormatter {
     pub fn skip_single_expr_blocks_tail(
         &self,
         expr: &ast::Expr,
-        tail: &Tail,
-        format: impl FnOnce(&ast::Expr, &Tail) -> FormatResult,
+        tail: Tail,
+        format: impl FnOnce(&ast::Expr, Tail) -> FormatResult,
     ) -> FormatResult {
         match plain_block(expr)
             .and_then(|b| self.try_into_expr_only_block(b))

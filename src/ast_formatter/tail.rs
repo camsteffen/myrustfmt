@@ -4,7 +4,7 @@ use crate::error::FormatResult;
 
 // Tail is usually passed by reference. We don't put the reference inside the Option because we
 // wouldn't be able to have functions that create and return Tail.
-pub type Tail<'a> = Option<TailS<'a>>;
+pub type Tail<'a, 'b> = &'a Option<TailS<'b>>;
 
 /// A Tail squeezes the code before it leftward to make room for itself.
 ///
@@ -23,13 +23,17 @@ pub struct TailS<'a> {
     func: Box<dyn Fn(&AstFormatter) -> FormatResult + 'a>,
     // captured constraints
     // todo would it be better to explicitly capture and apply constraints where needed?
+    // todo what about RecoverableConstraints?
     width_limit: Option<WidthLimit>,
     shape: Shape,
 }
 
 // Tail creation
 impl AstFormatter {
-    pub fn tail_fn<'a>(&self, tail: impl Fn(&AstFormatter) -> FormatResult + 'a) -> Tail<'a> {
+    pub fn tail_fn<'a>(
+        &self,
+        tail: impl Fn(&AstFormatter) -> FormatResult + 'a,
+    ) -> Option<TailS<'a>> {
         Some(self.tail_fn_inner(tail))
     }
 
@@ -44,7 +48,7 @@ impl AstFormatter {
         }
     }
 
-    pub fn tail_token<'a>(&self, token: &'static str) -> Tail<'a> {
+    pub fn tail_token<'a>(&self, token: &'static str) -> Option<TailS<'a>> {
         Some(self.tail_token_inner(token))
     }
 
@@ -54,7 +58,7 @@ impl AstFormatter {
 }
 
 impl AstFormatter {
-    pub fn tail(&self, tail: &Tail) -> FormatResult {
+    pub fn tail(&self, tail: Tail) -> FormatResult {
         let Some(tail) = tail else { return Ok(()) };
         self.with_replace_shape(tail.shape, || {
             self.with_replace_width_limit(tail.width_limit, || (tail.func)(self))

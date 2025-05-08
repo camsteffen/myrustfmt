@@ -103,7 +103,7 @@ fn write_parse_error(
     pos: BytePos,
 ) -> std::fmt::Result {
     write!(f, "{}, ", error_formatting_at(source, pos, path))?;
-    let next_token = |f: &mut Formatter<'_>| {
+    let next_token = |f: &mut Formatter| {
         let remaining = &source[pos.to_usize()..];
         if let Some(token) = rustc_lexer::tokenize(remaining).next() {
             let token_str = &remaining[..token.len.try_into().unwrap()];

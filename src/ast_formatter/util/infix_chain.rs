@@ -10,7 +10,7 @@ impl AstFormatter {
         items: &[T],
         format_item: impl Fn(&T) -> FormatResult,
         should_indent: bool,
-        tail: &Tail,
+        tail: Tail,
     ) -> FormatResult {
         let (first, rest) = items.split_first().unwrap();
         self.backtrack()

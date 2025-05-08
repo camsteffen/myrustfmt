@@ -14,7 +14,7 @@ impl AstFormatter {
         self.pat_tail(pat, &None)
     }
 
-    pub fn pat_tail(&self, pat: &ast::Pat, tail: &Tail) -> FormatResult {
+    pub fn pat_tail(&self, pat: &ast::Pat, tail: Tail) -> FormatResult {
         // todo is this right?
         self.out.skip_token_if_present("|")?;
 
@@ -97,7 +97,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn pat_list_item(&self, pat: &P<ast::Pat>, tail: &Tail, _lcx: ListItemContext) -> FormatResult {
+    fn pat_list_item(&self, pat: &P<ast::Pat>, tail: Tail, _lcx: ListItemContext) -> FormatResult {
         self.pat_tail(pat, tail)
     }
 
@@ -107,7 +107,7 @@ impl AstFormatter {
         path: &ast::Path,
         fields: &[ast::PatField],
         rest: ast::PatFieldsRest,
-        tail: &Tail,
+        tail: Tail,
     ) -> FormatResult {
         self.qpath(qself, path, false)?;
         self.out.space()?;
@@ -125,7 +125,7 @@ impl AstFormatter {
     fn pat_field(
         &self,
         pat_field: &ast::PatField,
-        tail: &Tail,
+        tail: Tail,
         _lcx: ListItemContext,
     ) -> FormatResult {
         self.with_attrs_tail(&pat_field.attrs, pat_field.span, tail, || {

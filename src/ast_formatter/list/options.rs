@@ -20,7 +20,7 @@ pub enum ListWrapToFit {
 pub struct ListOptions<'ast, 'tail, Item> {
     pub(super) rest: Option<ListRest<'ast>>,
     pub(super) shape: ListShape,
-    pub(super) tail: &'tail Tail<'ast>,
+    pub(super) tail: Tail<'tail, 'ast>,
     pub(super) force_trailing_comma: bool,
     /// Called with the last item in the list. Returns true if that item always prefers overflow
     /// to being wrapped to the next line.
@@ -54,7 +54,7 @@ impl<'ast, 'tail, Item> ListOptions<'ast, 'tail, Item> {
         ListOptions { shape, ..self }
     }
 
-    pub fn tail(self, tail: &'tail Tail<'ast>) -> ListOptions<'ast, 'tail, Item> {
+    pub fn tail(self, tail: Tail<'tail, 'ast>) -> ListOptions<'ast, 'tail, Item> {
         Self { tail, ..self }
     }
 

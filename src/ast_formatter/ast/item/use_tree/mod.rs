@@ -11,7 +11,7 @@ use rustc_lexer::TokenKind;
 use rustc_span::{BytePos, Pos};
 
 impl AstFormatter {
-    pub fn use_tree<'a>(&self, use_tree: &'a ast::UseTree, tail: &Tail) -> FormatResult {
+    pub fn use_tree<'a>(&self, use_tree: &'a ast::UseTree, tail: Tail) -> FormatResult {
         self.path(&use_tree.prefix, false)?;
         match use_tree.kind {
             ast::UseTreeKind::Glob => {

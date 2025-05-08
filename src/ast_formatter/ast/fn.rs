@@ -63,7 +63,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn closure(&self, closure: &ast::Closure, tail: &Tail) -> FormatResult {
+    pub fn closure(&self, closure: &ast::Closure, tail: Tail) -> FormatResult {
         let ast::Closure {
             ref binder,
             capture_clause,
@@ -101,7 +101,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn closure_body(&self, body: &ast::Expr, can_remove_block: bool, tail: &Tail) -> FormatResult {
+    fn closure_body(&self, body: &ast::Expr, can_remove_block: bool, tail: Tail) -> FormatResult {
         if can_remove_block {
             self.skip_single_expr_blocks_tail(body, tail, |body, tail| {
                 // todo consider allowing `match`, `loop`, `if`, `for`, `while` if the header fits on one line
@@ -138,7 +138,7 @@ impl AstFormatter {
     pub fn parenthesized_args(
         &self,
         parenthesized_args: &ast::ParenthesizedArgs,
-        tail: &Tail,
+        tail: Tail,
     ) -> FormatResult {
         let (list_tail, final_tail) = match parenthesized_args.output {
             ast::FnRetTy::Default(_) => (tail, &None),
@@ -174,7 +174,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn fn_decl(&self, fn_decl: &ast::FnDecl, braces: Braces, tail: &Tail) -> FormatResult {
+    fn fn_decl(&self, fn_decl: &ast::FnDecl, braces: Braces, tail: Tail) -> FormatResult {
         let params = |shape| {
             self.list(
                 braces,
@@ -204,13 +204,13 @@ impl AstFormatter {
             })
     }
 
-    fn param(&self, param: &ast::Param, tail: &Tail, _lcx: ListItemContext) -> FormatResult {
+    fn param(&self, param: &ast::Param, tail: Tail, _lcx: ListItemContext) -> FormatResult {
         self.with_attrs_tail(&param.attrs, param.span, tail, || {
             self.param_after_attrs(param, tail)
         })
     }
 
-    fn param_after_attrs(&self, param: &ast::Param, tail: &Tail) -> FormatResult {
+    fn param_after_attrs(&self, param: &ast::Param, tail: Tail) -> FormatResult {
         let colon_ty = |af: &Self| {
             af.out.token_space(":")?;
             af.ty_tail(&param.ty, tail)?;

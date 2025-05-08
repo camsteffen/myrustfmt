@@ -11,7 +11,7 @@ impl AstFormatter {
         self.ty_tail(ty, &None)
     }
 
-    pub fn ty_tail(&self, ty: &ast::Ty, tail: &Tail) -> FormatResult {
+    pub fn ty_tail(&self, ty: &ast::Ty, tail: Tail) -> FormatResult {
         let mut tail = Some(tail);
         let mut take_tail = || tail.take().unwrap();
         match &ty.kind {
@@ -112,7 +112,7 @@ impl AstFormatter {
         }
     }
 
-    pub fn generic_bounds(&self, bounds: &[ast::GenericBound], tail: &Tail) -> FormatResult {
+    pub fn generic_bounds(&self, bounds: &[ast::GenericBound], tail: Tail) -> FormatResult {
         self.simple_infix_chain("+", bounds, |b| self.generic_bound(b), true, tail)
     }
 
@@ -124,7 +124,7 @@ impl AstFormatter {
         }
     }
 
-    pub fn generic_arg(&self, arg: &ast::GenericArg, tail: &Tail) -> FormatResult {
+    pub fn generic_arg(&self, arg: &ast::GenericArg, tail: Tail) -> FormatResult {
         match &arg {
             ast::GenericArg::Const(anon_const) => self.anon_const_tail(anon_const, tail),
             ast::GenericArg::Lifetime(lifetime) => {

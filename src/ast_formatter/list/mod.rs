@@ -20,7 +20,7 @@ impl AstFormatter {
         &self,
         braces: Braces,
         list: &'ast [Item],
-        format_item: impl Fn(&AstFormatter, &Item, &Tail, ListItemContext) -> FormatResult,
+        format_item: impl Fn(&AstFormatter, &Item, Tail, ListItemContext) -> FormatResult,
         options: ListOptions<'ast, '_, Item>,
     ) -> FormatResult {
         ListContext {
@@ -44,7 +44,7 @@ struct ListContext<'af, 'ast, 'tail, Item, FormatItem> {
 
 impl<'af, 'ast, 'tail, Item, FormatItem> ListContext<'af, 'ast, 'tail, Item, FormatItem>
 where
-    FormatItem: Fn(&AstFormatter, &Item, &Tail, ListItemContext) -> FormatResult,
+    FormatItem: Fn(&AstFormatter, &Item, Tail, ListItemContext) -> FormatResult,
 {
     fn format(&self) -> FormatResult {
         let is_flexible = self.opt.shape == ListShape::Flexible;
@@ -349,7 +349,7 @@ where
     }
 }
 
-fn list_rest(af: &AstFormatter, rest: ListRest<'_>, tail: &Tail) -> FormatResult {
+fn list_rest(af: &AstFormatter, rest: ListRest, tail: Tail) -> FormatResult {
     af.out.token("..")?;
     if let Some(expr) = rest.base {
         af.expr_tail(expr, tail)?;

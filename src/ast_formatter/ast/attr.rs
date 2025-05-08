@@ -26,7 +26,7 @@ impl AstFormatter {
         &self,
         attrs: &[ast::Attribute],
         span: Span,
-        tail: &Tail,
+        tail: Tail,
         format: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
         // todo skip attributes as well?
@@ -36,7 +36,8 @@ impl AstFormatter {
         if attrs.iter().any(is_rustfmt_skip) {
             self.with_replace_width_limit(None, || self.out.copy_span(span))?;
             self.tail(tail)?;
-        } else if !self.out.has_any_constraint_recovery() || true {
+            // todo
+        } else if self.out.recoverable_constraints().is_nothing() || true {
             // todo don't do this in expr list item, when max width is not enforced
             self.with_copy_span_fallback(span, format, tail)?;
         } else {
@@ -53,7 +54,7 @@ impl AstFormatter {
         &self,
         span: Span,
         format: impl FnOnce() -> FormatResult,
-        tail: &Tail,
+        tail: Tail,
     ) -> FormatResult {
         let checkpoint = self.out.checkpoint_without_buffer_errors();
         #[cfg(debug_assertions)]

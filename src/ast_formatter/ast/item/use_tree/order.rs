@@ -42,7 +42,7 @@ enum Element<'a> {
     Nested(&'a [(ast::UseTree, ast::NodeId)]),
 }
 
-fn iter(use_tree: &ast::UseTree) -> impl Iterator<Item = Element<'_>> {
+fn iter(use_tree: &ast::UseTree) -> impl Iterator<Item = Element> {
     let prefix = use_tree
         .prefix
         .segments

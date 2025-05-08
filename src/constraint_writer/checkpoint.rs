@@ -1,4 +1,4 @@
-use crate::constraint_writer::{ConstraintRecoveryMode, ConstraintWriter};
+use crate::constraint_writer::{ConstraintWriter, RecoverableConstraints};
 use crate::constraints::Constraints;
 use crate::util::cell_ext::CellExt;
 
@@ -11,7 +11,7 @@ pub struct ConstraintWriterCheckpoint {
 #[derive(Debug)]
 pub struct ConstraintWriterSelfCheckpoint {
     #[cfg(debug_assertions)]
-    constraint_recovery_mode: ConstraintRecoveryMode,
+    recoverable_constraints: RecoverableConstraints,
     line: u32,
     last_line_start: usize,
     last_width_exceeded_line: Option<u32>,
@@ -37,7 +37,7 @@ impl ConstraintWriter {
         let Self {
             buffer: _,
             #[cfg(debug_assertions)]
-            ref constraint_recovery_mode,
+            ref recoverable_constraints,
             #[cfg(debug_assertions)]
             ref constraints,
             errors: _,
@@ -51,7 +51,7 @@ impl ConstraintWriter {
             last_line_start: last_line_start.get(),
             last_width_exceeded_line: last_width_exceeded_line.get(),
             #[cfg(debug_assertions)]
-            constraint_recovery_mode: constraint_recovery_mode.get(),
+            recoverable_constraints: recoverable_constraints.get(),
             #[cfg(debug_assertions)]
             constraints: constraints.clone(),
         }
@@ -69,7 +69,7 @@ impl ConstraintWriter {
     pub fn restore_self_checkpoint(&self, checkpoint: &ConstraintWriterSelfCheckpoint) {
         let ConstraintWriterSelfCheckpoint {
             #[cfg(debug_assertions)]
-            constraint_recovery_mode,
+            recoverable_constraints,
             last_line_start,
             last_width_exceeded_line,
             line,
@@ -79,8 +79,8 @@ impl ConstraintWriter {
         #[cfg(debug_assertions)]
         {
             assert_eq!(
-                self.constraint_recovery_mode.get(),
-                constraint_recovery_mode
+                self.recoverable_constraints.get(),
+                recoverable_constraints
             );
             assert_eq!(&self.constraints, constraints);
         }

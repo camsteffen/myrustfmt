@@ -22,7 +22,7 @@ struct PostfixItem<'a> {
 }
 
 impl AstFormatter {
-    pub fn postfix_chain(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
+    pub fn postfix_chain(&self, expr: &ast::Expr, tail: Tail) -> FormatResult {
         let chain = build_postfix_chain(expr);
         let mut chain = chain.as_slice();
         let (start_line, start_col) = self.out.line_col();
@@ -65,9 +65,9 @@ impl AstFormatter {
 
     fn postfix_chain_single_line_with_overflow(
         &self,
-        chain: &[PostfixItem<'_>],
+        chain: &[PostfixItem],
         start_col: HSize,
-        tail: &Tail,
+        tail: Tail,
     ) -> FormatResult {
         let last = chain.last().unwrap();
         if !matches!(last.root_or_dot_item.kind, ast::ExprKind::MethodCall(_)) {
@@ -84,9 +84,9 @@ impl AstFormatter {
 
     fn postfix_chain_overflow(
         &self,
-        overflowable: &PostfixItem<'_>,
+        overflowable: &PostfixItem,
         start_col: HSize,
-        tail: &Tail,
+        tail: Tail,
     ) -> FormatResult {
         let first_line = self.out.line();
         let checkpoint = self.out.checkpoint();
@@ -140,7 +140,7 @@ impl AstFormatter {
         //   - if you err out, there will be a cost of increased indent and added lines
     }
 
-    fn postfix_chain_vertical(&self, chain: &[PostfixItem<'_>], tail: &Tail) -> FormatResult {
+    fn postfix_chain_vertical(&self, chain: &[PostfixItem], tail: Tail) -> FormatResult {
         for item in chain {
             self.out.newline_indent(VerticalWhitespaceMode::Break)?;
             self.postfix_item(item)?;
@@ -160,14 +160,14 @@ impl AstFormatter {
         self.with_width_limit_from_start_first_line_opt(start_col, limit, format)
     }
 
-    fn postfix_item(&self, item: &PostfixItem<'_>) -> FormatResult {
+    fn postfix_item(&self, item: &PostfixItem) -> FormatResult {
         self.postfix_item_tail(item, &None, false)
     }
 
     fn postfix_item_tail(
         &self,
-        item: &PostfixItem<'_>,
-        tail: &Tail,
+        item: &PostfixItem,
+        tail: Tail,
         single_line_tail: bool,
     ) -> FormatResult {
         let non_dot_items = |af: &Self| {
@@ -201,13 +201,13 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn postfix_items(&self, items: &[PostfixItem<'_>], start_col: HSize) -> FormatResult {
+    fn postfix_items(&self, items: &[PostfixItem], start_col: HSize) -> FormatResult {
         items.iter().try_for_each(|item| {
             self.with_chain_item_max_width(start_col, || self.postfix_item(item))
         })
     }
 
-    fn postfix_non_dot_items(&self, postfix_tail: &[&ast::Expr], tail: &Tail) -> FormatResult {
+    fn postfix_non_dot_items(&self, postfix_tail: &[&ast::Expr], tail: Tail) -> FormatResult {
         if postfix_tail.is_empty() {
             return self.tail(tail);
         }
@@ -243,7 +243,7 @@ impl AstFormatter {
     }
 }
 
-fn build_postfix_chain(expr: &ast::Expr) -> Vec<PostfixItem<'_>> {
+fn build_postfix_chain(expr: &ast::Expr) -> Vec<PostfixItem> {
     let mut current = expr;
     let mut items = Vec::new();
     let mut non_dot_items = Vec::new();

@@ -39,7 +39,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn local_init(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
+    fn local_init(&self, expr: &ast::Expr, tail: Tail) -> FormatResult {
         self.out.space_token("=")?;
         let checkpoint_after_eq = self.out.checkpoint();
         enum Next {

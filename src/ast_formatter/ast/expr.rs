@@ -9,7 +9,7 @@ use crate::ast_formatter::list::{Braces, ListItemContext, ListStrategy};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
 use crate::ast_utils::postfix_expr_kind;
-use crate::constraint_writer::ConstraintRecoveryMode;
+use crate::constraint_writer::RecoverableConstraints;
 use crate::constraints::Shape;
 use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -23,7 +23,7 @@ impl AstFormatter {
         self.expr_tail(expr, &None)
     }
 
-    pub fn expr_tail(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
+    pub fn expr_tail(&self, expr: &ast::Expr, tail: Tail) -> FormatResult {
         if self.shape() < Shape::HangingIndent && !expr.attrs.is_empty() {
             return Err(ConstraintErrorKind::NextStrategy.into());
         }
@@ -33,7 +33,7 @@ impl AstFormatter {
     }
 
     #[instrument(name = "expr", skip_all, fields(kind=expr_kind_name(expr)))]
-    pub fn expr_after_attrs(&self, expr: &ast::Expr, tail: &Tail) -> FormatResult {
+    pub fn expr_after_attrs(&self, expr: &ast::Expr, tail: Tail) -> FormatResult {
         let mut tail_opt = Some(tail);
         let mut take_tail = || tail_opt.take().unwrap();
         match expr.kind {
@@ -183,7 +183,7 @@ impl AstFormatter {
 
     pub fn expr_list_item(
         &self,
-    ) -> impl Fn(&AstFormatter, &P<ast::Expr>, &Tail, ListItemContext) -> FormatResult {
+    ) -> impl Fn(&AstFormatter, &P<ast::Expr>, Tail, ListItemContext) -> FormatResult {
         // todo kinda hacky
         let shape_outer = self.shape();
 
@@ -210,7 +210,7 @@ impl AstFormatter {
                             // If it's too wide, adding a block won't help.
                             // The block is only for ensuring a "hanging indent"-compliant shape.
                             .next_with_constraint_recovery_mode(
-                                ConstraintRecoveryMode::Newline,
+                                RecoverableConstraints::Newline,
                                 || af.with_restrict_shape(Shape::HangingIndent, format),
                             )
                             .otherwise(|| {
@@ -233,7 +233,7 @@ impl AstFormatter {
         self.expr(&anon_const.value)
     }
 
-    pub fn anon_const_tail(&self, anon_const: &ast::AnonConst, tail: &Tail) -> FormatResult {
+    pub fn anon_const_tail(&self, anon_const: &ast::AnonConst, tail: Tail) -> FormatResult {
         self.expr_tail(&anon_const.value, tail)
     }
 
@@ -248,7 +248,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn cast(&self, target: &ast::Expr, ty: &ast::Ty, tail: &Tail) -> FormatResult {
+    fn cast(&self, target: &ast::Expr, ty: &ast::Ty, tail: Tail) -> FormatResult {
         self.expr(target)?;
         self.backtrack()
             .next(|| {
@@ -271,7 +271,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn paren(&self, inner: &ast::Expr, tail: &Tail) -> FormatResult {
+    fn paren(&self, inner: &ast::Expr, tail: Tail) -> FormatResult {
         self.out.token("(")?;
         self.backtrack()
             .next(|| {
@@ -293,7 +293,7 @@ impl AstFormatter {
         start: Option<&ast::Expr>,
         sigil: &'static str,
         end: Option<&ast::Expr>,
-        tail: &Tail,
+        tail: Tail,
     ) -> FormatResult {
         if let Some(start) = start {
             let first_line = self.out.line();
@@ -335,7 +335,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
+    pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
         let first_line = self.out.line();
         self.expr_tail(func, &self.tail_token("("))?;
         self.has_shape_if(self.out.line() != first_line, Shape::Any, || {
@@ -344,7 +344,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], tail: &Tail) -> FormatResult {
+    pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
         let mut list_opt = expr_list_opt();
         let is_only_closure = args.len() == 1 && matches!(args[0].kind, ast::ExprKind::Closure(_));
         if !is_only_closure {
@@ -371,7 +371,7 @@ impl AstFormatter {
         condition: &ast::Expr,
         block: &'a ast::Block,
         else_: Option<&'a ast::Expr>,
-        tail: &Tail,
+        tail: Tail,
     ) -> FormatResult {
         let start_col = self.out.col();
         let is_head_single_line = self.token_expr_open_brace("if", condition)?;
@@ -460,7 +460,7 @@ impl AstFormatter {
         self.delim_args(&mac_call.args)
     }
 
-    fn struct_expr(&self, struct_: &ast::StructExpr, tail: &Tail) -> FormatResult {
+    fn struct_expr(&self, struct_: &ast::StructExpr, tail: Tail) -> FormatResult {
         self.qpath(&struct_.qself, &struct_.path, true)?;
         self.out.space()?;
         // todo indent middle and multi-line qpath?
@@ -480,7 +480,7 @@ impl AstFormatter {
     fn expr_field(
         &self,
         field: &ast::ExprField,
-        tail: &Tail,
+        tail: Tail,
         _lcx: ListItemContext,
     ) -> FormatResult {
         self.with_attrs_tail(&field.attrs, field.span, tail, || {

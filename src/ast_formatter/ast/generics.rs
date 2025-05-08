@@ -25,7 +25,7 @@ impl AstFormatter {
     fn generic_param(
         &self,
         param: &ast::GenericParam,
-        tail: &Tail,
+        tail: Tail,
         _lcx: ListItemContext,
     ) -> FormatResult {
         self.ident(param.ident)?;

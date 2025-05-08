@@ -7,7 +7,7 @@ pub fn version_sort(a: &str, b: &str) -> Ordering {
         Number(&'a str),
         NonNumber(&'a str),
     }
-    fn chunks(s: &str) -> impl Iterator<Item = Chunk<'_>> {
+    fn chunks(s: &str) -> impl Iterator<Item = Chunk> {
         let mut remaining = s;
         std::iter::from_fn(move || {
             let mut chars = remaining.chars();

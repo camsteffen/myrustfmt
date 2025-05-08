@@ -12,22 +12,35 @@ use std::cell::Cell;
 use std::panic::Location;
 use std::rc::Rc;
 
+/// Specifies which constraints, when they are violated, may be recovered by falling back to another
+/// formatting strategy. When a recoverable constraint is violated, a `ConstraintError` is returned
+/// and is expected to trigger the next strategy. When it is not recoverable, an error is emitted to
+/// the user.
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub enum ConstraintRecoveryMode {
+pub enum RecoverableConstraints {
+    /// Don't recover from anything.
     Nothing,
+    /// Recover from disallowed newline characters.
     Newline,
+    /// Recover from width constraints, but only on the specified line.
+    /// When in scope, this also includes newline constraints.
     MaxWidth { line: u32 },
-    // MultiLineComment,
+}
+
+impl RecoverableConstraints {
+    pub fn is_nothing(self) -> bool {
+        matches!(self, RecoverableConstraints::Nothing)
+    }
 }
 
 pub struct ConstraintWriter {
     constraints: Constraints,
     buffer: Cell<String>,
-    constraint_recovery_mode: Cell<ConstraintRecoveryMode>,
     errors: Rc<BufferedErrorEmitter>,
     last_line_start: Cell<usize>,
     last_width_exceeded_line: Cell<Option<u32>>,
     line: Cell<u32>,
+    recoverable_constraints: Cell<RecoverableConstraints>,
 }
 
 impl ConstraintWriter {
@@ -39,11 +52,11 @@ impl ConstraintWriter {
         ConstraintWriter {
             constraints: Constraints::new(max_width),
             buffer: Cell::new(String::with_capacity(capacity)),
-            constraint_recovery_mode: Cell::new(ConstraintRecoveryMode::Nothing),
             errors,
             last_line_start: Cell::new(0),
             last_width_exceeded_line: Cell::new(None),
             line: Cell::new(0),
+            recoverable_constraints: Cell::new(RecoverableConstraints::Nothing),
         }
     }
 
@@ -74,28 +87,24 @@ impl ConstraintWriter {
         (self.line(), self.col())
     }
 
-    pub fn with_constraint_recovery_mode_max<T>(
+    pub fn with_recoverable_constraints<T>(
         &self,
-        mode: ConstraintRecoveryMode,
+        recoverable_constraints: RecoverableConstraints,
         scope: impl FnOnce() -> T,
     ) -> T {
-        if self.constraint_recovery_mode.get() >= mode {
+        if recoverable_constraints <= self.recoverable_constraints.get() {
             return scope();
         }
-        self.constraint_recovery_mode.with_replaced(mode, scope)
+        self.recoverable_constraints
+            .with_replaced(recoverable_constraints, scope)
     }
 
     pub fn with_enforce_max_width<T>(&self, scope: impl FnOnce() -> T) -> T {
-        self.with_constraint_recovery_mode_max(self.max_recovery_mode(), scope)
+        self.with_recoverable_constraints(self.max_recovery_mode(), scope)
     }
 
-    pub fn has_any_constraint_recovery(&self) -> bool {
-        match self.constraint_recovery_mode.get() {
-            ConstraintRecoveryMode::Nothing => false,
-            // todo doesn't make sense
-            ConstraintRecoveryMode::Newline => true,
-            ConstraintRecoveryMode::MaxWidth { .. } => true,
-        }
+    pub fn recoverable_constraints(&self) -> RecoverableConstraints {
+        self.recoverable_constraints.get()
     }
 
     pub fn is_enforcing_width(&self) -> bool {
@@ -106,10 +115,10 @@ impl ConstraintWriter {
         {
             return true;
         }
-        match self.constraint_recovery_mode.get() {
-            ConstraintRecoveryMode::Nothing => false,
-            ConstraintRecoveryMode::Newline => false,
-            ConstraintRecoveryMode::MaxWidth { line } => line == self.line(),
+        match self.recoverable_constraints.get() {
+            RecoverableConstraints::Nothing => false,
+            RecoverableConstraints::Newline => false,
+            RecoverableConstraints::MaxWidth { line } => line == self.line(),
         }
     }
 
@@ -183,8 +192,8 @@ impl ConstraintWriter {
     }
 
     // todo rename
-    pub fn max_recovery_mode(&self) -> ConstraintRecoveryMode {
-        ConstraintRecoveryMode::MaxWidth { line: self.line() }
+    pub fn max_recovery_mode(&self) -> RecoverableConstraints {
+        RecoverableConstraints::MaxWidth { line: self.line() }
     }
 
     #[track_caller]

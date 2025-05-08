@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraint_writer::ConstraintRecoveryMode;
+use crate::constraint_writer::RecoverableConstraints;
 use crate::error::FormatResult;
 use crate::source_formatter::checkpoint::Checkpoint;
 
@@ -51,16 +51,16 @@ impl<T> Backtrack<'_, T> {
 
     pub fn next_with_constraint_recovery_mode(
         mut self,
-        mode: ConstraintRecoveryMode,
+        recoverable_constraints: RecoverableConstraints,
         strategy: impl FnOnce() -> FormatResult<T>,
     ) -> Self {
-        self.do_next(mode, strategy);
+        self.do_next(recoverable_constraints, strategy);
         self
     }
 
     fn do_next(
         &mut self,
-        mode: ConstraintRecoveryMode,
+        recoverable_constraints: RecoverableConstraints,
         strategy: impl FnOnce() -> FormatResult<T>,
     ) {
         match self.state {
@@ -72,7 +72,7 @@ impl<T> Backtrack<'_, T> {
             }
             BacktrackState::Done(..) => return,
         }
-        let result = self.af.out.with_constraint_recovery_mode_max(mode, strategy);
+        let result = self.af.out.with_recoverable_constraints(recoverable_constraints, strategy);
         if result.is_ok() {
             self.state = BacktrackState::Done(result);
         }

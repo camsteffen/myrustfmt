@@ -51,7 +51,7 @@ impl AstFormatter {
         &self,
         segment: &ast::PathSegment,
         turbofish: bool,
-        tail: &Tail,
+        tail: Tail,
     ) -> FormatResult {
         self.ident(segment.ident)?;
         if let Some(generic_args) = segment.args.as_deref() {
@@ -66,7 +66,7 @@ impl AstFormatter {
         &self,
         generic_args: &ast::GenericArgs,
         turbofish: bool,
-        tail: &Tail,
+        tail: Tail,
     ) -> FormatResult {
         match generic_args {
             ast::GenericArgs::AngleBracketed(args) if args.args.is_empty() => {
@@ -101,7 +101,7 @@ impl AstFormatter {
     fn angle_bracketed_arg(
         &self,
         arg: &ast::AngleBracketedArg,
-        tail: &Tail,
+        tail: Tail,
         _lcx: ListItemContext,
     ) -> FormatResult {
         match arg {
@@ -115,7 +115,7 @@ impl AstFormatter {
     fn assoc_item_constraint(
         &self,
         constraint: &ast::AssocItemConstraint,
-        tail: &Tail,
+        tail: Tail,
     ) -> FormatResult {
         self.ident(constraint.ident)?;
         if let Some(generic_args) = &constraint.gen_args {
