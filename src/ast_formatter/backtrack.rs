@@ -45,7 +45,7 @@ enum BacktrackState<'a, T> {
 impl<T> Backtrack<'_, T> {
     /// Provides the next formatting strategy, but not the final one.
     pub fn next(mut self, strategy: impl FnOnce() -> FormatResult<T>) -> Self {
-        self.do_next(self.af.out.max_recovery_mode(), strategy);
+        self.do_next(self.af.out.recoverable_width(), strategy);
         self
     }
 
@@ -80,14 +80,14 @@ impl<T> Backtrack<'_, T> {
 
     pub fn next_if(mut self, condition: bool, strategy: impl Fn() -> FormatResult<T>) -> Self {
         if condition {
-            self.do_next(self.af.out.max_recovery_mode(), strategy);
+            self.do_next(self.af.out.recoverable_width(), strategy);
         }
         self
     }
 
     pub fn next_opt(mut self, strategy: Option<impl Fn() -> FormatResult<T>>) -> Self {
         if let Some(strategy) = strategy {
-            self.do_next(self.af.out.max_recovery_mode(), strategy);
+            self.do_next(self.af.out.recoverable_width(), strategy);
         }
         self
     }

@@ -90,7 +90,7 @@ impl AstFormatter {
     ) -> FormatResult {
         let first_line = self.out.line();
         let checkpoint = self.out.checkpoint();
-        let overflow_height = self.out.with_enforce_max_width(|| -> FormatResult<_> {
+        let overflow_height = self.out.with_recover_width(|| -> FormatResult<_> {
             self.with_chain_item_max_width(start_col, || {
                 self.postfix_item_tail(overflowable, &None, true)
             })?;
@@ -109,7 +109,7 @@ impl AstFormatter {
         // todo share logic with match arm
         // todo should we check if the wrap allows a *longer* first line, like match arm?
         // todo account for having less width if the fallback will add a block
-        let result = self.out.with_enforce_max_width(|| {
+        let result = self.out.with_recover_width(|| {
             self.indented(|| {
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 self.postfix_item(overflowable)?;

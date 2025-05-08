@@ -112,7 +112,7 @@ impl AstFormatter {
             AddBlock,
             Normal,
         }
-        let result = self.out.with_enforce_max_width(|| {
+        let result = self.out.with_recover_width(|| {
             // simulate having extra width if we had added a block
             let (used_extra_width, result) =
                 self.simulate_wrap_indent_first_line(|| self.expr(body));

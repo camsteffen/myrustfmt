@@ -2,8 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::constraints::{Shape, WidthLimit};
 use crate::error::FormatResult;
 
-// Tail is usually passed by reference. We don't put the reference inside the Option because we
-// wouldn't be able to have functions that create and return Tail.
+// The reference is not inside the Option so we don't have to call `.as_ref()` when creating a Tail
 pub type Tail<'a, 'b> = &'a Option<TailS<'b>>;
 
 /// A Tail squeezes the code before it leftward to make room for itself.

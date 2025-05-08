@@ -22,9 +22,9 @@ pub enum RecoverableConstraints {
     Nothing,
     /// Recover from disallowed newline characters.
     Newline,
-    /// Recover from width constraints, but only on the specified line.
+    /// Recover from exceeding width constraints, but only on the specified line.
     /// When in scope, this also includes newline constraints.
-    MaxWidth { line: u32 },
+    Width { line: u32 },
 }
 
 impl RecoverableConstraints {
@@ -99,8 +99,8 @@ impl ConstraintWriter {
             .with_replaced(recoverable_constraints, scope)
     }
 
-    pub fn with_enforce_max_width<T>(&self, scope: impl FnOnce() -> T) -> T {
-        self.with_recoverable_constraints(self.max_recovery_mode(), scope)
+    pub fn with_recover_width<T>(&self, scope: impl FnOnce() -> T) -> T {
+        self.with_recoverable_constraints(self.recoverable_width(), scope)
     }
 
     pub fn recoverable_constraints(&self) -> RecoverableConstraints {
@@ -118,7 +118,7 @@ impl ConstraintWriter {
         match self.recoverable_constraints.get() {
             RecoverableConstraints::Nothing => false,
             RecoverableConstraints::Newline => false,
-            RecoverableConstraints::MaxWidth { line } => line == self.line(),
+            RecoverableConstraints::Width { line } => line == self.line(),
         }
     }
 
@@ -165,8 +165,7 @@ impl ConstraintWriter {
             )
         } else {
             let line = self.line.get();
-            if self.last_width_exceeded_line.get() != Some(line) {
-                self.last_width_exceeded_line.set(Some(line));
+            if self.last_width_exceeded_line.replace(Some(line)) != Some(line) {
                 self.errors.max_width_exceeded(line);
             }
             Ok(())
@@ -191,9 +190,8 @@ impl ConstraintWriter {
         self.buffer.with_taken(f)
     }
 
-    // todo rename
-    pub fn max_recovery_mode(&self) -> RecoverableConstraints {
-        RecoverableConstraints::MaxWidth { line: self.line() }
+    pub fn recoverable_width(&self) -> RecoverableConstraints {
+        RecoverableConstraints::Width { line: self.line() }
     }
 
     #[track_caller]

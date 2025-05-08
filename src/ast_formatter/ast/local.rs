@@ -46,18 +46,14 @@ impl AstFormatter {
             SameLine,
             Wrap(Option<Lookahead>),
         }
-        let next = if self
-            .out
-            .with_enforce_max_width(|| self.out.space())
-            .is_err()
-        {
+        let next = if self.out.with_recover_width(|| self.out.space()).is_err() {
             // comments forced a line break
             Next::Wrap(None)
         } else {
             let checkpoint_after_space = self.out.checkpoint();
 
             // simulate extra width from wrap-indent
-            let (used_extra_width, result) = self.out.with_enforce_max_width(|| {
+            let (used_extra_width, result) = self.out.with_recover_width(|| {
                 self.simulate_wrap_indent_first_line(|| self.expr_tail(expr, tail))
             });
             if used_extra_width {
