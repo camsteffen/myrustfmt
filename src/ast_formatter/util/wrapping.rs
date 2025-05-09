@@ -8,7 +8,7 @@ impl AstFormatter {
         let checkpoint = self.out.checkpoint();
         let first_line = self.out.line();
         self.out.space_or_break()?;
-        let result = self.out.with_recover_width(&then);
+        let result = self.out.with_recoverable_width(&then);
         if self.out.line() == first_line && result.is_err() {
             self.out.restore_checkpoint(&checkpoint);
             self.out.newline_indent(VerticalWhitespaceMode::Break)?;
@@ -34,7 +34,7 @@ impl AstFormatter {
         let start_if_wrap = self.out.total_indent.get();
         drop(indent_guard);
         let wrap_has_more_width = self.out.col() > start_if_wrap;
-        let result = self.out.with_recover_width(&then);
+        let result = self.out.with_recoverable_width(&then);
         if self.out.line() != first_line {
             result?;
             return Ok(Some(self.begin_indent()));

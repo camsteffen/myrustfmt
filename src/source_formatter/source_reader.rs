@@ -89,6 +89,7 @@ impl SourceReader {
         &self.source()[span.lo().to_usize()..span.hi().to_usize()]
     }
 
+    #[track_caller]
     fn parse_error(&self, error: ParseError) -> ! {
         panic_parse_error(error, self.path.as_deref(), self.source(), self.pos.get())
     }

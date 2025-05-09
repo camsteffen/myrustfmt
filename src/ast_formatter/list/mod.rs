@@ -74,7 +74,7 @@ where
             Fail,
             Ok { height: u32 },
         }
-        let result = self.af.out.with_recover_width(|| -> FormatResult<_> {
+        let result = self.af.out.with_recoverable_width(|| -> FormatResult<_> {
             if self
                 .opt
                 .item_requires_own_line
@@ -119,7 +119,7 @@ where
                 if self
                     .af
                     .out
-                    .with_recover_width(|| self.contents_vertical())
+                    .with_recoverable_width(|| self.contents_vertical())
                     .is_err()
                 {
                     // separate lines failed, so overflow it is!

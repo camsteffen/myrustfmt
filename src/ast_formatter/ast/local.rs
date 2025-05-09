@@ -3,7 +3,6 @@ use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::num::HSize;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
-use crate::source_formatter::Lookahead;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 
@@ -42,39 +41,36 @@ impl AstFormatter {
     fn local_init(&self, expr: &ast::Expr, tail: Tail) -> FormatResult {
         self.out.space_token("=")?;
         let checkpoint_after_eq = self.out.checkpoint();
-        enum Next {
-            SameLine,
-            Wrap(Option<Lookahead>),
-        }
-        let next = if self.out.with_recover_width(|| self.out.space()).is_err() {
-            // comments forced a line break
-            Next::Wrap(None)
+
+        let (try_same_line, lookahead) = if self
+            .out
+            .with_recoverable_width(|| self.out.space())
+            .is_err()
+        {
+            (false, None)
         } else {
             let checkpoint_after_space = self.out.checkpoint();
-
-            // simulate extra width from wrap-indent
-            let (used_extra_width, result) = self.out.with_recover_width(|| {
-                self.simulate_wrap_indent_first_line(|| self.expr_tail(expr, tail))
-            });
-            if used_extra_width {
-                let lookahead =
-                    result.is_ok().then(|| self.out.capture_lookahead(&checkpoint_after_space));
-                Next::Wrap(lookahead)
-            } else if result.is_err() {
-                Next::SameLine
+            let (used_extra_width, result) =
+                self.simulate_wrap_indent_first_line(|| self.expr_tail(expr, tail));
+            if result.is_err() {
+                (true, None)
+            } else if used_extra_width {
+                let lookahead = self.out.capture_lookahead(&checkpoint_after_space);
+                (false, Some(lookahead))
             } else {
                 return Ok(());
             }
         };
 
         self.out.restore_checkpoint(&checkpoint_after_eq);
-        match next {
-            Next::SameLine => {
+        self.backtrack_from_checkpoint(checkpoint_after_eq)
+            .next_if(try_same_line, || {
                 self.out.space()?;
                 self.expr(expr)?;
                 self.tail(tail)?;
-            }
-            Next::Wrap(lookahead) => {
+                Ok(())
+            })
+            .otherwise(|| {
                 self.indented(|| {
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     if let Some(lookahead) = lookahead {
@@ -84,9 +80,8 @@ impl AstFormatter {
                         self.tail(tail)?;
                     }
                     Ok(())
-                })?;
-            }
-        }
+                })
+            })?;
         Ok(())
     }
 

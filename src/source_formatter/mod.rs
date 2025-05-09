@@ -51,7 +51,7 @@ delegate_to_constraint_writer! {
     pub fn recoverable_constraints(&self) -> RecoverableConstraints;
     pub fn recoverable_width(&self) -> RecoverableConstraints;
     pub fn with_recoverable_constraints<T>(&self, recoverable_constraints: RecoverableConstraints, scope: impl FnOnce() -> T) -> T;
-    pub fn with_recover_width<T>(&self, scope: impl FnOnce() -> T) -> T;
+    pub fn with_recoverable_width<T>(&self, scope: impl FnOnce() -> T) -> T;
     pub fn line(&self) -> u32;
     pub fn col(&self) -> HSize;
     pub fn line_col(&self) -> (u32, HSize);

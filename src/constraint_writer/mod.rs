@@ -99,7 +99,7 @@ impl ConstraintWriter {
             .with_replaced(recoverable_constraints, scope)
     }
 
-    pub fn with_recover_width<T>(&self, scope: impl FnOnce() -> T) -> T {
+    pub fn with_recoverable_width<T>(&self, scope: impl FnOnce() -> T) -> T {
         self.with_recoverable_constraints(self.recoverable_width(), scope)
     }
 

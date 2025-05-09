@@ -25,19 +25,21 @@ impl AstFormatter {
         &self,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> (bool, FormatResult<T>) {
-        let start_col = self.out.col();
-        // the starting position if we wrapped to the next line and indented
-        let next_line_start = self.out.total_indent.get() + INDENT_WIDTH;
-        let Some(extra_width) = start_col.checked_sub(next_line_start).filter(|&w| w > 0) else {
-            let result = self.with_replace_shape(Shape::SingleLine, scope);
-            return (false, result);
-        };
-        let max_width_prev = self.out.current_max_width();
-        let max_width = max_width_prev.saturating_add(extra_width);
-        let result = self.with_replace_shape(Shape::SingleLine, || {
-            self.with_replace_max_width(max_width, scope)
-        });
-        let used_extra_width = self.out.col() > max_width_prev;
-        (used_extra_width, result)
+        self.out.with_recoverable_width(|| {
+            let start_col = self.out.col();
+            // the starting position if we wrapped to the next line and indented
+            let next_line_start = self.out.total_indent.get() + INDENT_WIDTH;
+            let Some(extra_width) = start_col.checked_sub(next_line_start).filter(|&w| w > 0) else {
+                let result = self.with_replace_shape(Shape::SingleLine, scope);
+                return (false, result);
+            };
+            let max_width_prev = self.out.current_max_width();
+            let max_width = max_width_prev.saturating_add(extra_width);
+            let result = self.with_replace_shape(Shape::SingleLine, || {
+                self.with_replace_max_width(max_width, scope)
+            });
+            let used_extra_width = self.out.col() > max_width_prev;
+            (used_extra_width, result)
+        })
     }
 }

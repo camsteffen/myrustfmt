@@ -107,48 +107,39 @@ impl AstFormatter {
     // todo should we count lines or simply observe whether it's multi-line?
     fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
         let checkpoint = self.out.checkpoint();
-        enum Next {
-            Done,
-            AddBlock,
-            Normal,
-        }
-        let result = self.out.with_recover_width(|| {
-            // simulate having extra width if we had added a block
-            let (used_extra_width, result) =
-                self.simulate_wrap_indent_first_line(|| self.expr(body));
-            if used_extra_width {
-                // Formatting on the same line _might_ be possible,
-                // but adding a block allows for a longer first line.
-                return Next::AddBlock;
-            }
-            if result.is_err() {
-                // We did not use the extra width, and it did not fit on one line,
-                // so try again to format on the same line without the extra width.
-                return Next::Normal;
-            }
+        // simulate having extra width if we had added a block
+        let (used_extra_width, result) = self.simulate_wrap_indent_first_line(|| self.expr(body));
+        let add_block = if used_extra_width {
+            // Formatting on the same line _might_ be possible,
+            // but adding a block allows for a longer first line.
+            true
+        } else if result.is_err() {
+            // We did not use the extra width, and it did not fit on one line,
+            // so try again to format on the same line without the extra width.
+            false
+        } else if self
+            .out
+            .with_recoverable_width(|| self.out.token_insert(","))
+            .is_err()
+        {
             // it fits on one line, but now we need a comma (if we're not adding a block)
-            if self.out.token_insert(",").is_err() {
-                return Next::AddBlock;
-            }
-            Next::Done
-        });
-        match result {
-            Next::Done => {}
-            Next::AddBlock => {
-                self.out.restore_checkpoint(&checkpoint);
-                self.expr_add_block(body)?;
-            }
-            Next::Normal => {
-                // todo closures and structs should have single-line headers
-                // todo exclude comma for block-like expressions?
-                self.backtrack_from_checkpoint(checkpoint)
-                    .next(|| {
-                        self.with_restrict_shape(Shape::List, || {
-                            self.expr_tail(body, &self.tail_fn(|af| af.out.token_insert(",")))
-                        })
+            true
+        } else {
+            return Ok(());
+        };
+        if add_block {
+            self.out.restore_checkpoint(&checkpoint);
+            self.expr_add_block(body)?;
+        } else {
+            // todo closures and structs should have single-line headers
+            // todo exclude comma for block-like expressions?
+            self.backtrack_from_checkpoint(checkpoint)
+                .next(|| {
+                    self.with_restrict_shape(Shape::List, || {
+                        self.expr_tail(body, &self.tail_fn(|af| af.out.token_insert(",")))
                     })
-                    .otherwise(|| self.expr_add_block(body))?
-            }
+                })
+                .otherwise(|| self.expr_add_block(body))?
         }
         Ok(())
     }
