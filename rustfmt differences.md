@@ -21,6 +21,8 @@
   Rustfmt wraps the nested closure in a block if the nested closure is multiple lines and the outer closure args fit in a single line.
 * Closure arguments on multiple lines are formatted like other lists, not with visual style.
 * When breaking nested function calls into multiple lines, prefers to add breaks towards the outermost call
+* In `let` statement, if the expression does not fit in the first line, prefer introducing line breaks within the first
+  line of the expression before wrapping and indenting the entire expression.
 
 Chains
 * Chains may include index operators

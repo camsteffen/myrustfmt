@@ -196,6 +196,10 @@ impl AstFormatter {
                         // override the multi-line shape to be less strict than SingleLine
                         let shape = if lcx.len > 1 {
                             // don't overflow nested lists when the outer list has multiple items
+                            // (a, b, (x,
+                            //     y,
+                            //     z,
+                            // ))
                             Shape::BlockLike
                         } else {
                             Shape::List
