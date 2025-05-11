@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::util::simulate_wrap::SimulateWrapDecision;
+use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
 use crate::constraints::Shape;
 use crate::error::FormatResult;
@@ -110,12 +110,12 @@ impl AstFormatter {
         // todo reuse checkpoint in simulate function
         let checkpoint = self.out.checkpoint();
         // simulate having extra width if we had added a block
-        let simulate_wrap_result = self.simulate_wrap_indent_first_line(true, || self.expr(body));
+        let simulate_wrap_result = self.simulate_wrap_indent(true, || self.expr(body));
         let add_block = match simulate_wrap_result {
             // todo use lookahead
-            SimulateWrapDecision::Wrap { single_line: _ } => true,
-            SimulateWrapDecision::SameLine => false,
-            SimulateWrapDecision::Keep => {
+            SimulateWrapResult::Wrap { single_line: _ } => true,
+            SimulateWrapResult::NoWrap => false,
+            SimulateWrapResult::Ok => {
                 if self
                     .out
                     .with_recoverable_width(|| self.out.token_insert(","))
