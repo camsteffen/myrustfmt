@@ -127,12 +127,17 @@ impl AstFormatter {
     }
 
     // todo test removing and adding blocks when there are comments
-    /// Wraps an expression in a multi-line block
-    pub fn expr_add_block(&self, expr: &ast::Expr) -> FormatResult {
+    pub fn add_block(&self, contents: impl FnOnce() -> FormatResult) -> FormatResult {
         self.out.token_insert("{")?;
-        self.enclosed_contents(|| self.expr(expr))?;
+        self.enclosed_contents(contents)?;
         self.out.token_insert("}")?;
         Ok(())
+    }
+
+    // todo test removing and adding blocks when there are comments
+    /// Wraps an expression in a multi-line block
+    pub fn expr_add_block(&self, expr: &ast::Expr) -> FormatResult {
+        self.add_block(|| self.expr(expr))
     }
 
     /// `{{{ expr }}}` -> `expr`

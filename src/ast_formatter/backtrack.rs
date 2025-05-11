@@ -85,7 +85,7 @@ impl<T> Backtrack<'_, T> {
         self
     }
 
-    pub fn next_opt(mut self, strategy: Option<impl Fn() -> FormatResult<T>>) -> Self {
+    pub fn next_opt(mut self, strategy: Option<impl FnOnce() -> FormatResult<T>>) -> Self {
         if let Some(strategy) = strategy {
             self.do_next(self.af.out.recoverable_width(), strategy);
         }

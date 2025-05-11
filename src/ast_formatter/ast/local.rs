@@ -59,7 +59,6 @@ impl AstFormatter {
             }
         };
 
-        self.out.restore_checkpoint(&checkpoint_after_eq);
         self.backtrack_from_checkpoint(checkpoint_after_eq)
             .next_if(!force_wrap, || {
                 self.out.space()?;

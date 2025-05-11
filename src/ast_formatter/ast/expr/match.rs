@@ -111,36 +111,40 @@ impl AstFormatter {
         let checkpoint = self.out.checkpoint();
         // simulate having extra width if we had added a block
         let simulate_wrap_result = self.simulate_wrap_indent(true, || self.expr(body));
-        let add_block = match simulate_wrap_result {
+        let (force_block, lookahead) = match simulate_wrap_result {
             // todo use lookahead
-            SimulateWrapResult::Wrap { single_line: _ } => true,
-            SimulateWrapResult::NoWrap => false,
+            SimulateWrapResult::Wrap { single_line } => (true, single_line),
+            SimulateWrapResult::NoWrap => (false, None),
             SimulateWrapResult::Ok => {
                 if self
                     .out
                     .with_recoverable_width(|| self.out.token_insert(","))
                     .is_err()
                 {
-                    true
+                    (true, None)
                 } else {
                     return Ok(());
                 }
             }
         };
-        if add_block {
-            self.out.restore_checkpoint(&checkpoint);
-            self.expr_add_block(body)?;
-        } else {
-            // todo closures and structs should have single-line headers
-            // todo exclude comma for block-like expressions?
-            self.backtrack_from_checkpoint(checkpoint)
-                .next(|| {
-                    self.with_restrict_shape(Shape::List, || {
-                        self.expr_tail(body, &self.tail_fn(|af| af.out.token_insert(",")))
-                    })
+        // todo closures and structs should have single-line headers
+        // todo exclude comma for block-like expressions?
+        self.backtrack_from_checkpoint(checkpoint)
+            .next_if(!force_block, || {
+                self.with_restrict_shape(Shape::List, || {
+                    self.expr_tail(body, &self.tail_fn(|af| af.out.token_insert(",")))
                 })
-                .otherwise(|| self.expr_add_block(body))?
-        }
+            })
+            .otherwise(|| {
+                self.add_block(|| {
+                    if let Some(lookahead) = lookahead {
+                        self.out.restore_lookahead(lookahead);
+                    } else {
+                        self.expr(body)?;
+                    }
+                    Ok(())
+                })
+            })?;
         Ok(())
     }
 }
