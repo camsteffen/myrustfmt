@@ -1,13 +1,12 @@
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::constraints::Shape;
 use crate::error::{ConstraintErrorKind, FormatResult};
-use crate::source_formatter::Lookahead;
 
 #[derive(Debug)]
 pub enum SimulateWrapResult {
     Ok,
     NoWrap,
-    Wrap { single_line: Option<Lookahead> },
+    Wrap { single_line: bool },
 }
 
 impl AstFormatter {
@@ -29,7 +28,6 @@ impl AstFormatter {
         wrap_for_longer_first_line: bool,
         scope: impl FnOnce() -> FormatResult,
     ) -> SimulateWrapResult {
-        let checkpoint = self.out.checkpoint();
         self.out.with_recoverable_width(|| {
             let col = self.out.col();
             let wrap_indent_col = self.out.total_indent.get() + INDENT_WIDTH;
@@ -53,9 +51,7 @@ impl AstFormatter {
                 // simple case - we can use the result as is
                 (Ok(()), false) => SimulateWrapResult::Ok,
                 // the output will fit in a single line if wrapped
-                (Ok(()), true) => SimulateWrapResult::Wrap {
-                    single_line: Some(self.out.capture_lookahead(&checkpoint)),
-                },
+                (Ok(()), true) => SimulateWrapResult::Wrap { single_line: true },
                 // If we used extra width and still exceeded the max width, wrapping is preferred to
                 // in order to exceed the max width by not as much.
                 // If we used extra width and encountered a newline-related error, we can infer that
@@ -64,7 +60,7 @@ impl AstFormatter {
                     if e.kind == ConstraintErrorKind::WidthLimitExceeded
                         || wrap_for_longer_first_line =>
                 {
-                    SimulateWrapResult::Wrap { single_line: None }
+                    SimulateWrapResult::Wrap { single_line: false }
                 }
                 // In all other cases, we don't necessarily want to wrap
                 (Err(_), _) => SimulateWrapResult::NoWrap,

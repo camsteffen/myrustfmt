@@ -50,12 +50,14 @@ impl AstFormatter {
         {
             (true, None)
         } else {
-            let simulate_wrap_result =
-                self.simulate_wrap_indent(false, || self.expr_tail(expr, tail));
-            match simulate_wrap_result {
+            let checkpoint_after_space = self.out.checkpoint();
+            match self.simulate_wrap_indent(false, || self.expr_tail(expr, tail)) {
                 SimulateWrapResult::Ok => return Ok(()),
                 SimulateWrapResult::NoWrap => (false, None),
-                SimulateWrapResult::Wrap { single_line } => (true, single_line),
+                SimulateWrapResult::Wrap { single_line } => (
+                    true,
+                    single_line.then(|| self.out.capture_lookahead(&checkpoint_after_space)),
+                ),
             }
         };
 

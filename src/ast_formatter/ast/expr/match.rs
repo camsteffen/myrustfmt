@@ -107,13 +107,12 @@ impl AstFormatter {
     // todo share logic with local which also wraps to avoid multi-line
     // todo should we count lines or simply observe whether it's multi-line?
     fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
-        // todo reuse checkpoint in simulate function
         let checkpoint = self.out.checkpoint();
-        // simulate having extra width if we had added a block
-        let simulate_wrap_result = self.simulate_wrap_indent(true, || self.expr(body));
-        let (force_block, lookahead) = match simulate_wrap_result {
-            // todo use lookahead
-            SimulateWrapResult::Wrap { single_line } => (true, single_line),
+        let (force_block, lookahead) = match self.simulate_wrap_indent(true, || self.expr(body)) {
+            SimulateWrapResult::Wrap { single_line } => (
+                true,
+                single_line.then(|| self.out.capture_lookahead(&checkpoint)),
+            ),
             SimulateWrapResult::NoWrap => (false, None),
             SimulateWrapResult::Ok => {
                 if self
