@@ -1,4 +1,4 @@
-#![feature(rustc_private)]
+#![feature(default_field_values)]
 #![feature(let_chains)]
 #![feature(precise_capturing_in_traits)]
 #![feature(slice_take)]

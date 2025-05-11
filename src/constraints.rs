@@ -7,7 +7,7 @@ use std::num::NonZero;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Constraints {
     // max_width and width_limit are very similar in effect, but they need to be separate values for
-    // a couple reasons:
+    // a couple of reasons:
     //  1. width_limit can fall out of scope, and then the max_width is used as a fallback.
     //  2. Sometimes we change max_width as an experiment to simulate starting from a different
     //     horizontal position. The width_limit must be left unchanged for these experiments
@@ -58,7 +58,7 @@ impl WidthLimit {
 ///    a newline-not-allowed error. Sometimes this is useful to observe how long the first line of
 ///    output _would_ be if a more permissive shape were enabled.
 // todo using SingleLine to measure the width of the first line should ignore trailing line comments
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum Shape {
     /// No newline characters
     SingleLine,
@@ -73,8 +73,9 @@ pub enum Shape {
     /// Includes "hanging indent" shapes (where lines after the first line are indented) such as
     /// long dot chains or infix chains. Also includes attributes above the node.
     HangingIndent,
-    /// Anything!
-    #[default]
+    /// Anything else. In particular this includes formatting patterns where the code touches the
+    /// margin one or more times in between the first and last lines, like an if/else chain or a
+    /// non-indented dot chain.
     Any,
 }
 
