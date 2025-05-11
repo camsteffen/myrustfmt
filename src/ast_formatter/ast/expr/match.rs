@@ -1,4 +1,5 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::util::simulate_wrap::SimulateWrapDecision;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
 use crate::constraints::Shape;
 use crate::error::FormatResult;
@@ -106,26 +107,25 @@ impl AstFormatter {
     // todo share logic with local which also wraps to avoid multi-line
     // todo should we count lines or simply observe whether it's multi-line?
     fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
+        // todo reuse checkpoint in simulate function
         let checkpoint = self.out.checkpoint();
         // simulate having extra width if we had added a block
-        let (used_extra_width, result) = self.simulate_wrap_indent_first_line(|| self.expr(body));
-        let add_block = if used_extra_width {
-            // Formatting on the same line _might_ be possible,
-            // but adding a block allows for a longer first line.
-            true
-        } else if result.is_err() {
-            // We did not use the extra width, and it did not fit on one line,
-            // so try again to format on the same line without the extra width.
-            false
-        } else if self
-            .out
-            .with_recoverable_width(|| self.out.token_insert(","))
-            .is_err()
-        {
-            // it fits on one line, but now we need a comma (if we're not adding a block)
-            true
-        } else {
-            return Ok(());
+        let simulate_wrap_result = self.simulate_wrap_indent_first_line(true, || self.expr(body));
+        let add_block = match simulate_wrap_result {
+            // todo use lookahead
+            SimulateWrapDecision::Wrap { single_line: _ } => true,
+            SimulateWrapDecision::SameLine => false,
+            SimulateWrapDecision::Keep => {
+                if self
+                    .out
+                    .with_recoverable_width(|| self.out.token_insert(","))
+                    .is_err()
+                {
+                    true
+                } else {
+                    return Ok(());
+                }
+            }
         };
         if add_block {
             self.out.restore_checkpoint(&checkpoint);

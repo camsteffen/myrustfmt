@@ -16,7 +16,7 @@ mod ast;
 pub mod backtrack;
 mod list;
 pub mod tail;
-mod util;
+pub mod util;
 
 pub const INDENT_WIDTH: HSize = 4;
 

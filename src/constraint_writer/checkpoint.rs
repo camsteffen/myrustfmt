@@ -1,4 +1,4 @@
-use crate::constraint_writer::{ConstraintWriter, RecoverableConstraints};
+use crate::constraint_writer::ConstraintWriter;
 use crate::constraints::Constraints;
 use crate::util::cell_ext::CellExt;
 
@@ -10,8 +10,6 @@ pub struct ConstraintWriterCheckpoint {
 // todo rename
 #[derive(Debug)]
 pub struct ConstraintWriterSelfCheckpoint {
-    #[cfg(debug_assertions)]
-    recoverable_constraints: RecoverableConstraints,
     line: u32,
     last_line_start: usize,
     last_width_exceeded_line: Option<u32>,
@@ -37,8 +35,6 @@ impl ConstraintWriter {
         let Self {
             buffer: _,
             #[cfg(debug_assertions)]
-            ref recoverable_constraints,
-            #[cfg(debug_assertions)]
             ref constraints,
             errors: _,
             ref last_line_start,
@@ -50,8 +46,6 @@ impl ConstraintWriter {
             line: line.get(),
             last_line_start: last_line_start.get(),
             last_width_exceeded_line: last_width_exceeded_line.get(),
-            #[cfg(debug_assertions)]
-            recoverable_constraints: recoverable_constraints.get(),
             #[cfg(debug_assertions)]
             constraints: constraints.clone(),
         }
@@ -68,22 +62,12 @@ impl ConstraintWriter {
 
     pub fn restore_self_checkpoint(&self, checkpoint: &ConstraintWriterSelfCheckpoint) {
         let ConstraintWriterSelfCheckpoint {
-            #[cfg(debug_assertions)]
-            recoverable_constraints,
             last_line_start,
             last_width_exceeded_line,
             line,
-            #[cfg(debug_assertions)]
             ref constraints,
         } = *checkpoint;
-        #[cfg(debug_assertions)]
-        {
-            assert_eq!(
-                self.recoverable_constraints.get(),
-                recoverable_constraints
-            );
-            assert_eq!(&self.constraints, constraints);
-        }
+        debug_assert_eq!(&self.constraints, constraints);
         self.last_line_start.set(last_line_start);
         self.last_width_exceeded_line.set(last_width_exceeded_line);
         self.line.set(line);

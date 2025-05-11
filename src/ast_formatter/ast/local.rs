@@ -1,5 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::util::simulate_wrap::SimulateWrapDecision;
 use crate::error::FormatResult;
 use crate::num::HSize;
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -49,16 +50,12 @@ impl AstFormatter {
         {
             (false, None)
         } else {
-            let checkpoint_after_space = self.out.checkpoint();
-            let (used_extra_width, result) =
-                self.simulate_wrap_indent_first_line(|| self.expr_tail(expr, tail));
-            if result.is_err() {
-                (true, None)
-            } else if used_extra_width {
-                let lookahead = self.out.capture_lookahead(&checkpoint_after_space);
-                (false, Some(lookahead))
-            } else {
-                return Ok(());
+            let simulate_wrap_result =
+                self.simulate_wrap_indent_first_line(false, || self.expr_tail(expr, tail));
+            match simulate_wrap_result {
+                SimulateWrapDecision::SameLine => (true, None),
+                SimulateWrapDecision::Keep => return Ok(()),
+                SimulateWrapDecision::Wrap { single_line } => (false, single_line),
             }
         };
 
