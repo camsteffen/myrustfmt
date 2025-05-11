@@ -22,7 +22,7 @@
 * Closure arguments on multiple lines are formatted like other lists, not with visual style.
 * When breaking nested function calls into multiple lines, prefers to add breaks towards the outermost call
 * In `let` statement, if the expression does not fit in the first line, prefer introducing line breaks within the first
-  line of the expression before wrapping and indenting the entire expression.
+  line of the expression over wrapping and indenting the entire expression.
 
 Chains
 * Chains may include index operators
