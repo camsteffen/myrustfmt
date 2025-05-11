@@ -43,25 +43,25 @@ impl AstFormatter {
         self.out.space_token("=")?;
         let checkpoint_after_eq = self.out.checkpoint();
 
-        let (try_same_line, lookahead) = if self
+        let (force_wrap, lookahead) = if self
             .out
             .with_recoverable_width(|| self.out.space())
             .is_err()
         {
-            (false, None)
+            (true, None)
         } else {
             let simulate_wrap_result =
                 self.simulate_wrap_indent(false, || self.expr_tail(expr, tail));
             match simulate_wrap_result {
-                SimulateWrapResult::NoWrap => (true, None),
                 SimulateWrapResult::Ok => return Ok(()),
-                SimulateWrapResult::Wrap { single_line } => (false, single_line),
+                SimulateWrapResult::NoWrap => (false, None),
+                SimulateWrapResult::Wrap { single_line } => (true, single_line),
             }
         };
 
         self.out.restore_checkpoint(&checkpoint_after_eq);
         self.backtrack_from_checkpoint(checkpoint_after_eq)
-            .next_if(try_same_line, || {
+            .next_if(!force_wrap, || {
                 self.out.space()?;
                 self.expr(expr)?;
                 self.tail(tail)?;
