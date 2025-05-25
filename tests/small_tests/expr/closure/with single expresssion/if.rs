@@ -3,6 +3,9 @@
 fn test() {
     || if condition {
         some_value
+    };
+    || if condition {
+        some_value
     } else {
         some_other_value
     };
@@ -11,6 +14,11 @@ fn test() {
 // :after:
 
 fn test() {
+    || {
+        if condition {
+            some_value
+        }
+    };
     || {
         if condition {
             some_value

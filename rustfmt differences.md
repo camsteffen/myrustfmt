@@ -17,12 +17,16 @@
 * Large expressions in parentheses are broken into a separate line
 * A match arm with a guard on a separate line may have its body on one line without a block
 * A multi-line if/else in a call argument is wrapped instead of continuing after the parenthesis
-* Closures can be directly nested in closures without wrapping the nested closure in a block.
-  Rustfmt wraps the nested closure in a block if the nested closure is multiple lines and the outer closure args fit in a single line.
-* Closure arguments on multiple lines are formatted like other lists, not with visual style.
 * When breaking nested function calls into multiple lines, prefers to add breaks towards the outermost call
-* In `let` statement, if the expression does not fit in the first line, prefer introducing line breaks within the first
+
+`let` statements
+* If the expression does not fit in the first line, prefer introducing line breaks within the first
   line of the expression over wrapping and indenting the entire expression.
+
+Closures
+* Closures require a block for multi-line expressions more consistently, specifically `loop` and struct literals are included.
+* Closures with multi-line arguments always require a block.
+* Closure arguments on multiple lines are formatted like other lists, not with visual style.
 
 Chains
 * Chains may include index operators

@@ -1,6 +1,6 @@
-#![feature(default_field_values)]
 #![feature(let_chains)]
 #![feature(precise_capturing_in_traits)]
+#![feature(rustc_private)]
 #![feature(slice_take)]
 #![feature(unqualified_local_imports)]
 // Uncomment to let clippy babble (with some overrides made below)

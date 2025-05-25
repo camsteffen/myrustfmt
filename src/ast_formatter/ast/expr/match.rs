@@ -1,16 +1,18 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
-use crate::constraints::Shape;
+use crate::constraints::{VStruct};
 use crate::error::FormatResult;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 
 impl AstFormatter {
     pub fn match_(&self, scrutinee: &ast::Expr, arms: &[ast::Arm]) -> FormatResult {
-        self.token_expr_open_brace("match", scrutinee)?;
-        self.block(true, arms, |arm| self.arm(arm))?;
-        Ok(())
+        self.has_vstruct(VStruct::Match, || {
+            self.control_flow_header("match", scrutinee)?;
+            self.block(true, arms, |arm| self.arm(arm))?;
+            Ok(())
+        })
     }
 
     fn arm(&self, arm: &ast::Arm) -> FormatResult {
@@ -130,7 +132,7 @@ impl AstFormatter {
         // todo exclude comma for block-like expressions?
         self.backtrack_from_checkpoint(checkpoint)
             .next_if(!force_block, || {
-                self.with_restrict_shape(Shape::List, || {
+                self.disallow_vstructs(VStruct::BrokenIndent | VStruct::HangingIndent, || {
                     self.expr_tail(body, &self.tail_fn(|af| af.out.token_insert(",")))
                 })
             })

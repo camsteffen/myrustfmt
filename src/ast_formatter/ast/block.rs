@@ -57,13 +57,15 @@ impl AstFormatter {
     ) -> FormatResult {
         self.do_block(
             omit_open_brace,
-            list.split_first().map(|(first, rest)| move || {
-                format(first)?;
-                for item in rest {
-                    self.out.newline_indent(VerticalWhitespaceMode::Between)?;
-                    format(item)?;
+            list.split_first().map(|(first, rest)| {
+                move || {
+                    format(first)?;
+                    for item in rest {
+                        self.out.newline_indent(VerticalWhitespaceMode::Between)?;
+                        format(item)?;
+                    }
+                    Ok(())
                 }
-                Ok(())
             }),
         )
     }

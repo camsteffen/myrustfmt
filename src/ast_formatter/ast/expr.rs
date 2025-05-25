@@ -10,13 +10,14 @@ use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
 use crate::ast_utils::postfix_expr_kind;
 use crate::constraint_writer::RecoverableConstraints;
-use crate::constraints::Shape;
+use crate::constraints::{VStruct};
 use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 use tracing::instrument;
+use crate::util::cell_ext::CellExt;
 
 impl AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
@@ -24,7 +25,7 @@ impl AstFormatter {
     }
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: Tail) -> FormatResult {
-        if self.shape() < Shape::HangingIndent && !expr.attrs.is_empty() {
+        if !expr.attrs.is_empty() && self.constraints().disallowed_vstructs.get().contains(VStruct::HangingIndent) {
             return Err(ConstraintErrorKind::NextStrategy.into());
         }
         self.with_attrs_tail(&expr.attrs, expr.span, tail, || {
@@ -94,18 +95,27 @@ impl AstFormatter {
                 label,
                 ..
             } => {
-                self.label(label, true)?;
-                self.out.token_space("for")?;
-                self.pat(pat)?;
-                self.out.space_token_space("in")?;
-                self.expr(iter)?;
-                self.out.space()?;
-                self.block_expr(false, body)?;
+                self.has_vstruct(VStruct::ControlFlow, || {
+                    // todo multi-line header
+                    self.label(label, true)?;
+                    self.out.token_space("for")?;
+                    self.pat(pat)?;
+                    self.out.space_token_space("in")?;
+                    self.expr(iter)?;
+                    self.out.space()?;
+                    self.block_expr(false, body)?;
+                    Ok(())
+                })?
             }
             ast::ExprKind::Loop(ref block, label, _) => {
-                self.label(label, true)?;
-                self.out.token_space("loop")?;
-                self.block_expr(false, block)?;
+                self.has_vstruct(VStruct::ControlFlow,
+                 || {
+
+                        self.label(label, true)?;
+                        self.out.token_space("loop")?;
+                        self.block_expr(false, block)?;
+                        Ok(())
+                    })?
             }
             ast::ExprKind::Match(ref scrutinee, ref arms, match_kind) => match match_kind {
                 ast::MatchKind::Postfix => todo!(),
@@ -185,28 +195,30 @@ impl AstFormatter {
         &self,
     ) -> impl Fn(&AstFormatter, &P<ast::Expr>, Tail, ListItemContext) -> FormatResult {
         // todo kinda hacky
-        let shape_outer = self.shape();
+        let single_line_outer = self.constraints().single_line.get();
+        let disallowed_vstructs_outer = self.constraints().disallowed_vstructs.get();
 
         move |af, expr, tail, lcx| {
             af.skip_single_expr_blocks_tail(expr, tail, |expr, tail| {
                 let format = || af.expr_tail(expr, tail);
                 match lcx.strategy {
                     // overflow last item
-                    ListStrategy::Horizontal if shape_outer >= Shape::List && lcx.is_last() => {
-                        // override the multi-line shape to be less strict than SingleLine
-                        let shape = if lcx.len > 1 {
+                    ListStrategy::Horizontal if !single_line_outer && !disallowed_vstructs_outer.contains(VStruct::List) && lcx.is_last() => {
+                        let mut vstructs = VStruct::ControlFlow | VStruct::Match | VStruct::HangingIndent | VStruct::BrokenIndent;
+                        if lcx.len > 1 {
                             // don't overflow nested lists when the outer list has multiple items
-                            // (a, b, (x,
+                            // (a, b, c, (x,
                             //     y,
                             //     z,
                             // ))
-                            Shape::BlockLike
-                        } else {
-                            Shape::List
-                        };
-                        // todo avoid replace?
-                        af.with_replace_shape(shape, format)?;
-                        Ok(())
+                            vstructs |= VStruct::List;
+                        }
+                        af.disallow_vstructs(vstructs, || {
+                            // override the multi-line shape to be less strict than SingleLine
+                            // todo avoid replace?
+                            af.constraints().single_line.with_replaced(false, format)?;
+                            Ok(())
+                        })
                     }
                     // on separate lines, enforce IndentMiddle by adding a block
                     ListStrategy::Vertical if lcx.len > 1 => {
@@ -215,7 +227,7 @@ impl AstFormatter {
                             // The block is only for ensuring a "hanging indent"-compliant shape.
                             .next_with_constraint_recovery_mode(
                                 RecoverableConstraints::Newline,
-                                || af.with_restrict_shape(Shape::HangingIndent, format),
+                                || af.disallow_vstructs(VStruct::BrokenIndent, format),
                             )
                             .otherwise(|| {
                                 af.expr_add_block(expr)?;
@@ -262,7 +274,7 @@ impl AstFormatter {
                 Ok(())
             })
             .otherwise(|| {
-                self.has_shape(Shape::HangingIndent, || {
+                self.has_vstruct(VStruct::HangingIndent, || {
                     self.indented(|| {
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         self.out.token_space("as")?;
@@ -279,7 +291,7 @@ impl AstFormatter {
         self.out.token("(")?;
         self.backtrack()
             .next(|| {
-                self.with_restrict_shape(Shape::List, || self.expr(inner))?;
+                self.disallow_vstructs(VStruct::HangingIndent, || self.expr(inner))?;
                 self.out.token(")")?;
                 self.tail(tail)?;
                 Ok(())
@@ -311,7 +323,7 @@ impl AstFormatter {
                     if af.out.line() == first_line {
                         af.expr_tail(end, tail)?;
                     } else {
-                        self.has_shape(Shape::Any, || af.expr_tail(end, tail))?;
+                        self.has_vstruct(VStruct::BrokenIndent,  || af.expr_tail(end, tail))?;
                     }
                     Ok(())
                 }),
@@ -342,7 +354,7 @@ impl AstFormatter {
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
         let first_line = self.out.line();
         self.expr_tail(func, &self.tail_token("("))?;
-        self.has_shape_if(self.out.line() != first_line, Shape::Any, || {
+        self.has_vstruct_if(self.out.line() > first_line, VStruct::BrokenIndent, || {
             self.call_args_after_open_paren(args, tail)
         })?;
         Ok(())
@@ -377,84 +389,84 @@ impl AstFormatter {
         else_: Option<&'a ast::Expr>,
         tail: Tail,
     ) -> FormatResult {
-        let start_col = self.out.col();
-        let is_head_single_line = self.token_expr_open_brace("if", condition)?;
+        self.has_vstruct(VStruct::ControlFlow, || {
+            let start_col = self.out.col();
+            let is_head_single_line = self.control_flow_header("if", condition)?;
 
-        let single_line = (|| {
-            if !is_head_single_line {
-                return None;
-            }
-            let else_ = else_?;
-            let ast::ExprKind::Block(else_block, _) = &else_.kind else {
-                return None;
-            };
-            let block_expr = self.try_into_expr_only_block(block)?;
-            let else_expr = self.try_into_expr_only_block(else_block)?;
-
-            Some(move || {
-                self.with_single_line(|| {
-                    self.with_width_limit_from_start(
-                        start_col,
-                        RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
-                        || {
-                            self.expr_only_block_after_open_brace(block_expr)?;
-                            self.out.space_token_space("else")?;
-                            self.expr_only_block(else_expr)?;
-                            self.tail(tail)?;
-                            Ok(())
-                        },
-                    )
-                })
-            })
-        })();
-
-        let multi_line = || {
-            // todo this is failing earlier than "indent middle" is really violated;
-            //   do we need to revise the guidelines in Shape docs?
-            self.has_shape_if(else_.is_some(), Shape::Any, || self.block_expr(true, block))?;
-            let mut else_ = else_;
-            loop {
-                let Some(else_expr) = else_ else { break };
-                self.out.space_token_space("else")?;
-                match &else_expr.kind {
-                    ast::ExprKind::Block(block, _) => {
-                        self.block_expr(false, block)?;
-                        break;
-                    }
-                    ast::ExprKind::If(condition, next_block, next_else) => {
-                        self.token_expr_open_brace("if", condition)?;
-                        self.block_expr(true, next_block)?;
-                        else_ = next_else.as_deref();
-                    }
-                    _ => unreachable!(),
+            let single_line = (|| {
+                if !is_head_single_line {
+                    return None;
                 }
-            }
-            self.tail(tail)?;
-            Ok(())
-        };
+                let else_ = else_?;
+                let ast::ExprKind::Block(else_block, _) = &else_.kind else {
+                    return None;
+                };
+                let block_expr = self.try_into_expr_only_block(block)?;
+                let else_expr = self.try_into_expr_only_block(else_block)?;
 
-        self.backtrack().next_opt(single_line).otherwise(multi_line)
+                Some(move || {
+                    self.with_single_line(|| {
+                        self.with_width_limit_from_start(
+                            start_col,
+                            RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
+                            || {
+                                self.expr_only_block_after_open_brace(block_expr)?;
+                                self.out.space_token_space("else")?;
+                                self.expr_only_block(else_expr)?;
+                                self.tail(tail)?;
+                                Ok(())
+                            },
+                        )
+                    })
+                })
+            })();
+
+            let multi_line = || {
+                self.block_expr(true, block)?;
+                let mut else_ = else_;
+                loop {
+                    let Some(else_expr) = else_ else { break };
+                    self.out.space_token_space("else")?;
+                    match &else_expr.kind {
+                        ast::ExprKind::Block(block, _) => {
+                            self.block_expr(false, block)?;
+                            break;
+                        }
+                        ast::ExprKind::If(condition, next_block, next_else) => {
+                            self.control_flow_header("if", condition)?;
+                            self.block_expr(true, next_block)?;
+                            else_ = next_else.as_deref();
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                self.tail(tail)?;
+                Ok(())
+            };
+
+            self.backtrack().next_opt(single_line).otherwise(multi_line)
+        })
     }
 
-    pub fn token_expr_open_brace(
+    pub fn control_flow_header(
         &self,
-        token: &'static str,
+        keyword: &'static str,
         expr: &ast::Expr,
     ) -> FormatResult<bool> {
-        self.has_shape(Shape::Any, || {
-            let first_line = self.out.line();
-            self.out.token_space(token)?;
-            self.expr(expr)?;
-            self.backtrack()
-                .next_if(self.out.line() == first_line || self.out.last_line_is_closers(), || {
-                    self.with_single_line(|| self.out.space_token("{"))
-                })
-                .otherwise(|| {
-                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                    self.out.token("{")?;
-                    Ok(())
-                })?;
-            Ok(self.out.line() == first_line)
+        self.has_vstruct(VStruct::BrokenIndent, || {
+                let first_line = self.out.line();
+                self.out.token_space(keyword)?;
+                self.expr(expr)?;
+                self.backtrack()
+                    .next_if(self.out.line() == first_line || self.out.last_line_is_closers(), || {
+                        self.with_single_line(|| self.out.space_token("{"))
+                    })
+                    .otherwise(|| {
+                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                        self.out.token("{")?;
+                        Ok(())
+                    })?;
+                Ok(self.out.line() == first_line)
         })
     }
 
@@ -500,9 +512,11 @@ impl AstFormatter {
     }
 
     pub fn while_(&self, condition: &ast::Expr, block: &ast::Block) -> FormatResult {
-        self.token_expr_open_brace("while", condition)?;
-        self.block_expr(true, block)?;
-        Ok(())
+        self.has_vstruct(VStruct::ControlFlow, || {
+            self.control_flow_header("while", condition)?;
+            self.block_expr(true, block)?;
+            Ok(())
+        })
     }
 }
 

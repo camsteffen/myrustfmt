@@ -2,7 +2,7 @@ use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::error::FormatResult;
 
-use crate::constraints::Shape;
+use crate::constraints::{VStruct};
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 use rustc_ast::util::parser::AssocOp;
@@ -19,7 +19,7 @@ impl AstFormatter {
         let (first, chain) = collect_binary_expr_chain(left, right, op);
         let first_line = self.out.line();
         self.expr(first)?;
-        self.has_shape(Shape::HangingIndent, || {
+        self.has_vstruct(VStruct::HangingIndent, || {
             let mut chain = chain.as_slice();
             let indent_margin = self.out.total_indent.get() + INDENT_WIDTH;
             let indent_guard = loop {

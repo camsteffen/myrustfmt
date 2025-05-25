@@ -8,6 +8,19 @@ use std::path::Path;
 
 pub type FormatResult<T = ()> = Result<T, ConstraintError>;
 
+pub trait FormatResultExt {
+    fn debug_err(self) -> Self;
+}
+
+impl<T> FormatResultExt for FormatResult<T> {
+    fn debug_err(self) -> Self {
+        if let Err(e) = &self {
+            eprintln!("{}", &e.backtrace);
+        }
+        self
+    }
+}
+
 #[derive(Debug)]
 pub struct ConstraintError {
     pub kind: ConstraintErrorKind,

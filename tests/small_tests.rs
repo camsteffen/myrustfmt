@@ -46,12 +46,14 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
                 if test_kind.is_some() {
                     return Err("test-kind already declared".into());
                 }
-                test_kind = Some(match value {
-                    "before-after" => TestKindRaw::BeforeAfter,
-                    "breakpoint" => TestKindRaw::Breakpoint,
-                    "no-change" => TestKindRaw::NoChange,
-                    _ => return Err(format!("invalid test-kind: {value:?}").into()),
-                });
+                test_kind = Some(
+                    match value {
+                        "before-after" => TestKindRaw::BeforeAfter,
+                        "breakpoint" => TestKindRaw::Breakpoint,
+                        "no-change" => TestKindRaw::NoChange,
+                        _ => return Err(format!("invalid test-kind: {value:?}").into()),
+                    },
+                );
             }
             _ => return Err(format!("invalid name: {name:?}").into()),
         }

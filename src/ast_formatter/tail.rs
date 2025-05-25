@@ -1,6 +1,7 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::{Shape, WidthLimit};
+use crate::constraints::WidthLimit;
 use crate::error::FormatResult;
+use crate::util::cell_ext::CellExt;
 
 // The reference is not inside the Option so we don't have to call `.as_ref()` when creating a Tail
 pub type Tail<'a, 'b> = &'a Option<TailS<'b>>;
@@ -23,8 +24,9 @@ pub struct TailS<'a> {
     // captured constraints
     // todo would it be better to explicitly capture and apply constraints where needed?
     // todo what about RecoverableConstraints?
+    // todo what about disallowed vstructs?
+    single_line: bool,
     width_limit: Option<WidthLimit>,
-    shape: Shape,
 }
 
 // Tail creation
@@ -42,8 +44,8 @@ impl AstFormatter {
     ) -> TailS<'a> {
         TailS {
             func: Box::new(tail),
+            single_line: self.constraints().single_line.get(),
             width_limit: self.width_limit(),
-            shape: self.shape(),
         }
     }
 
@@ -59,8 +61,10 @@ impl AstFormatter {
 impl AstFormatter {
     pub fn tail(&self, tail: Tail) -> FormatResult {
         let Some(tail) = tail else { return Ok(()) };
-        self.with_replace_shape(tail.shape, || {
-            self.with_replace_width_limit(tail.width_limit, || (tail.func)(self))
-        })
+        self.constraints()
+            .single_line
+            .with_replaced(tail.single_line, || {
+                self.with_replace_width_limit(tail.width_limit, || (tail.func)(self))
+            })
     }
 }

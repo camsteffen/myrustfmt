@@ -1,5 +1,4 @@
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
-use crate::constraints::Shape;
 use crate::error::{ConstraintErrorKind, FormatResult};
 
 #[derive(Debug)]
@@ -33,13 +32,13 @@ impl AstFormatter {
             let wrap_indent_col = self.out.total_indent.get() + INDENT_WIDTH;
             let (result, used_extra_width) = match col.checked_sub(wrap_indent_col) {
                 None | Some(0) => {
-                    let result = self.with_replace_shape(Shape::SingleLine, scope);
+                    let result = self.with_single_line(scope);
                     (result, false)
                 }
                 Some(extra_width) => {
                     let max_width = self.out.current_max_width();
                     let max_width_extra = max_width.saturating_add(extra_width);
-                    let result = self.with_replace_shape(Shape::SingleLine, || {
+                    let result = self.with_single_line(|| {
                         self.with_replace_max_width(max_width_extra, scope)
                     });
                     let used_extra_width = self.out.col() > max_width;

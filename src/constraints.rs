@@ -1,11 +1,15 @@
 use crate::error::FormatResult;
 use crate::num::HSize;
 use crate::util::cell_ext::CellExt;
+use enumset::{EnumSet, EnumSetType};
 use std::cell::Cell;
 use std::num::NonZero;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Constraints {
+    // pub in_closure_body: Cell<Option</* first line */ VSize>>,
+    // pub in_list_overflow: Cell<Option</* first line */ VSize>>,
+    pub disallowed_vstructs: Cell<EnumSet<VStruct>>,
     // max_width and width_limit are very similar in effect, but they need to be separate values for
     // a couple of reasons:
     //  1. width_limit can fall out of scope, and then the max_width is used as a fallback.
@@ -14,7 +18,9 @@ pub struct Constraints {
     //     since it represents limits that are independent of the global limit.
     /// The global maximum width
     max_width: Cell<HSize>,
-    shape: Cell<Shape>,
+    // shape: Cell<Shape>,
+    // todo using SingleLine to measure the width of the first line should ignore trailing line comments
+    pub single_line: Cell<bool>,
     width_limit: Cell<Option<WidthLimit>>,
 }
 
@@ -57,38 +63,52 @@ impl WidthLimit {
 ///  * It creates an invariant that we'll always emit the entire first line of output leading up to
 ///    a newline-not-allowed error. Sometimes this is useful to observe how long the first line of
 ///    output _would_ be if a more permissive shape were enabled.
-// todo using SingleLine to measure the width of the first line should ignore trailing line comments
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub enum Shape {
-    /// No newline characters
-    SingleLine,
-    /// Generally includes nodes with curly braces like a block or loop/if/match, etc.
-    /// All lines between the first and last lines must be indented (e.g. no if/else).
-    /// Does not include struct literals; they are counted as lists in this context.
-    BlockLike,
+#[derive(Debug, EnumSetType)]
+pub enum VStruct {
+    Closure,
+    /// Blocks, including those with `unsafe` or `const` or a label
+    // Block,
+    /// `match` expressions
+    Match,
+    // List,
+    /// Control flow expressions like if/for/loop/while
+    ControlFlow,
+    List,
     /// Includes lists of all shapes including overflow of the last element.
     /// At a high level, this variant includes shapes that are indented between the first and last
     /// lines.
-    List,
+    // List,
     /// Includes "hanging indent" shapes (where lines after the first line are indented) such as
     /// long dot chains or infix chains. Also includes attributes above the node.
     HangingIndent,
     /// Anything else. In particular this includes formatting patterns where the code touches the
     /// margin one or more times in between the first and last lines, like an if/else chain or a
     /// non-indented dot chain.
-    Any,
+    BrokenIndent,
+    // FlatChain,
 }
 
 impl Constraints {
     pub fn new(max_width: HSize) -> Constraints {
         Constraints {
+            disallowed_vstructs: Cell::new(EnumSet::empty()),
+            // in_closure_body: Cell::new(None),
+            // in_list_overflow: Cell::new(None),
             max_width: Cell::new(max_width),
             width_limit: Cell::new(None),
-            shape: Cell::new(Shape::Any),
+            single_line: Cell::new(false),
         }
     }
 
     // basic getters
+
+    // pub fn in_closure_body(&self) -> Option<VSize> {
+    //     self.in_closure_body.get()
+    // }
+
+    // pub fn in_list_item(&self) -> Option<VSize> {
+    //     self.in_list_overflow.get()
+    // }
 
     pub fn max_width(&self) -> HSize {
         self.max_width.get()
@@ -96,10 +116,6 @@ impl Constraints {
 
     pub fn width_limit(&self) -> Option<WidthLimit> {
         self.width_limit.get()
-    }
-
-    pub fn shape(&self) -> Shape {
-        self.shape.get()
     }
 
     // more getters
@@ -123,9 +139,30 @@ impl Constraints {
 
     // effects
 
+    pub fn disallow_vstructs(
+        &self,
+        values: impl Into<EnumSet<VStruct>>,
+        scope: impl FnOnce() -> FormatResult,
+    ) -> FormatResult {
+        let vstructs = self.disallowed_vstructs.get() | values.into();
+        self.disallowed_vstructs.with_replaced(vstructs, scope)
+    }
+
+    /// Declares that the output in the given scope has the given Shape.
+    ///
+    /// If this shape is not allowed, then an error will be raised upon emitting a newline.
+    /// (This also means that, if no newline is emitted, there will not be an error.)
+    pub fn has_vstruct<T>(
+        &self,
+        vstruct: VStruct,
+        scope: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
+        self.with_single_line_if(self.disallowed_vstructs.get().contains(vstruct), scope)
+    }
+
     pub fn with_width_limit<T>(&self, width_limit: WidthLimit, scope: impl FnOnce() -> T) -> T {
         if matches!(width_limit, WidthLimit::SingleLine { .. }) {
-            debug_assert_eq!(self.shape(), Shape::SingleLine);
+            debug_assert!(self.single_line.get());
         }
         if self
             .width_limit()
@@ -140,38 +177,13 @@ impl Constraints {
         self.max_width.with_replaced(max_width, scope)
     }
 
-    /// Replace without regard to the current setting
-    pub fn with_replace_shape<T>(
-        &self,
-        shape: Shape,
-        scope: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        self.shape.with_replaced(shape, scope)
-    }
-
-    /// Declares that the output in the given scope has the given Shape.
-    /// 
-    /// If this shape is not allowed, then an error will be raised upon emitting a newline.
-    /// (This also means that, if no newline is emitted, there will not be an error.)
-    pub fn has_shape<T>(
-        &self,
-        shape: Shape,
-        scope: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        if shape == Shape::SingleLine || self.shape() >= shape {
-            return scope();
-        }
-        self.with_replace_shape(Shape::SingleLine, scope)
-    }
-
-    pub fn has_shape_if<T>(
+    pub fn with_single_line_if<T>(
         &self,
         condition: bool,
-        shape: Shape,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         if condition {
-            self.has_shape(shape, scope)
+            self.single_line.with_replaced(true, scope)
         } else {
             scope()
         }

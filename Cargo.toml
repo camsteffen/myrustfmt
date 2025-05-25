@@ -6,6 +6,7 @@ edition = "2024"
 
 [dependencies]
 derive-where = "1.4.0"
+enumset = "1.1.6"
 tracing = "0.1.35"
 thiserror = "2.0.8"
 serde = { version = "1.0.217", features = ["derive"] }

@@ -10,8 +10,8 @@ pub use self::rest::ListRest;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::options::{ListOptions, ListShape, ListWrapToFit};
 use crate::ast_formatter::tail::Tail;
-use crate::constraints::Shape;
-use crate::error::FormatResult;
+use crate::constraints::VStruct;
+use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::num::HSize;
 use crate::whitespace::VerticalWhitespaceMode;
 
@@ -47,8 +47,7 @@ where
     FormatItem: Fn(&AstFormatter, &Item, Tail, ListItemContext) -> FormatResult,
 {
     fn format(&self) -> FormatResult {
-        let is_flexible = self.opt.shape == ListShape::Flexible;
-        self.af.has_shape_if(is_flexible, Shape::List, || {
+        self.af.has_vstruct(VStruct::List, || {
             if !self.opt.omit_open_brace {
                 self.af.out.token(self.braces.start())?;
             }
@@ -58,6 +57,7 @@ where
                 return Ok(());
             }
             match self.opt.shape {
+                // trying to not fallback to vertical because we need to see the width of the line when we fail because overflow is not allowed
                 ListShape::Flexible => self.contents_flexible(),
                 ListShape::Horizontal => self.contents_horizontal(),
                 ListShape::Vertical => self.contents_vertical(),
@@ -68,12 +68,6 @@ where
     fn contents_flexible(&self) -> FormatResult {
         let first_line = self.af.out.line();
         let checkpoint = self.af.out.checkpoint();
-        #[derive(Debug)]
-        enum HorizontalResult {
-            Skip,
-            Fail,
-            Ok { height: u32 },
-        }
         let result = self.af.out.with_recoverable_width(|| -> FormatResult<_> {
             if self
                 .opt
@@ -81,37 +75,31 @@ where
                 .as_ref()
                 .is_some_and(|f| self.list.iter().any(f))
             {
-                return Ok(HorizontalResult::Skip);
+                return Err(ConstraintErrorKind::NextStrategy.into());
             }
-            if self.contents_horizontal().is_err() {
-                return Ok(HorizontalResult::Fail);
-            }
+            self.contents_horizontal()?;
             // N.B. measure before writing the tail
             let height = self.af.out.line() - first_line + 1;
-            if self.af.tail(self.opt.tail).is_err() {
-                return Ok(HorizontalResult::Fail);
-            }
-            Ok(HorizontalResult::Ok { height })
-        })?;
+            self.af.tail(self.opt.tail)?;
+            Ok(height)
+        });
 
         match result {
-            HorizontalResult::Skip | HorizontalResult::Fail => {
+            Err(_) => {
                 self.af
                     .backtrack_from_checkpoint(checkpoint)
                     .next_opt(self.contents_wrap_to_fit_fn_opt())
                     .otherwise(|| self.contents_vertical())?;
             }
-            HorizontalResult::Ok { height: 1 } => {}
-            HorizontalResult::Ok { .. }
+            Ok(1) => {}
+            Ok(_)
                 if self.opt.rest.is_none()
                     && self
                         .opt
                         .item_prefers_overflow
                         .as_ref()
                         .is_some_and(|f| f(self.list.last().unwrap())) => {}
-            HorizontalResult::Ok {
-                height: overflow_height,
-            } => {
+            Ok(overflow_height) => {
                 // todo don't lookahead if there isn't any width gained by wrapping
                 let overflow_lookahead = self.af.out.capture_lookahead(&checkpoint);
 

@@ -1,10 +1,10 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
-use crate::error::FormatResult;
+use crate::error::{FormatResult, FormatResultExt};
 
 use crate::ast_formatter::list::options::{ListOptions, ListShape};
-use crate::constraints::Shape;
+use crate::constraints::{VStruct};
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
@@ -21,6 +21,7 @@ impl AstFormatter {
         self.fn_header(&sig.header)?;
         self.token_ident_generic_params("fn", item.ident, generics)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
+        // todo use self.fn_decl()
         let params = |shape| {
             self.list(
                 Braces::Parens,
@@ -64,65 +65,61 @@ impl AstFormatter {
     }
 
     pub fn closure(&self, closure: &ast::Closure, tail: Tail) -> FormatResult {
-        let ast::Closure {
-            ref binder,
-            capture_clause,
-            constness,
-            ref coroutine_kind,
-            ref fn_decl,
-            ref body,
-            ..
-        } = *closure;
-        match *binder {
-            ast::ClosureBinder::NotPresent => {}
-            ast::ClosureBinder::For {
-                span: _,
-                generic_params: _,
-            } => todo!(),
-        }
-        match capture_clause {
-            ast::CaptureBy::Ref => {}
-            ast::CaptureBy::Value { .. } => self.out.token_space("move")?,
-        }
-        self.constness(constness)?;
-        if let Some(coroutine_kind) = coroutine_kind {
-            self.coroutine_kind(coroutine_kind)?;
-        }
-        self.fn_decl(
-            fn_decl,
-            Braces::Pipe,
-            &self.tail_fn(|af| {
-                af.out.space()?;
-                let can_remove_block = matches!(fn_decl.output, ast::FnRetTy::Default(_));
-                af.closure_body(body, can_remove_block, tail)?;
-                Ok(())
-            }),
-        )?;
-        Ok(())
+        self.has_vstruct(VStruct::Closure, || {
+            let first_line = self.out.line();
+            match closure.binder {
+                ast::ClosureBinder::NotPresent => {}
+                ast::ClosureBinder::For {
+                    ..
+                } => todo!(),
+            }
+            match closure.capture_clause {
+                ast::CaptureBy::Ref => {}
+                ast::CaptureBy::Value { .. } => self.out.token_space("move")?,
+            }
+            self.constness(closure.constness)?;
+            if let Some(coroutine_kind) = &closure.coroutine_kind {
+                self.coroutine_kind(coroutine_kind)?;
+            }
+            self.fn_decl(
+                &closure.fn_decl,
+                Braces::Pipe,
+                &self.tail_fn(|af| {
+                    af.out.space()?;
+                    let has_return_type = match closure.fn_decl.output {
+                        ast::FnRetTy::Default(_) => false,
+                        ast::FnRetTy::Ty(_) => true,
+                    };
+                    let multi_line_header = self.out.line() == first_line;
+                    af.closure_body(&closure.body, has_return_type, multi_line_header, tail).debug_err()?;
+                    Ok(())
+                }),
+            )?;
+            Ok(())
+        })
     }
 
-    fn closure_body(&self, body: &ast::Expr, can_remove_block: bool, tail: Tail) -> FormatResult {
-        if can_remove_block {
-            self.skip_single_expr_blocks_tail(body, tail, |body, tail| {
-                // todo consider allowing `match`, `loop`, `if`, `for`, `while` if the header fits on one line
-                //   should we preserve the block in such cases?
-                //   actually, does indent-middle or SingleLineChains make sense here?
-                //   and if/for/while should enforce single line headers
-
-                // add a block unless it fits on a single line
-                self.backtrack()
-                    .next(|| {
-                        self.with_restrict_shape(Shape::BlockLike, || self.expr_tail(body, tail))
-                    })
-                    .otherwise(|| {
-                        self.expr_add_block(body)?;
-                        self.tail(tail)?;
-                        Ok(())
-                    })
-            })
-        } else {
-            self.expr_tail(body, tail)
+    fn closure_body(&self, body: &ast::Expr, has_return_type: bool, single_line_header: bool, tail: Tail) -> FormatResult {
+        if has_return_type {
+            return self.expr_tail(body, tail)
         }
+        self.skip_single_expr_blocks_tail(body, tail, |body, tail| {
+            self.backtrack()
+                .next(|| {
+                    let mut vstructs = VStruct::Closure | VStruct::ControlFlow | VStruct::HangingIndent | VStruct::List;
+                    if !single_line_header {
+                        vstructs |= VStruct::Match;
+                    }
+                    self.disallow_vstructs(vstructs, || {
+                            self.expr_tail(body, tail)
+                    })
+                })
+                .otherwise(|| {
+                    self.expr_add_block(body)?;
+                    self.tail(tail)?;
+                    Ok(())
+                })
+        })
     }
 
     pub fn bare_fn_ty(&self, bare_fn_ty: &ast::BareFnTy) -> FormatResult {
@@ -195,11 +192,11 @@ impl AstFormatter {
             })
             // args on separate lines
             .otherwise(|| {
-                self.has_shape(Shape::Any, || {
-                    params(ListShape::Vertical)?;
-                    self.fn_ret_ty(&fn_decl.output)?;
-                    self.tail(tail)?;
-                    Ok(())
+                self.has_vstruct(VStruct::BrokenIndent, || {
+                        params(ListShape::Vertical)?;
+                        self.fn_ret_ty(&fn_decl.output)?;
+                        self.tail(tail)?;
+                        Ok(())
                 })
             })
     }

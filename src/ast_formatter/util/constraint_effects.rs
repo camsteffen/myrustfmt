@@ -1,8 +1,10 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::{Constraints, Shape, WidthLimit};
+use crate::constraints::{Constraints, VStruct, WidthLimit};
 use crate::error::{FormatResult, WidthLimitExceededError};
 use crate::num::HSize;
 use std::num::NonZero;
+use enumset::EnumSet;
+use crate::util::cell_ext::CellExt;
 
 macro_rules! delegate_to_constraints {
     ($($vis:vis fn $name:ident $(<$gen:tt>)?(&self $(, $arg:ident: $ty:ty)* $(,)?) $(-> $ret_ty:ty)? ;)*) => {
@@ -23,20 +25,26 @@ delegate_to_constraints! {
     pub fn with_replace_width_limit<T>(&self, width_limit: Option<WidthLimit>, scope: impl FnOnce() -> T) -> T;
 
     // shape
-    pub fn shape(&self) -> Shape;
-    pub fn with_replace_shape<T>(&self, shape: Shape, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
-    pub fn has_shape<T>(&self, shape: Shape, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
-    pub fn has_shape_if<T>(&self, condition: bool, shape: Shape, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
+    pub fn disallow_vstructs(&self, values: impl Into<EnumSet<VStruct>>, scope: impl FnOnce() -> FormatResult) -> FormatResult;
+    pub fn has_vstruct<T>(&self, vstruct: VStruct, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
 }
 
 impl AstFormatter {
     pub fn constraints(&self) -> &Constraints {
         self.out.constraints()
     }
+    
+    pub fn has_vstruct_if(&self, condition: bool, vstruct: VStruct, scope: impl FnOnce() -> FormatResult) -> FormatResult {
+        if condition {
+            self.has_vstruct(vstruct, scope)
+        } else {
+            scope()
+        }
+    }
 
-    pub fn with_single_line<T>(&self, format: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
+    pub fn with_single_line<T>(&self, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         self.constraints()
-            .with_replace_shape(Shape::SingleLine, format)
+            .single_line.with_replaced(true, scope)
     }
 
     pub fn with_single_line_opt<T>(
@@ -48,17 +56,6 @@ impl AstFormatter {
             return scope();
         }
         self.with_single_line(scope)
-    }
-
-    pub fn with_restrict_shape<T>(
-        &self,
-        shape: Shape,
-        scope: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        if shape >= self.shape() {
-            return scope();
-        }
-        self.constraints().with_replace_shape(shape, scope)
     }
 
     pub fn with_width_limit<T>(

@@ -1,5 +1,5 @@
+use enumset::EnumSet;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
-use crate::constraints::Shape;
 use crate::error::FormatResult;
 use crate::source_formatter::SourceFormatter;
 use crate::util::cell_ext::CellExt;
@@ -29,12 +29,12 @@ impl AstFormatter {
         let indent = self.out.total_indent.get() + INDENT_WIDTH;
         self.out
             .total_indent
-            .with_replaced(indent, || match self.shape() {
-                // SingleLine must be preserved
-                Shape::SingleLine | Shape::Any => format(),
-                // For any other shape, indentation "resets" the shape to Unrestricted
+            .with_replaced(indent, || {
+                // indentation "resets" the shape to Unrestricted
                 // since the shape is only concerned with where code touches the left margin.
-                _ => self.with_replace_shape(Shape::Any, format),
+                self.constraints().disallowed_vstructs.with_replaced(EnumSet::new(), format)
+                // self.constraints().single_line.with_replaced(false, || {
+                // })
             })
     }
 
