@@ -1,10 +1,10 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
-use crate::error::{FormatResult, FormatResultExt};
+use crate::error::FormatResult;
 
 use crate::ast_formatter::list::options::{ListOptions, ListShape};
-use crate::constraints::{VStruct};
+use crate::constraints::VStruct;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
@@ -18,43 +18,30 @@ impl AstFormatter {
             body,
             ..
         } = fn_;
+        let first_line = self.out.line();
         self.fn_header(&sig.header)?;
         self.token_ident_generic_params("fn", item.ident, generics)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
-        // todo use self.fn_decl()
-        let params = |shape| {
-            self.list(
-                Braces::Parens,
-                &sig.decl.inputs,
-                Self::param,
-                ListOptions::new().shape(shape),
-            )
-        };
-        self.backtrack()
-            .next(|| {
-                self.with_single_line(|| {
-                    params(ListShape::Horizontal)?;
-                    self.fn_ret_ty(&sig.decl.output)?;
-                    if is_block_after_decl {
-                        self.out.space_token("{")?;
-                    }
-                    Ok(())
-                })
-            })
-            .otherwise(|| {
-                params(ListShape::Vertical)?;
-                self.fn_ret_ty(&sig.decl.output)?;
+        self.fn_decl(
+            &sig.decl,
+            Braces::Parens,
+            &self.tail_fn(|af| {
                 if is_block_after_decl {
-                    self.backtrack()
-                        .next(|| self.out.space_token("{"))
-                        .otherwise(|| {
-                            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                            self.out.token("{")?;
-                            Ok(())
-                        })?;
+                    if self.out.line() == first_line && !sig.decl.inputs.is_empty() {
+                        af.out.space_token("{")?;
+                    } else {
+                        af.backtrack()
+                            .next(|| af.out.space_token("{"))
+                            .otherwise(|| {
+                                af.out.newline(VerticalWhitespaceMode::Break)?;
+                                af.out.token("{")?;
+                                Ok(())
+                            })?;
+                    }
                 }
                 Ok(())
-            })?;
+            }),
+        )?;
         self.where_clause(&generics.where_clause, body.is_some())?;
         if let Some(body) = body {
             self.block_expr(is_block_after_decl, body)?;
@@ -69,9 +56,7 @@ impl AstFormatter {
             let first_line = self.out.line();
             match closure.binder {
                 ast::ClosureBinder::NotPresent => {}
-                ast::ClosureBinder::For {
-                    ..
-                } => todo!(),
+                ast::ClosureBinder::For { .. } => todo!(),
             }
             match closure.capture_clause {
                 ast::CaptureBy::Ref => {}
@@ -91,7 +76,7 @@ impl AstFormatter {
                         ast::FnRetTy::Ty(_) => true,
                     };
                     let multi_line_header = self.out.line() == first_line;
-                    af.closure_body(&closure.body, has_return_type, multi_line_header, tail).debug_err()?;
+                    af.closure_body(&closure.body, has_return_type, multi_line_header, tail)?;
                     Ok(())
                 }),
             )?;
@@ -99,20 +84,27 @@ impl AstFormatter {
         })
     }
 
-    fn closure_body(&self, body: &ast::Expr, has_return_type: bool, single_line_header: bool, tail: Tail) -> FormatResult {
+    fn closure_body(
+        &self,
+        body: &ast::Expr,
+        has_return_type: bool,
+        single_line_header: bool,
+        tail: Tail,
+    ) -> FormatResult {
         if has_return_type {
-            return self.expr_tail(body, tail)
+            return self.expr_tail(body, tail);
         }
         self.skip_single_expr_blocks_tail(body, tail, |body, tail| {
             self.backtrack()
                 .next(|| {
-                    let mut vstructs = VStruct::Closure | VStruct::ControlFlow | VStruct::HangingIndent | VStruct::List;
+                    let mut vstructs = VStruct::Closure
+                        | VStruct::ControlFlow
+                        | VStruct::HangingIndent
+                        | VStruct::List;
                     if !single_line_header {
                         vstructs |= VStruct::Match;
                     }
-                    self.disallow_vstructs(vstructs, || {
-                            self.expr_tail(body, tail)
-                    })
+                    self.disallow_vstructs(vstructs, || self.expr_tail(body, tail))
                 })
                 .otherwise(|| {
                     self.expr_add_block(body)?;
@@ -193,10 +185,10 @@ impl AstFormatter {
             // args on separate lines
             .otherwise(|| {
                 self.has_vstruct(VStruct::BrokenIndent, || {
-                        params(ListShape::Vertical)?;
-                        self.fn_ret_ty(&fn_decl.output)?;
-                        self.tail(tail)?;
-                        Ok(())
+                    params(ListShape::Vertical)?;
+                    self.fn_ret_ty(&fn_decl.output)?;
+                    self.tail(tail)?;
+                    Ok(())
                 })
             })
     }

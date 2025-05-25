@@ -38,9 +38,8 @@ impl AstFormatter {
                 Some(extra_width) => {
                     let max_width = self.out.current_max_width();
                     let max_width_extra = max_width.saturating_add(extra_width);
-                    let result = self.with_single_line(|| {
-                        self.with_replace_max_width(max_width_extra, scope)
-                    });
+                    let result = self
+                        .with_single_line(|| self.with_replace_max_width(max_width_extra, scope));
                     let used_extra_width = self.out.col() > max_width;
                     (result, used_extra_width)
                 }

@@ -2,7 +2,7 @@ use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::error::FormatResult;
 
-use crate::constraints::{VStruct};
+use crate::constraints::VStruct;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 use rustc_ast::util::parser::AssocOp;

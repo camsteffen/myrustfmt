@@ -66,26 +66,22 @@ impl WidthLimit {
 #[derive(Debug, EnumSetType)]
 pub enum VStruct {
     Closure,
-    /// Blocks, including those with `unsafe` or `const` or a label
-    // Block,
-    /// `match` expressions
-    Match,
-    // List,
     /// Control flow expressions like if/for/loop/while
     ControlFlow,
-    List,
+    /// `match` expressions
+    Match,
     /// Includes lists of all shapes including overflow of the last element.
     /// At a high level, this variant includes shapes that are indented between the first and last
     /// lines.
-    // List,
+    List,
     /// Includes "hanging indent" shapes (where lines after the first line are indented) such as
     /// long dot chains or infix chains. Also includes attributes above the node.
     HangingIndent,
-    /// Anything else. In particular this includes formatting patterns where the code touches the
-    /// margin one or more times in between the first and last lines, like an if/else chain or a
-    /// non-indented dot chain.
+    /// Formatting patterns where the code touches the margin one or more times in between the first
+    /// and last lines, like an if/else chain or a non-indented dot chain.
+    // flat dot chain, range, call, multi-line control flow header, multi-line closure header
+    // todo include structs with multi-line headers
     BrokenIndent,
-    // FlatChain,
 }
 
 impl Constraints {
@@ -144,8 +140,8 @@ impl Constraints {
         values: impl Into<EnumSet<VStruct>>,
         scope: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
-        let vstructs = self.disallowed_vstructs.get() | values.into();
-        self.disallowed_vstructs.with_replaced(vstructs, scope)
+        let next = self.disallowed_vstructs.get() | values;
+        self.disallowed_vstructs.with_replaced(next, scope)
     }
 
     /// Declares that the output in the given scope has the given Shape.

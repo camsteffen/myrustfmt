@@ -1,12 +1,10 @@
 use crate::constraint_writer::checkpoint::ConstraintWriterCheckpoint;
 use crate::error_emitter::Checkpoint as BufferedErrorEmitterCheckpoint;
 use crate::source_formatter::{Lookahead, SourceFormatter};
-use crate::util::cell_ext::CellNumberExt;
 use rustc_span::BytePos;
 
 pub struct Checkpoint<'a> {
     error_emitter_checkpoint: Option<BufferedErrorEmitterCheckpoint>,
-    index: u32,
     owner: &'a SourceFormatter,
     source_pos: BytePos,
     writer_checkpoint: ConstraintWriterCheckpoint,
@@ -14,8 +12,6 @@ pub struct Checkpoint<'a> {
 
 impl Drop for Checkpoint<'_> {
     fn drop(&mut self) {
-        self.owner.assert_last_checkpoint(self);
-        self.owner.checkpoint_count.decrement();
         if let Some(error_emitter_checkpoint) = self.error_emitter_checkpoint.take() {
             self.owner
                 .error_emitter
@@ -35,26 +31,17 @@ impl SourceFormatter {
 
     pub fn checkpoint_inner(&self, buffer_errors: bool) -> Checkpoint {
         let error_emitter_checkpoint = buffer_errors.then(|| self.error_emitter.checkpoint());
-        let index = self.checkpoint_count.get();
-        self.checkpoint_count.set(index + 1);
         Checkpoint {
             error_emitter_checkpoint,
-            index,
             owner: self,
             source_pos: self.source_reader.pos.get(),
             writer_checkpoint: self.out.checkpoint(),
         }
     }
 
-    fn assert_last_checkpoint(&self, checkpoint: &Checkpoint) {
-        assert_eq!(checkpoint.index, self.checkpoint_count.get() - 1);
-    }
-
     pub fn restore_checkpoint(&self, checkpoint: &Checkpoint) {
-        self.assert_last_checkpoint(checkpoint);
         let Checkpoint {
             ref error_emitter_checkpoint,
-            index: _,
             owner: _,
             source_pos,
             ref writer_checkpoint,
@@ -68,7 +55,6 @@ impl SourceFormatter {
     }
 
     pub fn capture_lookahead(&self, from: &Checkpoint) -> Lookahead {
-        self.assert_last_checkpoint(from);
         let error_buffer = match &from.error_emitter_checkpoint {
             Some(error_emitter_checkpoint) => {
                 self.error_emitter

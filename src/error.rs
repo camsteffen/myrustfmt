@@ -9,6 +9,7 @@ use std::path::Path;
 pub type FormatResult<T = ()> = Result<T, ConstraintError>;
 
 pub trait FormatResultExt {
+    #[allow(unused)]
     fn debug_err(self) -> Self;
 }
 

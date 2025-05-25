@@ -2,9 +2,9 @@ use crate::ast_formatter::AstFormatter;
 use crate::constraints::{Constraints, VStruct, WidthLimit};
 use crate::error::{FormatResult, WidthLimitExceededError};
 use crate::num::HSize;
-use std::num::NonZero;
-use enumset::EnumSet;
 use crate::util::cell_ext::CellExt;
+use enumset::EnumSet;
+use std::num::NonZero;
 
 macro_rules! delegate_to_constraints {
     ($($vis:vis fn $name:ident $(<$gen:tt>)?(&self $(, $arg:ident: $ty:ty)* $(,)?) $(-> $ret_ty:ty)? ;)*) => {
@@ -33,8 +33,13 @@ impl AstFormatter {
     pub fn constraints(&self) -> &Constraints {
         self.out.constraints()
     }
-    
-    pub fn has_vstruct_if(&self, condition: bool, vstruct: VStruct, scope: impl FnOnce() -> FormatResult) -> FormatResult {
+
+    pub fn has_vstruct_if(
+        &self,
+        condition: bool,
+        vstruct: VStruct,
+        scope: impl FnOnce() -> FormatResult,
+    ) -> FormatResult {
         if condition {
             self.has_vstruct(vstruct, scope)
         } else {
@@ -43,8 +48,7 @@ impl AstFormatter {
     }
 
     pub fn with_single_line<T>(&self, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        self.constraints()
-            .single_line.with_replaced(true, scope)
+        self.constraints().single_line.with_replaced(true, scope)
     }
 
     pub fn with_single_line_opt<T>(

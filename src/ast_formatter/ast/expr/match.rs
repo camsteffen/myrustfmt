@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
 use crate::ast_utils::{arm_body_requires_block, plain_block};
-use crate::constraints::{VStruct};
+use crate::constraints::VStruct;
 use crate::error::FormatResult;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -60,19 +60,24 @@ impl AstFormatter {
             self.arm_guard(guard)?;
             Ok(())
         })?;
-        if let Some(body) = arm.body.as_deref() {
-            self.out.space_token("=>")?;
-            if plain_block(body)
-                .is_some_and(|block| self.is_block_empty(block))
-            {
-                self.out.space()?;
-                self.expr(body)?;
-            } else {
-                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                // todo allow single line without block?
-                self.arm_body_force_block(body)?;
-            }
+        let Some(body) = arm.body.as_deref() else {
+            return Ok(());
+        };
+        self.out.space_token("=>")?;
+        if plain_block(body)
+            .is_some_and(|block| self.is_block_empty(block))
+        {
+            self.out.space()?;
+            self.expr(body)?;
+            return Ok(());
         }
+        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+        if let Some(block) = plain_block(body) {
+            self.block_expr(false, block)?;
+        } else {
+            self.expr_add_block(body)?;
+        }
+        self.out.skip_token_if_present(",")?;
         Ok(())
     }
 
@@ -92,16 +97,6 @@ impl AstFormatter {
                 self.arm_body_maybe_add_block(body)
             }
         })?;
-        self.out.skip_token_if_present(",")?;
-        Ok(())
-    }
-
-    fn arm_body_force_block(&self, body: &ast::Expr) -> FormatResult {
-        if let Some(block) = plain_block(body) {
-            self.block_expr(false, block)?;
-        } else {
-            self.expr_add_block(body)?;
-        }
         self.out.skip_token_if_present(",")?;
         Ok(())
     }
@@ -128,9 +123,11 @@ impl AstFormatter {
                 }
             }
         };
-        // todo closures and structs should have single-line headers
+        if lookahead.is_none() {
+            self.out.restore_checkpoint(&checkpoint);
+        }
         // todo exclude comma for block-like expressions?
-        self.backtrack_from_checkpoint(checkpoint)
+        self.backtrack()
             .next_if(!force_block, || {
                 self.disallow_vstructs(VStruct::BrokenIndent | VStruct::HangingIndent, || {
                     self.expr_tail(body, &self.tail_fn(|af| af.out.token_insert(",")))

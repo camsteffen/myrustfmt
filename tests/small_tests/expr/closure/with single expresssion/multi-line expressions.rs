@@ -1,73 +1,73 @@
 // test-kind: before-after
 
 fn test() {
-    || if x {
+    |arg| if x {
         y;
     };
-    || if x {
+    |arg| if x {
         yyyyyyyyyyyyyyyy
     } else {
         zzzzzzzzzzzzzzzz
     };
-    || for x in y {
+    |arg| for x in y {
         z;
     };
-    || loop {
+    |arg| loop {
         x;
     };
-    || while x {
+    |arg| while x {
         y;
     };
-    || {
+    |arg| {
         match x {
             _ => {}
         }
     };
-    || Struct { aaaaaaaaaaaaa, bbbbbbbbbbbbbb, cccccccccccccccccccccccccccccccc };
-    || call(aaaaaaaaaaaaa, bbbbbbbbbbbbbb, cccccccccccccccccccccccccccccccccccccccccccccccccccc);
+    |arg| Struct { aaaaaaaaaaaaa, bbbbbbbbbbbbbb, cccccccccccccccccccccccccccccccc };
+    |arg| call(aaaaaaaaaaaaa, bbbbbbbbbbbbbb, cccccccccccccccccccccccccccccccccccccccccccccccccccc);
 }
 
 // :after:
 
 fn test() {
-    || {
+    |arg| {
         if x {
             y;
         }
     };
-    || {
+    |arg| {
         if x {
             yyyyyyyyyyyyyyyy
         } else {
             zzzzzzzzzzzzzzzz
         }
     };
-    || {
+    |arg| {
         for x in y {
             z;
         }
     };
-    || {
+    |arg| {
         loop {
             x;
         }
     };
-    || {
+    |arg| {
         while x {
             y;
         }
     };
-    || match x {
+    |arg| match x {
         _ => {}
     };
-    || {
+    |arg| {
         Struct {
             aaaaaaaaaaaaa,
             bbbbbbbbbbbbbb,
             cccccccccccccccccccccccccccccccc,
         }
     };
-    || {
+    |arg| {
         call(
             aaaaaaaaaaaaa,
             bbbbbbbbbbbbbb,

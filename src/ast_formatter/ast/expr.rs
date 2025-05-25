@@ -10,14 +10,14 @@ use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
 use crate::ast_utils::postfix_expr_kind;
 use crate::constraint_writer::RecoverableConstraints;
-use crate::constraints::{VStruct};
+use crate::constraints::VStruct;
 use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
+use crate::util::cell_ext::CellExt;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 use tracing::instrument;
-use crate::util::cell_ext::CellExt;
 
 impl AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
@@ -25,7 +25,13 @@ impl AstFormatter {
     }
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: Tail) -> FormatResult {
-        if !expr.attrs.is_empty() && self.constraints().disallowed_vstructs.get().contains(VStruct::HangingIndent) {
+        if !expr.attrs.is_empty()
+            && self
+                .constraints()
+                .disallowed_vstructs
+                .get()
+                .contains(VStruct::HangingIndent)
+        {
             return Err(ConstraintErrorKind::NextStrategy.into());
         }
         self.with_attrs_tail(&expr.attrs, expr.span, tail, || {
@@ -41,7 +47,7 @@ impl AstFormatter {
             ast::ExprKind::Array(ref items) => self.list(
                 Braces::Square,
                 items,
-                self.expr_list_item(),
+                self.expr_list_item(false),
                 expr_list_opt()
                     .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.array_width)
                     .wrap_to_fit(ListWrapToFit::Yes {
@@ -60,7 +66,7 @@ impl AstFormatter {
             ast::ExprKind::Tup(ref items) => self.list(
                 Braces::Parens,
                 items,
-                self.expr_list_item(),
+                self.expr_list_item(true),
                 expr_list_opt()
                     .force_trailing_comma(items.len() == 1)
                     .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
@@ -94,29 +100,23 @@ impl AstFormatter {
                 ref body,
                 label,
                 ..
-            } => {
-                self.has_vstruct(VStruct::ControlFlow, || {
-                    // todo multi-line header
-                    self.label(label, true)?;
-                    self.out.token_space("for")?;
-                    self.pat(pat)?;
-                    self.out.space_token_space("in")?;
-                    self.expr(iter)?;
-                    self.out.space()?;
-                    self.block_expr(false, body)?;
-                    Ok(())
-                })?
-            }
-            ast::ExprKind::Loop(ref block, label, _) => {
-                self.has_vstruct(VStruct::ControlFlow,
-                 || {
-
-                        self.label(label, true)?;
-                        self.out.token_space("loop")?;
-                        self.block_expr(false, block)?;
-                        Ok(())
-                    })?
-            }
+            } => self.has_vstruct(VStruct::ControlFlow, || {
+                // todo multi-line header
+                self.label(label, true)?;
+                self.out.token_space("for")?;
+                self.pat(pat)?;
+                self.out.space_token_space("in")?;
+                self.expr(iter)?;
+                self.out.space()?;
+                self.block_expr(false, body)?;
+                Ok(())
+            })?,
+            ast::ExprKind::Loop(ref block, label, _) => self.has_vstruct(VStruct::ControlFlow, || {
+                self.label(label, true)?;
+                self.out.token_space("loop")?;
+                self.block_expr(false, block)?;
+                Ok(())
+            })?,
             ast::ExprKind::Match(ref scrutinee, ref arms, match_kind) => match match_kind {
                 ast::MatchKind::Postfix => todo!(),
                 ast::MatchKind::Prefix => self.match_(scrutinee, arms)?,
@@ -193,6 +193,7 @@ impl AstFormatter {
 
     pub fn expr_list_item(
         &self,
+        is_call: bool,
     ) -> impl Fn(&AstFormatter, &P<ast::Expr>, Tail, ListItemContext) -> FormatResult {
         // todo kinda hacky
         let single_line_outer = self.constraints().single_line.get();
@@ -203,8 +204,13 @@ impl AstFormatter {
                 let format = || af.expr_tail(expr, tail);
                 match lcx.strategy {
                     // overflow last item
-                    ListStrategy::Horizontal if !single_line_outer && !disallowed_vstructs_outer.contains(VStruct::List) && lcx.is_last() => {
-                        let mut vstructs = VStruct::ControlFlow | VStruct::Match | VStruct::HangingIndent | VStruct::BrokenIndent;
+                    ListStrategy::Horizontal
+                        if !single_line_outer
+                            && !disallowed_vstructs_outer.contains(VStruct::List)
+                            && lcx.is_last() =>
+                    {
+                        let mut vstructs =
+                            VStruct::BrokenIndent | VStruct::ControlFlow | VStruct::HangingIndent;
                         if lcx.len > 1 {
                             // don't overflow nested lists when the outer list has multiple items
                             // (a, b, c, (x,
@@ -212,6 +218,9 @@ impl AstFormatter {
                             //     z,
                             // ))
                             vstructs |= VStruct::List;
+                        }
+                        if lcx.len > 1 || !is_call {
+                            vstructs |= VStruct::Match;
                         }
                         af.disallow_vstructs(vstructs, || {
                             // override the multi-line shape to be less strict than SingleLine
@@ -323,7 +332,7 @@ impl AstFormatter {
                     if af.out.line() == first_line {
                         af.expr_tail(end, tail)?;
                     } else {
-                        self.has_vstruct(VStruct::BrokenIndent,  || af.expr_tail(end, tail))?;
+                        self.has_vstruct(VStruct::BrokenIndent, || af.expr_tail(end, tail))?;
                     }
                     Ok(())
                 }),
@@ -370,7 +379,7 @@ impl AstFormatter {
         self.list(
             Braces::Parens,
             args,
-            self.expr_list_item(),
+            self.expr_list_item(true),
             list_opt.omit_open_brace().tail(tail),
         )
     }
@@ -454,19 +463,19 @@ impl AstFormatter {
         expr: &ast::Expr,
     ) -> FormatResult<bool> {
         self.has_vstruct(VStruct::BrokenIndent, || {
-                let first_line = self.out.line();
-                self.out.token_space(keyword)?;
-                self.expr(expr)?;
-                self.backtrack()
-                    .next_if(self.out.line() == first_line || self.out.last_line_is_closers(), || {
-                        self.with_single_line(|| self.out.space_token("{"))
-                    })
-                    .otherwise(|| {
-                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                        self.out.token("{")?;
-                        Ok(())
-                    })?;
-                Ok(self.out.line() == first_line)
+            let first_line = self.out.line();
+            self.out.token_space(keyword)?;
+            self.expr(expr)?;
+            self.backtrack()
+                .next_if(self.out.line() == first_line || self.out.last_line_is_closers(), || {
+                    self.with_single_line(|| self.out.space_token("{"))
+                })
+                .otherwise(|| {
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                    self.out.token("{")?;
+                    Ok(())
+                })?;
+            Ok(self.out.line() == first_line)
         })
     }
 

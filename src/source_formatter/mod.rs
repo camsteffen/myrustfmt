@@ -24,7 +24,7 @@ pub struct Lookahead {
 }
 
 pub struct SourceFormatter {
-    checkpoint_count: Cell<u32>,
+    // checkpoint_count: Cell<u32>,
     error_emitter: Rc<BufferedErrorEmitter>,
     // This should be encapsulated, but we break that rule sometimes
     pub source_reader: SourceReader,
@@ -73,7 +73,6 @@ impl SourceFormatter {
         let capacity = source_reader.source().len() * 2;
         let out = ConstraintWriter::new(max_width, Rc::clone(&error_emitter), capacity);
         SourceFormatter {
-            checkpoint_count: Cell::new(0),
             error_emitter,
             source_reader,
             out,
@@ -82,7 +81,6 @@ impl SourceFormatter {
     }
 
     pub fn finish(self) -> String {
-        assert_eq!(self.checkpoint_count.get(), 0);
         self.source_reader.finish();
         self.out.finish()
     }
