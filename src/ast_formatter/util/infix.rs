@@ -25,7 +25,7 @@ impl AstFormatter {
                     Ok(())
                 })
             })
-            .otherwise(|| {
+            .next(|| {
                 format_item(first)?;
                 self.indented_optional(should_indent, || {
                     for item in rest {
@@ -38,5 +38,6 @@ impl AstFormatter {
                 })?;
                 Ok(())
             })
+            .result()
     }
 }

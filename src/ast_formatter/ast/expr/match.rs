@@ -25,9 +25,10 @@ impl AstFormatter {
             self.pat(&arm.pat)?;
             self.backtrack()
                 .next_if(self.out.line() == first_line, || {
-                    self.arm_guard_same_line(arm, guard)
+                    self.out.with_recover_width(|| self.arm_guard_same_line(arm, guard))
                 })
-                .otherwise(|| self.arm_guard_separate_line(arm, guard))?;
+                .next(|| self.arm_guard_separate_line(arm, guard))
+                .result()?;
         } else if let Some(body) = arm.body.as_deref() {
             self.pat_tail(
                 &arm.pat,
@@ -72,11 +73,7 @@ impl AstFormatter {
             return Ok(());
         }
         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-        if let Some(block) = plain_block(body) {
-            self.block_expr(false, block)?;
-        } else {
-            self.expr_add_block(body)?;
-        }
+        self.expr_force_plain_block(body)?;
         self.out.skip_token_if_present(",")?;
         Ok(())
     }
@@ -114,7 +111,7 @@ impl AstFormatter {
             SimulateWrapResult::Ok => {
                 if self
                     .out
-                    .with_recoverable_width(|| self.out.token_insert(","))
+                    .with_recover_width(|| self.out.token_insert(","))
                     .is_err()
                 {
                     (true, None)
@@ -127,13 +124,13 @@ impl AstFormatter {
             self.out.restore_checkpoint(&checkpoint);
         }
         // todo exclude comma for block-like expressions?
-        self.backtrack()
+        self.backtrack_from_checkpoint(checkpoint)
             .next_if(!force_block, || {
                 self.disallow_vstructs(VStruct::BrokenIndent | VStruct::HangingIndent, || {
                     self.expr_tail(body, &self.tail_fn(|af| af.out.token_insert(",")))
                 })
             })
-            .otherwise(|| {
+            .next(|| {
                 self.add_block(|| {
                     if let Some(lookahead) = lookahead {
                         self.out.restore_lookahead(lookahead);
@@ -142,7 +139,8 @@ impl AstFormatter {
                     }
                     Ok(())
                 })
-            })?;
+            })
+            .result()?;
         Ok(())
     }
 }

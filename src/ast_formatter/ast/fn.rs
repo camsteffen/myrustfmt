@@ -18,7 +18,6 @@ impl AstFormatter {
             body,
             ..
         } = fn_;
-        let first_line = self.out.line();
         self.fn_header(&sig.header)?;
         self.token_ident_generic_params("fn", item.ident, generics)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
@@ -27,17 +26,7 @@ impl AstFormatter {
             Braces::Parens,
             &self.tail_fn(|af| {
                 if is_block_after_decl {
-                    if self.out.line() == first_line && !sig.decl.inputs.is_empty() {
-                        af.out.space_token("{")?;
-                    } else {
-                        af.backtrack()
-                            .next(|| af.out.space_token("{"))
-                            .otherwise(|| {
-                                af.out.newline(VerticalWhitespaceMode::Break)?;
-                                af.out.token("{")?;
-                                Ok(())
-                            })?;
-                    }
+                    af.out.space_token("{")?;
                 }
                 Ok(())
             }),
@@ -94,23 +83,29 @@ impl AstFormatter {
         if has_return_type {
             return self.expr_tail(body, tail);
         }
+        if !single_line_header {
+            self.expr_force_plain_block(body)?;
+            self.tail(tail)?;
+            return Ok(());
+        }
         self.skip_single_expr_blocks_tail(body, tail, |body, tail| {
             self.backtrack()
+                // todo recover width?
                 .next(|| {
-                    let mut vstructs = VStruct::Closure
-                        | VStruct::ControlFlow
-                        | VStruct::HangingIndent
-                        | VStruct::List;
-                    if !single_line_header {
-                        vstructs |= VStruct::Match;
-                    }
-                    self.disallow_vstructs(vstructs, || self.expr_tail(body, tail))
+                    self.disallow_vstructs(
+                        VStruct::Closure
+                            | VStruct::ControlFlow
+                            | VStruct::HangingIndent
+                            | VStruct::List,
+                        || self.expr_tail(body, tail),
+                    )
                 })
-                .otherwise(|| {
+                .next(|| {
                     self.expr_add_block(body)?;
                     self.tail(tail)?;
                     Ok(())
                 })
+                .result()
         })
     }
 
@@ -183,7 +178,7 @@ impl AstFormatter {
                 })
             })
             // args on separate lines
-            .otherwise(|| {
+            .next(|| {
                 self.has_vstruct(VStruct::BrokenIndent, || {
                     params(ListShape::Vertical)?;
                     self.fn_ret_ty(&fn_decl.output)?;
@@ -191,6 +186,7 @@ impl AstFormatter {
                     Ok(())
                 })
             })
+            .result()
     }
 
     fn param(&self, param: &ast::Param, tail: Tail, _lcx: ListItemContext) -> FormatResult {
@@ -246,12 +242,14 @@ impl AstFormatter {
             ast::FnRetTy::Default(_) => {}
             ast::FnRetTy::Ty(ty) => {
                 self.backtrack()
+                    // todo recover width?
                     .next(|| self.out.space_token_space("->"))
-                    .otherwise(|| {
+                    .next(|| {
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         self.out.token_space("->")?;
                         Ok(())
-                    })?;
+                    })
+                    .result()?;
                 self.ty(ty)?;
             }
         }

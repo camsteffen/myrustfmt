@@ -68,7 +68,7 @@ where
     fn contents_flexible(&self) -> FormatResult {
         let first_line = self.af.out.line();
         let checkpoint = self.af.out.checkpoint();
-        let result = self.af.out.with_recoverable_width(|| -> FormatResult<_> {
+        let result = self.af.out.with_recover_width(|| -> FormatResult<_> {
             if self
                 .opt
                 .item_requires_own_line
@@ -89,7 +89,8 @@ where
                 self.af
                     .backtrack_from_checkpoint(checkpoint)
                     .next_opt(self.contents_wrap_to_fit_fn_opt())
-                    .otherwise(|| self.contents_vertical())?;
+                    .next(|| self.contents_vertical())
+                    .result()?;
             }
             Ok(1) => {}
             Ok(_)
@@ -107,7 +108,7 @@ where
                 if self
                     .af
                     .out
-                    .with_recoverable_width(|| self.contents_vertical())
+                    .with_recover_width(|| self.contents_vertical())
                     .is_err()
                 {
                     // separate lines failed, so overflow it is!
@@ -275,15 +276,18 @@ where
                 }
                 af.backtrack()
                     .next_if(!is_own_line, || {
-                        af.out.space()?;
-                        item_comma()?;
-                        Ok(())
+                        af.out.with_recover_width(|| {
+                            af.out.space()?;
+                            item_comma()?;
+                            Ok(())
+                        })
                     })
-                    .otherwise(|| {
+                    .next(|| {
                         af.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         item_comma()?;
                         Ok(())
-                    })?;
+                    })
+                    .result()?;
             }
             Ok(())
         })?;

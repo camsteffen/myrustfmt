@@ -1,12 +1,13 @@
 // test-kind: breakpoint
 
-fn test() {
+fn test(arg: u32) {
     x;
 }
 
 // :after:
 
-fn test()
-{
+fn test(
+    arg: u32,
+) {
     x;
 }

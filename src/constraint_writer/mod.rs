@@ -12,27 +12,6 @@ use std::cell::Cell;
 use std::panic::Location;
 use std::rc::Rc;
 
-/// Specifies which constraints, when they are violated, may be recovered by falling back to another
-/// formatting strategy. When a recoverable constraint is violated, a `ConstraintError` is returned
-/// and is expected to trigger the next strategy. When it is not recoverable, an error is emitted to
-/// the user.
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub enum RecoverableConstraints {
-    /// Don't recover from anything.
-    Nothing,
-    /// Recover from disallowed newline characters.
-    Newline,
-    /// Recover from exceeding width constraints, but only on the specified line.
-    /// When in scope, this also includes newline constraints.
-    Width { line: u32 },
-}
-
-impl RecoverableConstraints {
-    pub fn is_nothing(self) -> bool {
-        matches!(self, RecoverableConstraints::Nothing)
-    }
-}
-
 pub struct ConstraintWriter {
     constraints: Constraints,
     buffer: Cell<String>,
@@ -40,7 +19,10 @@ pub struct ConstraintWriter {
     last_line_start: Cell<usize>,
     last_width_exceeded_line: Cell<Option<u32>>,
     line: Cell<u32>,
-    recoverable_constraints: Cell<RecoverableConstraints>,
+    /// When Some, we consider width to be recoverable. This means that if a width limit is
+    /// exceeded, we may fall back to another formatting strategy that is known to take less width.
+    /// The contained value is the line number.
+    recover_width: Cell<Option<u32>>,
 }
 
 impl ConstraintWriter {
@@ -56,7 +38,7 @@ impl ConstraintWriter {
             last_line_start: Cell::new(0),
             last_width_exceeded_line: Cell::new(None),
             line: Cell::new(0),
-            recoverable_constraints: Cell::new(RecoverableConstraints::Nothing),
+            recover_width: Cell::new(None),
         }
     }
 
@@ -87,24 +69,8 @@ impl ConstraintWriter {
         (self.line(), self.col())
     }
 
-    pub fn with_recoverable_constraints<T>(
-        &self,
-        recoverable_constraints: RecoverableConstraints,
-        scope: impl FnOnce() -> T,
-    ) -> T {
-        if recoverable_constraints <= self.recoverable_constraints.get() {
-            return scope();
-        }
-        self.recoverable_constraints
-            .with_replaced(recoverable_constraints, scope)
-    }
-
-    pub fn with_recoverable_width<T>(&self, scope: impl FnOnce() -> T) -> T {
-        self.with_recoverable_constraints(self.recoverable_width(), scope)
-    }
-
-    pub fn recoverable_constraints(&self) -> RecoverableConstraints {
-        self.recoverable_constraints.get()
+    pub fn with_recover_width<T>(&self, scope: impl FnOnce() -> T) -> T {
+        self.recover_width.with_replaced(Some(self.line()), scope)
     }
 
     pub fn is_enforcing_width(&self) -> bool {
@@ -115,11 +81,10 @@ impl ConstraintWriter {
         {
             return true;
         }
-        match self.recoverable_constraints.get() {
-            RecoverableConstraints::Nothing => false,
-            RecoverableConstraints::Newline => false,
-            RecoverableConstraints::Width { line } => line == self.line(),
+        if self.recover_width.get() == Some(self.line()) {
+            return true;
         }
+        false
     }
 
     pub fn token(&self, token: &str) -> FormatResult {
@@ -189,10 +154,6 @@ impl ConstraintWriter {
 
     pub fn with_taken_buffer(&self, f: impl FnOnce(&mut String)) {
         self.buffer.with_taken(f)
-    }
-
-    pub fn recoverable_width(&self) -> RecoverableConstraints {
-        RecoverableConstraints::Width { line: self.line() }
     }
 
     #[track_caller]

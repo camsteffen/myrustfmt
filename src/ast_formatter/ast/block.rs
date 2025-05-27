@@ -39,11 +39,12 @@ impl AstFormatter {
                             Ok(())
                         })
                     })
-                    .otherwise(|| {
+                    .next(|| {
                         self.block_expr(true, block)?;
                         self.tail(tail)?;
                         Ok(())
-                    })?
+                    })
+                    .result()?
             }
         }
         Ok(())

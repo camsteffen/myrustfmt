@@ -49,6 +49,7 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
                 test_kind = Some(match value {
                     "before-after" => TestKindRaw::BeforeAfter,
                     "breakpoint" => TestKindRaw::Breakpoint,
+                    "breakpoint-no-change" => TestKindRaw::BreakpointNoChange,
                     "no-change" => TestKindRaw::NoChange,
                     _ => return Err(format!("invalid test-kind: {value:?}").into()),
                 });
@@ -78,14 +79,14 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
             let (before, after) = parse_before_after(source)?;
             TestKind::Breakpoint { before, after }
         }
-        TestKindRaw::NoChange => {
-            for line in source.lines() {
-                if let Some((_, comment)) = line.split_once("//") {
-                    if comment.to_ascii_lowercase().contains(":after:") {
-                        return Err("Unexpected control comment".into());
-                    }
-                }
+        TestKindRaw::BreakpointNoChange => {
+            expect_no_after(source)?;
+            TestKind::BreakpointNoChange {
+                formatted: source.to_owned(),
             }
+        }
+        TestKindRaw::NoChange => {
+            expect_no_after(source)?;
             TestKind::NoChange {
                 formatted: source.to_owned(),
             }
@@ -111,6 +112,17 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
     Ok(())
 }
 
+fn expect_no_after(source: &str) -> TestResult {
+    for line in source.lines() {
+        if let Some((_, comment)) = line.split_once("//") {
+            if comment.to_ascii_lowercase().contains(":after:") {
+                return Err("Unexpected control comment".into());
+            }
+        }
+    }
+    Ok(())
+}
+
 fn parse_before_after(source: &str) -> TestResult<(String, String)> {
     let delim = "\n\n// :after:\n\n";
     let Some(index) = source.find(delim) else {
@@ -127,7 +139,12 @@ fn small_test(test: &Test) -> TestResult {
         TestKind::Breakpoint { before, after } => {
             assert!(!test.expect_errors);
             assert!(test.max_width.is_none());
-            breakpoint_test(before, after)?
+            breakpoint_test(before, after, false)?
+        }
+        TestKind::BreakpointNoChange { formatted } => {
+            assert!(test.expect_errors);
+            assert!(test.max_width.is_none());
+            breakpoint_test(formatted, formatted, true)?
         }
         TestKind::NoChange { formatted } => {
             let formatted = formatted.trim();
@@ -170,6 +187,7 @@ enum TestKind {
     /// string. The result should equal the "after" string. Also, the "before" string is formatted
     /// with exactly a large enough max width to test that it is not changed.
     Breakpoint { before: String, after: String },
+    BreakpointNoChange { formatted: String },
     NoChange { formatted: String },
     BeforeAfter { before: String, after: String },
 }
@@ -177,10 +195,11 @@ enum TestKind {
 enum TestKindRaw {
     BeforeAfter,
     Breakpoint,
+    BreakpointNoChange,
     NoChange,
 }
 
-fn breakpoint_test(before: &str, after: &str) -> TestResult {
+fn breakpoint_test(before: &str, after: &str, expect_errors_after: bool) -> TestResult {
     let before = before.trim();
     let after = after.trim();
     let initial_used_width = before.lines().map(|line| line.len() as u16).max().unwrap();
@@ -197,7 +216,7 @@ fn breakpoint_test(before: &str, after: &str) -> TestResult {
         Some(initial_used_width - 1),
         after,
         "after max width reduction",
-        false,
+        expect_errors_after,
     )?;
     Ok(())
 }

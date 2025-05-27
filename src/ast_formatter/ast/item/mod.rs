@@ -219,13 +219,14 @@ impl AstFormatter {
                         Ok(false)
                     })
                 })
-                .otherwise(|| {
+                .next(|| {
                     self.indented(|| {
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         first_part()?;
                         Ok(true)
                     })
-                })?
+                })
+                .result()?
         } else {
             self.out.space()?;
             first_part()?;
@@ -234,19 +235,21 @@ impl AstFormatter {
         if impl_.of_trait.is_some() {
             self.backtrack()
                 .next(|| {
-                    self.out.space()?;
-                    self.out.token_space("for")?;
-                    self.ty(&impl_.self_ty)?;
-                    Ok(())
+                    self.space_could_wrap_indent(|| {
+                        self.out.token_space("for")?;
+                        self.ty(&impl_.self_ty)?;
+                        Ok(())
+                    })
                 })
-                .otherwise(|| {
+                .next(|| {
                     self.indented_optional(!indented, || {
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         self.out.token_space("for")?;
                         self.ty(&impl_.self_ty)?;
                         Ok(())
                     })
-                })?;
+                })
+                .result()?;
         }
         if !self.where_clause(&impl_.generics.where_clause, true)? {
             self.out.space()?;

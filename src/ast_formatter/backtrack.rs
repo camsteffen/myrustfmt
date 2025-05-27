@@ -1,15 +1,13 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraint_writer::RecoverableConstraints;
 use crate::error::FormatResult;
 use crate::source_formatter::checkpoint::Checkpoint;
 
 impl AstFormatter {
-    // todo should backtrack be specific to a constraint? unless_too_wide(..).otherwise(..)
     /// See [`Backtrack`]
     pub fn backtrack<T>(&self) -> Backtrack<T> {
         Backtrack {
             af: self,
-            state: BacktrackState::Init,
+            state: None,
         }
     }
 
@@ -19,7 +17,10 @@ impl AstFormatter {
     ) -> Backtrack<'a, T> {
         Backtrack {
             af: self,
-            state: BacktrackState::Incomplete(checkpoint),
+            state: Some(BacktrackState {
+                checkpoint,
+                last_result: None,
+            }),
         }
     }
 }
@@ -33,75 +34,56 @@ impl AstFormatter {
 #[must_use]
 pub struct Backtrack<'a, T = ()> {
     af: &'a AstFormatter,
-    state: BacktrackState<'a, T>,
+    state: Option<BacktrackState<'a, T>>,
 }
 
-enum BacktrackState<'a, T> {
-    Init,
-    Incomplete(Checkpoint<'a>),
-    Done(FormatResult<T>),
+struct BacktrackState<'a, T> {
+    checkpoint: Checkpoint<'a>,
+    last_result: Option<FormatResult<T>>,
 }
 
 impl<T> Backtrack<'_, T> {
-    /// Provides the next formatting strategy, but not the final one.
     pub fn next(mut self, strategy: impl FnOnce() -> FormatResult<T>) -> Self {
-        self.do_next(self.af.out.recoverable_width(), strategy);
+        self.do_next(strategy);
         self
-    }
-
-    pub fn next_with_constraint_recovery_mode(
-        mut self,
-        recoverable_constraints: RecoverableConstraints,
-        strategy: impl FnOnce() -> FormatResult<T>,
-    ) -> Self {
-        self.do_next(recoverable_constraints, strategy);
-        self
-    }
-
-    fn do_next(
-        &mut self,
-        recoverable_constraints: RecoverableConstraints,
-        strategy: impl FnOnce() -> FormatResult<T>,
-    ) {
-        match self.state {
-            BacktrackState::Init => {
-                self.state = BacktrackState::Incomplete(self.af.out.checkpoint());
-            }
-            BacktrackState::Incomplete(ref checkpoint) => {
-                self.af.out.restore_checkpoint(checkpoint);
-            }
-            BacktrackState::Done(..) => return,
-        }
-        let result = self.af.out.with_recoverable_constraints(recoverable_constraints, strategy);
-        if result.is_ok() {
-            self.state = BacktrackState::Done(result);
-        }
     }
 
     pub fn next_if(mut self, condition: bool, strategy: impl Fn() -> FormatResult<T>) -> Self {
         if condition {
-            self.do_next(self.af.out.recoverable_width(), strategy);
+            self.do_next(strategy);
         }
         self
     }
 
     pub fn next_opt(mut self, strategy: Option<impl FnOnce() -> FormatResult<T>>) -> Self {
         if let Some(strategy) = strategy {
-            self.do_next(self.af.out.recoverable_width(), strategy);
+            self.do_next(strategy);
         }
         self
     }
 
-    /// Provides the final formatting strategy and returns the result of the backtracking chain.
-    /// This is a required terminal operation.
-    pub fn otherwise(self, strategy: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        match self.state {
-            BacktrackState::Init => strategy(),
-            BacktrackState::Incomplete(checkpoint) => {
-                self.af.out.restore_checkpoint(&checkpoint);
-                strategy()
+    pub fn result(self) -> FormatResult<T> {
+        self.state.and_then(|state| state.last_result).unwrap()
+    }
+
+    fn do_next(&mut self, strategy: impl FnOnce() -> FormatResult<T>) {
+        let state = match &mut self.state {
+            None => {
+                let checkpoint = self.af.out.checkpoint();
+                self.state.insert(BacktrackState {
+                    checkpoint,
+                    last_result: None,
+                })
             }
-            BacktrackState::Done(result) => result,
-        }
+            Some(state) => {
+                if matches!(state.last_result, Some(Ok(_))) {
+                    return;
+                }
+                self.af.out.restore_checkpoint(&state.checkpoint);
+                state
+            }
+        };
+        let result = strategy();
+        state.last_result = Some(result);
     }
 }

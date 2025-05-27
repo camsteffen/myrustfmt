@@ -1,15 +1,14 @@
 mod binary_expr;
 mod r#match;
-mod postfix_chain;
+mod postfix;
 
-use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::options::{ListOptions, ListWrapToFit};
 use crate::ast_formatter::list::{Braces, ListItemContext, ListStrategy};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
-use crate::ast_utils::postfix_expr_kind;
-use crate::constraint_writer::RecoverableConstraints;
+use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
+use crate::ast_utils::{plain_block, postfix_expr_kind};
 use crate::constraints::VStruct;
 use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -191,6 +190,13 @@ impl AstFormatter {
         Ok(())
     }
 
+    pub fn expr_force_plain_block(&self, expr: &ast::Expr) -> FormatResult {
+        match plain_block(expr) {
+            Some(block) => self.block_expr(false, block),
+            None => self.expr_add_block(expr),
+        }
+    }
+
     pub fn expr_list_item(
         &self,
         is_call: bool,
@@ -212,8 +218,8 @@ impl AstFormatter {
                         let mut vstructs =
                             VStruct::BrokenIndent | VStruct::ControlFlow | VStruct::HangingIndent;
                         if lcx.len > 1 {
-                            // don't overflow nested lists when the outer list has multiple items
-                            // (a, b, c, (x,
+                            // avoid this:
+                            // foo(a, b, c, bar(x,
                             //     y,
                             //     z,
                             // ))
@@ -229,20 +235,18 @@ impl AstFormatter {
                             Ok(())
                         })
                     }
-                    // on separate lines, enforce IndentMiddle by adding a block
+                    // add a block to some expressions in vertical lists
                     ListStrategy::Vertical if lcx.len > 1 => {
                         af.backtrack()
                             // If it's too wide, adding a block won't help.
                             // The block is only for ensuring a "hanging indent"-compliant shape.
-                            .next_with_constraint_recovery_mode(
-                                RecoverableConstraints::Newline,
-                                || af.disallow_vstructs(VStruct::BrokenIndent, format),
-                            )
-                            .otherwise(|| {
+                            .next(|| af.disallow_vstructs(VStruct::BrokenIndent, format))
+                            .next(|| {
                                 af.expr_add_block(expr)?;
                                 af.tail(tail)?;
                                 Ok(())
                             })
+                            .result()
                     }
                     _ => format(),
                 }
@@ -277,12 +281,14 @@ impl AstFormatter {
         self.expr(target)?;
         self.backtrack()
             .next(|| {
-                self.out.space_token_space("as")?;
-                self.ty(ty)?;
-                self.tail(tail)?;
-                Ok(())
+                self.space_could_wrap_indent(|| {
+                    self.out.token_space("as")?;
+                    self.ty(ty)?;
+                    self.tail(tail)?;
+                    Ok(())
+                })
             })
-            .otherwise(|| {
+            .next(|| {
                 self.has_vstruct(VStruct::HangingIndent, || {
                     self.indented(|| {
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
@@ -292,7 +298,8 @@ impl AstFormatter {
                         Ok(())
                     })
                 })
-            })?;
+            })
+            .result()?;
         Ok(())
     }
 
@@ -300,16 +307,47 @@ impl AstFormatter {
         self.out.token("(")?;
         self.backtrack()
             .next(|| {
-                self.disallow_vstructs(VStruct::HangingIndent, || self.expr(inner))?;
-                self.out.token(")")?;
-                self.tail(tail)?;
-                Ok(())
+                self.disallow_vstructs(VStruct::HangingIndent, || {
+                    let expr_start = self.out.col();
+                    self.expr_tail(
+                        inner,
+                        &self.tail_fn(|af| {
+                            let end_start = self.out.col();
+                            let before_end = self.out.checkpoint();
+                            let Err(err) = self.out.with_recover_width(|| -> FormatResult {
+                                af.out.token(")")?;
+                                af.tail(tail)?;
+                                Ok(())
+                            }) else {
+                                return Ok(());
+                            };
+                            if err.kind != ConstraintErrorKind::WidthLimitExceeded {
+                                return Err(err);
+                            }
+                            let expr_width = end_start - expr_start;
+                            let end_end = self.out.col();
+                            let end_width = end_end - end_start;
+                            let next_inside_end = INDENT_WIDTH + expr_width;
+                            if next_inside_end.max(end_width)
+                                < end_end - self.out.total_indent.get()
+                            {
+                                // multi-line strategy
+                                return Err(err);
+                            }
+                            self.out.restore_checkpoint(&before_end);
+                            af.out.token(")")?;
+                            self.tail(tail)?;
+                            Ok(())
+                        }),
+                    )
+                })
             })
-            .otherwise(|| {
+            .next(|| {
                 self.enclosed_after_opening(")", || self.expr(inner))?;
                 self.tail(tail)?;
                 Ok(())
-            })?;
+            })
+            .result()?;
         Ok(())
     }
 
@@ -329,11 +367,9 @@ impl AstFormatter {
                     let Some(end) = end else {
                         return af.tail(tail);
                     };
-                    if af.out.line() == first_line {
-                        af.expr_tail(end, tail)?;
-                    } else {
-                        self.has_vstruct(VStruct::BrokenIndent, || af.expr_tail(end, tail))?;
-                    }
+                    self.has_vstruct_if(af.out.line() > first_line, VStruct::BrokenIndent, || {
+                        af.expr_tail(end, tail)
+                    })?;
                     Ok(())
                 }),
             )?;
@@ -453,7 +489,10 @@ impl AstFormatter {
                 Ok(())
             };
 
-            self.backtrack().next_opt(single_line).otherwise(multi_line)
+            self.backtrack()
+                .next_opt(single_line)
+                .next(multi_line)
+                .result()
         })
     }
 
@@ -470,11 +509,12 @@ impl AstFormatter {
                 .next_if(self.out.line() == first_line || self.out.last_line_is_closers(), || {
                     self.with_single_line(|| self.out.space_token("{"))
                 })
-                .otherwise(|| {
+                .next(|| {
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     self.out.token("{")?;
                     Ok(())
-                })?;
+                })
+                .result()?;
             Ok(self.out.line() == first_line)
         })
     }

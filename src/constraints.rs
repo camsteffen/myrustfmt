@@ -140,8 +140,9 @@ impl Constraints {
         values: impl Into<EnumSet<VStruct>>,
         scope: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
-        let next = self.disallowed_vstructs.get() | values;
-        self.disallowed_vstructs.with_replaced(next, scope)
+        let values = values.into();
+        let prev = self.disallowed_vstructs.get();
+        self.disallowed_vstructs.with_replaced(prev | values, scope)
     }
 
     /// Declares that the output in the given scope has the given Shape.
@@ -153,7 +154,10 @@ impl Constraints {
         vstruct: VStruct,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        self.with_single_line_if(self.disallowed_vstructs.get().contains(vstruct), scope)
+        if self.single_line.get() || !self.disallowed_vstructs.get().contains(vstruct) {
+            return scope();
+        }
+        self.single_line.with_replaced(true, scope)
     }
 
     pub fn with_width_limit<T>(&self, width_limit: WidthLimit, scope: impl FnOnce() -> T) -> T {
@@ -171,18 +175,6 @@ impl Constraints {
 
     pub fn with_replace_max_width<T>(&self, max_width: HSize, scope: impl FnOnce() -> T) -> T {
         self.max_width.with_replaced(max_width, scope)
-    }
-
-    pub fn with_single_line_if<T>(
-        &self,
-        condition: bool,
-        scope: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        if condition {
-            self.single_line.with_replaced(true, scope)
-        } else {
-            scope()
-        }
     }
 
     pub fn with_replace_width_limit<T>(

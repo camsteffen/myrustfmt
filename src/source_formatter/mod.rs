@@ -3,8 +3,8 @@ mod source_reader;
 mod whitespace;
 
 use self::source_reader::SourceReader;
+use crate::constraint_writer::ConstraintWriter;
 use crate::constraint_writer::checkpoint::ConstraintWriterLookahead;
-use crate::constraint_writer::{ConstraintWriter, RecoverableConstraints};
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::{BufferedErrorEmitter, Error};
@@ -48,10 +48,7 @@ macro_rules! delegate_to_constraint_writer {
 delegate_to_constraint_writer! {
     pub fn constraints(&self) -> &Constraints;
     pub fn current_max_width(&self) -> HSize;
-    pub fn recoverable_constraints(&self) -> RecoverableConstraints;
-    pub fn recoverable_width(&self) -> RecoverableConstraints;
-    pub fn with_recoverable_constraints<T>(&self, recoverable_constraints: RecoverableConstraints, scope: impl FnOnce() -> T) -> T;
-    pub fn with_recoverable_width<T>(&self, scope: impl FnOnce() -> T) -> T;
+    pub fn with_recover_width<T>(&self, scope: impl FnOnce() -> T) -> T;
     pub fn line(&self) -> u32;
     pub fn col(&self) -> HSize;
     pub fn line_col(&self) -> (u32, HSize);

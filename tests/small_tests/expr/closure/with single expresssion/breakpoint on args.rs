@@ -12,5 +12,7 @@ fn test() {
     |
         arg,
         arg,
-    | result;
+    | {
+        result
+    };
 }

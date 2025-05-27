@@ -85,7 +85,12 @@ impl AstFormatter {
             )?,
             ast::PatKind::Rest => self.out.token("..")?,
             ast::PatKind::Never => todo!(),
-            ast::PatKind::Paren(_) => todo!(),
+            ast::PatKind::Paren(ref inner) => {
+                // todo breakpoint
+                self.out.token("(")?;
+                self.pat(inner)?;
+                self.out.token(")")?;
+            }
             ast::PatKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,
             ast::PatKind::Err(_) => todo!(),
         }

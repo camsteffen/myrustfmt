@@ -43,11 +43,7 @@ impl AstFormatter {
         self.out.space_token("=")?;
         let checkpoint_after_eq = self.out.checkpoint();
 
-        let (force_wrap, lookahead) = if self
-            .out
-            .with_recoverable_width(|| self.out.space())
-            .is_err()
-        {
+        let (force_wrap, lookahead) = if self.out.with_recover_width(|| self.out.space()).is_err() {
             (true, None)
         } else {
             let checkpoint_after_space = self.out.checkpoint();
@@ -63,12 +59,13 @@ impl AstFormatter {
 
         self.backtrack_from_checkpoint(checkpoint_after_eq)
             .next_if(!force_wrap, || {
-                self.out.space()?;
-                self.expr(expr)?;
-                self.tail(tail)?;
-                Ok(())
+                self.space_could_wrap_indent(|| {
+                    self.expr(expr)?;
+                    self.tail(tail)?;
+                    Ok(())
+                })
             })
-            .otherwise(|| {
+            .next(|| {
                 self.indented(|| {
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     if let Some(lookahead) = lookahead {
@@ -79,7 +76,8 @@ impl AstFormatter {
                     }
                     Ok(())
                 })
-            })?;
+            })
+            .result()?;
         Ok(())
     }
 
@@ -122,7 +120,8 @@ impl AstFormatter {
             };
             self.backtrack()
                 .next_opt(else_block_horizontal)
-                .otherwise(else_block_vertical)?;
+                .next(else_block_vertical)
+                .result()?;
             Ok(())
         };
         let next_line_else = || -> FormatResult {
@@ -133,11 +132,11 @@ impl AstFormatter {
             Ok(())
         };
         self.backtrack()
-            .next_if(
-                is_single_line_init || self.out.last_line_is_closers(),
-                same_line_else,
-            )
-            .otherwise(next_line_else)?;
+            .next_if(is_single_line_init || self.out.last_line_is_closers(), || {
+                self.out.with_recover_width(same_line_else)
+            })
+            .next(next_line_else)
+            .result()?;
         Ok(())
     }
 }

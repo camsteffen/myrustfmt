@@ -55,7 +55,7 @@ impl AstFormatter {
                         Ok(())
                     })
                 })
-                .otherwise(|| {
+                .next(|| {
                     let _indent_guard = indent_guard.unwrap_or_else(|| self.begin_indent());
                     for (op, expr) in chain {
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
@@ -65,6 +65,7 @@ impl AstFormatter {
                     self.tail(tail)?;
                     Ok(())
                 })
+                .result()
         })
     }
 }

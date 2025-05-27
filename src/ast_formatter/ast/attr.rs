@@ -37,7 +37,7 @@ impl AstFormatter {
             self.with_replace_width_limit(None, || self.out.copy_span(span))?;
             self.tail(tail)?;
             // todo
-        } else if self.out.recoverable_constraints().is_nothing() || true {
+        } else if /*self.out.recover().is_none() ||*/ true {
             // todo don't do this in expr list item, when max width is not enforced
             self.with_copy_span_fallback(span, format, tail)?;
         } else {

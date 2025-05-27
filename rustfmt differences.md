@@ -1,7 +1,4 @@
-* When a closure body begins with `match`, `loop` or a multi-line struct literal,
-  it is wrapped with a block.
 * A chain of binary operators of equal precedence are treated as a single chain.
-* A dot chain of only two elements (e.g. expr.field) may be wrapped and is not exempt from chain_width.
 * A method call with one argument that is a function call is not exempt from fn_call_width.
 * When `impl` generics are formatted on multiple lines, the rest of the header is not indented.
 * Struct patterns are formatted consistently with struct expressions. Rustfmt gives struct patterns
@@ -18,6 +15,7 @@
 * A match arm with a guard on a separate line may have its body on one line without a block
 * A multi-line if/else in a call argument is wrapped instead of continuing after the parenthesis
 * When breaking nested function calls into multiple lines, prefers to add breaks towards the outermost call
+* Some expressions are not combinable with a list with one item
 
 `let` statements
 * If the expression does not fit in the first line, prefer introducing line breaks within the first
@@ -29,7 +27,8 @@ Closures
 * Closure arguments on multiple lines are formatted like other lists, not with visual style.
 
 Chains
-* Chains may include index operators
+* A dot chain of only two elements (e.g. expr.field) may be wrapped and is not exempt from chain_width.
+* Dot chains may include index operators
 * Multi-line chains as a match arm body are always wrapped with a block. Rustfmt makes an exception when the chain
   ends in a multi-line method call (this is probably a bug).
 * Multi-line chains with no indent as a list item (e.g. array element) are wrapped with a block

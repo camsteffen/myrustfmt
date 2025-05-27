@@ -90,7 +90,7 @@ fn write_constraint_error(
         ConstraintErrorKind::MultiLineCommentNotAllowed => {
             write!(f, "multi-line comment not allowed")?
         }
-        ConstraintErrorKind::NextStrategy => write!(f, "unhandled NextStrategy error")?,
+        kind @ ConstraintErrorKind::NextStrategy => write!(f, "unhandled {kind:?}")?,
         ConstraintErrorKind::NewlineNotAllowed => write!(f, "newline not allowed")?,
         ConstraintErrorKind::WidthLimitExceeded => write!(f, "width limit exceeded")?,
     }

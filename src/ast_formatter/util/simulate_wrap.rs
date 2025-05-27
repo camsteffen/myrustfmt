@@ -27,7 +27,7 @@ impl AstFormatter {
         wrap_for_longer_first_line: bool,
         scope: impl FnOnce() -> FormatResult,
     ) -> SimulateWrapResult {
-        self.out.with_recoverable_width(|| {
+        self.out.with_recover_width(|| {
             let col = self.out.col();
             let wrap_indent_col = self.out.total_indent.get() + INDENT_WIDTH;
             let (result, used_extra_width) = match col.checked_sub(wrap_indent_col) {

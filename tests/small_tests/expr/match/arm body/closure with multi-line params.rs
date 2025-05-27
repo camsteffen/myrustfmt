@@ -21,7 +21,9 @@ fn test() {
                 arrrrrrrrrrrrrrrrrrrrrrrrrrrrg,
                 arrrrrrrrrrrrrrrrrrrrrrrrrrrrg,
                 arrrrrrrrrrrrrrrrrrrrrrrrrrrrg,
-            | x
+            | {
+                x
+            }
         }
     }
 }
