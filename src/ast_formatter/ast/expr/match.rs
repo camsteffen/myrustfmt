@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
-use crate::ast_utils::{arm_body_requires_block, plain_block};
+use crate::ast_utils::plain_block;
 use crate::constraints::VStruct;
 use crate::error::FormatResult;
 use crate::whitespace::VerticalWhitespaceMode;
@@ -87,9 +87,7 @@ impl AstFormatter {
 
     fn arm_body(&self, body: &ast::Expr) -> FormatResult {
         self.skip_single_expr_blocks(body, |body| {
-            if arm_body_requires_block(body) {
-                self.expr_add_block(body)
-            } else if plain_block(body).is_some() {
+            if plain_block(body).is_some() {
                 self.expr(body)
             } else {
                 self.arm_body_maybe_add_block(body)
@@ -127,7 +125,7 @@ impl AstFormatter {
         // todo exclude comma for block-like expressions?
         self.backtrack_from_checkpoint(checkpoint)
             .next_if(!force_block, || {
-                self.disallow_vstructs(VStruct::NonBlockIndent, || {
+                self.disallow_vstructs(VStruct::ControlFlow | VStruct::NonBlockIndent, || {
                     self.expr_tail(body, self.tail_fn(|af| af.out.token_insert(",")).as_ref())
                 })
             })

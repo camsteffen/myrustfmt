@@ -50,7 +50,7 @@ impl WidthLimit {
 }
 
 /// Specifies a set of code formatting shapes, used to restrict what formatting strategies may be
-/// used in a given context. Each variant is a superset of all preceding variants.
+/// used in a given context.
 ///
 /// It is generally enforced in two ways:
 ///  1. The SingleLine variant causes an error to be raised upon attempting to write a newline.
@@ -65,23 +65,24 @@ impl WidthLimit {
 ///    output _would_ be if a more permissive shape were enabled.
 #[derive(Debug, EnumSetType)]
 pub enum VStruct {
-    Attribute,
     Closure,
     /// Control flow expressions (if / for / loop / while)
     ControlFlow,
-    /// `match` expressions
-    Match,
     /// All kinds of lists (e.g. arrays, tuples, call arguments)
     List,
+    /// `match` expressions
+    Match,
     // todo include structs with multi-line headers
     /// "block indent" here means that the first and last lines of the node are not indented, and
     /// all lines in between are indented. Examples:
-    ///  * Attributes (multiple not indented lines)
+    ///  * Nodes with attributes
     ///  * Control flow expressions where the header is multiple lines
     ///  * if/else expressions
     ///  * Multi-line dot chains and infix chains (with or without hanging indentation)
     ///  * Range expression where both sides are multiple lines
     ///  * Call expression where both the function and the arguments are multiple lines
+    ///  * Cast expression with wrapped `as`
+    ///  * Closure expressions with arguments on multiple lines
     NonBlockIndent,
 }
 

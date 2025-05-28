@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::ast::item::MaybeItem;
 use crate::ast_formatter::tail::Tail;
-use crate::ast_utils::{control_flow_expr_kind, plain_block};
+use crate::ast_utils::{jump_expr_kind, plain_block};
 use crate::error::FormatResult;
 use crate::util::whitespace_utils::is_whitespace;
 use crate::whitespace::VerticalWhitespaceMode;
@@ -102,7 +102,7 @@ impl AstFormatter {
             ast::StmtKind::Item(item) => self.item(item),
             ast::StmtKind::Expr(expr) => {
                 let tail = match expr.kind {
-                    control_flow_expr_kind!() => self.tail_fn(|af| af.out.token_insert(";")),
+                    jump_expr_kind!() => self.tail_fn(|af| af.out.token_insert(";")),
                     _ => None,
                 };
                 self.expr_tail(expr, tail.as_ref())

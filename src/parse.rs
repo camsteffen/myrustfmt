@@ -20,10 +20,10 @@ pub struct ParseModuleResult {
     pub submodules: Vec<Submodule>,
 }
 
-pub fn parse_module(
-    crate_source: CrateSource,
-    relative: Option<Ident>,
-) -> Result<ParseModuleResult, ErrorGuaranteed> {
+pub fn parse_module(crate_source: CrateSource, relative: Option<Ident>) -> Result<
+    ParseModuleResult,
+    ErrorGuaranteed,
+> {
     let module;
     let submodules;
     let source_file;

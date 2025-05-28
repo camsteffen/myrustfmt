@@ -3,7 +3,7 @@ mod r#match;
 mod postfix;
 
 use crate::ast_formatter::list::ListRest;
-use crate::ast_formatter::list::options::{ListOptions, ListWrapToFit};
+use crate::ast_formatter::list::options::{ListOptions, ListShape, ListWrapToFit};
 use crate::ast_formatter::list::{Braces, ListItemContext, ListStrategy};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
@@ -30,7 +30,7 @@ impl AstFormatter {
     }
 
     #[instrument(name = "expr", skip_all, fields(kind=expr_kind_name(expr)))]
-    pub fn expr_after_attrs(&self, expr: &ast::Expr, tail: Tail) -> FormatResult {
+    fn expr_after_attrs(&self, expr: &ast::Expr, tail: Tail) -> FormatResult {
         let mut tail_opt = Some(tail);
         let mut take_tail = || tail_opt.take().unwrap();
         match expr.kind {
@@ -475,19 +475,29 @@ impl AstFormatter {
     }
 
     fn struct_expr(&self, struct_: &ast::StructExpr, tail: Tail) -> FormatResult {
+        let first_line = self.out.line();
         self.qpath(&struct_.qself, &struct_.path, true)?;
-        self.out.space()?;
-        // todo indent middle and multi-line qpath?
-        self.list(
-            Braces::Curly,
-            &struct_.fields,
-            Self::expr_field,
-            ListOptions::new()
-                // todo not wide enough?
-                .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
-                .rest(ListRest::from_struct_rest(&struct_.rest))
-                .tail(tail),
-        )?;
+        self.has_vstruct_if(self.out.line() > first_line, VStruct::NonBlockIndent, || {
+            self.out.space()?;
+            self.list(
+                Braces::Curly,
+                &struct_.fields,
+                Self::expr_field,
+                ListOptions::new()
+                    // todo not wide enough?
+                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
+                    .rest(ListRest::from_struct_rest(&struct_.rest))
+                    .shape(
+                        if self.out.line() > first_line {
+                            ListShape::Vertical
+                        } else {
+                            ListShape::Flexible
+                        },
+                    )
+                    .tail(tail),
+            )?;
+            Ok(())
+        })?;
         Ok(())
     }
 

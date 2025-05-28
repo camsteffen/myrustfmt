@@ -50,8 +50,8 @@ impl AstFormatter {
                 (Ok(()), false) => SimulateWrapResult::Ok,
                 // the output will fit in a single line if wrapped
                 (Ok(()), true) => SimulateWrapResult::Wrap { single_line: true },
-                // If we used extra width and still exceeded the max width, wrapping is preferred to
-                // in order to exceed the max width by not as much.
+                // If we used extra width and still exceeded the max width, wrapping is preferred in
+                // order to exceed the max width by a lesser amount.
                 // If we used extra width and encountered a newline-related error, we can infer that
                 // wrapping allows for more code to fit in the first line.
                 (Err(e), true)

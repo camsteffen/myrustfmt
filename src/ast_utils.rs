@@ -12,7 +12,7 @@ use rustc_span::sym;
 // }
 // pub(crate) use block_like_expr_kind;
 
-macro_rules! control_flow_expr_kind {
+macro_rules! jump_expr_kind {
     () => {
         ::rustc_ast::ast::ExprKind::Become(..)
             | ::rustc_ast::ast::ExprKind::Break(..)
@@ -29,7 +29,7 @@ macro_rules! control_flow_expr_kind {
             | ::rustc_ast::ast::ExprKind::Yield(Some($target))
     };
 }
-pub(crate) use control_flow_expr_kind;
+pub(crate) use jump_expr_kind;
 
 // note: ExprKind::Cast isn't here since it is lower precedence and so it doesn't chain
 macro_rules! postfix_meta {
@@ -74,26 +74,6 @@ macro_rules! postfix_defs {
     };
 }
 postfix_meta!(postfix_defs);
-
-/// Returns true if the given arm body expression requires to be wrapped in a block.
-/// For false cases, we may still decide to add a block later in the process.
-pub fn arm_body_requires_block(expr: &ast::Expr) -> bool {
-    match &expr.kind {
-        // if/for/while headers get their own line for scan-ability
-        // Also `if` could be easily mistaken for a guard otherwise
-        ast::ExprKind::If(..) | ast::ExprKind::ForLoop { .. } | ast::ExprKind::While(..) => true,
-
-        // prefix/postfix operations - see the underlying expression
-        ::rustc_ast::ast::ExprKind::AddrOf(_, _, target)
-        | ::rustc_ast::ast::ExprKind::Unary(_, target)
-        | ::rustc_ast::ast::ExprKind::Cast(target, _)
-        | control_flow_expr_kind!(Some(target)) => arm_body_requires_block(target),
-        postfix_expr_kind!() => arm_body_requires_block(postfix_expr_receiver(expr)),
-
-        // everything else - no block required
-        _ => false,
-    }
-}
 
 pub fn is_rustfmt_skip(attr: &ast::Attribute) -> bool {
     attr.path_matches(&[sym::rustfmt, sym::skip])

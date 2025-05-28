@@ -33,10 +33,9 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn space_or_wrap_indent_then(
-        &self,
-        then: impl Fn() -> FormatResult,
-    ) -> FormatResult<Option<IndentGuard>> {
+    pub fn space_or_wrap_indent_then(&self, then: impl Fn() -> FormatResult) -> FormatResult<
+        Option<IndentGuard>,
+    > {
         let checkpoint = self.out.checkpoint();
         let first_line = self.out.line();
         let indent_guard = self.begin_indent();

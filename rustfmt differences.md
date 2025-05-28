@@ -12,10 +12,13 @@
   This formatter always puts all fields on separate lines if the struct does not fit on one line.
 * Large expressions in an index operator are broken into a separate line
 * Large expressions in parentheses are broken into a separate line
-* A match arm with a guard on a separate line may have its body on one line without a block
 * A multi-line if/else in a call argument is wrapped instead of continuing after the parenthesis
 * When breaking nested function calls into multiple lines, prefers to add breaks towards the outermost call
 * Single-item arrays and tuples are not combinable with multi-line expressions. The element is wrapped and indented.
+* A single call argument cannot be combined with control flow expressions
+
+`match`
+ * A match arm may not start with `loop`
 
 `let` statements
 * If the expression does not fit in the first line, prefer introducing line breaks within the first

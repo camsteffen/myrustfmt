@@ -172,7 +172,7 @@ impl AstFormatter {
         // args and return type all on one line
         self.backtrack()
             .next(|| {
-                self.with_single_line(|| {
+                self.out.with_recover_width(|| {
                     params(ListShape::Horizontal)?;
                     self.fn_ret_ty(&fn_decl.output)?;
                     self.tail(tail)?;
@@ -245,15 +245,7 @@ impl AstFormatter {
         match output {
             ast::FnRetTy::Default(_) => {}
             ast::FnRetTy::Ty(ty) => {
-                self.backtrack()
-                    // todo recover width?
-                    .next(|| self.out.space_token_space("->"))
-                    .next(|| {
-                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                        self.out.token_space("->")?;
-                        Ok(())
-                    })
-                    .result()?;
+                self.out.space_token_space("->")?;
                 self.ty(ty)?;
             }
         }
