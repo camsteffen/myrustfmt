@@ -24,15 +24,6 @@ impl AstFormatter {
     }
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: Tail) -> FormatResult {
-        if !expr.attrs.is_empty()
-            && self
-                .constraints()
-                .disallowed_vstructs
-                .get()
-                .contains(VStruct::HangingIndent)
-        {
-            return Err(ConstraintErrorKind::NextStrategy.into());
-        }
         self.with_attrs_tail(&expr.attrs, expr.span, tail, || {
             self.expr_after_attrs(expr, tail)
         })
@@ -228,7 +219,7 @@ impl AstFormatter {
                 })
             })
             .next(|| {
-                self.has_vstruct(VStruct::HangingIndent, || {
+                self.has_vstruct(VStruct::NonBlockIndent, || {
                     self.indented(|| {
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         self.out.token_space("as")?;
@@ -246,7 +237,7 @@ impl AstFormatter {
         self.out.token("(")?;
         self.backtrack()
             .next(|| {
-                self.disallow_vstructs(VStruct::HangingIndent, || {
+                self.disallow_vstructs(VStruct::NonBlockIndent, || {
                     let expr_start = self.out.col();
                     self.expr_tail(
                         inner,
@@ -307,7 +298,7 @@ impl AstFormatter {
                     let Some(end) = end else {
                         return af.tail(tail);
                     };
-                    self.has_vstruct_if(af.out.line() > first_line, VStruct::BrokenIndent, || {
+                    self.has_vstruct_if(af.out.line() > first_line, VStruct::NonBlockIndent, || {
                         af.expr_tail(end, tail)
                     })?;
                     Ok(())
@@ -340,7 +331,7 @@ impl AstFormatter {
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
         let first_line = self.out.line();
         self.expr_tail(func, self.tail_token("(").as_ref())?;
-        self.has_vstruct_if(self.out.line() > first_line, VStruct::BrokenIndent, || {
+        self.has_vstruct_if(self.out.line() > first_line, VStruct::NonBlockIndent, || {
             self.call_args_after_open_paren(args, tail)
         })?;
         Ok(())
@@ -360,8 +351,7 @@ impl AstFormatter {
                 af.constraints()
                     .single_line
                     .with_replaced(outer_single_line, || {
-                        let mut vstructs =
-                            VStruct::BrokenIndent | VStruct::ControlFlow | VStruct::HangingIndent;
+                        let mut vstructs = VStruct::ControlFlow | VStruct::NonBlockIndent;
                         if args.len() > 1 {
                             vstructs |= VStruct::List | VStruct::Match;
                         }
@@ -398,11 +388,11 @@ impl AstFormatter {
         tail: Tail,
     ) -> FormatResult {
         self.has_vstruct(VStruct::ControlFlow, || {
-            let start_col = self.out.col();
-            let is_head_single_line = self.control_flow_header("if", condition)?;
+            let (first_line, start_col) = self.out.line_col();
+            self.control_flow_header("if", condition)?;
 
             let single_line = (|| {
-                if !is_head_single_line {
+                if self.out.line() != first_line {
                     return None;
                 }
                 let else_ = else_?;
@@ -459,12 +449,8 @@ impl AstFormatter {
         })
     }
 
-    pub fn control_flow_header(
-        &self,
-        keyword: &'static str,
-        expr: &ast::Expr,
-    ) -> FormatResult<bool> {
-        self.has_vstruct(VStruct::BrokenIndent, || {
+    pub fn control_flow_header(&self, keyword: &'static str, expr: &ast::Expr) -> FormatResult {
+        self.has_vstruct(VStruct::NonBlockIndent, || {
             let first_line = self.out.line();
             self.out.token_space(keyword)?;
             self.expr(expr)?;
@@ -478,7 +464,7 @@ impl AstFormatter {
                     Ok(())
                 })
                 .result()?;
-            Ok(self.out.line() == first_line)
+            Ok(())
         })
     }
 

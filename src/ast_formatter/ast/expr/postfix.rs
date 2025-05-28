@@ -40,7 +40,7 @@ impl AstFormatter {
             if chain.is_empty() {
                 return self.postfix_item_tail(next, tail, false);
             }
-            self.has_vstruct(VStruct::BrokenIndent, || self.postfix_item(next))?;
+            self.has_vstruct(VStruct::NonBlockIndent, || self.postfix_item(next))?;
             if self.out.line() != start_line {
                 break true;
             }
@@ -57,7 +57,7 @@ impl AstFormatter {
                 // todo recover width?
                 .next(|| self.postfix_chain_horizontal(chain, start_col, tail))
                 .next(|| {
-                    self.has_vstruct(VStruct::HangingIndent, || {
+                    self.has_vstruct(VStruct::NonBlockIndent, || {
                         self.indented(|| self.postfix_chain_vertical(chain, tail))
                     })
                 })

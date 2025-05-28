@@ -3,6 +3,7 @@ use crate::ast_formatter::list::Braces;
 use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::tail::Tail;
 use crate::ast_utils::is_rustfmt_skip;
+use crate::constraints::VStruct;
 use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::whitespace::VerticalWhitespaceMode;
@@ -29,17 +30,19 @@ impl AstFormatter {
         tail: Tail,
         format: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
-        // todo skip attributes as well?
-        attrs.iter().try_for_each(|attr| self.attr(attr))?;
-        // todo make my own attribute? or comment?
-        // handle #[rustfmt::skip]
-        if attrs.iter().any(is_rustfmt_skip) {
-            self.with_replace_width_limit(None, || self.out.copy_span(span))?;
-            self.tail(tail)?;
-        } else {
-            self.with_copy_span_fallback(span, format, tail)?;
-        }
-        Ok(())
+        self.has_vstruct_if(!attrs.is_empty(), VStruct::NonBlockIndent, || {
+            // todo skip attributes as well?
+            attrs.iter().try_for_each(|attr| self.attr(attr))?;
+            // todo make my own attribute? or comment?
+            // handle #[rustfmt::skip]
+            if attrs.iter().any(is_rustfmt_skip) {
+                self.with_replace_width_limit(None, || self.out.copy_span(span))?;
+                self.tail(tail)?;
+            } else {
+                self.with_copy_span_fallback(span, format, tail)?;
+            }
+            Ok(())
+        })
     }
 
     /// This is a "last resort" fallback for when a constraint error occurs, but we have no

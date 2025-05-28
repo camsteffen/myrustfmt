@@ -25,6 +25,13 @@ fn test() {
     };
     |arg| Struct { aaaaaaaaaaaaa, bbbbbbbbbbbbbb, cccccccccccccccccccccccccccccccc };
     |arg| call(aaaaaaaaaaaaa, bbbbbbbbbbbbbb, cccccccccccccccccccccccccccccccccccccccccccccccccccc);
+    |arg| aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        .bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        .cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc;
+    |arg| aaaaaaaaaaaaaa({
+        x;
+    })
+    .bbbbbbbb;
 }
 
 // :after:
@@ -73,5 +80,16 @@ fn test() {
             bbbbbbbbbbbbbb,
             cccccccccccccccccccccccccccccccccccccccccccccccccccc,
         )
+    };
+    |arg| {
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            .bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+            .cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+    };
+    |arg| {
+        aaaaaaaaaaaaaa({
+            x;
+        })
+        .bbbbbbbb
     };
 }

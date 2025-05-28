@@ -65,23 +65,24 @@ impl WidthLimit {
 ///    output _would_ be if a more permissive shape were enabled.
 #[derive(Debug, EnumSetType)]
 pub enum VStruct {
+    Attribute,
     Closure,
-    /// Control flow expressions like if/for/loop/while
+    /// Control flow expressions (if / for / loop / while)
     ControlFlow,
     /// `match` expressions
     Match,
-    /// Includes lists of all shapes including overflow of the last element.
-    /// At a high level, this variant includes shapes that are indented between the first and last
-    /// lines.
+    /// All kinds of lists (e.g. arrays, tuples, call arguments)
     List,
-    /// Includes "hanging indent" shapes (where lines after the first line are indented) such as
-    /// long dot chains or infix chains. Also includes attributes above the node.
-    HangingIndent,
-    /// Formatting patterns where the code touches the margin one or more times in between the first
-    /// and last lines, like an if/else chain or a non-indented dot chain.
-    // flat dot chain, range, call, multi-line control flow header, multi-line closure header
     // todo include structs with multi-line headers
-    BrokenIndent,
+    /// "block indent" here means that the first and last lines of the node are not indented, and
+    /// all lines in between are indented. Examples:
+    ///  * Attributes (multiple not indented lines)
+    ///  * Control flow expressions where the header is multiple lines
+    ///  * if/else expressions
+    ///  * Multi-line dot chains and infix chains (with or without hanging indentation)
+    ///  * Range expression where both sides are multiple lines
+    ///  * Call expression where both the function and the arguments are multiple lines
+    NonBlockIndent,
 }
 
 impl Constraints {

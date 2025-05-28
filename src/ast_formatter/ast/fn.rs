@@ -97,8 +97,8 @@ impl AstFormatter {
                     self.disallow_vstructs(
                         VStruct::Closure
                             | VStruct::ControlFlow
-                            | VStruct::HangingIndent
-                            | VStruct::List,
+                            | VStruct::List
+                            | VStruct::NonBlockIndent,
                         || self.expr_tail(body, tail),
                     )
                 })
@@ -181,7 +181,7 @@ impl AstFormatter {
             })
             // args on separate lines
             .next(|| {
-                self.has_vstruct(VStruct::BrokenIndent, || {
+                self.has_vstruct(VStruct::NonBlockIndent, || {
                     params(ListShape::Vertical)?;
                     self.fn_ret_ty(&fn_decl.output)?;
                     self.tail(tail)?;

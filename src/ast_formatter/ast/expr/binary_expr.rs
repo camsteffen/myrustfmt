@@ -19,7 +19,7 @@ impl AstFormatter {
         let (first, chain) = collect_binary_expr_chain(left, right, op);
         let first_line = self.out.line();
         self.expr(first)?;
-        self.has_vstruct(VStruct::HangingIndent, || {
+        self.has_vstruct(VStruct::NonBlockIndent, || {
             let mut chain = chain.as_slice();
             let indent_margin = self.out.total_indent.get() + INDENT_WIDTH;
             let indent_guard = loop {

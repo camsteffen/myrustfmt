@@ -127,7 +127,7 @@ impl AstFormatter {
         // todo exclude comma for block-like expressions?
         self.backtrack_from_checkpoint(checkpoint)
             .next_if(!force_block, || {
-                self.disallow_vstructs(VStruct::BrokenIndent | VStruct::HangingIndent, || {
+                self.disallow_vstructs(VStruct::NonBlockIndent, || {
                     self.expr_tail(body, self.tail_fn(|af| af.out.token_insert(",")).as_ref())
                 })
             })
