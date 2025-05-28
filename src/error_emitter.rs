@@ -61,7 +61,9 @@ impl BufferedErrorEmitter {
 
     pub fn restore_checkpoint(&self, checkpoint: &Checkpoint) {
         self.assert_last_checkpoint(checkpoint);
-        self.buffer.with_taken(|buffer| buffer.truncate(checkpoint.buffer_len));
+        self.buffer.with_taken(|buffer| {
+            buffer.truncate(checkpoint.buffer_len);
+        });
     }
 
     pub fn take_from_checkpoint(&self, checkpoint: &Checkpoint) -> Vec<Error> {

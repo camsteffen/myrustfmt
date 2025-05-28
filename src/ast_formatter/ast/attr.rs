@@ -36,12 +36,8 @@ impl AstFormatter {
         if attrs.iter().any(is_rustfmt_skip) {
             self.with_replace_width_limit(None, || self.out.copy_span(span))?;
             self.tail(tail)?;
-            // todo
-        } else if /*self.out.recover().is_none() ||*/ true {
-            // todo don't do this in expr list item, when max width is not enforced
-            self.with_copy_span_fallback(span, format, tail)?;
         } else {
-            format()?;
+            self.with_copy_span_fallback(span, format, tail)?;
         }
         Ok(())
     }
@@ -66,7 +62,6 @@ impl AstFormatter {
             ConstraintErrorKind::LineCommentNotAllowed => {
                 let (line, col) = self.out.line_col();
                 // todo emit a more appropriate error for bad comments
-                println!("{}", e.backtrace);
                 self.errors.line_comment_not_allowed(line, col);
             }
             ConstraintErrorKind::MultiLineCommentNotAllowed => {
@@ -74,15 +69,9 @@ impl AstFormatter {
                 // todo emit a more appropriate error for bad comments
                 self.errors.multi_line_comment_not_allowed(line, col);
             }
-            ConstraintErrorKind::NewlineNotAllowed => {
+            ConstraintErrorKind::NewlineNotAllowed | ConstraintErrorKind::WidthLimitExceeded | ConstraintErrorKind::NextStrategy => {
                 return Err(e);
             }
-            // width limit errors are emitted before the error value is returned
-            ConstraintErrorKind::WidthLimitExceeded => {
-                return Err(e);
-            }
-            // unexpected
-            ConstraintErrorKind::NextStrategy => return Err(e),
         }
         #[cfg(debug_assertions)]
         assert!(
