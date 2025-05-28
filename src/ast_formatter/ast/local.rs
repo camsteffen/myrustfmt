@@ -18,21 +18,21 @@ impl AstFormatter {
         self.out.token_space("let")?;
         self.pat_tail(
             pat,
-            &(ty.is_none() && kind.init().is_none())
-                .then_some(self.tail_token_inner(";")),
+            (ty.is_none() && kind.init().is_none())
+                .then_some(&self.tail_token_inner(";")),
         )?;
         if let Some(ty) = ty {
             self.out.token_space(":")?;
             // todo tail with expression?
             self.ty_tail(
                 ty,
-                &kind.init().is_none().then_some(self.tail_token_inner(";")),
+                kind.init().is_none().then_some(&self.tail_token_inner(";")),
             )?;
         }
         let Some((init, else_)) = kind.init_else_opt() else {
             return Ok(());
         };
-        self.local_init(init, &else_.is_none().then_some(self.tail_token_inner(";")))?;
+        self.local_init(init, else_.is_none().then_some(&self.tail_token_inner(";")))?;
         let Some(else_) = else_ else { return Ok(()) };
         let is_single_line_init = self.out.line() == first_line;
         self.local_else(else_, is_single_line_init, start_col)?;

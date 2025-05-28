@@ -36,7 +36,7 @@ impl<'ast, 'tail, Item> ListOptions<'ast, 'tail, Item> {
         ListOptions {
             rest: None,
             shape: ListShape::default(),
-            tail: &None,
+            tail: None,
             force_trailing_comma: false,
             item_prefers_overflow: None,
             item_requires_own_line: None,

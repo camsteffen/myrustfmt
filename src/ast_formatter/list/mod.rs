@@ -157,7 +157,7 @@ where
 
         let len = list.len();
 
-        let format_index = |index, tail: &_| {
+        let format_index = |index, tail: Tail| {
             format_item(
                 af,
                 &list[index],
@@ -185,6 +185,7 @@ where
             };
             // N.B. tails are created outside of width limit
             let close_tail = af.tail_fn(close);
+            let close_tail = close_tail.as_ref();
             let last_tail = af.tail_fn(move |af| {
                 if !rest.is_none() || opt.force_trailing_comma {
                     af.out.token(",")?;
@@ -196,24 +197,25 @@ where
                 }
                 Ok(())
             });
+            let last_tail = last_tail.as_ref();
             af.with_width_limit_first_line_opt(opt.single_line_max_contents_width, move || {
                 if len == 0 {
                     if let Some(rest) = rest {
-                        list_rest(af, rest, &close_tail)?;
+                        list_rest(af, rest, close_tail)?;
                     }
                     return Ok(());
                 }
                 let (until_last, last) = (0..(len - 1), len - 1);
                 for index in until_last {
-                    format_index(index, &None)?;
+                    format_index(index, None)?;
                     af.out.token_maybe_missing(",")?;
                     af.out.space()?;
                 }
                 // A tail is only necessary with the last item since it may overflow
-                format_index(last, &last_tail)?;
+                format_index(last, last_tail)?;
                 if let Some(rest) = rest {
                     af.out.space()?;
-                    list_rest(af, rest, &close_tail)?;
+                    list_rest(af, rest, close_tail)?;
                 }
                 Ok(())
             })
@@ -240,7 +242,7 @@ where
             (self.format_item)(
                 self.af,
                 &self.list[index],
-                &None,
+                None,
                 ListItemContext {
                     len,
                     index,
@@ -308,7 +310,7 @@ where
             (self.format_item)(
                 af,
                 &list[index],
-                &af.tail_fn(|af| af.out.token_maybe_missing(",")),
+                af.tail_fn(|af| af.out.token_maybe_missing(",")).as_ref(),
                 ListItemContext {
                     len,
                     index,
@@ -331,7 +333,7 @@ where
                         item_comma(index)?;
                         af.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     }
-                    list_rest(af, rest, &None)?;
+                    list_rest(af, rest, None)?;
                 }
             }
             Ok(())

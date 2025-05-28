@@ -25,12 +25,13 @@ impl AstFormatter {
                     self.out.skip_token("{")?;
                     self.use_tree(
                         item,
-                        &self.tail_fn(|af| {
+                        self.tail_fn(|af| {
                             af.out.skip_token_if_present(",")?;
                             af.out.skip_token("}")?;
                             af.tail(tail)?;
                             Ok(())
-                        }),
+                        })
+                        .as_ref(),
                     )?;
                 } else {
                     self.out.token("{")?;
@@ -48,12 +49,14 @@ impl AstFormatter {
                         &sorted,
                         |af, &(ref use_tree, start), tail, lcx| {
                             af.out.source_reader.goto(start);
+                            let last_tail;
                             let tail = if lcx.index == sorted.len() - 1 {
-                                &self.tail_fn(|af| {
+                                last_tail = self.tail_fn(|af| {
                                     af.out.source_reader.goto(items.last().unwrap().0.span.hi());
                                     af.tail(tail)?;
                                     Ok(())
-                                })
+                                });
+                                last_tail.as_ref()
                             } else {
                                 tail
                             };

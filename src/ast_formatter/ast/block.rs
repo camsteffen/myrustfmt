@@ -105,12 +105,12 @@ impl AstFormatter {
             ast::StmtKind::Item(item) => self.item(item),
             ast::StmtKind::Expr(expr) => {
                 let tail = match expr.kind {
-                    control_flow_expr_kind!() => &self.tail_fn(|af| af.out.token_insert(";")),
-                    _ => &None,
+                    control_flow_expr_kind!() => self.tail_fn(|af| af.out.token_insert(";")),
+                    _ => None,
                 };
-                self.expr_tail(expr, tail)
+                self.expr_tail(expr, tail.as_ref())
             }
-            ast::StmtKind::Semi(expr) => self.expr_tail(expr, &self.tail_token(";")),
+            ast::StmtKind::Semi(expr) => self.expr_tail(expr, self.tail_token(";").as_ref()),
             ast::StmtKind::Empty => self.out.token(";"),
             ast::StmtKind::MacCall(mac_call_stmt) => {
                 self.with_attrs(&mac_call_stmt.attrs, stmt.span, || {
@@ -149,7 +149,7 @@ impl AstFormatter {
         expr: &ast::Expr,
         format: impl FnOnce(&ast::Expr) -> FormatResult,
     ) -> FormatResult {
-        self.skip_single_expr_blocks_tail(expr, &None, |e, tail| {
+        self.skip_single_expr_blocks_tail(expr, None, |e, tail| {
             format(e)?;
             self.tail(tail)?;
             Ok(())
@@ -171,11 +171,12 @@ impl AstFormatter {
                 self.out.skip_token("{")?;
                 self.skip_single_expr_blocks_tail(
                     inner,
-                    &self.tail_fn(|af| {
+                    self.tail_fn(|af| {
                         af.out.skip_token("}")?;
                         self.tail(tail)?;
                         Ok(())
-                    }),
+                    })
+                    .as_ref(),
                     format,
                 )?;
                 Ok(())

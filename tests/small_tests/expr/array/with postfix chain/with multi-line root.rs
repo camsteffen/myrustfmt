@@ -29,12 +29,10 @@ fn test() {
     // multiple items
     [
         first,
-        {
-            asdfasdf({
-                let x;
-            })
-            .aaaa
-            .aaaa
-        },
+        asdfasdf({
+            let x;
+        })
+        .aaaa
+        .aaaa,
     ];
 }

@@ -24,12 +24,13 @@ impl AstFormatter {
         self.fn_decl(
             &sig.decl,
             Braces::Parens,
-            &self.tail_fn(|af| {
+            self.tail_fn(|af| {
                 if is_block_after_decl {
                     af.out.space_token("{")?;
                 }
                 Ok(())
-            }),
+            })
+            .as_ref(),
         )?;
         self.where_clause(&generics.where_clause, body.is_some())?;
         if let Some(body) = body {
@@ -58,7 +59,7 @@ impl AstFormatter {
             self.fn_decl(
                 &closure.fn_decl,
                 Braces::Pipe,
-                &self.tail_fn(|af| {
+                self.tail_fn(|af| {
                     af.out.space()?;
                     let has_return_type = match closure.fn_decl.output {
                         ast::FnRetTy::Default(_) => false,
@@ -67,7 +68,8 @@ impl AstFormatter {
                     let multi_line_header = self.out.line() == first_line;
                     af.closure_body(&closure.body, has_return_type, multi_line_header, tail)?;
                     Ok(())
-                }),
+                })
+                .as_ref(),
             )?;
             Ok(())
         })
@@ -115,7 +117,7 @@ impl AstFormatter {
         // self.extern_(&bare_fn_ty.ext)?;
         // self.generic_params(&bare_fn_ty.generic_params)?;
         self.out.token("fn")?;
-        self.fn_decl(&bare_fn_ty.decl, Braces::Parens, &None)?;
+        self.fn_decl(&bare_fn_ty.decl, Braces::Parens, None)?;
         Ok(())
     }
 
@@ -125,8 +127,8 @@ impl AstFormatter {
         tail: Tail,
     ) -> FormatResult {
         let (list_tail, final_tail) = match parenthesized_args.output {
-            ast::FnRetTy::Default(_) => (tail, &None),
-            ast::FnRetTy::Ty(_) => (&None, tail),
+            ast::FnRetTy::Default(_) => (tail, None),
+            ast::FnRetTy::Ty(_) => (None, tail),
         };
         self.list(
             Braces::Parens,
@@ -228,10 +230,12 @@ impl AstFormatter {
                 _ => {}
             }
         }
+        let colon_ty_tail;
         let tail = if matches!(param.ty.kind, ast::TyKind::Infer) {
             tail
         } else {
-            &self.tail_fn(colon_ty)
+            colon_ty_tail = self.tail_fn(colon_ty);
+            colon_ty_tail.as_ref()
         };
         self.pat_tail(&param.pat, tail)?;
         Ok(())

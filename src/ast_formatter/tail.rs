@@ -4,7 +4,7 @@ use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
 
 // The reference is not inside the Option so we don't have to call `.as_ref()` when creating a Tail
-pub type Tail<'a, 'b> = &'a Option<TailS<'b>>;
+pub type Tail<'a, 'b> = Option<&'a TailS<'b>>;
 
 /// A Tail squeezes the code before it leftward to make room for itself.
 ///

@@ -32,11 +32,12 @@ impl AstFormatter {
         } else if let Some(body) = arm.body.as_deref() {
             self.pat_tail(
                 &arm.pat,
-                &self.tail_fn(|af| {
+                self.tail_fn(|af| {
                     af.out.space_token_space("=>")?;
                     af.arm_body(body)?;
                     Ok(())
-                }),
+                })
+                .as_ref(),
             )?;
         }
         Ok(())
@@ -127,7 +128,7 @@ impl AstFormatter {
         self.backtrack_from_checkpoint(checkpoint)
             .next_if(!force_block, || {
                 self.disallow_vstructs(VStruct::BrokenIndent | VStruct::HangingIndent, || {
-                    self.expr_tail(body, &self.tail_fn(|af| af.out.token_insert(",")))
+                    self.expr_tail(body, self.tail_fn(|af| af.out.token_insert(",")).as_ref())
                 })
             })
             .next(|| {

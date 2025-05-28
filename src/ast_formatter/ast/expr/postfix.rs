@@ -94,7 +94,7 @@ impl AstFormatter {
         let checkpoint = self.out.checkpoint();
         let overflow_height = self.out.with_recover_width(|| -> FormatResult<_> {
             self.with_chain_item_max_width(start_col, || {
-                self.postfix_item_tail(overflowable, &None, true)
+                self.postfix_item_tail(overflowable, None, true)
             })?;
             // todo can we prove that the overflow is so long that a separate line won't be shorter?
             let overflow_height = self.out.line() - first_line + 1;
@@ -163,7 +163,7 @@ impl AstFormatter {
     }
 
     fn postfix_item(&self, item: &PostfixItem) -> FormatResult {
-        self.postfix_item_tail(item, &None, false)
+        self.postfix_item_tail(item, None, false)
     }
 
     fn postfix_item_tail(
@@ -190,14 +190,17 @@ impl AstFormatter {
             }
             ast::ExprKind::MethodCall(ref method_call) => {
                 self.out.token(".")?;
-                self.path_segment(&method_call.seg, true, &self.tail_token("("))?;
+                self.path_segment(&method_call.seg, true, self.tail_token("(").as_ref())?;
                 // todo this is consistent with rustfmt, but would it be better to force args to be
                 //   on the same line, just allowing overflow of the last arg?
-                self.call_args_after_open_paren(&method_call.args, &self.tail_fn(non_dot_items))?;
+                self.call_args_after_open_paren(
+                    &method_call.args,
+                    self.tail_fn(non_dot_items).as_ref(),
+                )?;
             }
             // root expression
             _ => {
-                self.expr_tail(item.root_or_dot_item, &self.tail_fn(non_dot_items))?;
+                self.expr_tail(item.root_or_dot_item, self.tail_fn(non_dot_items).as_ref())?;
             }
         }
         Ok(())
@@ -215,7 +218,7 @@ impl AstFormatter {
         }
         for (i, expr) in postfix_tail.iter().enumerate() {
             let is_last = i == postfix_tail.len() - 1;
-            let tail = if is_last { tail } else { &None };
+            let tail = if is_last { tail } else { None };
             match expr.kind {
                 ast::ExprKind::Index(_, ref index, _) => {
                     self.out.token("[")?;

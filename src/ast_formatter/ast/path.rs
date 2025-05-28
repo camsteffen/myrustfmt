@@ -38,10 +38,10 @@ impl AstFormatter {
 
     pub fn path_segments(&self, segments: &[ast::PathSegment], turbofish: bool) -> FormatResult {
         let (first, rest) = segments.split_first().unwrap();
-        self.path_segment(first, turbofish, &None)?;
+        self.path_segment(first, turbofish, None)?;
         for segment in rest {
             self.out.token("::")?;
-            self.path_segment(segment, turbofish, &None)?;
+            self.path_segment(segment, turbofish, None)?;
         }
         Ok(())
     }
@@ -119,7 +119,7 @@ impl AstFormatter {
     ) -> FormatResult {
         self.ident(constraint.ident)?;
         if let Some(generic_args) = &constraint.gen_args {
-            self.generic_args(generic_args, false, &None)?;
+            self.generic_args(generic_args, false, None)?;
         }
         match &constraint.kind {
             ast::AssocItemConstraintKind::Bound { bounds } => self.generic_bounds(bounds, tail),

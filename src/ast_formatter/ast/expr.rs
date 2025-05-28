@@ -20,7 +20,7 @@ use tracing::instrument;
 
 impl AstFormatter {
     pub fn expr(&self, expr: &ast::Expr) -> FormatResult {
-        self.expr_tail(expr, &None)
+        self.expr_tail(expr, None)
     }
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: Tail) -> FormatResult {
@@ -235,19 +235,6 @@ impl AstFormatter {
                             Ok(())
                         })
                     }
-                    // add a block to some expressions in vertical lists
-                    ListStrategy::Vertical if lcx.len > 1 => {
-                        af.backtrack()
-                            // If it's too wide, adding a block won't help.
-                            // The block is only for ensuring a "hanging indent"-compliant shape.
-                            .next(|| af.disallow_vstructs(VStruct::BrokenIndent, format))
-                            .next(|| {
-                                af.expr_add_block(expr)?;
-                                af.tail(tail)?;
-                                Ok(())
-                            })
-                            .result()
-                    }
                     _ => format(),
                 }
             })?;
@@ -311,7 +298,7 @@ impl AstFormatter {
                     let expr_start = self.out.col();
                     self.expr_tail(
                         inner,
-                        &self.tail_fn(|af| {
+                        self.tail_fn(|af| {
                             let end_start = self.out.col();
                             let before_end = self.out.checkpoint();
                             let Err(err) = self.out.with_recover_width(|| -> FormatResult {
@@ -338,7 +325,8 @@ impl AstFormatter {
                             af.out.token(")")?;
                             self.tail(tail)?;
                             Ok(())
-                        }),
+                        })
+                        .as_ref(),
                     )
                 })
             })
@@ -362,7 +350,7 @@ impl AstFormatter {
             let first_line = self.out.line();
             self.expr_tail(
                 start,
-                &self.tail_fn(|af| {
+                self.tail_fn(|af| {
                     af.out.token(sigil)?;
                     let Some(end) = end else {
                         return af.tail(tail);
@@ -371,7 +359,8 @@ impl AstFormatter {
                         af.expr_tail(end, tail)
                     })?;
                     Ok(())
-                }),
+                })
+                .as_ref(),
             )?;
         } else {
             self.out.token(sigil)?;
@@ -398,7 +387,7 @@ impl AstFormatter {
 
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
         let first_line = self.out.line();
-        self.expr_tail(func, &self.tail_token("("))?;
+        self.expr_tail(func, self.tail_token("(").as_ref())?;
         self.has_vstruct_if(self.out.line() > first_line, VStruct::BrokenIndent, || {
             self.call_args_after_open_paren(args, tail)
         })?;

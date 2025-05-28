@@ -54,7 +54,7 @@ impl AstFormatter {
             ast::ItemKind::ExternCrate(name) => self.extern_crate(name, item)?,
             ast::ItemKind::Use(ref use_tree) => {
                 self.out.token_space("use")?;
-                self.use_tree(use_tree, &self.tail_token(";"))?;
+                self.use_tree(use_tree, self.tail_token(";").as_ref())?;
             }
             ast::ItemKind::Static(ref static_item) => {
                 self.out.token_space("static")?;
@@ -130,12 +130,12 @@ impl AstFormatter {
         self.ident(ident)?;
         self.out.token_space(":")?;
         let Some(expr) = &const_item.expr else {
-            self.ty_tail(&const_item.ty, &self.tail_token(";"))?;
+            self.ty_tail(&const_item.ty, self.tail_token(";").as_ref())?;
             return Ok(());
         };
         self.ty(&const_item.ty)?;
         self.out.space_token_space("=")?;
-        self.expr_tail(expr, &self.tail_token(";"))?;
+        self.expr_tail(expr, self.tail_token(";").as_ref())?;
         Ok(())
     }
 

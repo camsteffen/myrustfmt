@@ -16,7 +16,7 @@ impl AstFormatter {
         span: Span,
         format: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
-        self.with_attrs_tail(attrs, span, &None, format)
+        self.with_attrs_tail(attrs, span, None, format)
     }
 
     // todo test usages
@@ -69,7 +69,9 @@ impl AstFormatter {
                 // todo emit a more appropriate error for bad comments
                 self.errors.multi_line_comment_not_allowed(line, col);
             }
-            ConstraintErrorKind::NewlineNotAllowed | ConstraintErrorKind::WidthLimitExceeded | ConstraintErrorKind::NextStrategy => {
+            ConstraintErrorKind::NewlineNotAllowed
+            | ConstraintErrorKind::WidthLimitExceeded
+            | ConstraintErrorKind::NextStrategy => {
                 return Err(e);
             }
         }
