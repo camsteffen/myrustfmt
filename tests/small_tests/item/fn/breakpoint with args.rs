@@ -1,6 +1,6 @@
 // test-kind: breakpoint
 
-fn test(arg: u32) {
+fn test(arg: u32) -> Option<Foo> {
     x;
 }
 
@@ -8,6 +8,6 @@ fn test(arg: u32) {
 
 fn test(
     arg: u32,
-) {
+) -> Option<Foo> {
     x;
 }

@@ -25,7 +25,8 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
     let string = fs::read_to_string(test_source_path)?;
     let mut lines = string.split_inclusive('\n');
     let mut lines_peekable = lines.by_ref().peekable();
-    let mut test_kind = None;
+    let mut test_kind = None::<TestKindRaw>;
+    let mut max_width = None::<u16>;
     loop {
         let Some(&line) = lines_peekable.peek() else {
             break;
@@ -42,6 +43,9 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
             .split_once(": ")
             .ok_or("expected \": \" in header comment")?;
         match name {
+            "max-width" => {
+                max_width = Some(value.parse().map_err(|_| "invalid max-width value")?);
+            }
             "test-kind" => {
                 if test_kind.is_some() {
                     return Err("test-kind already declared".into());
@@ -49,7 +53,7 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
                 test_kind = Some(match value {
                     "before-after" => TestKindRaw::BeforeAfter,
                     "breakpoint" => TestKindRaw::Breakpoint,
-                    "breakpoint-no-change" => TestKindRaw::BreakpointNoChange,
+                    "breakpoint-error" => TestKindRaw::BreakpointError,
                     "no-change" => TestKindRaw::NoChange,
                     _ => return Err(format!("invalid test-kind: {value:?}").into()),
                 });
@@ -73,19 +77,26 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
     let kind = match test_kind_raw {
         TestKindRaw::BeforeAfter => {
             let (before, after) = parse_before_after(source)?;
-            TestKind::BeforeAfter { before, after }
+            TestKind::BeforeAfter {
+                before,
+                after,
+                max_width,
+            }
         }
         TestKindRaw::Breakpoint => {
+            assert!(max_width.is_none(), "cannot use max-width with this test kind");
             let (before, after) = parse_before_after(source)?;
             TestKind::Breakpoint { before, after }
         }
-        TestKindRaw::BreakpointNoChange => {
+        TestKindRaw::BreakpointError => {
+            assert!(max_width.is_none(), "cannot use max-width with this test kind");
             expect_no_after(source)?;
-            TestKind::BreakpointNoChange {
+            TestKind::BreakpointError {
                 formatted: source.to_owned(),
             }
         }
         TestKindRaw::NoChange => {
+            assert!(max_width.is_none(), "cannot use max-width with this test kind");
             expect_no_after(source)?;
             TestKind::NoChange {
                 formatted: source.to_owned(),
@@ -105,7 +116,6 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
             .unwrap()
             .to_owned(),
         kind,
-        max_width: None,
         expect_errors,
     };
     small_test(&test)?;
@@ -135,38 +145,37 @@ fn parse_before_after(source: &str) -> TestResult<(String, String)> {
 
 fn small_test(test: &Test) -> TestResult {
     eprintln!("Test: {}", &test.name);
-    match &test.kind {
-        TestKind::Breakpoint { before, after } => {
+    match test.kind {
+        TestKind::Breakpoint {
+            ref before,
+            ref after,
+        } => {
             assert!(!test.expect_errors);
-            assert!(test.max_width.is_none());
             breakpoint_test(before, after, false)?
         }
-        TestKind::BreakpointNoChange { formatted } => {
+        TestKind::BreakpointError { ref formatted } => {
             assert!(test.expect_errors);
-            assert!(test.max_width.is_none());
             breakpoint_test(formatted, formatted, true)?
         }
-        TestKind::NoChange { formatted } => {
+        TestKind::NoChange { ref formatted } => {
             let formatted = formatted.trim();
-            format_max_width_expected(
-                formatted,
-                test.max_width,
-                formatted,
-                "formatted",
-                test.expect_errors,
-            )?;
+            format_max_width_expected(formatted, None, formatted, "formatted", test.expect_errors)?;
         }
-        TestKind::BeforeAfter { before, after } => {
+        TestKind::BeforeAfter {
+            ref before,
+            ref after,
+            max_width,
+        } => {
             let before = before.trim();
             let after = after.trim();
             format_max_width_expected(
                 before,
-                test.max_width,
+                max_width,
                 after,
                 "before -> after",
                 test.expect_errors,
             )?;
-            format_max_width_expected(after, test.max_width, after, "after (idempotency)", false)?;
+            format_max_width_expected(after, max_width, after, "after (idempotency)", false)?;
         }
     }
     Ok(())
@@ -176,7 +185,6 @@ struct Test {
     name: String,
     kind: TestKind,
     expect_errors: bool,
-    max_width: Option<u16>,
 }
 
 enum TestKind {
@@ -187,15 +195,19 @@ enum TestKind {
     /// string. The result should equal the "after" string. Also, the "before" string is formatted
     /// with exactly a large enough max width to test that it is not changed.
     Breakpoint { before: String, after: String },
-    BreakpointNoChange { formatted: String },
+    BreakpointError { formatted: String },
     NoChange { formatted: String },
-    BeforeAfter { before: String, after: String },
+    BeforeAfter {
+        before: String,
+        after: String,
+        max_width: Option<u16>,
+    },
 }
 
 enum TestKindRaw {
     BeforeAfter,
     Breakpoint,
-    BreakpointNoChange,
+    BreakpointError,
     NoChange,
 }
 

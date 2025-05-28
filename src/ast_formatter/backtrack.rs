@@ -11,10 +11,10 @@ impl AstFormatter {
         }
     }
 
-    pub fn backtrack_from_checkpoint<'a, T>(&'a self, checkpoint: Checkpoint<'a>) -> Backtrack<
-        'a,
-        T,
-    > {
+    pub fn backtrack_from_checkpoint<'a, T>(
+        &'a self,
+        checkpoint: Checkpoint<'a>,
+    ) -> Backtrack<'a, T> {
         Backtrack {
             af: self,
             state: Some(BacktrackState {

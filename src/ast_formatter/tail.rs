@@ -31,9 +31,10 @@ pub struct TailS<'a> {
 
 // Tail creation
 impl AstFormatter {
-    pub fn tail_fn<'a>(&self, tail: impl Fn(&AstFormatter) -> FormatResult + 'a) -> Option<
-        TailS<'a>,
-    > {
+    pub fn tail_fn<'a>(
+        &self,
+        tail: impl Fn(&AstFormatter) -> FormatResult + 'a,
+    ) -> Option<TailS<'a>> {
         Some(self.tail_fn_inner(tail))
     }
 

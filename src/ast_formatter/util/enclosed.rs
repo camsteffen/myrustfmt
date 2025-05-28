@@ -1,9 +1,16 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::list::Braces;
 use crate::error::FormatResult;
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
-    /// Writes a closing brace. Allows for indented comments between braces.
+    /// Allows for indented comments between braces.
+    pub fn enclosed_empty(&self, braces: Braces) -> FormatResult {
+        self.out.token(braces.start())?;
+        self.enclosed_empty_after_opening(braces.end())?;
+        Ok(())
+    }
+
     pub fn enclosed_empty_after_opening(&self, closing_brace: &'static str) -> FormatResult {
         let first_line = self.out.line();
         self.indented(|| self.out.comments(VerticalWhitespaceMode::Break))?;

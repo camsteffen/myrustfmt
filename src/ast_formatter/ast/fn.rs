@@ -10,6 +10,13 @@ use rustc_ast::BindingMode;
 use rustc_ast::ast;
 use rustc_span::symbol::kw;
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum FnDeclMode {
+    BareFnTy,
+    Closure,
+    Fn { open_brace: bool },
+}
+
 impl AstFormatter {
     pub fn fn_<K>(&self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
         let ast::Fn {
@@ -22,15 +29,11 @@ impl AstFormatter {
         self.token_ident_generic_params("fn", item.ident, generics)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
         self.fn_decl(
+            FnDeclMode::Fn {
+                open_brace: is_block_after_decl,
+            },
             &sig.decl,
-            Braces::Parens,
-            self.tail_fn(|af| {
-                if is_block_after_decl {
-                    af.out.space_token("{")?;
-                }
-                Ok(())
-            })
-            .as_ref(),
+            None,
         )?;
         self.where_clause(&generics.where_clause, body.is_some())?;
         if let Some(body) = body {
@@ -57,16 +60,16 @@ impl AstFormatter {
                 self.coroutine_kind(coroutine_kind)?;
             }
             self.fn_decl(
+                FnDeclMode::Closure,
                 &closure.fn_decl,
-                Braces::Pipe,
                 self.tail_fn(|af| {
                     af.out.space()?;
                     let has_return_type = match closure.fn_decl.output {
                         ast::FnRetTy::Default(_) => false,
                         ast::FnRetTy::Ty(_) => true,
                     };
-                    let multi_line_header = self.out.line() == first_line;
-                    af.closure_body(&closure.body, has_return_type, multi_line_header, tail)?;
+                    let single_line_header = self.out.line() == first_line;
+                    af.closure_body(&closure.body, has_return_type, single_line_header, tail)?;
                     Ok(())
                 })
                 .as_ref(),
@@ -117,7 +120,7 @@ impl AstFormatter {
         // self.extern_(&bare_fn_ty.ext)?;
         // self.generic_params(&bare_fn_ty.generic_params)?;
         self.out.token("fn")?;
-        self.fn_decl(&bare_fn_ty.decl, Braces::Parens, None)?;
+        self.fn_decl(FnDeclMode::BareFnTy, &bare_fn_ty.decl, None)?;
         Ok(())
     }
 
@@ -136,7 +139,10 @@ impl AstFormatter {
             |af, ty, tail, _lcx| af.ty_tail(ty, tail),
             ListOptions::new().tail(list_tail),
         )?;
-        self.fn_ret_ty(&parenthesized_args.output)?;
+        if let ast::FnRetTy::Ty(_) = parenthesized_args.output {
+            self.out.space()?;
+            self.fn_ret_ty(&parenthesized_args.output)?;
+        }
         // todo pass tail to ret ty?
         self.tail(final_tail)?;
         Ok(())
@@ -160,35 +166,75 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn fn_decl(&self, fn_decl: &ast::FnDecl, braces: Braces, tail: Tail) -> FormatResult {
-        let params = |shape| {
-            self.list(
-                braces,
-                &fn_decl.inputs,
-                Self::param,
-                ListOptions::new().shape(shape),
-            )
+    fn fn_decl(&self, mode: FnDeclMode, fn_decl: &ast::FnDecl, tail: Tail) -> FormatResult {
+        let args_braces = match mode {
+            FnDeclMode::Closure => Braces::Pipe,
+            _ => Braces::Parens,
         };
-        // args and return type all on one line
-        self.backtrack()
-            .next(|| {
-                self.out.with_recover_width(|| {
-                    params(ListShape::Horizontal)?;
-                    self.fn_ret_ty(&fn_decl.output)?;
-                    self.tail(tail)?;
+        let has_ret_ty = matches!(fn_decl.output, ast::FnRetTy::Ty(_));
+        let open_brace_tail = |newline: bool| -> FormatResult {
+            if mode == (FnDeclMode::Fn { open_brace: true }) {
+                if newline {
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                } else {
+                    self.out.space()?;
+                }
+                self.out.token("{")?;
+            }
+            self.tail(tail)?;
+            Ok(())
+        };
+        if fn_decl.inputs.is_empty() {
+            self.enclosed_empty(args_braces)?;
+            if !has_ret_ty {
+                open_brace_tail(false)?;
+                return Ok(());
+            }
+            self.backtrack()
+                .next(|| {
+                    self.space_could_wrap_indent(|| {
+                        self.with_single_line(|| self.fn_ret_ty(&fn_decl.output))?;
+                        open_brace_tail(false)?;
+                        Ok(())
+                    })
+                })
+                .next(|| {
+                    self.indented(|| {
+                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                        self.fn_ret_ty(&fn_decl.output)?;
+                        Ok(())
+                    })?;
+                    open_brace_tail(true)?;
                     Ok(())
                 })
-            })
-            // args on separate lines
-            .next(|| {
-                self.has_vstruct(VStruct::NonBlockIndent, || {
-                    params(ListShape::Vertical)?;
+                .result()?;
+        } else {
+            let with_args = |shape| {
+                self.list(
+                    args_braces,
+                    &fn_decl.inputs,
+                    Self::param,
+                    ListOptions::new().shape(shape),
+                )?;
+                if has_ret_ty {
+                    self.out.space()?;
                     self.fn_ret_ty(&fn_decl.output)?;
-                    self.tail(tail)?;
-                    Ok(())
+                }
+                open_brace_tail(false)?;
+                Ok(())
+            };
+            self.backtrack()
+                .next(|| {
+                    self.out.with_recover_width(|| {
+                        self.with_single_line(|| with_args(ListShape::Horizontal))
+                    })
                 })
-            })
-            .result()
+                .next(|| {
+                    self.has_vstruct(VStruct::NonBlockIndent, || with_args(ListShape::Vertical))
+                })
+                .result()?
+        }
+        Ok(())
     }
 
     fn param(&self, param: &ast::Param, tail: Tail, _lcx: ListItemContext) -> FormatResult {
@@ -245,7 +291,7 @@ impl AstFormatter {
         match output {
             ast::FnRetTy::Default(_) => {}
             ast::FnRetTy::Ty(ty) => {
-                self.out.space_token_space("->")?;
+                self.out.token_space("->")?;
                 self.ty(ty)?;
             }
         }

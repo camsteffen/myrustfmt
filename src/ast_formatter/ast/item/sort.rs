@@ -56,9 +56,10 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn iter_with_sortable_item_groups<'a, T: MaybeItem>(&self, list: &'a [T]) -> impl Iterator<
-        Item = NodeOrSortableItemGroup<'a, T>,
-    > {
+    fn iter_with_sortable_item_groups<'a, T: MaybeItem>(
+        &self,
+        list: &'a [T],
+    ) -> impl Iterator<Item = NodeOrSortableItemGroup<'a, T>> {
         let mut remaining = list;
         std::iter::from_fn(move || {
             let Some(item) = remaining.first()?.as_item() else {

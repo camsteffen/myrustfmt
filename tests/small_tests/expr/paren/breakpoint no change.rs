@@ -1,4 +1,4 @@
-// test-kind: breakpoint-no-change
+// test-kind: breakpoint-error
 
 fn test() {
     (aaaaaa);
