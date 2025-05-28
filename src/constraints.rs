@@ -1,5 +1,5 @@
 use crate::error::FormatResult;
-use crate::num::HSize;
+use crate::num::{HSize, VSize};
 use crate::util::cell_ext::CellExt;
 use enumset::{EnumSet, EnumSetType};
 use std::cell::Cell;
@@ -30,7 +30,7 @@ pub enum WidthLimit {
     /// Used where a single-line constraint is active
     SingleLine { end: NonZero<HSize> },
     /// Applies a width limit to the first line, then falls out of scope
-    FirstLine { end: NonZero<HSize>, line: u32 },
+    FirstLine { end: NonZero<HSize>, line: VSize },
 }
 
 impl WidthLimit {
@@ -41,7 +41,7 @@ impl WidthLimit {
         }
     }
 
-    pub fn is_applicable(self, at_line: u32) -> bool {
+    pub fn is_applicable(self, at_line: VSize) -> bool {
         match self {
             WidthLimit::SingleLine { .. } => true,
             WidthLimit::FirstLine { line, .. } => line == at_line,
@@ -116,14 +116,14 @@ impl Constraints {
 
     // more getters
 
-    pub fn max_width_at(&self, line: u32) -> HSize {
+    pub fn max_width_at(&self, line: VSize) -> HSize {
         let Some(width_limit_end) = self.width_limit_end_at(line) else {
             return self.max_width();
         };
         self.max_width().min(width_limit_end)
     }
 
-    fn width_limit_end_at(&self, line: u32) -> Option<HSize> {
+    fn width_limit_end_at(&self, line: VSize) -> Option<HSize> {
         let Some(width_limit) = self.width_limit() else {
             return None;
         };

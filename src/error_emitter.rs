@@ -1,13 +1,13 @@
-use crate::num::HSize;
+use crate::num::{HSize, VSize};
 use crate::util::cell_ext::{CellExt, CellNumberExt};
 use std::cell::Cell;
 use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum Error {
-    LineCommentNotAllowed { line: u32, col: HSize },
-    MaxWidthExceeded { line: u32 },
-    MultiLineCommentNotAllowed { line: u32, col: HSize },
+    LineCommentNotAllowed { line: VSize, col: HSize },
+    MaxWidthExceeded { line: VSize },
+    MultiLineCommentNotAllowed { line: VSize, col: HSize },
 }
 
 pub struct BufferedErrorEmitter {
@@ -81,7 +81,7 @@ impl BufferedErrorEmitter {
 
     // actual errors
 
-    pub fn line_comment_not_allowed(&self, line: u32, col: HSize) {
+    pub fn line_comment_not_allowed(&self, line: VSize, col: HSize) {
         if self.is_buffering() {
             self.buffer(Error::LineCommentNotAllowed { line, col });
         } else {
@@ -89,7 +89,7 @@ impl BufferedErrorEmitter {
         }
     }
 
-    pub fn max_width_exceeded(&self, line: u32) {
+    pub fn max_width_exceeded(&self, line: VSize) {
         if self.is_buffering() {
             self.buffer(Error::MaxWidthExceeded { line });
         } else {
@@ -97,7 +97,7 @@ impl BufferedErrorEmitter {
         }
     }
 
-    pub fn multi_line_comment_not_allowed(&self, line: u32, col: HSize) {
+    pub fn multi_line_comment_not_allowed(&self, line: VSize, col: HSize) {
         if self.is_buffering() {
             self.buffer(Error::MultiLineCommentNotAllowed { line, col });
         } else {
@@ -158,19 +158,19 @@ impl ErrorEmitter {
         self.error_count.get()
     }
 
-    pub fn line_comment_not_allowed(&self, line: u32, col: HSize) {
+    pub fn line_comment_not_allowed(&self, line: VSize, col: HSize) {
         self.error_count.increment();
         eprint!("Line comment not allowed");
         self.at(line, col);
     }
 
-    pub fn multi_line_comment_not_allowed(&self, line: u32, col: HSize) {
+    pub fn multi_line_comment_not_allowed(&self, line: VSize, col: HSize) {
         self.error_count.increment();
         eprint!("Multi-line comment not allowed");
         self.at(line, col);
     }
 
-    fn width_exceeded(&self, line: u32) {
+    fn width_exceeded(&self, line: VSize) {
         self.error_count.increment();
         eprint!("Max width exceeded at ");
         match &self.path {
@@ -179,7 +179,7 @@ impl ErrorEmitter {
         }
     }
 
-    fn at(&self, line: u32, col: HSize) {
+    fn at(&self, line: VSize, col: HSize) {
         let (line, col) = (line + 1, col + 1);
         match &self.path {
             None => eprintln!(" at {line}:{col}"),

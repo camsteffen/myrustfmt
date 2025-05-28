@@ -8,7 +8,7 @@ use crate::constraint_writer::checkpoint::ConstraintWriterLookahead;
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::{BufferedErrorEmitter, Error};
-use crate::num::HSize;
+use crate::num::{HSize, VSize};
 use crate::util::chars::is_closer_char;
 use rustc_span::{BytePos, Pos, SourceFile, Span};
 use std::cell::Cell;
@@ -49,9 +49,9 @@ delegate_to_constraint_writer! {
     pub fn constraints(&self) -> &Constraints;
     pub fn current_max_width(&self) -> HSize;
     pub fn with_recover_width<T>(&self, scope: impl FnOnce() -> T) -> T;
-    pub fn line(&self) -> u32;
+    pub fn line(&self) -> VSize;
     pub fn col(&self) -> HSize;
-    pub fn line_col(&self) -> (u32, HSize);
+    pub fn line_col(&self) -> (VSize, HSize);
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T;
 
     #[allow(unused)]

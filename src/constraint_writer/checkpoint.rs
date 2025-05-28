@@ -1,5 +1,6 @@
 use crate::constraint_writer::ConstraintWriter;
 use crate::constraints::Constraints;
+use crate::num::VSize;
 use crate::util::cell_ext::CellExt;
 
 pub struct ConstraintWriterCheckpoint {
@@ -10,9 +11,9 @@ pub struct ConstraintWriterCheckpoint {
 // todo rename
 #[derive(Debug)]
 pub struct ConstraintWriterSelfCheckpoint {
-    line: u32,
+    line: VSize,
     last_line_start: usize,
-    last_width_exceeded_line: Option<u32>,
+    last_width_exceeded_line: Option<VSize>,
     #[cfg(debug_assertions)]
     constraints: Constraints,
 }

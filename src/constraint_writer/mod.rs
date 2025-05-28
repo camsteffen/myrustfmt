@@ -6,7 +6,7 @@ use crate::error::{
     WidthLimitExceededError,
 };
 use crate::error_emitter::BufferedErrorEmitter;
-use crate::num::HSize;
+use crate::num::{HSize, VSize};
 use crate::util::cell_ext::{CellExt, CellNumberExt};
 use std::cell::Cell;
 use std::panic::Location;
@@ -17,12 +17,12 @@ pub struct ConstraintWriter {
     buffer: Cell<String>,
     errors: Rc<BufferedErrorEmitter>,
     last_line_start: Cell<usize>,
-    last_width_exceeded_line: Cell<Option<u32>>,
-    line: Cell<u32>,
+    last_width_exceeded_line: Cell<Option<VSize>>,
+    line: Cell<VSize>,
     /// When Some, we consider width to be recoverable. This means that if a width limit is
     /// exceeded, we may fall back to another formatting strategy that is known to take less width.
     /// The contained value is the line number.
-    recover_width: Cell<Option<u32>>,
+    recover_width: Cell<Option<VSize>>,
 }
 
 impl ConstraintWriter {
@@ -54,7 +54,7 @@ impl ConstraintWriter {
         self.buffer.with_taken(|b| b.len())
     }
 
-    pub fn line(&self) -> u32 {
+    pub fn line(&self) -> VSize {
         self.line.get()
     }
 
@@ -65,7 +65,7 @@ impl ConstraintWriter {
             .expect("line length exceeds HSize::MAX")
     }
 
-    pub fn line_col(&self) -> (u32, HSize) {
+    pub fn line_col(&self) -> (VSize, HSize) {
         (self.line(), self.col())
     }
 
