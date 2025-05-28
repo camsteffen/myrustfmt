@@ -46,6 +46,7 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
             "max-width" => {
                 max_width = Some(value.parse().map_err(|_| "invalid max-width value")?);
             }
+            "note" => {}
             "test-kind" => {
                 if test_kind.is_some() {
                     return Err("test-kind already declared".into());
