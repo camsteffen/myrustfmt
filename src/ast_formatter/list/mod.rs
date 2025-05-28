@@ -163,7 +163,6 @@ where
                 &list[index],
                 tail,
                 ListItemContext {
-                    len,
                     index,
                     strategy: ListStrategy::Horizontal,
                 },
@@ -244,7 +243,6 @@ where
                 &self.list[index],
                 None,
                 ListItemContext {
-                    len,
                     index,
                     strategy: ListStrategy::WrapToFit,
                 },
@@ -312,7 +310,6 @@ where
                 &list[index],
                 af.tail_fn(|af| af.out.token_maybe_missing(",")).as_ref(),
                 ListItemContext {
-                    len,
                     index,
                     strategy: ListStrategy::Vertical,
                 },

@@ -2,11 +2,11 @@
 
 fn test() {
     match x {
-        x => [{
+        x => foo({
             let x;
-        }]..[{
+        })..foo({
             let x;
-        }]
+        })
     }
 }
 
@@ -15,11 +15,11 @@ fn test() {
 fn test() {
     match x {
         x => {
-            [{
+            foo({
                 let x;
-            }]..[{
+            })..foo({
                 let x;
-            }]
+            })
         }
     }
 }

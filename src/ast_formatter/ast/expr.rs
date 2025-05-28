@@ -46,7 +46,7 @@ impl AstFormatter {
             ast::ExprKind::Array(ref items) => self.list(
                 Braces::Square,
                 items,
-                self.expr_list_item(false),
+                |af, expr, tail, _lcx| af.expr_tail(expr, tail),
                 expr_list_opt()
                     .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.array_width)
                     .wrap_to_fit(ListWrapToFit::Yes {
@@ -65,7 +65,7 @@ impl AstFormatter {
             ast::ExprKind::Tup(ref items) => self.list(
                 Braces::Parens,
                 items,
-                self.expr_list_item(true),
+                |af, expr, tail, _lcx| af.expr_tail(expr, tail),
                 expr_list_opt()
                     .force_trailing_comma(items.len() == 1)
                     .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
@@ -194,54 +194,6 @@ impl AstFormatter {
         match plain_block(expr) {
             Some(block) => self.block_expr(false, block),
             None => self.expr_add_block(expr),
-        }
-    }
-
-    pub fn expr_list_item(
-        &self,
-        is_call: bool,
-    ) -> impl Fn(&AstFormatter, &P<ast::Expr>, Tail, ListItemContext) -> FormatResult {
-        // todo kinda hacky
-        let single_line_outer = self.constraints().single_line.get();
-        let disallowed_vstructs_outer = self.constraints().disallowed_vstructs.get();
-
-        move |af, expr, tail, lcx| {
-            af.skip_single_expr_blocks_tail(expr, tail, |expr, tail| {
-                let format = || af.expr_tail(expr, tail);
-                match lcx.strategy {
-                    // overflow last item
-                    ListStrategy::Horizontal
-                        if !single_line_outer
-                            && !disallowed_vstructs_outer.contains(VStruct::List)
-                            && lcx.is_last() =>
-                    {
-                        let mut vstructs =
-                            VStruct::BrokenIndent | VStruct::ControlFlow | VStruct::HangingIndent;
-                        if lcx.len > 1 {
-                            // avoid this:
-                            // foo(a, b, c, bar(x,
-                            //     y,
-                            //     z,
-                            // ))
-                            vstructs |= VStruct::List;
-                        }
-                        if lcx.len > 1 || !is_call {
-                            vstructs |= VStruct::Match;
-                        }
-                        af.disallow_vstructs(vstructs, || {
-                            // override the multi-line shape to be less strict than SingleLine
-                            // todo avoid replace?
-                            af.constraints().single_line.with_replaced(false, format)?;
-                            Ok(())
-                        })
-                    }
-                    _ => format(),
-                }
-            })?;
-            // todo I wish this were more symmetrical with Tail being passed in
-            //   maybe introduce a more specific Tail type for list comma
-            self.out.skip_token_if_present(",")?;
-            Ok(())
         }
     }
 
@@ -395,18 +347,40 @@ impl AstFormatter {
     }
 
     pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
-        let mut list_opt = expr_list_opt();
+        let outer_single_line = self.constraints().single_line.get();
+
+        let format_arg = |
+            af: &AstFormatter,
+            expr: &P<ast::Expr>,
+            tail: Tail,
+            lcx: ListItemContext,
+        | -> FormatResult {
+            if lcx.strategy == ListStrategy::Horizontal && lcx.index == args.len() - 1 {
+                // todo avoid replace?
+                af.constraints()
+                    .single_line
+                    .with_replaced(outer_single_line, || {
+                        let mut vstructs =
+                            VStruct::BrokenIndent | VStruct::ControlFlow | VStruct::HangingIndent;
+                        if args.len() > 1 {
+                            vstructs |= VStruct::List | VStruct::Match;
+                        }
+                        af.disallow_vstructs(vstructs, || af.expr_tail(expr, tail))
+                    })?;
+            } else {
+                af.expr_tail(expr, tail)?
+            }
+            Ok(())
+        };
+
+        let mut list_opt = expr_list_opt().omit_open_brace().tail(tail);
         let is_only_closure = args.len() == 1 && matches!(args[0].kind, ast::ExprKind::Closure(_));
         if !is_only_closure {
             list_opt = list_opt
                 .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
         }
-        self.list(
-            Braces::Parens,
-            args,
-            self.expr_list_item(true),
-            list_opt.omit_open_brace().tail(tail),
-        )
+
+        self.list(Braces::Parens, args, format_arg, list_opt)
     }
 
     fn delim_args(&self, delim_args: &ast::DelimArgs) -> FormatResult {

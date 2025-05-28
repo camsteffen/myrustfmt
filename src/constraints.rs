@@ -98,14 +98,6 @@ impl Constraints {
 
     // basic getters
 
-    // pub fn in_closure_body(&self) -> Option<VSize> {
-    //     self.in_closure_body.get()
-    // }
-
-    // pub fn in_list_item(&self) -> Option<VSize> {
-    //     self.in_list_overflow.get()
-    // }
-
     pub fn max_width(&self) -> HSize {
         self.max_width.get()
     }

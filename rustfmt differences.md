@@ -15,7 +15,7 @@
 * A match arm with a guard on a separate line may have its body on one line without a block
 * A multi-line if/else in a call argument is wrapped instead of continuing after the parenthesis
 * When breaking nested function calls into multiple lines, prefers to add breaks towards the outermost call
-* Some expressions are not combinable with a list with one item
+* Single-item arrays and tuples are not combinable with multi-line expressions. The element is wrapped and indented.
 
 `let` statements
 * If the expression does not fit in the first line, prefer introducing line breaks within the first
