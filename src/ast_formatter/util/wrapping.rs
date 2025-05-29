@@ -4,6 +4,8 @@ use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
+    /// If the current position is farther right compared to the position if wrap-indented, then
+    /// width is recoverable for the given scope.
     pub fn could_wrap_indent(&self, scope: impl Fn() -> FormatResult) -> FormatResult {
         if self.out.col() <= self.out.total_indent.get() + INDENT_WIDTH {
             scope()
@@ -22,7 +24,7 @@ impl AstFormatter {
     pub fn space_or_wrap_then(&self, then: impl Fn() -> FormatResult) -> FormatResult {
         let checkpoint = self.out.checkpoint();
         let first_line = self.out.line();
-        self.out.space_or_break()?;
+        self.out.space_allow_comments()?;
         let result = self.out.with_recover_width(&then);
         if self.out.line() == first_line && result.is_err() {
             self.out.restore_checkpoint(&checkpoint);
@@ -41,7 +43,7 @@ impl AstFormatter {
         let checkpoint = self.out.checkpoint();
         let first_line = self.out.line();
         let indent_guard = self.begin_indent();
-        self.out.space_or_break()?;
+        self.out.space_allow_comments()?;
         if self.out.line() != first_line {
             then()?;
             return Ok(Some(indent_guard));

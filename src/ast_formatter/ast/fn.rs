@@ -10,13 +10,6 @@ use rustc_ast::BindingMode;
 use rustc_ast::ast;
 use rustc_span::symbol::kw;
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum FnDeclMode {
-    BareFnTy,
-    Closure,
-    Fn { open_brace: bool },
-}
-
 impl AstFormatter {
     pub fn fn_<K>(&self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
         let ast::Fn {
@@ -28,13 +21,17 @@ impl AstFormatter {
         self.fn_header(&sig.header)?;
         self.token_ident_generic_params("fn", item.ident, generics)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
-        self.fn_decl(
-            FnDeclMode::Fn {
-                open_brace: is_block_after_decl,
-            },
-            &sig.decl,
-            None,
-        )?;
+        self.fn_decl(&sig.decl, Braces::Parens, |wrapped_return_type| {
+            if is_block_after_decl {
+                if wrapped_return_type {
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                } else {
+                    self.out.space_allow_comments()?;
+                }
+                self.out.token("{")?;
+            }
+            Ok(())
+        })?;
         self.where_clause(&generics.where_clause, body.is_some())?;
         if let Some(body) = body {
             self.block_expr(is_block_after_decl, body)?;
@@ -59,21 +56,20 @@ impl AstFormatter {
             if let Some(coroutine_kind) = &closure.coroutine_kind {
                 self.coroutine_kind(coroutine_kind)?;
             }
-            self.fn_decl(
-                FnDeclMode::Closure,
-                &closure.fn_decl,
-                self.tail_fn(|af| {
-                    af.out.space()?;
-                    let has_return_type = match closure.fn_decl.output {
-                        ast::FnRetTy::Default(_) => false,
-                        ast::FnRetTy::Ty(_) => true,
-                    };
-                    let single_line_header = self.out.line() == first_line;
-                    af.closure_body(&closure.body, has_return_type, single_line_header, tail)?;
-                    Ok(())
-                })
-                .as_ref(),
-            )?;
+            self.fn_decl(&closure.fn_decl, Braces::Pipe, |wrapped_return_type| {
+                if wrapped_return_type {
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                } else {
+                    self.out.space_allow_comments()?;
+                }
+                let has_return_type = match closure.fn_decl.output {
+                    ast::FnRetTy::Default(_) => false,
+                    ast::FnRetTy::Ty(_) => true,
+                };
+                let single_line_header = self.out.line() == first_line;
+                self.closure_body(&closure.body, has_return_type, single_line_header, tail)?;
+                Ok(())
+            })?;
             Ok(())
         })
     }
@@ -86,6 +82,7 @@ impl AstFormatter {
         tail: Tail,
     ) -> FormatResult {
         if has_return_type {
+            // it must be a block
             return self.expr_tail(body, tail);
         }
         if !single_line_header {
@@ -95,15 +92,16 @@ impl AstFormatter {
         }
         self.skip_single_expr_blocks_tail(body, tail, |body, tail| {
             self.backtrack()
-                // todo recover width?
                 .next(|| {
-                    self.disallow_vstructs(
-                        VStruct::Closure
+                    self.could_wrap_indent(|| {
+                        let disallowed_vstructs = VStruct::Closure
                             | VStruct::ControlFlow
                             | VStruct::List
-                            | VStruct::NonBlockIndent,
-                        || self.allow_vstructs(VStruct::Match, || self.expr_tail(body, tail)),
-                    )
+                            | VStruct::NonBlockIndent;
+                        self.disallow_vstructs(disallowed_vstructs, || {
+                            self.allow_vstructs(VStruct::Match, || self.expr_tail(body, tail))
+                        })
+                    })
                 })
                 .next(|| {
                     self.expr_add_block(body)?;
@@ -120,7 +118,7 @@ impl AstFormatter {
         // self.extern_(&bare_fn_ty.ext)?;
         // self.generic_params(&bare_fn_ty.generic_params)?;
         self.out.token("fn")?;
-        self.fn_decl(FnDeclMode::BareFnTy, &bare_fn_ty.decl, None)?;
+        self.fn_decl(&bare_fn_ty.decl, Braces::Parens, |_| Ok(()))?;
         Ok(())
     }
 
@@ -166,74 +164,67 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn fn_decl(&self, mode: FnDeclMode, fn_decl: &ast::FnDecl, tail: Tail) -> FormatResult {
-        let args_braces = match mode {
-            FnDeclMode::Closure => Braces::Pipe,
-            _ => Braces::Parens,
-        };
+    fn fn_decl(
+        &self,
+        fn_decl: &ast::FnDecl,
+        braces: Braces,
+        tail: impl Fn(/*wrapped_return_type:*/ bool) -> FormatResult,
+    ) -> FormatResult {
         let has_ret_ty = matches!(fn_decl.output, ast::FnRetTy::Ty(_));
-        let open_brace_tail = |newline: bool| -> FormatResult {
-            if mode == (FnDeclMode::Fn { open_brace: true }) {
-                if newline {
-                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                } else {
-                    self.out.space()?;
-                }
-                self.out.token("{")?;
+        let return_ty_tail = |force_wrap: bool| {
+            if !has_ret_ty {
+                return tail(false);
             }
-            self.tail(tail)?;
+            let did_wrap = self.indented(|| {
+                let did_wrap = if force_wrap {
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                    true
+                } else {
+                    self.out.space_allow_comments()?
+                };
+                self.with_single_line_if(!did_wrap, || self.fn_ret_ty(&fn_decl.output))?;
+                Ok(did_wrap)
+            })?;
+            tail(did_wrap)?;
             Ok(())
         };
-        if fn_decl.inputs.is_empty() {
-            self.enclosed_empty(args_braces)?;
-            if !has_ret_ty {
-                open_brace_tail(false)?;
-                return Ok(());
-            }
-            self.backtrack()
-                .next(|| {
-                    self.space_could_wrap_indent(|| {
-                        self.with_single_line(|| self.fn_ret_ty(&fn_decl.output))?;
-                        open_brace_tail(false)?;
-                        Ok(())
-                    })
-                })
-                .next(|| {
-                    self.indented(|| {
-                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                        self.fn_ret_ty(&fn_decl.output)?;
-                        Ok(())
-                    })?;
-                    open_brace_tail(true)?;
-                    Ok(())
-                })
-                .result()?;
-        } else {
-            let with_args = |shape| {
+        let args = |arg_list_shape| {
+            self.has_vstruct(VStruct::NonBlockIndent, || {
                 self.list(
-                    args_braces,
+                    braces,
                     &fn_decl.inputs,
                     Self::param,
-                    ListOptions::new().shape(shape),
-                )?;
-                if has_ret_ty {
-                    self.out.space()?;
-                    self.fn_ret_ty(&fn_decl.output)?;
-                }
-                open_brace_tail(false)?;
-                Ok(())
-            };
-            self.backtrack()
-                .next(|| {
-                    self.out.with_recover_width(|| {
-                        self.with_single_line(|| with_args(ListShape::Horizontal))
-                    })
-                })
-                .next(|| {
-                    self.has_vstruct(VStruct::NonBlockIndent, || with_args(ListShape::Vertical))
-                })
-                .result()?
+                    ListOptions::new().shape(arg_list_shape),
+                )
+            })
+        };
+        let args_return_ty = |arg_list_shape| {
+            args(arg_list_shape)?;
+            return_ty_tail(false)?;
+            Ok(())
+        };
+
+        // if there are no args, then we might wrap the return type to recover width
+        if fn_decl.inputs.is_empty() {
+            let first_line = self.out.line();
+            args(ListShape::Horizontal)?;
+            let can_wrap_ret_ty = has_ret_ty && self.out.line() == first_line;
+            if can_wrap_ret_ty {
+                self.backtrack()
+                    .next(|| self.out.with_recover_width(|| return_ty_tail(false)))
+                    .next(|| return_ty_tail(true))
+                    .result()?;
+            } else {
+                return_ty_tail(false)?;
+            }
+            return Ok(());
         }
+
+        // there are one or more args
+        self.backtrack()
+            .next(|| self.out.with_recover_width(|| args_return_ty(ListShape::Horizontal)))
+            .next(|| args_return_ty(ListShape::Vertical))
+            .result()?;
         Ok(())
     }
 

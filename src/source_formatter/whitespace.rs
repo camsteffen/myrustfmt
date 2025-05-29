@@ -15,17 +15,18 @@ impl SourceFormatter {
         })
     }
 
-    /// Try to write a space but also allow a line break with some comments
-    pub fn space_or_break(&self) -> FormatResult {
+    /// Try to write a space but also allow any comments
+    pub fn space_allow_comments(&self) -> FormatResult<bool> {
         let first_line = self.line();
         self.whitespace_and_comments(WhitespaceMode::Flexible {
             vertical_mode: VerticalWhitespaceMode::Break,
             space_if_horizontal: true,
         })?;
-        if self.out.line() != first_line {
+        let is_multiline = self.out.line() > first_line;
+        if is_multiline {
             self.indent();
         }
-        Ok(())
+        Ok(is_multiline)
     }
 
     /// Skip over whitespace, allow horizontal comments, disallow newlines.
