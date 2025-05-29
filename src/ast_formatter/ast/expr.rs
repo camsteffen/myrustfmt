@@ -12,7 +12,6 @@ use crate::ast_utils::{plain_block, postfix_expr_kind};
 use crate::constraints::VStruct;
 use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
-use crate::util::cell_ext::CellExt;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
@@ -38,7 +37,7 @@ impl AstFormatter {
                 Braces::Square,
                 items,
                 |af, expr, tail, _lcx| af.expr_tail(expr, tail),
-                expr_list_opt()
+                ListOptions::new()
                     .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.array_width)
                     .wrap_to_fit(ListWrapToFit::Yes {
                         max_element_width: Some(
@@ -57,7 +56,7 @@ impl AstFormatter {
                 Braces::Parens,
                 items,
                 |af, expr, tail, _lcx| af.expr_tail(expr, tail),
-                expr_list_opt()
+                ListOptions::new()
                     .force_trailing_comma(items.len() == 1)
                     .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
                     .tail(take_tail()),
@@ -338,8 +337,6 @@ impl AstFormatter {
     }
 
     pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
-        let outer_single_line = self.constraints().single_line.get();
-
         let format_arg = |
             af: &AstFormatter,
             expr: &P<ast::Expr>,
@@ -347,23 +344,22 @@ impl AstFormatter {
             lcx: ListItemContext,
         | -> FormatResult {
             if lcx.strategy == ListStrategy::Horizontal && lcx.index == args.len() - 1 {
-                // todo avoid replace?
-                af.constraints()
-                    .single_line
-                    .with_replaced(outer_single_line, || {
-                        let mut vstructs = VStruct::ControlFlow | VStruct::NonBlockIndent;
-                        if args.len() > 1 {
-                            vstructs |= VStruct::List | VStruct::Match;
-                        }
-                        af.disallow_vstructs(vstructs, || af.expr_tail(expr, tail))
-                    })?;
+                let mut vstructs = VStruct::ControlFlow | VStruct::NonBlockIndent;
+                if args.len() > 1 {
+                    vstructs |= VStruct::List | VStruct::Match;
+                }
+                af.disallow_vstructs(vstructs, || af.expr_tail(expr, tail))?;
             } else {
-                af.expr_tail(expr, tail)?
+                af.expr_tail(expr, tail)?;
             }
             Ok(())
         };
 
-        let mut list_opt = expr_list_opt().omit_open_brace().tail(tail);
+        let mut list_opt = ListOptions::<P<ast::Expr>>::new()
+            .enable_overflow()
+            .item_prefers_overflow(|expr| matches!(expr.kind, ast::ExprKind::Closure(_)))
+            .omit_open_brace()
+            .tail(tail);
         let is_only_closure = args.len() == 1 && matches!(args[0].kind, ast::ExprKind::Closure(_));
         if !is_only_closure {
             list_opt = list_opt
@@ -526,9 +522,4 @@ impl AstFormatter {
             Ok(())
         })
     }
-}
-
-pub fn expr_list_opt<'ast, 'tail>() -> ListOptions<'ast, 'tail, P<ast::Expr>> {
-    ListOptions::<P<ast::Expr>>::new()
-        .item_prefers_overflow(|expr| matches!(expr.kind, ast::ExprKind::Closure(_)))
 }

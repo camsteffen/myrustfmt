@@ -58,17 +58,18 @@ where
             }
             match self.opt.shape {
                 // trying to not fallback to vertical because we need to see the width of the line when we fail because overflow is not allowed
-                ListShape::Flexible => self.contents_flexible(),
-                ListShape::Horizontal => self.contents_horizontal(),
-                ListShape::Vertical => self.contents_vertical(),
+                ListShape::Flexible => self.contents_flexible()?,
+                ListShape::Horizontal => self.contents_horizontal()?,
+                ListShape::Vertical => self.contents_vertical()?,
             }
+            Ok(())
         })
     }
 
     fn contents_flexible(&self) -> FormatResult {
         let first_line = self.af.out.line();
         let checkpoint = self.af.out.checkpoint();
-        let result = self.af.out.with_recover_width(|| -> FormatResult<_> {
+        let horizontal_result = self.af.out.with_recover_width(|| -> FormatResult<_> {
             if self
                 .opt
                 .item_requires_own_line
@@ -84,46 +85,50 @@ where
             Ok(height)
         });
 
-        match result {
-            Err(_) => {
-                self.af
-                    .backtrack_from_checkpoint(checkpoint)
-                    .next_opt(self.contents_wrap_to_fit_fn_opt())
-                    .next(|| self.contents_vertical())
-                    .result()?;
-            }
-            Ok(1) => {}
-            Ok(_)
-                if self.opt.rest.is_none()
-                    && self
-                        .opt
-                        .item_prefers_overflow
-                        .as_ref()
-                        .is_some_and(|f| f(self.list.last().unwrap())) => {}
-            Ok(overflow_height) => {
-                // todo don't lookahead if there isn't any width gained by wrapping
-                let overflow_lookahead = self.af.out.capture_lookahead(&checkpoint);
+        let Ok(horizontal_height) = horizontal_result else {
+            return self
+                .af
+                .backtrack_from_checkpoint(checkpoint)
+                .next_opt(self.contents_wrap_to_fit_fn_opt())
+                .next(|| self.contents_vertical())
+                .result();
+        };
 
-                // try vertical
-                if self
-                    .af
-                    .out
-                    .with_recover_width(|| self.contents_vertical())
-                    .is_err()
-                {
-                    // separate lines failed, so overflow it is!
-                    self.af.out.restore_checkpoint(&checkpoint);
-                    self.af.out.restore_lookahead(overflow_lookahead);
-                    return Ok(());
-                }
+        if horizontal_height == 1 {
+            return Ok(());
+        }
 
-                // choose between separate lines and overflow
-                let vertical_height = self.af.out.line() - first_line + 1;
-                if overflow_height < vertical_height {
-                    self.af.out.restore_checkpoint(&checkpoint);
-                    self.af.out.restore_lookahead(overflow_lookahead);
-                }
-            }
+        if self.opt.rest.is_none()
+            && self
+                .opt
+                .item_prefers_overflow
+                .as_ref()
+                .is_some_and(|f| f(self.list.last().unwrap()))
+        {
+            return Ok(());
+        }
+
+        // todo don't lookahead if there isn't any width gained by wrapping
+        let overflow_lookahead = self.af.out.capture_lookahead(&checkpoint);
+
+        // try vertical
+        if self
+            .af
+            .out
+            .with_recover_width(|| self.contents_vertical())
+            .is_err()
+        {
+            // separate lines failed, so overflow it is!
+            self.af.out.restore_checkpoint(&checkpoint);
+            self.af.out.restore_lookahead(overflow_lookahead);
+            return Ok(());
+        }
+
+        // choose between separate lines and overflow
+        let vertical_height = self.af.out.line() - first_line + 1;
+        if horizontal_height < vertical_height {
+            self.af.out.restore_checkpoint(&checkpoint);
+            self.af.out.restore_lookahead(overflow_lookahead);
         }
         Ok(())
     }
@@ -158,15 +163,17 @@ where
         let len = list.len();
 
         let format_index = |index, tail: Tail| {
-            format_item(
-                af,
-                &list[index],
-                tail,
-                ListItemContext {
-                    index,
-                    strategy: ListStrategy::Horizontal,
-                },
-            )
+            af.with_single_line_if(index < len - 1 || !opt.enable_overflow, || {
+                format_item(
+                    af,
+                    &list[index],
+                    tail,
+                    ListItemContext {
+                        index,
+                        strategy: ListStrategy::Horizontal,
+                    },
+                )
+            })
         };
 
         let do_pad = |af: &AstFormatter| -> FormatResult {
@@ -175,49 +182,47 @@ where
             }
             Ok(())
         };
-        af.with_single_line(|| {
+        do_pad(af)?;
+        let close = |af: &AstFormatter| {
             do_pad(af)?;
-            let close = |af: &AstFormatter| {
-                do_pad(af)?;
-                af.out.token(braces.end())?;
-                Ok(())
-            };
-            // N.B. tails are created outside of width limit
-            let close_tail = af.tail_fn(close);
-            let close_tail = close_tail.as_ref();
-            let last_tail = af.tail_fn(move |af| {
-                if !rest.is_none() || opt.force_trailing_comma {
-                    af.out.token(",")?;
-                } else {
-                    af.out.skip_token_if_present(",")?;
-                }
-                if rest.is_none() {
-                    close(af)?;
-                }
-                Ok(())
-            });
-            let last_tail = last_tail.as_ref();
-            af.with_width_limit_first_line_opt(opt.single_line_max_contents_width, move || {
-                if len == 0 {
-                    if let Some(rest) = rest {
-                        list_rest(af, rest, close_tail)?;
-                    }
-                    return Ok(());
-                }
-                let (until_last, last) = (0..(len - 1), len - 1);
-                for index in until_last {
-                    format_index(index, None)?;
-                    af.out.token_maybe_missing(",")?;
-                    af.out.space()?;
-                }
-                // A tail is only necessary with the last item since it may overflow
-                format_index(last, last_tail)?;
+            af.out.token(braces.end())?;
+            Ok(())
+        };
+        // N.B. tails are created outside of width limit
+        let close_tail = af.tail_fn(close);
+        let close_tail = close_tail.as_ref();
+        let last_tail = af.tail_fn(move |af| {
+            if !rest.is_none() || opt.force_trailing_comma {
+                af.out.token(",")?;
+            } else {
+                af.out.skip_token_if_present(",")?;
+            }
+            if rest.is_none() {
+                close(af)?;
+            }
+            Ok(())
+        });
+        let last_tail = last_tail.as_ref();
+        af.with_width_limit_first_line_opt(opt.single_line_max_contents_width, move || {
+            if len == 0 {
                 if let Some(rest) = rest {
-                    af.out.space()?;
                     list_rest(af, rest, close_tail)?;
                 }
-                Ok(())
-            })
+                return Ok(());
+            }
+            let (until_last, last) = (0..(len - 1), len - 1);
+            for index in until_last {
+                format_index(index, None)?;
+                af.out.token_maybe_missing(",")?;
+                af.out.space()?;
+            }
+            // A tail is only necessary with the last item since it may overflow
+            format_index(last, last_tail)?;
+            if let Some(rest) = rest {
+                af.out.space()?;
+                list_rest(af, rest, close_tail)?;
+            }
+            Ok(())
         })
     }
 

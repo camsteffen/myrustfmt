@@ -173,7 +173,7 @@ impl AstFormatter {
         single_line_tail: bool,
     ) -> FormatResult {
         let non_dot_items = |af: &Self| {
-            af.with_single_line_opt(single_line_tail, || {
+            af.with_single_line_if(single_line_tail, || {
                 af.postfix_non_dot_items(&item.non_dot_items, tail)
             })
         };

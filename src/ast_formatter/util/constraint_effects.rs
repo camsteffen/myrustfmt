@@ -53,12 +53,12 @@ impl AstFormatter {
             .with_replaced(true, || self.out.with_recover_width(scope))
     }
 
-    pub fn with_single_line_opt<T>(
+    pub fn with_single_line_if<T>(
         &self,
-        apply: bool,
+        condition: bool,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        if !apply {
+        if !condition {
             return scope();
         }
         self.with_single_line(scope)

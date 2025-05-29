@@ -1,4 +1,5 @@
 use crate::error::{ParseError, panic_parse_error};
+use crate::util::line_col::line_col;
 use rustc_span::{BytePos, Pos, SourceFile, Span};
 use std::cell::Cell;
 use std::path::PathBuf;
@@ -92,5 +93,10 @@ impl SourceReader {
     #[track_caller]
     fn parse_error(&self, error: ParseError) -> ! {
         panic_parse_error(error, self.path.as_deref(), self.source(), self.pos.get())
+    }
+
+    #[allow(unused)]
+    pub fn line_col(&self) -> (u32, u32) {
+        line_col(self.source(), self.pos.get())
     }
 }
