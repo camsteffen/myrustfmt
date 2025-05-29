@@ -78,34 +78,30 @@ fn collect_binary_expr_chain<'a>(
     right: &'a ast::Expr,
     top_op: Spanned<ast::BinOpKind>,
 ) -> (&'a ast::Expr, Vec<(ast::BinOpKind, &'a ast::Expr)>) {
-    let mut first = None;
-    let mut chain = Vec::new();
+    let mut current = left;
     let mut stack = vec![right];
     let mut operators = vec![top_op.node];
-    let precedence = top_op.node.precedence();
-    let mut current = left;
+
+    let (mut first, mut chain) = (None, Vec::new());
 
     loop {
-        match current.kind {
-            ast::ExprKind::Binary(op, ref left, ref right)
-                if op.node.precedence() == precedence =>
-            {
-                operators.push(op.node);
-                current = left;
-                stack.push(right);
+        if let ast::ExprKind::Binary(op, ref left, ref right) = current.kind
+            && op.node.precedence() == top_op.node.precedence()
+        {
+            current = left;
+            operators.push(op.node);
+            stack.push(right);
+        } else {
+            if first.is_none() {
+                first = Some(current);
+            } else {
+                let operator = operators.pop().unwrap();
+                chain.push((operator, current));
             }
-            _ => {
-                if first.is_none() {
-                    first = Some(current);
-                } else {
-                    let op = operators.pop().unwrap();
-                    chain.push((op, current));
-                }
-                match stack.pop() {
-                    None => break,
-                    Some(expr) => current = expr,
-                }
-            }
+            let Some(expr) = stack.pop() else {
+                break;
+            };
+            current = expr;
         }
     }
     (first.unwrap(), chain)
