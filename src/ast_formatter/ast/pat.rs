@@ -44,7 +44,8 @@ impl AstFormatter {
                 self.struct_pat(qself, path, fields, rest, take_tail())?
             }
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
-                self.qpath(qself, path, false)?;
+                // todo tail?
+                self.qpath(qself, path, false, None)?;
                 self.list(
                     Braces::Parens,
                     fields,
@@ -55,7 +56,7 @@ impl AstFormatter {
             ast::PatKind::Or(ref pats) => {
                 self.simple_infix_chain("|", pats, |pat| self.pat(pat), false, take_tail())?
             }
-            ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false)?,
+            ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false, take_tail())?,
             ast::PatKind::Tuple(ref fields) => self.list(
                 Braces::Parens,
                 fields,
@@ -114,7 +115,8 @@ impl AstFormatter {
         rest: ast::PatFieldsRest,
         tail: Tail,
     ) -> FormatResult {
-        self.qpath(qself, path, false)?;
+        // todo tail?
+        self.qpath(qself, path, false, None)?;
         self.out.space()?;
         self.list(
             Braces::Curly,

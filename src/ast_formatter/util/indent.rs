@@ -28,11 +28,7 @@ impl AstFormatter {
     pub fn indented<T>(&self, format: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         let indent = self.out.total_indent.get() + INDENT_WIDTH;
         self.out.total_indent.with_replaced(indent, || {
-            // indentation "resets" the shape to Unrestricted
-            // since the shape is only concerned with where code touches the left margin.
             self.constraints().disallowed_vstructs.with_replaced(EnumSet::new(), format)
-            // self.constraints().single_line.with_replaced(false, || {
-            // })
         })
     }
 

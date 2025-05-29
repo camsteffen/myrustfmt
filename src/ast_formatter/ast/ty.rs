@@ -47,7 +47,7 @@ impl AstFormatter {
                     .force_trailing_comma(elements.len() == 1)
                     .tail(take_tail()),
             )?,
-            ast::TyKind::Path(qself, path) => self.qpath(qself, path, false)?,
+            ast::TyKind::Path(qself, path) => self.qpath(qself, path, false, take_tail())?,
             ast::TyKind::TraitObject(bounds, syntax) => {
                 match syntax {
                     ast::TraitObjectSyntax::Dyn => {

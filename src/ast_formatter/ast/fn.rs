@@ -21,17 +21,22 @@ impl AstFormatter {
         self.fn_header(&sig.header)?;
         self.token_ident_generic_params("fn", item.ident, generics)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
-        self.fn_decl(&sig.decl, Braces::Parens, |wrapped_return_type| {
-            if is_block_after_decl {
-                if wrapped_return_type {
-                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                } else {
-                    self.out.space_allow_comments()?;
+        let wrapped_return_type = self.fn_decl(
+            &sig.decl,
+            Braces::Parens,
+            self.tail_fn(|af| {
+                if is_block_after_decl {
+                    af.out.space_allow_comments()?;
+                    af.out.token("{")?;
                 }
-                self.out.token("{")?;
-            }
-            Ok(())
-        })?;
+                Ok(())
+            })
+            .as_ref(),
+        )?;
+        if is_block_after_decl && wrapped_return_type {
+            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+            self.out.token("{")?;
+        }
         self.where_clause(&generics.where_clause, body.is_some())?;
         if let Some(body) = body {
             self.block_expr(is_block_after_decl, body)?;
@@ -56,20 +61,29 @@ impl AstFormatter {
             if let Some(coroutine_kind) = &closure.coroutine_kind {
                 self.coroutine_kind(coroutine_kind)?;
             }
-            self.fn_decl(&closure.fn_decl, Braces::Pipe, |wrapped_return_type| {
-                if wrapped_return_type {
-                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                } else {
-                    self.out.space_allow_comments()?;
-                }
+            let body = |af: &AstFormatter| -> FormatResult {
                 let has_return_type = match closure.fn_decl.output {
                     ast::FnRetTy::Default(_) => false,
                     ast::FnRetTy::Ty(_) => true,
                 };
-                let single_line_header = self.out.line() == first_line;
-                self.closure_body(&closure.body, has_return_type, single_line_header, tail)?;
+                let single_line_header = af.out.line() == first_line;
+                af.closure_body(&closure.body, has_return_type, single_line_header, tail)?;
                 Ok(())
-            })?;
+            };
+            let wrapped_return_type = self.fn_decl(
+                &closure.fn_decl,
+                Braces::Pipe,
+                self.tail_fn(|af| {
+                    af.out.space_allow_comments()?;
+                    body(af)?;
+                    Ok(())
+                })
+                .as_ref(),
+            )?;
+            if wrapped_return_type {
+                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                body(self)?;
+            }
             Ok(())
         })
     }
@@ -118,7 +132,7 @@ impl AstFormatter {
         // self.extern_(&bare_fn_ty.ext)?;
         // self.generic_params(&bare_fn_ty.generic_params)?;
         self.out.token("fn")?;
-        self.fn_decl(&bare_fn_ty.decl, Braces::Parens, |_| Ok(()))?;
+        self.fn_decl(&bare_fn_ty.decl, Braces::Parens, None)?;
         Ok(())
     }
 
@@ -139,7 +153,7 @@ impl AstFormatter {
         )?;
         if let ast::FnRetTy::Ty(_) = parenthesized_args.output {
             self.out.space()?;
-            self.fn_ret_ty(&parenthesized_args.output)?;
+            self.fn_ret_ty(&parenthesized_args.output, None)?;
         }
         // todo pass tail to ret ty?
         self.tail(final_tail)?;
@@ -164,29 +178,33 @@ impl AstFormatter {
         Ok(())
     }
 
+    /// N.B. `tail` is not invoked if the return type is wrapped (`true` is returned)
     fn fn_decl(
         &self,
         fn_decl: &ast::FnDecl,
         braces: Braces,
-        tail: impl Fn(/*wrapped_return_type:*/ bool) -> FormatResult,
-    ) -> FormatResult {
+        tail: Tail,
+    ) -> FormatResult</*wrapped_return_type*/bool> {
         let has_ret_ty = matches!(fn_decl.output, ast::FnRetTy::Ty(_));
-        let return_ty_tail = |force_wrap: bool| {
+        let return_ty_tail = |single_line: bool, force_wrap: bool| -> FormatResult<bool> {
             if !has_ret_ty {
-                return tail(false);
+                self.tail(tail)?;
+                return Ok(false);
             }
-            let did_wrap = self.indented(|| {
-                let did_wrap = if force_wrap {
-                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                    true
-                } else {
-                    self.out.space_allow_comments()?
-                };
-                self.with_single_line_if(!did_wrap, || self.fn_ret_ty(&fn_decl.output))?;
-                Ok(did_wrap)
-            })?;
-            tail(did_wrap)?;
-            Ok(())
+            let indent_guard = self.begin_indent();
+            let wrapped = if force_wrap {
+                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                true
+            } else {
+                self.out.space_allow_comments()?
+            };
+            if wrapped {
+                self.fn_ret_ty(&fn_decl.output, None)?;
+            } else {
+                drop(indent_guard);
+                self.with_single_line_if(single_line, || self.fn_ret_ty(&fn_decl.output, tail))?;
+            }
+            Ok(wrapped)
         };
         let args = |arg_list_shape| {
             self.has_vstruct(VStruct::NonBlockIndent, || {
@@ -198,34 +216,38 @@ impl AstFormatter {
                 )
             })
         };
-        let args_return_ty = |arg_list_shape| {
-            args(arg_list_shape)?;
-            return_ty_tail(false)?;
-            Ok(())
-        };
 
         // if there are no args, then we might wrap the return type to recover width
         if fn_decl.inputs.is_empty() {
             let first_line = self.out.line();
             args(ListShape::Horizontal)?;
-            let can_wrap_ret_ty = has_ret_ty && self.out.line() == first_line;
-            if can_wrap_ret_ty {
-                self.backtrack()
-                    .next(|| self.out.with_recover_width(|| return_ty_tail(false)))
-                    .next(|| return_ty_tail(true))
-                    .result()?;
-            } else {
-                return_ty_tail(false)?;
+            if !has_ret_ty {
+                self.tail(tail)?;
+                return Ok(false);
             }
-            return Ok(());
+            if self.out.line() > first_line {
+                return return_ty_tail(false, false);
+            }
+            return self
+                .backtrack()
+                .next(|| self.out.with_recover_width(|| return_ty_tail(true, false)))
+                .next(|| return_ty_tail(false, true))
+                .result();
         }
 
         // there are one or more args
         self.backtrack()
-            .next(|| self.out.with_recover_width(|| args_return_ty(ListShape::Horizontal)))
-            .next(|| args_return_ty(ListShape::Vertical))
-            .result()?;
-        Ok(())
+            .next(|| {
+                self.out.with_recover_width(|| {
+                    args(ListShape::Horizontal)?;
+                    return_ty_tail(true, false)
+                })
+            })
+            .next(|| {
+                args(ListShape::Vertical)?;
+                return_ty_tail(false, false)
+            })
+            .result()
     }
 
     fn param(&self, param: &ast::Param, tail: Tail, _lcx: ListItemContext) -> FormatResult {
@@ -278,12 +300,12 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn fn_ret_ty(&self, output: &ast::FnRetTy) -> FormatResult {
+    fn fn_ret_ty(&self, output: &ast::FnRetTy, tail: Tail) -> FormatResult {
         match output {
             ast::FnRetTy::Default(_) => {}
             ast::FnRetTy::Ty(ty) => {
                 self.out.token_space("->")?;
-                self.ty(ty)?;
+                self.ty_tail(ty, tail)?;
             }
         }
         Ok(())

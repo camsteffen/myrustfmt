@@ -12,9 +12,10 @@ impl AstFormatter {
         qself: &Option<P<ast::QSelf>>,
         path: &ast::Path,
         turbofish: bool,
+        tail: Tail,
     ) -> FormatResult {
         let Some(qself) = qself.as_deref() else {
-            return self.path(path, turbofish);
+            return self.path_tail(path, turbofish, tail);
         };
         self.out.token("<")?;
         self.ty(&qself.ty)?;
@@ -28,7 +29,7 @@ impl AstFormatter {
         };
         self.out.token(">")?;
         self.out.token("::")?;
-        self.path_segments(rest, turbofish)?;
+        self.path_segments_tail(rest, turbofish, tail)?;
         Ok(())
     }
 
@@ -36,12 +37,32 @@ impl AstFormatter {
         self.path_segments(&path.segments, turbofish)
     }
 
+    pub fn path_tail(&self, path: &ast::Path, turbofish: bool, tail: Tail) -> FormatResult {
+        self.path_segments_tail(&path.segments, turbofish, tail)
+    }
+
     pub fn path_segments(&self, segments: &[ast::PathSegment], turbofish: bool) -> FormatResult {
-        let (first, rest) = segments.split_first().unwrap();
-        self.path_segment(first, turbofish, None)?;
-        for segment in rest {
-            self.out.token("::")?;
-            self.path_segment(segment, turbofish, None)?;
+        self.path_segments_tail(segments, turbofish, None)
+    }
+
+    pub fn path_segments_tail(
+        &self,
+        segments: &[ast::PathSegment],
+        turbofish: bool,
+        tail: Tail,
+    ) -> FormatResult {
+        match segments {
+            [] => panic!("empty path segments"),
+            [segment] => self.path_segment(segment, turbofish, tail)?,
+            [first, middle @ .., last] => {
+                self.path_segment(first, turbofish, None)?;
+                for segment in middle {
+                    self.out.token("::")?;
+                    self.path_segment(segment, turbofish, None)?;
+                }
+                self.out.token("::")?;
+                self.path_segment(last, turbofish, tail)?;
+            }
         }
         Ok(())
     }

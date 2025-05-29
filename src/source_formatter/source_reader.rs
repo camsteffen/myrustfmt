@@ -23,12 +23,7 @@ impl SourceReader {
 
     pub fn finish(self) {
         if self.pos.get().to_usize() != self.source().len() {
-            panic_parse_error(
-                ParseError::UnexpectedEof,
-                self.path.as_deref(),
-                self.source(),
-                self.pos.get(),
-            )
+            self.parse_error(ParseError::UnexpectedEof);
         }
     }
 
