@@ -40,7 +40,9 @@ impl AstFormatter {
                 }
             };
             if chain.is_empty() {
-                drop(indent_guard);
+                if let Some(indent_guard) = indent_guard {
+                    indent_guard.close();
+                }
                 return self.tail(tail);
             }
             self.backtrack()

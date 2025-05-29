@@ -104,7 +104,7 @@ impl AstFormatter {
             Ok(())
         })?;
         if let Some(indent_guard) = indent_guard {
-            drop(indent_guard);
+            indent_guard.close();
             self.out.newline_indent(VerticalWhitespaceMode::Break)?;
             Ok(true)
         } else {

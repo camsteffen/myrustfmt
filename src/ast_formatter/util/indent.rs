@@ -1,11 +1,13 @@
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::error::FormatResult;
 use crate::source_formatter::SourceFormatter;
-use crate::util::cell_ext::CellExt;
-use enumset::EnumSet;
 
 pub struct IndentGuard<'a> {
     out: &'a SourceFormatter,
+}
+
+impl IndentGuard<'_> {
+    pub fn close(self) {}
 }
 
 impl Drop for IndentGuard<'_> {
@@ -26,10 +28,8 @@ impl AstFormatter {
     }
 
     pub fn indented<T>(&self, format: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        let indent = self.out.total_indent.get() + INDENT_WIDTH;
-        self.out.total_indent.with_replaced(indent, || {
-            self.constraints().disallowed_vstructs.with_replaced(EnumSet::new(), format)
-        })
+        let _guard = self.begin_indent();
+        format()
     }
 
     pub fn indented_optional(

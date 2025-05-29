@@ -43,32 +43,34 @@ impl AstFormatter {
         let checkpoint = self.out.checkpoint();
         let first_line = self.out.line();
         let indent_guard = self.begin_indent();
-        self.out.space_allow_comments()?;
-        if self.out.line() != first_line {
+        if self.out.space_allow_comments()? {
+            // wrap forced by comments
             then()?;
             return Ok(Some(indent_guard));
         }
-        let start_if_wrap = self.out.total_indent.get();
-        drop(indent_guard);
-        let wrap_has_more_width = self.out.col() > start_if_wrap;
+        // N.B. observe indent before closing indent guard
+        let col_if_wrap_indent = self.out.total_indent.get();
+        indent_guard.close();
+        if self.out.col() <= col_if_wrap_indent {
+            // wrapping does not give more width
+            then()?;
+            return Ok(None);
+        }
         let result = self.out.with_recover_width(&then);
         if self.out.line() != first_line {
             result?;
             return Ok(Some(self.begin_indent()));
         }
         match result {
-            Err(e)
-                if wrap_has_more_width && matches!(e.kind, ConstraintErrorKind::WidthLimitExceeded) =>
-            {
+            Err(e) if matches!(e.kind, ConstraintErrorKind::WidthLimitExceeded) => {
                 self.out.restore_checkpoint(&checkpoint);
                 let indent_guard = self.begin_indent();
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 then()?;
-                return Ok(Some(indent_guard));
+                Ok(Some(indent_guard))
             }
-            _ => {}
+            Err(e) => Err(e),
+            Ok(()) => Ok(None),
         }
-        result?;
-        Ok(None)
     }
 }
