@@ -46,6 +46,7 @@ pub fn expr_kind_name(expr: &Expr) -> &'static str {
         ExprKind::Unary(..) => "Unary",
         ExprKind::Underscore => "Underscore",
         ExprKind::UnsafeBinderCast(..) => "UnsafeBinderCast",
+        ExprKind::Use(..) => "Use",
         ExprKind::While(..) => "While",
         ExprKind::Yeet(_) => "Yeet",
         ExprKind::Yield(_) => "Yield",

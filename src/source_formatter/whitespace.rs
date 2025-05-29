@@ -1,8 +1,7 @@
 use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::source_formatter::SourceFormatter;
 use crate::whitespace::VerticalWhitespaceMode;
-use rustc_lexer::Token;
-use rustc_lexer::TokenKind;
+use rustc_lexer::{FrontmatterAllowed, Token, TokenKind};
 
 impl SourceFormatter {
     /// Allows any comments or nothing.
@@ -153,7 +152,7 @@ impl SourceFormatter {
 
 /// Tokenize whitespace and comment tokens. Stop upon encountering anything else.
 fn tokenize(source: &str) -> impl Iterator<Item = Token> {
-    let mut cursor = rustc_lexer::Cursor::new(source);
+    let mut cursor = rustc_lexer::Cursor::new(source, FrontmatterAllowed::No);
     std::iter::from_fn(move || {
         let remaining = cursor.as_str();
         let next_char = remaining.chars().next();

@@ -93,6 +93,7 @@ impl AstFormatter {
                 self.out.token(")")?;
             }
             ast::PatKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,
+            ast::PatKind::Missing => todo!(),
             ast::PatKind::Err(_) => todo!(),
         }
 

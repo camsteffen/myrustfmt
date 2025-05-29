@@ -1,7 +1,5 @@
 #![feature(let_chains)]
-#![feature(precise_capturing_in_traits)]
 #![feature(rustc_private)]
-#![feature(slice_take)]
 #![feature(unqualified_local_imports)]
 // Uncomment to let clippy babble (with some overrides made below)
 // #![warn(clippy::pedantic)]
@@ -181,7 +179,8 @@ pub fn format_module_file_roots(
     is_check: bool,
     is_verbose: bool,
 ) -> Result<(), ()> {
-    rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
+    // todo use extra_symbols?
+    rustc_span::create_session_globals_then(Edition::Edition2024, &[], None, || {
         let config = Rc::new(config);
         let mut queue = VecDeque::<(PathBuf, Option<Ident>)>::from_iter(
             paths.into_iter().map(|path| (path.into(), None)),
@@ -233,7 +232,7 @@ fn format_module_file(
 }
 
 pub fn format_str(source: &str, config: Config) -> Result<FormatModuleResult, ErrorGuaranteed> {
-    rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
+    rustc_span::create_session_globals_then(Edition::Edition2024, &[], None, || {
         let ParseModuleResult {
             module,
             source_file,

@@ -57,11 +57,11 @@ fn is_mod_inline(kind: &ModKind) -> bool {
 
 impl Visitor<'_> for SubmoduleVisitor<'_> {
     fn visit_item(&mut self, item: &ast::Item) {
-        match &item.kind {
-            ast::ItemKind::Mod(_, mod_kind) => {
+        match item.kind {
+            ast::ItemKind::Mod(_, ident, ref mod_kind) => {
                 let path_from_attr = self.path_from_attr(item);
                 if is_mod_inline(mod_kind) {
-                    let dir = path_from_attr.unwrap_or_else(|| self.inline_mod_dir(item));
+                    let dir = path_from_attr.unwrap_or_else(|| self.inline_mod_dir(ident));
                     let dir_prev = std::mem::replace(&mut self.dir, dir);
                     let relative = self.relative.take();
                     visit::walk_item(self, item);
@@ -72,7 +72,7 @@ impl Visitor<'_> for SubmoduleVisitor<'_> {
                         let relative = None;
                         Submodule { path, relative }
                     } else {
-                        self.find_external_module(item)
+                        self.find_external_module(ident)
                     };
                     self.submodules.push(submodule);
                 }
@@ -91,9 +91,9 @@ impl SubmoduleVisitor<'_> {
         Some(self.dir.join(path.as_str()))
     }
 
-    fn find_external_module(&mut self, item: &ast::Item) -> Submodule {
+    fn find_external_module(&mut self, ident: Ident) -> Submodule {
         // todo check for mod cycle
-        let mod_path = match default_submod_path(self.psess, item.ident, self.relative, &self.dir) {
+        let mod_path = match default_submod_path(self.psess, ident, self.relative, &self.dir) {
             Ok(mod_path) => mod_path,
             Err(e) => self.mod_error(e),
         };
@@ -106,14 +106,14 @@ impl SubmoduleVisitor<'_> {
         }
     }
 
-    fn inline_mod_dir(&self, item: &ast::Item) -> PathBuf {
+    fn inline_mod_dir(&self, ident: Ident) -> PathBuf {
         let mut dir = self.dir.clone();
         if let Some(relative) = self.relative {
             // we're in foo.rs and found `mod bar {..}`, so go into ./foo/bar
             dir.push(relative.name.as_str());
-            dir.push(item.ident.name.as_str());
+            dir.push(ident.name.as_str());
         } else {
-            dir.push(item.ident.name.as_str());
+            dir.push(ident.name.as_str());
         }
         dir
     }

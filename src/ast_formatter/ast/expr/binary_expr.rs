@@ -5,7 +5,6 @@ use crate::error::FormatResult;
 use crate::constraints::VStruct;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
-use rustc_ast::util::parser::AssocOp;
 use rustc_span::source_map::Spanned;
 
 impl AstFormatter {
@@ -83,13 +82,13 @@ fn collect_binary_expr_chain<'a>(
     let mut chain = Vec::new();
     let mut stack = vec![right];
     let mut operators = vec![top_op.node];
-    let precedence = AssocOp::from_ast_binop(top_op.node).precedence();
+    let precedence = top_op.node.precedence();
     let mut current = left;
 
     loop {
         match current.kind {
             ast::ExprKind::Binary(op, ref left, ref right)
-                if AssocOp::from_ast_binop(op.node).precedence() == precedence =>
+                if op.node.precedence() == precedence =>
             {
                 operators.push(op.node);
                 current = left;

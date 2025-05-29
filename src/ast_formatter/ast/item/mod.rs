@@ -51,14 +51,14 @@ impl AstFormatter {
 
     pub fn item_kind(&self, kind: &ast::ItemKind, item: &ast::Item) -> FormatResult {
         match *kind {
-            ast::ItemKind::ExternCrate(name) => self.extern_crate(name, item)?,
+            ast::ItemKind::ExternCrate(name, ident) => self.extern_crate(name, ident)?,
             ast::ItemKind::Use(ref use_tree) => {
                 self.out.token_space("use")?;
                 self.use_tree(use_tree, self.tail_token(";").as_ref())?;
             }
             ast::ItemKind::Static(ref static_item) => {
                 self.out.token_space("static")?;
-                self.ident(item.ident)?;
+                self.ident(static_item.ident)?;
                 self.out.token_space(":")?;
                 self.ty(&static_item.ty)?;
                 if let Some(expr) = &static_item.expr {
@@ -67,28 +67,30 @@ impl AstFormatter {
                 }
                 self.out.token(";")?;
             }
-            ast::ItemKind::Const(ref const_item) => self.const_item(const_item, item.ident)?,
-            ast::ItemKind::Fn(ref fn_) => self.fn_(fn_, item)?,
-            ast::ItemKind::Mod(safety, ref mod_kind) => self.mod_item(safety, mod_kind, item)?,
+            ast::ItemKind::Const(ref const_item) => self.const_item(const_item)?,
+            ast::ItemKind::Fn(ref fn_) => self.fn_(fn_)?,
+            ast::ItemKind::Mod(safety, ident, ref mod_kind) => {
+                self.mod_item(safety, ident, mod_kind)?
+            }
             ast::ItemKind::ForeignMod(_) => todo!(),
             ast::ItemKind::GlobalAsm(_) => todo!(),
             ast::ItemKind::TyAlias(ref ty_alias) => {
-                self.token_ident_generic_params("type", item.ident, &ty_alias.generics)?;
+                self.token_ident_generic_params("type", ty_alias.ident, &ty_alias.generics)?;
                 if let Some(ty) = &ty_alias.ty {
                     self.out.space_token_space("=")?;
                     self.ty(ty)?;
                 }
                 self.out.token(";")?;
             }
-            ast::ItemKind::Enum(ref def, ref generics) => {
-                self.enum_(&def.variants, generics, item)?
+            ast::ItemKind::Enum(ident, ref def, ref generics) => {
+                self.enum_(ident, &def.variants, generics)?
             }
-            ast::ItemKind::Struct(ref variants, ref generics) => {
-                self.struct_item(variants, generics, item)?
+            ast::ItemKind::Struct(ident, ref variants, ref generics) => {
+                self.struct_item(ident, variants, generics)?
             }
-            ast::ItemKind::Union(_, _) => todo!(),
-            ast::ItemKind::Trait(ref trait_) => self.trait_(trait_, item)?,
-            ast::ItemKind::TraitAlias(_, _) => todo!(),
+            ast::ItemKind::Union(..) => todo!(),
+            ast::ItemKind::Trait(ref trait_) => self.trait_(trait_)?,
+            ast::ItemKind::TraitAlias(..) => todo!(),
             ast::ItemKind::Impl(ref impl_) => self.impl_(impl_)?,
             ast::ItemKind::MacCall(ref mac_call) => {
                 self.mac_call(mac_call)?;
@@ -97,7 +99,7 @@ impl AstFormatter {
                 }
             }
             // todo
-            ast::ItemKind::MacroDef(_) => self.out.copy_span(item.span)?,
+            ast::ItemKind::MacroDef(..) => self.out.copy_span(item.span)?,
             ast::ItemKind::Delegation(_) => todo!(),
             ast::ItemKind::DelegationMac(_) => todo!(),
         }
@@ -125,9 +127,9 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn const_item(&self, const_item: &ast::ConstItem, ident: Ident) -> FormatResult {
+    fn const_item(&self, const_item: &ast::ConstItem) -> FormatResult {
         self.out.token_space("const")?;
-        self.ident(ident)?;
+        self.ident(const_item.ident)?;
         self.out.token_space(":")?;
         let Some(expr) = &const_item.expr else {
             self.ty_tail(&const_item.ty, self.tail_token(";").as_ref())?;
@@ -141,11 +143,11 @@ impl AstFormatter {
 
     fn enum_(
         &self,
+        ident: Ident,
         variants: &[ast::Variant],
         generics: &ast::Generics,
-        item: &ast::Item,
     ) -> FormatResult {
-        self.token_ident_generic_params("enum", item.ident, generics)?;
+        self.token_ident_generic_params("enum", ident, generics)?;
         self.out.space()?;
         self.list(
             Braces::Curly,
@@ -156,27 +158,22 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn extern_crate(&self, name: Option<Symbol>, item: &ast::Item) -> FormatResult {
+    fn extern_crate(&self, name: Option<Symbol>, ident: Ident) -> FormatResult {
         self.out.token_space("extern")?;
         self.out.token_space("crate")?;
         if name.is_some() {
             self.out.copy_next_token()?;
             self.out.space_token_space("as")?;
         }
-        self.ident(item.ident)?;
+        self.ident(ident)?;
         self.out.token(";")?;
         Ok(())
     }
 
-    fn mod_item(
-        &self,
-        safety: ast::Safety,
-        mod_kind: &ast::ModKind,
-        item: &ast::Item,
-    ) -> FormatResult {
+    fn mod_item(&self, safety: ast::Safety, ident: Ident, mod_kind: &ast::ModKind) -> FormatResult {
         self.safety(safety)?;
         self.out.token_space("mod")?;
-        self.ident(item.ident)?;
+        self.ident(ident)?;
         match mod_kind {
             ast::ModKind::Loaded(items, ast::Inline::Yes, ..) => {
                 self.out.space()?;
@@ -259,22 +256,22 @@ impl AstFormatter {
     }
 
     fn assoc_item(&self, item: &ast::AssocItem) -> FormatResult {
-        self.item_generic(item, |kind| self.assoc_item_kind(kind, item))
+        self.item_generic(item, |kind| self.assoc_item_kind(kind))
     }
 
-    fn assoc_item_kind(&self, kind: &ast::AssocItemKind, item: &ast::AssocItem) -> FormatResult {
+    fn assoc_item_kind(&self, kind: &ast::AssocItemKind) -> FormatResult {
         match kind {
-            ast::AssocItemKind::Const(const_item) => self.const_item(const_item, item.ident),
-            ast::AssocItemKind::Fn(fn_) => self.fn_(fn_, item),
-            ast::AssocItemKind::Type(ty_alias) => self.ty_alias(ty_alias, item.ident),
+            ast::AssocItemKind::Const(const_item) => self.const_item(const_item),
+            ast::AssocItemKind::Fn(fn_) => self.fn_(fn_),
+            ast::AssocItemKind::Type(ty_alias) => self.ty_alias(ty_alias),
             ast::AssocItemKind::MacCall(_mac_call) => todo!(),
             ast::AssocItemKind::Delegation(_delegation) => todo!(),
             ast::AssocItemKind::DelegationMac(_delegation_mac) => todo!(),
         }
     }
 
-    fn ty_alias(&self, ty_alias: &ast::TyAlias, ident: Ident) -> FormatResult {
-        self.token_ident_generic_params("type", ident, &ty_alias.generics)?;
+    fn ty_alias(&self, ty_alias: &ast::TyAlias) -> FormatResult {
+        self.token_ident_generic_params("type", ty_alias.ident, &ty_alias.generics)?;
         self.generic_bounds_optional(&ty_alias.bounds)?;
         if let Some(ty) = &ty_alias.ty {
             self.out.space_token_space("=")?;
@@ -286,16 +283,16 @@ impl AstFormatter {
 
     fn struct_item(
         &self,
+        ident: Ident,
         variants: &ast::VariantData,
         generics: &ast::Generics,
-        item: &ast::Item,
     ) -> FormatResult {
         let (has_body, has_semi) = match variants {
             ast::VariantData::Struct { .. } => (true, false),
             ast::VariantData::Tuple(..) => (true, true),
             ast::VariantData::Unit(_) => (false, true),
         };
-        self.token_ident_generic_params("struct", item.ident, generics)?;
+        self.token_ident_generic_params("struct", ident, generics)?;
         self.where_clause(&generics.where_clause, has_body)?;
         self.variant_data(variants, false, generics.where_clause.is_empty())?;
         if has_semi {
@@ -316,8 +313,8 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn trait_(&self, trait_: &ast::Trait, item: &ast::Item) -> FormatResult {
-        self.token_ident_generic_params("trait", item.ident, &trait_.generics)?;
+    fn trait_(&self, trait_: &ast::Trait) -> FormatResult {
+        self.token_ident_generic_params("trait", trait_.ident, &trait_.generics)?;
         let wrapped_bounds = self.generic_bounds_optional(&trait_.bounds)?;
         // todo share this code with other constructs
         let has_where = self.where_clause(&trait_.generics.where_clause, true)?;

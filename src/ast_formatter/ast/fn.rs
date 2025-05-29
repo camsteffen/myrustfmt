@@ -11,7 +11,7 @@ use rustc_ast::ast;
 use rustc_span::symbol::kw;
 
 impl AstFormatter {
-    pub fn fn_<K>(&self, fn_: &ast::Fn, item: &ast::Item<K>) -> FormatResult {
+    pub fn fn_(&self, fn_: &ast::Fn) -> FormatResult {
         let ast::Fn {
             generics,
             sig,
@@ -19,7 +19,7 @@ impl AstFormatter {
             ..
         } = fn_;
         self.fn_header(&sig.header)?;
-        self.token_ident_generic_params("fn", item.ident, generics)?;
+        self.token_ident_generic_params("fn", fn_.ident, generics)?;
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
         let wrapped_return_type = self.fn_decl(
             &sig.decl,
@@ -55,6 +55,7 @@ impl AstFormatter {
             }
             match closure.capture_clause {
                 ast::CaptureBy::Ref => {}
+                ast::CaptureBy::Use { .. } => todo!(),
                 ast::CaptureBy::Value { .. } => self.out.token_space("move")?,
             }
             self.constness(closure.constness)?;
@@ -262,32 +263,30 @@ impl AstFormatter {
             af.ty_tail(&param.ty, tail)?;
             Ok(())
         };
-        if let ast::PatKind::Ident(BindingMode(_, mutbl), ident, _) = param.pat.kind {
-            match ident.name {
-                // fn(TypeWithoutName)
-                kw::Empty => return self.ty_tail(&param.ty, tail),
-                kw::SelfLower => {
-                    match param.ty.kind {
-                        ast::TyKind::ImplicitSelf => {
-                            self.mutability(mutbl)?;
-                            self.ty_tail(&param.ty, tail)?;
-                            return Ok(());
-                        }
-                        ast::TyKind::Ref(_, ref mut_ty) | ast::TyKind::PinnedRef(_, ref mut_ty)
-                            if mut_ty.ty.kind.is_implicit_self() =>
-                        {
-                            return self.ty_tail(&param.ty, tail);
-                        }
-                        _ => {
-                            self.mutability(mutbl)?;
-                            self.out.token("self")?;
-                            colon_ty(self)?;
-                            return Ok(());
-                        }
-                    };
+        // fn(TypeWithoutName)
+        if let ast::PatKind::Missing = param.pat.kind {
+            return self.ty_tail(&param.ty, tail);
+        }
+        if let ast::PatKind::Ident(BindingMode(_, mutbl), ident, _) = param.pat.kind
+            && ident.name == kw::SelfLower
+        {
+            match param.ty.kind {
+                ast::TyKind::ImplicitSelf => {
+                    self.mutability(mutbl)?;
+                    self.ty_tail(&param.ty, tail)?;
                 }
-                _ => {}
+                ast::TyKind::Ref(_, ref mut_ty) | ast::TyKind::PinnedRef(_, ref mut_ty)
+                    if mut_ty.ty.kind.is_implicit_self() =>
+                {
+                    self.ty_tail(&param.ty, tail)?;
+                }
+                _ => {
+                    self.mutability(mutbl)?;
+                    self.out.token("self")?;
+                    colon_ty(self)?;
+                }
             }
+            return Ok(());
         }
         let colon_ty_tail;
         let tail = if matches!(param.ty.kind, ast::TyKind::Infer) {

@@ -159,6 +159,7 @@ impl AstFormatter {
                     self.expr_tail(target, take_tail())?;
                 }
             }
+            ast::ExprKind::Use(_, _) => todo!(),
             ast::ExprKind::InlineAsm(_) => todo!(),
             ast::ExprKind::OffsetOf(_, _) => todo!(),
             ast::ExprKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,

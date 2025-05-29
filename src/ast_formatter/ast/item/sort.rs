@@ -22,7 +22,10 @@ enum SortableItemGroupKind {
 impl SortableItemGroupKind {
     fn compare(self, a: &ast::Item, b: &ast::Item) -> Ordering {
         match self {
-            SortableItemGroupKind::Mod => version_sort(a.ident.as_str(), b.ident.as_str()),
+            SortableItemGroupKind::Mod => version_sort(
+                a.kind.ident().unwrap().as_str(),
+                b.kind.ident().unwrap().as_str(),
+            ),
             SortableItemGroupKind::Use => {
                 fn expect_use_tree(item: &ast::Item) -> &ast::UseTree {
                     match &item.kind {
@@ -140,7 +143,7 @@ impl AstFormatter {
 }
 
 fn is_external_mod(item: &ast::Item) -> bool {
-    matches!(item.kind, ast::ItemKind::Mod(_, ast::ModKind::Unloaded))
+    matches!(item.kind, ast::ItemKind::Mod(_, _, ast::ModKind::Unloaded))
 }
 
 fn is_use(item: &ast::Item) -> bool {
