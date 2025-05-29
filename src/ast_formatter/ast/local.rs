@@ -57,7 +57,7 @@ impl AstFormatter {
             }
         };
 
-        self.backtrack_from_checkpoint(checkpoint_after_eq)
+        self.backtrack()
             .next_if(!force_wrap, || {
                 self.space_could_wrap_indent(|| {
                     self.expr(expr)?;
@@ -77,7 +77,7 @@ impl AstFormatter {
                     Ok(())
                 })
             })
-            .result()?;
+            .result_with_checkpoint(&checkpoint_after_eq)?;
         Ok(())
     }
 

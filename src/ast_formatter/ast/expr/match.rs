@@ -123,7 +123,7 @@ impl AstFormatter {
             self.out.restore_checkpoint(&checkpoint);
         }
         // todo exclude comma for block-like expressions?
-        self.backtrack_from_checkpoint(checkpoint)
+        self.backtrack()
             .next_if(!force_block, || {
                 self.disallow_vstructs(VStruct::ControlFlow | VStruct::NonBlockIndent, || {
                     self.expr_tail(body, self.tail_fn(|af| af.out.token_insert(",")).as_ref())
@@ -139,7 +139,7 @@ impl AstFormatter {
                     Ok(())
                 })
             })
-            .result()?;
+            .result_with_checkpoint(&checkpoint)?;
         Ok(())
     }
 }

@@ -3,87 +3,76 @@ use crate::error::FormatResult;
 use crate::source_formatter::checkpoint::Checkpoint;
 
 impl AstFormatter {
-    /// See [`Backtrack`]
-    pub fn backtrack<T>(&self) -> Backtrack<T> {
+    pub fn backtrack<'a, T>(&self) -> Backtrack<'_, 'a, T> {
         Backtrack {
             af: self,
-            state: None,
-        }
-    }
-
-    pub fn backtrack_from_checkpoint<'a, T>(
-        &'a self,
-        checkpoint: Checkpoint<'a>,
-    ) -> Backtrack<'a, T> {
-        Backtrack {
-            af: self,
-            state: Some(BacktrackState {
-                checkpoint,
-                last_result: None,
-            }),
+            strategies: Vec::with_capacity(2),
         }
     }
 }
 
-/// Executes a series of formatting strategies to find one that succeeds with the given constraints.
-///
-/// Each strategy is chained by calling `next` with a formatting function, and the final strategy
-/// is chained with `otherwise`. If a strategy fails with a constraint error, it will restore a
-/// checkpoint before running the next strategy. If a strategy succeeds, it will hold the result
-/// until the end, and all subsequent strategies will be ignored.
-#[must_use]
-pub struct Backtrack<'a, T = ()> {
+pub struct Backtrack<'a, 's, T> {
     af: &'a AstFormatter,
-    state: Option<BacktrackState<'a, T>>,
+    strategies: Vec<Box<dyn FnOnce() -> FormatResult<T> + 's>>,
 }
 
-struct BacktrackState<'a, T> {
-    checkpoint: Checkpoint<'a>,
-    last_result: Option<FormatResult<T>>,
-}
-
-impl<T> Backtrack<'_, T> {
-    pub fn next(mut self, strategy: impl FnOnce() -> FormatResult<T>) -> Self {
-        self.do_next(strategy);
+impl<'s, T> Backtrack<'_, 's, T> {
+    pub fn next(mut self, strategy: impl FnOnce() -> FormatResult<T> + 's) -> Self {
+        self.strategies.push(Box::new(strategy));
         self
     }
 
-    pub fn next_if(mut self, condition: bool, strategy: impl Fn() -> FormatResult<T>) -> Self {
+    pub fn next_if(
+        mut self,
+        condition: bool,
+        strategy: impl FnOnce() -> FormatResult<T> + 's,
+    ) -> Self {
         if condition {
-            self.do_next(strategy);
+            self.strategies.push(Box::new(strategy));
         }
         self
     }
 
-    pub fn next_opt(mut self, strategy: Option<impl FnOnce() -> FormatResult<T>>) -> Self {
+    pub fn next_opt(mut self, strategy: Option<impl FnOnce() -> FormatResult<T> + 's>) -> Self {
         if let Some(strategy) = strategy {
-            self.do_next(strategy);
+            self.strategies.push(Box::new(strategy));
         }
         self
     }
 
     pub fn result(self) -> FormatResult<T> {
-        self.state.and_then(|state| state.last_result).unwrap()
+        self.result_inner(None)
     }
 
-    fn do_next(&mut self, strategy: impl FnOnce() -> FormatResult<T>) {
-        let state = match &mut self.state {
+    pub fn result_with_checkpoint(self, checkpoint: &Checkpoint) -> FormatResult<T> {
+        // todo is this redundant?
+        self.af.out.restore_checkpoint(checkpoint);
+        self.result_inner(Some(checkpoint))
+    }
+
+    fn result_inner(self, checkpoint: Option<&Checkpoint>) -> FormatResult<T> {
+        let mut iter = self.strategies.into_iter();
+        let first = iter.next().expect("must provide at least one strategy");
+        if iter.len() == 0 {
+            // avoid creating a checkpoint if there is only one strategy
+            return first();
+        }
+        let new_checkpoint;
+        let checkpoint = match checkpoint {
+            Some(checkpoint) => checkpoint,
             None => {
-                let checkpoint = self.af.out.checkpoint();
-                self.state.insert(BacktrackState {
-                    checkpoint,
-                    last_result: None,
-                })
-            }
-            Some(state) => {
-                if matches!(state.last_result, Some(Ok(_))) {
-                    return;
-                }
-                self.af.out.restore_checkpoint(&state.checkpoint);
-                state
+                new_checkpoint = self.af.out.checkpoint();
+                &new_checkpoint
             }
         };
-        let result = strategy();
-        state.last_result = Some(result);
+        let mut result = first();
+        for strategy in iter {
+            if result.is_ok() {
+                break;
+            }
+            self.af.out.restore_checkpoint(&checkpoint);
+            result = strategy();
+        }
+        result
     }
 }

@@ -88,10 +88,10 @@ where
         let Ok(horizontal_height) = horizontal_result else {
             return self
                 .af
-                .backtrack_from_checkpoint(checkpoint)
+                .backtrack()
                 .next_opt(self.contents_wrap_to_fit_fn_opt())
                 .next(|| self.contents_vertical())
-                .result();
+                .result_with_checkpoint(&checkpoint);
         };
 
         if horizontal_height == 1 {
