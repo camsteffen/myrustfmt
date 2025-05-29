@@ -102,7 +102,7 @@ impl AstFormatter {
                             | VStruct::ControlFlow
                             | VStruct::List
                             | VStruct::NonBlockIndent,
-                        || self.expr_tail(body, tail),
+                        || self.allow_vstructs(VStruct::Match, || self.expr_tail(body, tail)),
                     )
                 })
                 .next(|| {

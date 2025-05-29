@@ -7,12 +7,10 @@ use std::cmp::Ordering;
 
 pub fn use_tree_order(a: &ast::UseTree, b: &ast::UseTree) -> Ordering {
     cmp_iter_by(iter(a), iter(b), |element_a, element_b| {
-        cmp_by_key(&element_a, &element_b, |e| {
-            match e {
-                Element::Segment(_) => 0,
-                Element::Glob => 1,
-                Element::Nested(_) => 2,
-            }
+        cmp_by_key(&element_a, &element_b, |e| match e {
+            Element::Segment(_) => 0,
+            Element::Glob => 1,
+            Element::Nested(_) => 2,
         })
         .then_with(|| match (element_a, element_b) {
             (Element::Segment(a), Element::Segment(b)) => {

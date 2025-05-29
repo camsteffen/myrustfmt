@@ -129,14 +129,24 @@ impl Constraints {
 
     // effects
 
+    pub fn allow_vstructs(
+        &self,
+        values: impl Into<EnumSet<VStruct>>,
+        scope: impl FnOnce() -> FormatResult,
+    ) -> FormatResult {
+        let mut next = self.disallowed_vstructs.get();
+        next.remove_all(values.into());
+        self.disallowed_vstructs.with_replaced(next, scope)
+    }
+
     pub fn disallow_vstructs(
         &self,
         values: impl Into<EnumSet<VStruct>>,
         scope: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
-        let values = values.into();
-        let prev = self.disallowed_vstructs.get();
-        self.disallowed_vstructs.with_replaced(prev | values, scope)
+        let mut next = self.disallowed_vstructs.get();
+        next.insert_all(values.into());
+        self.disallowed_vstructs.with_replaced(next, scope)
     }
 
     /// Declares that the output in the given scope has the given Shape.

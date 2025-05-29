@@ -25,6 +25,7 @@ delegate_to_constraints! {
     pub fn with_replace_width_limit<T>(&self, width_limit: Option<WidthLimit>, scope: impl FnOnce() -> T) -> T;
 
     // shape
+    pub fn allow_vstructs(&self, values: impl Into<EnumSet<VStruct>>, scope: impl FnOnce() -> FormatResult) -> FormatResult;
     pub fn disallow_vstructs(&self, values: impl Into<EnumSet<VStruct>>, scope: impl FnOnce() -> FormatResult) -> FormatResult;
     pub fn has_vstruct<T>(&self, vstruct: VStruct, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
 }
