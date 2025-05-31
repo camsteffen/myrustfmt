@@ -16,7 +16,7 @@ impl AstFormatter {
     /// 
     /// N.B. This function relies on a subtle invariant that the given formatting scope will emit
     /// the entire first line except for trailing comments before returning a newline-related error
-    /// when applicable. See also [`Shape`].
+    /// when applicable.
     ///
     /// When the extra width is used, this means one of two things: either the extra width allowed
     /// for a different formatting strategy with more code on the first line, or the extra width was

@@ -1,4 +1,4 @@
-use crate::error::FormatResult;
+use crate::error::{ConstraintErrorKind, FormatResult};
 use crate::num::{HSize, VSize};
 use crate::util::cell_ext::CellExt;
 use enumset::{EnumSet, EnumSetType};
@@ -18,7 +18,6 @@ pub struct Constraints {
     //     since it represents limits that are independent of the global limit.
     /// The global maximum width
     max_width: Cell<HSize>,
-    // shape: Cell<Shape>,
     // todo using SingleLine to measure the width of the first line should ignore trailing line comments
     pub single_line: Cell<bool>,
     width_limit: Cell<Option<WidthLimit>>,
@@ -49,40 +48,29 @@ impl WidthLimit {
     }
 }
 
-/// Specifies a set of code formatting shapes, used to restrict what formatting strategies may be
-/// used in a given context.
-///
-/// It is generally enforced in two ways:
-///  1. The SingleLine variant causes an error to be raised upon attempting to write a newline.
-///  2. Other variants are "downgraded" to the SingleLine variant at times when it is known that
-///     a newline character would violate the original constraint.
-///
-/// A couple of reasons for this approach:
-///  * It simplifies the implementation since we can simply "decorate" code paths with what shape it
-///    has or requires.
-///  * It creates an invariant that we'll always emit the entire first line of output leading up to
-///    a newline-not-allowed error. Sometimes this is useful to observe how long the first line of
-///    output _would_ be if a more permissive shape were enabled.
+/// "Vertical structures". Various formatting shapes that may be disallowed in certain contexts and
+/// formatting strategies. It's "vertical" because this describes shapes that span multiple lines.
 #[derive(Debug, EnumSetType)]
 pub enum VStruct {
+    /// Closures when they span multiple lines.
     Closure,
-    /// Control flow expressions (if / for / loop / while)
+    /// Control flow expressions (if/for/loop/while)
     ControlFlow,
-    /// All kinds of lists (e.g. arrays, tuples, call arguments)
+    /// All kinds of lists (e.g. arrays, tuples, call arguments) when they span multiple lines.
     List,
     /// `match` expressions
     Match,
-    // todo include structs with multi-line headers
-    /// "block indent" here means that the first and last lines of the node are not indented, and
-    /// all lines in between are indented. Examples:
+    /// "block indent" means that the first and last lines of the node are not indented, and all
+    /// lines in between are indented. This variant describes anything that deviates from that
+    /// pattern.
+    /// 
+    /// Some examples:
     ///  * Nodes with attributes
     ///  * Control flow expressions where the header is multiple lines
     ///  * if/else expressions
     ///  * Multi-line dot chains and infix chains (with or without hanging indentation)
-    ///  * Range expression where both sides are multiple lines
-    ///  * Call expression where both the function and the arguments are multiple lines
-    ///  * Cast expression with wrapped `as`
-    ///  * Closure expressions with arguments on multiple lines
+    ///  * Cast expressions with `as <type>` wrapped and indented
+    ///  * Closure expressions with arguments on separate lines
     NonBlockIndent,
 }
 
@@ -149,10 +137,15 @@ impl Constraints {
         self.disallowed_vstructs.with_replaced(next, scope)
     }
 
-    /// Declares that the output in the given scope has the given Shape.
+    /// Declares that the output in the given scope has the given VStruct.
     ///
-    /// If this shape is not allowed, then an error will be raised upon emitting a newline.
-    /// (This also means that, if no newline is emitted, there will not be an error.)
+    /// If this shape is not allowed, then "single line" mode is enabled, so an error will be raised
+    /// upon emitting a newline.
+    ///
+    /// The reason we enable "single line" mode instead of returning an error immediately is because
+    /// we sometimes measure the width of the first line of output to inform a decision between
+    /// formatting strategies. It also makes this function more flexible by allowing for cases where
+    /// the scope fits in one line.
     pub fn has_vstruct<T>(
         &self,
         vstruct: VStruct,
