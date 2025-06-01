@@ -17,11 +17,6 @@ macro_rules! delegate_to_constraints {
 }
 
 delegate_to_constraints! {
-    // max width
-    pub fn with_replace_max_width<T>(&self, max_width: HSize, scope: impl FnOnce() -> T) -> T;
-
-    // width limit
-    pub fn width_limit(&self) -> Option<WidthLimit>;
     pub fn with_replace_width_limit<T>(&self, width_limit: Option<WidthLimit>, scope: impl FnOnce() -> T) -> T;
 
     // vertical structures
@@ -65,37 +60,21 @@ impl AstFormatter {
         self.with_single_line(scope)
     }
 
-    pub fn with_width_limit<T>(
-        &self,
-        width_limit: HSize,
-        format: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        // todo assert there is a checkpoint since width limits enable max width enforcement
-        let end = NonZero::new(self.out.col() + width_limit)
-            .expect("width limit should not end at column zero");
-        self.constraints()
-            .with_width_limit(WidthLimit::SingleLine { end }, format)
-    }
-
-    pub fn with_width_limit_first_line<T>(
-        &self,
-        width_limit: HSize,
-        format: impl FnOnce() -> T,
-    ) -> T {
+    pub fn with_width_limit<T>(&self, width_limit: HSize, scope: impl FnOnce() -> T) -> T {
         let (line, col) = self.out.line_col();
-        let end = NonZero::new(col + width_limit).unwrap();
+        let end_col = NonZero::new(col + width_limit).unwrap();
         self.constraints()
-            .with_width_limit(WidthLimit::FirstLine { end, line }, format)
+            .with_width_limit(WidthLimit { end_col, line }, scope)
     }
 
-    pub fn with_width_limit_first_line_opt<T>(
+    pub fn with_width_limit_opt<T>(
         &self,
         width_limit: Option<HSize>,
-        format: impl FnOnce() -> FormatResult<T>,
+        scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         match width_limit {
-            None => format(),
-            Some(width_limit) => self.with_width_limit_first_line(width_limit, format),
+            None => scope(),
+            Some(width_limit) => self.with_width_limit(width_limit, scope),
         }
     }
 
@@ -103,35 +82,23 @@ impl AstFormatter {
         &self,
         start_col: HSize,
         width_limit: HSize,
-        format: impl FnOnce() -> FormatResult<T>,
+        scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         let Some(remaining) = width_limit.checked_sub(self.out.col() - start_col) else {
             return Err(WidthLimitExceededError.into());
         };
-        self.with_width_limit(remaining, format)
+        self.with_width_limit(remaining, scope)
     }
 
-    pub fn with_width_limit_from_start_first_line<T>(
-        &self,
-        start_col: HSize,
-        width_limit: HSize,
-        format: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        let Some(remaining) = width_limit.checked_sub(self.out.col() - start_col) else {
-            return Err(WidthLimitExceededError.into());
-        };
-        self.with_width_limit_first_line(remaining, format)
-    }
-
-    pub fn with_width_limit_from_start_first_line_opt<T>(
+    pub fn with_width_limit_from_start_opt<T>(
         &self,
         start_col: HSize,
         width_limit: Option<HSize>,
-        format: impl FnOnce() -> FormatResult<T>,
+        scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
         let Some(width_limit) = width_limit else {
-            return format();
+            return scope();
         };
-        self.with_width_limit_from_start_first_line(start_col, width_limit, format)
+        self.with_width_limit_from_start(start_col, width_limit, scope)
     }
 }

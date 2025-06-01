@@ -19,10 +19,6 @@ pub struct ConstraintWriter {
     last_line_start: Cell<usize>,
     last_width_exceeded_line: Cell<Option<VSize>>,
     line: Cell<VSize>,
-    /// When Some, we consider width to be recoverable. This means that if a width limit is
-    /// exceeded, we may fall back to another formatting strategy that is known to take less width.
-    /// The contained value is the line number.
-    recover_width: Cell<Option<VSize>>,
 }
 
 impl ConstraintWriter {
@@ -38,7 +34,6 @@ impl ConstraintWriter {
             last_line_start: Cell::new(0),
             last_width_exceeded_line: Cell::new(None),
             line: Cell::new(0),
-            recover_width: Cell::new(None),
         }
     }
 
@@ -70,18 +65,21 @@ impl ConstraintWriter {
     }
 
     pub fn with_recover_width<T>(&self, scope: impl FnOnce() -> T) -> T {
-        self.recover_width.with_replaced(Some(self.line()), scope)
+        self.constraints()
+            .recover_width
+            .with_replaced(Some(self.line()), scope)
     }
 
     pub fn is_enforcing_width(&self) -> bool {
         if self
             .constraints
-            .width_limit()
-            .is_some_and(|limit| limit.is_applicable(self.line()))
+            .width_limit
+            .get()
+            .is_some_and(|limit| limit.line == self.line())
         {
             return true;
         }
-        if self.recover_width.get() == Some(self.line()) {
+        if self.constraints.recover_width.get() == Some(self.line()) {
             return true;
         }
         false

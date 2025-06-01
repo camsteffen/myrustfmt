@@ -203,7 +203,7 @@ where
             Ok(())
         });
         let last_tail = last_tail.as_ref();
-        af.with_width_limit_first_line_opt(opt.single_line_max_contents_width, move || {
+        af.with_width_limit_opt(opt.single_line_max_contents_width, move || {
             if len == 0 {
                 if let Some(rest) = rest {
                     list_rest(af, rest, close_tail)?;

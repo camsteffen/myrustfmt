@@ -45,7 +45,7 @@ impl AstFormatter {
         TailS {
             func: Box::new(tail),
             single_line: self.constraints().single_line.get(),
-            width_limit: self.width_limit(),
+            width_limit: self.constraints().width_limit.get(),
         }
     }
 

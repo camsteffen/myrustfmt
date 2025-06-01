@@ -159,7 +159,7 @@ impl AstFormatter {
         let offset = self.out.col() - start_col;
         let limit = (offset >= POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH)
             .then_some(POSTFIX_CHAIN_MAX_WIDTH);
-        self.with_width_limit_from_start_first_line_opt(start_col, limit, format)
+        self.with_width_limit_from_start_opt(start_col, limit, format)
     }
 
     fn postfix_item(&self, item: &PostfixItem) -> FormatResult {

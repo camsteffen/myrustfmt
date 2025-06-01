@@ -1,4 +1,4 @@
-use crate::error::{ConstraintErrorKind, FormatResult};
+use crate::error::FormatResult;
 use crate::num::{HSize, VSize};
 use crate::util::cell_ext::CellExt;
 use enumset::{EnumSet, EnumSetType};
@@ -7,8 +7,6 @@ use std::num::NonZero;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Constraints {
-    // pub in_closure_body: Cell<Option</* first line */ VSize>>,
-    // pub in_list_overflow: Cell<Option</* first line */ VSize>>,
     pub disallowed_vstructs: Cell<EnumSet<VStruct>>,
     // max_width and width_limit are very similar in effect, but they need to be separate values for
     // a couple of reasons:
@@ -17,35 +15,21 @@ pub struct Constraints {
     //     horizontal position. The width_limit must be left unchanged for these experiments
     //     since it represents limits that are independent of the global limit.
     /// The global maximum width
-    max_width: Cell<HSize>,
+    pub max_width: Cell<HSize>,
+    /// When Some, we consider width to be recoverable. This means that if a width limit is
+    /// exceeded, we may fall back to another formatting strategy that is known to take less width.
+    /// The contained value is the line number.
+    pub recover_width: Cell<Option<VSize>>,
     // todo using SingleLine to measure the width of the first line should ignore trailing line comments
     pub single_line: Cell<bool>,
-    width_limit: Cell<Option<WidthLimit>>,
+    pub width_limit: Cell<Option<WidthLimit>>,
 }
 
 /// Width limit imposed on a specific node or range as part of formatting logic.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum WidthLimit {
-    /// Used where a single-line constraint is active
-    SingleLine { end: NonZero<HSize> },
-    /// Applies a width limit to the first line, then falls out of scope
-    FirstLine { end: NonZero<HSize>, line: VSize },
-}
-
-impl WidthLimit {
-    fn end(self) -> HSize {
-        match self {
-            WidthLimit::SingleLine { end } => end.get(),
-            WidthLimit::FirstLine { end, .. } => end.get(),
-        }
-    }
-
-    pub fn is_applicable(self, at_line: VSize) -> bool {
-        match self {
-            WidthLimit::SingleLine { .. } => true,
-            WidthLimit::FirstLine { line, .. } => line == at_line,
-        }
-    }
+pub struct WidthLimit {
+    pub end_col: NonZero<HSize>,
+    pub line: VSize,
 }
 
 /// "Vertical structures". Various formatting shapes that may be disallowed in certain contexts and
@@ -78,40 +62,18 @@ impl Constraints {
     pub fn new(max_width: HSize) -> Constraints {
         Constraints {
             disallowed_vstructs: Cell::new(EnumSet::empty()),
-            // in_closure_body: Cell::new(None),
-            // in_list_overflow: Cell::new(None),
             max_width: Cell::new(max_width),
-            width_limit: Cell::new(None),
+            recover_width: Cell::new(None),
             single_line: Cell::new(false),
+            width_limit: Cell::new(None),
         }
     }
 
-    // basic getters
-
-    pub fn max_width(&self) -> HSize {
-        self.max_width.get()
-    }
-
-    pub fn width_limit(&self) -> Option<WidthLimit> {
-        self.width_limit.get()
-    }
-
-    // more getters
-
     pub fn max_width_at(&self, line: VSize) -> HSize {
-        let Some(width_limit_end) = self.width_limit_end_at(line) else {
-            return self.max_width();
-        };
-        self.max_width().min(width_limit_end)
-    }
-
-    fn width_limit_end_at(&self, line: VSize) -> Option<HSize> {
-        let Some(width_limit) = self.width_limit() else {
-            return None;
-        };
-        match width_limit {
-            WidthLimit::SingleLine { end } => Some(end.into()),
-            WidthLimit::FirstLine { end, line: l } => (l == line).then_some(end.into()),
+        if let Some(width_limit) = self.width_limit.get() && width_limit.line == line {
+            self.max_width.get().min(width_limit.end_col.get())
+        } else {
+            self.max_width.get()
         }
     }
 
@@ -158,20 +120,14 @@ impl Constraints {
     }
 
     pub fn with_width_limit<T>(&self, width_limit: WidthLimit, scope: impl FnOnce() -> T) -> T {
-        if matches!(width_limit, WidthLimit::SingleLine { .. }) {
-            debug_assert!(self.single_line.get());
-        }
         if self
-            .width_limit()
-            .is_some_and(|current| current.end() <= width_limit.end())
+            .width_limit
+            .get()
+            .is_some_and(|wl| wl.end_col <= width_limit.end_col)
         {
             return scope();
         }
         self.with_replace_width_limit(Some(width_limit), scope)
-    }
-
-    pub fn with_replace_max_width<T>(&self, max_width: HSize, scope: impl FnOnce() -> T) -> T {
-        self.max_width.with_replaced(max_width, scope)
     }
 
     pub fn with_replace_width_limit<T>(
