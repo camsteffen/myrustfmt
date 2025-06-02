@@ -33,147 +33,89 @@ impl AstFormatter {
         let mut tail_opt = Some(tail);
         let mut take_tail = || tail_opt.take().unwrap();
         match expr.kind {
-            ast::ExprKind::Array(ref items) => self.list(
-                Braces::Square,
-                items,
-                |af, expr, tail, _lcx| af.expr_tail(expr, tail),
-                ListOptions::new()
-                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.array_width)
-                    .wrap_to_fit(ListWrapToFit::Yes {
-                        max_element_width: Some(
-                            RUSTFMT_CONFIG_DEFAULTS.short_array_element_width_threshold,
-                        ),
-                    })
-                    .tail(take_tail()),
-            )?,
+            postfix_expr_kind!() => self.postfix_chain(expr, take_tail())?,
+            ast::ExprKind::AddrOf(borrow_kind, mutability, ref target) => {
+                self.addr_of(borrow_kind, mutability, target, take_tail())?
+            }
+            ast::ExprKind::Array(ref items) => self.array(items, take_tail())?,
+            ast::ExprKind::Assign(ref left, ref right, _) => {
+                self.expr_infix(left, "=", right, take_tail())?
+            }
+            ast::ExprKind::AssignOp(op, ref left, ref right) => {
+                self.expr_infix(left, op.node.as_str(), right, take_tail())?
+            }
+            ast::ExprKind::Binary(op, ref left, ref right) => {
+                self.binary_expr(left, right, op, take_tail())?
+            }
+            ast::ExprKind::Block(ref block, label) => {
+                self.block_expr_allow_horizontal(label, block, take_tail())?
+            }
+            ast::ExprKind::Break(label, ref inner) => {
+                self.break_(label, inner.as_deref(), take_tail())?
+            }
+            ast::ExprKind::Call(ref func, ref args) => self.call(func, args, take_tail())?,
+            ast::ExprKind::Cast(ref target, ref ty) => self.cast(target, ty, take_tail())?,
+            ast::ExprKind::Closure(ref closure) => self.closure(closure, take_tail())?,
             ast::ExprKind::ConstBlock(ref anon_const) => {
                 self.out.token_space("const")?;
                 self.expr_tail(&anon_const.value, take_tail())?;
             }
-            ast::ExprKind::Call(ref func, ref args) => self.call(func, args, take_tail())?,
-            postfix_expr_kind!() => self.postfix_chain(expr, take_tail())?,
-            ast::ExprKind::Tup(ref items) => self.list(
-                Braces::Parens,
-                items,
-                |af, expr, tail, _lcx| af.expr_tail(expr, tail),
-                ListOptions::new()
-                    .force_trailing_comma(items.len() == 1)
-                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
-                    .tail(take_tail()),
-            )?,
-            ast::ExprKind::Binary(op, ref left, ref right) => {
-                self.binary_expr(left, right, op, take_tail())?
-            }
-            ast::ExprKind::Unary(op, ref target) => {
-                self.out.token(op.as_str())?;
-                self.expr_tail(target, take_tail())?;
-            }
-            ast::ExprKind::Lit(_) => self.out.copy_span(expr.span)?,
-            ast::ExprKind::Cast(ref target, ref ty) => self.cast(target, ty, take_tail())?,
-            ast::ExprKind::Type(_, _) => todo!(),
-            ast::ExprKind::Let(ref pat, ref init, ..) => {
-                self.out.token_space("let")?;
-                self.pat(pat)?;
-                self.out.space_token_space("=")?;
-                self.expr_tail(init, take_tail())?;
-            }
-            ast::ExprKind::If(ref condition, ref block, ref else_) => {
-                self.if_(condition, block, else_.as_deref(), take_tail())?
-            }
-            ast::ExprKind::While(ref condition, ref block, _label) => {
-                self.while_(condition, block)?
-            }
+            ast::ExprKind::Continue(label) => self.continue_(label)?,
             ast::ExprKind::ForLoop {
                 ref pat,
                 ref iter,
                 ref body,
                 label,
                 ..
-            } => self.has_vstruct(VStruct::ControlFlow, || {
-                // todo multi-line header
-                self.label(label, true)?;
-                self.out.token_space("for")?;
-                self.pat(pat)?;
-                self.out.space_token_space("in")?;
-                self.expr(iter)?;
-                self.out.space()?;
-                self.block_expr(false, body)?;
-                Ok(())
-            })?,
-            ast::ExprKind::Loop(ref block, label, _) => self.has_vstruct(VStruct::ControlFlow, || {
-                self.label(label, true)?;
-                self.out.token_space("loop")?;
-                self.block_expr(false, block)?;
-                Ok(())
-            })?,
-            ast::ExprKind::Match(ref scrutinee, ref arms, match_kind) => match match_kind {
-                ast::MatchKind::Postfix => todo!(),
-                ast::MatchKind::Prefix => self.match_(scrutinee, arms)?,
-            },
-            ast::ExprKind::Closure(ref closure) => self.closure(closure, take_tail())?,
-            ast::ExprKind::Block(ref block, label) => {
-                self.block_expr_allow_horizontal(label, block, take_tail())?
+            } => self.for_loop(pat, iter, body, label)?,
+            ast::ExprKind::If(ref condition, ref block, ref else_) => {
+                self.if_(condition, block, else_.as_deref(), take_tail())?
             }
-            ast::ExprKind::Gen(_, _, _, _) => todo!(),
-            ast::ExprKind::TryBlock(_) => todo!(),
-            ast::ExprKind::Assign(ref left, ref right, _) => {
-                self.expr(left)?;
-                self.out.space_token_space("=")?;
-                self.expr_tail(right, take_tail())?;
+            ast::ExprKind::Let(ref pat, ref init, ..) => self.let_(pat, init, take_tail())?,
+            ast::ExprKind::Lit(_) => self.out.copy_span(expr.span)?,
+            ast::ExprKind::Loop(ref block, label, _) => self.loop_(label, block)?,
+            ast::ExprKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,
+            ast::ExprKind::Match(ref scrutinee, ref arms, ast::MatchKind::Prefix) => {
+                self.match_(scrutinee, arms)?
             }
-            ast::ExprKind::AssignOp(op, ref left, ref right) => {
-                self.expr(left)?;
-                self.out.space()?;
-                self.out.copy_span(op.span)?;
-                self.out.space()?;
-                self.expr_tail(right, take_tail())?;
-            }
-            ast::ExprKind::Range(ref start, ref end, limits) => {
-                let sigil = match limits {
-                    ast::RangeLimits::Closed => "..=",
-                    ast::RangeLimits::HalfOpen => "..",
-                };
-                self.range(start.as_deref(), sigil, end.as_deref(), take_tail())?
-            }
-            ast::ExprKind::Underscore => todo!(),
+            ast::ExprKind::Paren(ref inner) => self.paren(inner, take_tail())?,
             ast::ExprKind::Path(ref qself, ref path) => self.qpath(qself, path, true, take_tail())?,
-            ast::ExprKind::AddrOf(borrow_kind, mutability, ref target) => {
-                self.addr_of(borrow_kind, mutability)?;
+            ast::ExprKind::Range(ref start, ref end, limits) => self.range(
+                start.as_deref(),
+                limits.as_str(),
+                end.as_deref(),
+                take_tail(),
+            )?,
+            ast::ExprKind::Repeat(ref element, ref count) => {
+                self.repeat(element, count, take_tail())?
+            }
+            ast::ExprKind::Ret(ref target) => self.return_(target.as_deref(), take_tail())?,
+            ast::ExprKind::Struct(ref struct_) => self.struct_expr(struct_, take_tail())?,
+            ast::ExprKind::Tup(ref items) => self.tuple(items, take_tail())?,
+            ast::ExprKind::Unary(op, ref target) => {
+                self.out.token(op.as_str())?;
                 self.expr_tail(target, take_tail())?;
             }
-            ast::ExprKind::Break(label, ref inner) => {
-                self.out.token("break")?;
-                if label.is_some() || inner.is_some() {
-                    self.out.space()?;
-                }
-                self.label(label, false)?;
-                if let Some(inner) = inner {
-                    self.expr_tail(inner, take_tail())?;
-                }
+            ast::ExprKind::Underscore => self.out.token("_")?,
+            ast::ExprKind::While(ref condition, ref block, _label) => {
+                self.while_(condition, block)?
             }
-            ast::ExprKind::Continue(_) => todo!(),
-            ast::ExprKind::Ret(ref target) => {
-                self.out.token("return")?;
-                if let Some(target) = target {
-                    self.out.space()?;
-                    self.expr_tail(target, take_tail())?;
-                }
-            }
-            ast::ExprKind::Use(_, _) => todo!(),
-            ast::ExprKind::InlineAsm(_) => todo!(),
-            ast::ExprKind::OffsetOf(_, _) => todo!(),
-            ast::ExprKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,
-            ast::ExprKind::Struct(ref struct_) => self.struct_expr(struct_, take_tail())?,
-            ast::ExprKind::Repeat(_, _) => todo!(),
-            ast::ExprKind::Paren(ref inner) => self.paren(inner, take_tail())?,
-            ast::ExprKind::Yield(_) => todo!(),
-            ast::ExprKind::Yeet(_) => todo!(),
-            ast::ExprKind::Become(_) => todo!(),
-            ast::ExprKind::IncludedBytes(_) => todo!(),
-            ast::ExprKind::FormatArgs(_) => todo!(),
-            ast::ExprKind::UnsafeBinderCast(..) => todo!(),
-            ast::ExprKind::Err(_) => todo!(),
-            ast::ExprKind::Dummy => todo!(),
+            ast::ExprKind::Become(_)
+            // todo
+            | ast::ExprKind::FormatArgs(_)
+            | ast::ExprKind::Gen(..)
+            | ast::ExprKind::InlineAsm(_)
+            | ast::ExprKind::Match(.., ast::MatchKind::Postfix)
+            | ast::ExprKind::TryBlock(_)
+            | ast::ExprKind::Type(..)
+            | ast::ExprKind::UnsafeBinderCast(..)
+            | ast::ExprKind::Use(..)
+            | ast::ExprKind::Yeet(_)
+            | ast::ExprKind::Yield(_) => return Err(FormatErrorKind::UnsupportedSyntax.into()),
+            ast::ExprKind::Dummy
+            | ast::ExprKind::Err(_)
+            | ast::ExprKind::IncludedBytes(_)
+            | ast::ExprKind::OffsetOf(..) => panic!("unexpected ExprKind"),
         }
         if let Some(tail) = tail_opt {
             self.tail(tail)?;
@@ -181,22 +123,97 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn expr_force_plain_block(&self, expr: &ast::Expr) -> FormatResult {
-        match plain_block(expr) {
-            Some(block) => self.block_expr(false, block),
-            None => self.expr_add_block(expr),
+    pub fn addr_of(
+        &self,
+        borrow_kind: ast::BorrowKind,
+        mutability: ast::Mutability,
+        expr: &ast::Expr,
+        tail: Tail,
+    ) -> FormatResult {
+        match borrow_kind {
+            ast::BorrowKind::Raw => todo!(),
+            ast::BorrowKind::Ref => self.out.token("&")?,
         }
+        self.mutability(mutability)?;
+        self.expr_tail(expr, tail)?;
+        Ok(())
     }
 
-    pub fn label(&self, label: Option<ast::Label>, has_colon: bool) -> FormatResult {
+    fn array(&self, items: &[P<ast::Expr>], tail: Tail) -> FormatResult {
+        self.list(
+            Braces::Square,
+            items,
+            |af, expr, tail, _lcx| af.expr_tail(expr, tail),
+            ListOptions::new()
+                .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.array_width)
+                .wrap_to_fit(ListWrapToFit::Yes {
+                    max_element_width: Some(
+                        RUSTFMT_CONFIG_DEFAULTS.short_array_element_width_threshold,
+                    ),
+                })
+                .tail(tail),
+        )
+    }
+
+    fn break_(
+        &self,
+        label: Option<ast::Label>,
+        expr: Option<&ast::Expr>,
+        tail: Tail,
+    ) -> FormatResult {
+        self.out.token("break")?;
         if let Some(label) = label {
-            self.ident(label.ident)?;
-            if has_colon {
-                self.out.token(":")?;
-            }
             self.out.space()?;
+            self.label(label)?;
         }
+        let Some(expr) = expr else {
+            return self.tail(tail);
+        };
+        self.out.space()?;
+        self.expr_tail(expr, tail)?;
         Ok(())
+    }
+
+    pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
+        let first_line = self.out.line();
+        self.expr_tail(func, self.tail_token("(").as_ref())?;
+        self.has_vstruct_if(self.out.line() > first_line, VStruct::NonBlockIndent, || {
+            self.call_args_after_open_paren(args, tail)
+        })?;
+        Ok(())
+    }
+
+    pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
+        let format_arg = |
+            af: &AstFormatter,
+            expr: &P<ast::Expr>,
+            tail: Tail,
+            lcx: ListItemContext,
+        | -> FormatResult {
+            if lcx.strategy == ListStrategy::Horizontal && lcx.index == args.len() - 1 {
+                let mut vstructs = VStruct::ControlFlow | VStruct::NonBlockIndent;
+                if args.len() > 1 {
+                    vstructs |= VStruct::List | VStruct::Match;
+                }
+                af.disallow_vstructs(vstructs, || af.expr_tail(expr, tail))?;
+            } else {
+                af.expr_tail(expr, tail)?;
+            }
+            Ok(())
+        };
+
+        let mut list_opt = ListOptions::<P<ast::Expr>>::new()
+            .enable_overflow()
+            .item_prefers_overflow(|expr| matches!(expr.kind, ast::ExprKind::Closure(_)))
+            .omit_open_brace()
+            .tail(tail);
+        let is_only_closure = args.len() == 1 && matches!(args[0].kind, ast::ExprKind::Closure(_));
+        if !is_only_closure {
+            list_opt = list_opt
+                .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
+        }
+
+        self.list(Braces::Parens, args, format_arg, list_opt)
     }
 
     fn cast(&self, target: &ast::Expr, ty: &ast::Ty, tail: Tail) -> FormatResult {
@@ -223,6 +240,159 @@ impl AstFormatter {
             })
             .result()?;
         Ok(())
+    }
+
+    fn continue_(&self, label: Option<ast::Label>) -> FormatResult {
+        self.out.token("continue")?;
+        if let Some(label) = label {
+            self.out.space()?;
+            self.label(label)?;
+        }
+        Ok(())
+    }
+
+    fn for_loop(
+        &self,
+        pat: &ast::Pat,
+        iter: &ast::Expr,
+        body: &ast::Block,
+        label: Option<ast::Label>,
+    ) -> FormatResult {
+        self.has_vstruct(VStruct::ControlFlow, || {
+            self.label_colon(label)?;
+            self.out.token_space("for")?;
+            self.pat(pat)?;
+            // todo comments
+            let wrapped_iter = self
+                .backtrack()
+                .next(|| {
+                    self.could_wrap_indent(|| {
+                        self.out.space_token_space("in")?;
+                        self.expr_tail(
+                            iter,
+                            self.tail_fn(|af| {
+                                af.out.space()?;
+                                af.out.token("{")?;
+                                Ok(())
+                            })
+                            .as_ref(),
+                        )?;
+                        Ok(false)
+                    })
+                })
+                .next(|| {
+                    self.indented(|| {
+                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                        self.out.token_space("in")?;
+                        self.expr(iter)?;
+                        Ok(())
+                    })?;
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                    Ok(true)
+                })
+                .result()?;
+            self.block_expr(!wrapped_iter, body)?;
+            Ok(())
+        })
+    }
+
+    fn if_<'a>(
+        &self,
+        condition: &ast::Expr,
+        block: &'a ast::Block,
+        else_: Option<&'a ast::Expr>,
+        tail: Tail,
+    ) -> FormatResult {
+        self.has_vstruct(VStruct::ControlFlow, || {
+            let (first_line, start_col) = self.out.line_col();
+            self.control_flow_header("if", condition)?;
+
+            let single_line = (|| {
+                if self.out.line() != first_line {
+                    return None;
+                }
+                let else_ = else_?;
+                let ast::ExprKind::Block(else_block, _) = &else_.kind else {
+                    return None;
+                };
+                let block_expr = self.try_into_expr_only_block(block)?;
+                let else_expr = self.try_into_expr_only_block(else_block)?;
+
+                Some(move || {
+                    self.with_single_line(|| {
+                        self.with_width_limit_from_start(
+                            start_col,
+                            RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
+                            || {
+                                self.expr_only_block_after_open_brace(block_expr)?;
+                                self.out.space_token_space("else")?;
+                                self.expr_only_block(else_expr)?;
+                                self.tail(tail)?;
+                                Ok(())
+                            },
+                        )
+                    })
+                })
+            })();
+
+            let multi_line = || {
+                self.block_expr(true, block)?;
+                let mut else_ = else_;
+                loop {
+                    let Some(else_expr) = else_ else { break };
+                    self.out.space_token_space("else")?;
+                    match &else_expr.kind {
+                        ast::ExprKind::Block(block, _) => {
+                            self.block_expr(false, block)?;
+                            break;
+                        }
+                        ast::ExprKind::If(condition, next_block, next_else) => {
+                            self.control_flow_header("if", condition)?;
+                            self.block_expr(true, next_block)?;
+                            else_ = next_else.as_deref();
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                self.tail(tail)?;
+                Ok(())
+            };
+
+            self.backtrack()
+                .next_opt(single_line)
+                .next(multi_line)
+                .result()
+        })
+    }
+
+    pub fn label(&self, label: ast::Label) -> FormatResult {
+        self.ident(label.ident)
+    }
+
+    pub fn label_colon(&self, label: Option<ast::Label>) -> FormatResult {
+        if let Some(label) = label {
+            self.label(label)?;
+            self.out.token(":")?;
+            self.out.space()?;
+        }
+        Ok(())
+    }
+
+    fn let_(&self, pat: &ast::Pat, init: &ast::Expr, tail: Tail) -> FormatResult {
+        self.out.token_space("let")?;
+        self.pat(pat)?;
+        self.out.space_token_space("=")?;
+        self.expr_tail(init, tail)?;
+        Ok(())
+    }
+
+    fn loop_(&self, label: Option<ast::Label>, block: &ast::Block) -> FormatResult {
+        self.has_vstruct(VStruct::ControlFlow, || {
+            self.label_colon(label)?;
+            self.out.token_space("loop")?;
+            self.block_expr(false, block)?;
+            Ok(())
+        })
     }
 
     fn paren(&self, inner: &ast::Expr, tail: Tail) -> FormatResult {
@@ -307,137 +477,109 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn addr_of(
-        &self,
-        borrow_kind: ast::BorrowKind,
-        mutability: ast::Mutability,
-    ) -> FormatResult {
-        match borrow_kind {
-            ast::BorrowKind::Raw => todo!(),
-            ast::BorrowKind::Ref => self.out.token("&")?,
-        }
-        self.mutability(mutability)?;
+    fn repeat(&self, element: &ast::Expr, count: &ast::AnonConst, tail: Tail) -> FormatResult {
+        self.out.token("[")?;
+        self.expr_tail(
+            element,
+            self.tail_fn(|af| {
+                af.out.token_space(";")?;
+                af.expr(&count.value)?;
+                af.out.token("]")?;
+                self.tail(tail)?;
+                Ok(())
+            })
+            .as_ref(),
+        )?;
         Ok(())
     }
 
-    pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
+    fn return_(&self, target: Option<&ast::Expr>, tail: Tail) -> FormatResult {
+        self.out.token("return")?;
+        let Some(target) = target else {
+            return self.tail(tail);
+        };
+        self.out.space()?;
+        self.expr_tail(target, tail)?;
+        Ok(())
+    }
+
+    pub fn mac_call(&self, mac_call: &ast::MacCall) -> FormatResult {
+        self.path(&mac_call.path, true)?;
+        self.out.token("!")?;
+        if matches!(mac_call.args.delim, rustc_ast::token::Delimiter::Brace) {
+            self.out.space()?;
+        }
+        self.out.copy_span(mac_call.args.dspan.entire())
+    }
+
+    fn struct_expr(&self, struct_: &ast::StructExpr, tail: Tail) -> FormatResult {
         let first_line = self.out.line();
-        self.expr_tail(func, self.tail_token("(").as_ref())?;
+        self.qpath(&struct_.qself, &struct_.path, true, None)?;
         self.has_vstruct_if(self.out.line() > first_line, VStruct::NonBlockIndent, || {
-            self.call_args_after_open_paren(args, tail)
+            self.out.space()?;
+            self.list(
+                Braces::Curly,
+                &struct_.fields,
+                Self::struct_field,
+                ListOptions::new()
+                    // todo not wide enough?
+                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
+                    .rest(ListRest::from_struct_rest(&struct_.rest))
+                    .shape(
+                        if self.out.line() > first_line {
+                            ListShape::Vertical
+                        } else {
+                            ListShape::Flexible
+                        },
+                    )
+                    .tail(tail),
+            )?;
+            Ok(())
         })?;
         Ok(())
     }
 
-    pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
-        let format_arg = |
-            af: &AstFormatter,
-            expr: &P<ast::Expr>,
-            tail: Tail,
-            lcx: ListItemContext,
-        | -> FormatResult {
-            if lcx.strategy == ListStrategy::Horizontal && lcx.index == args.len() - 1 {
-                let mut vstructs = VStruct::ControlFlow | VStruct::NonBlockIndent;
-                if args.len() > 1 {
-                    vstructs |= VStruct::List | VStruct::Match;
-                }
-                af.disallow_vstructs(vstructs, || af.expr_tail(expr, tail))?;
+    fn struct_field(
+        &self,
+        field: &ast::ExprField,
+        tail: Tail,
+        _lcx: ListItemContext,
+    ) -> FormatResult {
+        self.with_attrs_tail(&field.attrs, field.span, tail, || {
+            self.ident(field.ident)?;
+            if field.is_shorthand {
+                self.tail(tail)?;
             } else {
-                af.expr_tail(expr, tail)?;
+                self.out.token_space(":")?;
+                self.expr_tail(&field.expr, tail)?;
             }
             Ok(())
-        };
-
-        let mut list_opt = ListOptions::<P<ast::Expr>>::new()
-            .enable_overflow()
-            .item_prefers_overflow(|expr| matches!(expr.kind, ast::ExprKind::Closure(_)))
-            .omit_open_brace()
-            .tail(tail);
-        let is_only_closure = args.len() == 1 && matches!(args[0].kind, ast::ExprKind::Closure(_));
-        if !is_only_closure {
-            list_opt = list_opt
-                .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
-        }
-
-        self.list(Braces::Parens, args, format_arg, list_opt)
-    }
-
-    fn delim_args(&self, delim_args: &ast::DelimArgs) -> FormatResult {
-        if matches!(delim_args.delim, rustc_ast::token::Delimiter::Brace) {
-            self.out.space()?;
-        }
-        self.out.copy_span(delim_args.dspan.entire())
-    }
-
-    fn if_<'a>(
-        &self,
-        condition: &ast::Expr,
-        block: &'a ast::Block,
-        else_: Option<&'a ast::Expr>,
-        tail: Tail,
-    ) -> FormatResult {
-        self.has_vstruct(VStruct::ControlFlow, || {
-            let (first_line, start_col) = self.out.line_col();
-            self.control_flow_header("if", condition)?;
-
-            let single_line = (|| {
-                if self.out.line() != first_line {
-                    return None;
-                }
-                let else_ = else_?;
-                let ast::ExprKind::Block(else_block, _) = &else_.kind else {
-                    return None;
-                };
-                let block_expr = self.try_into_expr_only_block(block)?;
-                let else_expr = self.try_into_expr_only_block(else_block)?;
-
-                Some(move || {
-                    self.with_single_line(|| {
-                        self.with_width_limit_from_start(
-                            start_col,
-                            RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
-                            || {
-                                self.expr_only_block_after_open_brace(block_expr)?;
-                                self.out.space_token_space("else")?;
-                                self.expr_only_block(else_expr)?;
-                                self.tail(tail)?;
-                                Ok(())
-                            },
-                        )
-                    })
-                })
-            })();
-
-            let multi_line = || {
-                self.block_expr(true, block)?;
-                let mut else_ = else_;
-                loop {
-                    let Some(else_expr) = else_ else { break };
-                    self.out.space_token_space("else")?;
-                    match &else_expr.kind {
-                        ast::ExprKind::Block(block, _) => {
-                            self.block_expr(false, block)?;
-                            break;
-                        }
-                        ast::ExprKind::If(condition, next_block, next_else) => {
-                            self.control_flow_header("if", condition)?;
-                            self.block_expr(true, next_block)?;
-                            else_ = next_else.as_deref();
-                        }
-                        _ => unreachable!(),
-                    }
-                }
-                self.tail(tail)?;
-                Ok(())
-            };
-
-            self.backtrack()
-                .next_opt(single_line)
-                .next(multi_line)
-                .result()
         })
     }
 
+    fn tuple(&self, items: &[P<ast::Expr>], tail: Tail) -> FormatResult {
+        self.list(
+            Braces::Parens,
+            items,
+            |af, expr, tail, _lcx| af.expr_tail(expr, tail),
+            ListOptions::new()
+                .force_trailing_comma(items.len() == 1)
+                .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
+                .tail(tail),
+        )
+    }
+
+    pub fn while_(&self, condition: &ast::Expr, block: &ast::Block) -> FormatResult {
+        self.has_vstruct(VStruct::ControlFlow, || {
+            self.control_flow_header("while", condition)?;
+            self.block_expr(true, block)?;
+            Ok(())
+        })
+    }
+}
+
+// helpers/utils
+impl AstFormatter {
     pub fn control_flow_header(&self, keyword: &'static str, expr: &ast::Expr) -> FormatResult {
         self.has_vstruct(VStruct::NonBlockIndent, || {
             let first_line = self.out.line();
@@ -457,62 +599,10 @@ impl AstFormatter {
         })
     }
 
-    pub fn mac_call(&self, mac_call: &ast::MacCall) -> FormatResult {
-        self.path(&mac_call.path, true)?;
-        self.out.token("!")?;
-        self.delim_args(&mac_call.args)
-    }
-
-    fn struct_expr(&self, struct_: &ast::StructExpr, tail: Tail) -> FormatResult {
-        let first_line = self.out.line();
-        self.qpath(&struct_.qself, &struct_.path, true, None)?;
-        self.has_vstruct_if(self.out.line() > first_line, VStruct::NonBlockIndent, || {
-            self.out.space()?;
-            self.list(
-                Braces::Curly,
-                &struct_.fields,
-                Self::expr_field,
-                ListOptions::new()
-                    // todo not wide enough?
-                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
-                    .rest(ListRest::from_struct_rest(&struct_.rest))
-                    .shape(
-                        if self.out.line() > first_line {
-                            ListShape::Vertical
-                        } else {
-                            ListShape::Flexible
-                        },
-                    )
-                    .tail(tail),
-            )?;
-            Ok(())
-        })?;
-        Ok(())
-    }
-
-    fn expr_field(
-        &self,
-        field: &ast::ExprField,
-        tail: Tail,
-        _lcx: ListItemContext,
-    ) -> FormatResult {
-        self.with_attrs_tail(&field.attrs, field.span, tail, || {
-            self.ident(field.ident)?;
-            if field.is_shorthand {
-                self.tail(tail)?;
-            } else {
-                self.out.token_space(":")?;
-                self.expr_tail(&field.expr, tail)?;
-            }
-            Ok(())
-        })
-    }
-
-    pub fn while_(&self, condition: &ast::Expr, block: &ast::Block) -> FormatResult {
-        self.has_vstruct(VStruct::ControlFlow, || {
-            self.control_flow_header("while", condition)?;
-            self.block_expr(true, block)?;
-            Ok(())
-        })
+    pub fn expr_force_plain_block(&self, expr: &ast::Expr) -> FormatResult {
+        match plain_block(expr) {
+            Some(block) => self.block_expr(false, block),
+            None => self.expr_add_block(expr),
+        }
     }
 }

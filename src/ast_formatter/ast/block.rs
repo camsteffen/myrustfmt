@@ -19,7 +19,7 @@ impl AstFormatter {
         block: &ast::Block,
         tail: Tail,
     ) -> FormatResult {
-        self.label(label, true)?;
+        self.label_colon(label)?;
         match block.rules {
             ast::BlockCheckMode::Default => {}
             ast::BlockCheckMode::Unsafe(_) => self.out.token_space("unsafe")?,

@@ -2,8 +2,27 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::whitespace::VerticalWhitespaceMode;
+use rustc_ast::ast;
 
 impl AstFormatter {
+    pub fn expr_infix(
+        &self,
+        left: &ast::Expr,
+        op: &'static str,
+        right: &ast::Expr,
+        tail: Tail,
+    ) -> FormatResult {
+        self.expr_tail(
+            left,
+            self.tail_fn(|af| {
+                af.out.space_token_space(op)?;
+                af.expr_tail(right, tail)?;
+                Ok(())
+            })
+            .as_ref(),
+        )
+    }
+
     pub fn simple_infix_chain<T>(
         &self,
         token: &'static str,
