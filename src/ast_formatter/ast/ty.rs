@@ -2,7 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
 use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::tail::Tail;
-use crate::error::FormatResult;
+use crate::error::{FormatErrorKind, FormatResult};
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 
@@ -11,15 +11,11 @@ impl AstFormatter {
         self.ty_tail(ty, None)
     }
 
+    // todo breakpoints
     pub fn ty_tail(&self, ty: &ast::Ty, tail: Tail) -> FormatResult {
         let mut tail = Some(tail);
         let mut take_tail = || tail.take().unwrap();
         match &ty.kind {
-            ast::TyKind::Slice(elem) => {
-                self.out.token("[")?;
-                self.ty(elem)?;
-                self.out.token("]")?;
-            }
             ast::TyKind::Array(ty, length) => {
                 self.out.token("[")?;
                 self.ty(ty)?;
@@ -27,7 +23,26 @@ impl AstFormatter {
                 self.expr(&length.value)?;
                 self.out.token("]")?;
             }
-            ast::TyKind::Ptr(_mut_ty) => todo!(),
+            ast::TyKind::BareFn(bare_fn_ty) => self.bare_fn_ty(bare_fn_ty)?,
+            ast::TyKind::CVarArgs => self.out.token("...")?,
+            ast::TyKind::ImplicitSelf => self.out.token("self")?,
+            ast::TyKind::ImplTrait(_, bounds) => {
+                self.out.token_space("impl")?;
+                self.generic_bounds(bounds, take_tail())?;
+            }
+            ast::TyKind::Infer => self.out.token("_")?,
+            ast::TyKind::MacCall(mac_call) => self.mac_call(mac_call)?,
+            ast::TyKind::Never => self.out.token("!")?,
+            ast::TyKind::Paren(ty) => {
+                self.out.token("(")?;
+                self.ty(ty)?;
+                self.out.token(")")?;
+            }
+            ast::TyKind::Path(qself, path) => self.qpath(qself, path, false, take_tail())?,
+            ast::TyKind::Ptr(mut_ty) => {
+                self.out.token_space("*const")?;
+                self.mut_ty(mut_ty)?
+            }
             ast::TyKind::Ref(lifetime, mut_ty) => {
                 self.out.token("&")?;
                 if let Some(lifetime) = lifetime {
@@ -36,9 +51,21 @@ impl AstFormatter {
                 }
                 self.mut_ty(mut_ty)?;
             }
-            ast::TyKind::PinnedRef(_lifetime, _mut_ty) => todo!(),
-            ast::TyKind::BareFn(bare_fn_ty) => self.bare_fn_ty(bare_fn_ty)?,
-            ast::TyKind::Never => self.out.token("!")?,
+            ast::TyKind::Slice(elem) => {
+                self.out.token("[")?;
+                self.ty(elem)?;
+                self.out.token("]")?;
+            }
+            ast::TyKind::TraitObject(bounds, syntax) => {
+                match syntax {
+                    ast::TraitObjectSyntax::Dyn => self.out.token_space("dyn")?,
+                    ast::TraitObjectSyntax::DynStar => {
+                        return Err(FormatErrorKind::UnsupportedSyntax.into())
+                    }
+                    ast::TraitObjectSyntax::None => {}
+                }
+                self.generic_bounds(bounds, take_tail())?;
+            }
             ast::TyKind::Tup(elements) => self.list(
                 Braces::Parens,
                 elements,
@@ -47,35 +74,11 @@ impl AstFormatter {
                     .force_trailing_comma(elements.len() == 1)
                     .tail(take_tail()),
             )?,
-            ast::TyKind::Path(qself, path) => self.qpath(qself, path, false, take_tail())?,
-            ast::TyKind::TraitObject(bounds, syntax) => {
-                match syntax {
-                    ast::TraitObjectSyntax::Dyn => {
-                        self.out.token_space("dyn")?;
-                    }
-                    ast::TraitObjectSyntax::DynStar => todo!(),
-                    ast::TraitObjectSyntax::None => todo!(),
-                }
-                self.generic_bounds(bounds, take_tail())?;
-            }
-            ast::TyKind::ImplTrait(_, bounds) => {
-                self.out.token_space("impl")?;
-                self.generic_bounds(bounds, take_tail())?;
-            }
-            ast::TyKind::Paren(ty) => {
-                self.out.token("(")?;
-                self.ty(ty)?;
-                self.out.token(")")?;
-            }
             ast::TyKind::Typeof(anon_const) => self.expr(&anon_const.value)?,
-            ast::TyKind::Infer => self.out.token("_")?,
-            ast::TyKind::ImplicitSelf => self.out.token("self")?,
-            ast::TyKind::MacCall(_mac_call) => todo!(),
-            ast::TyKind::CVarArgs => todo!(),
-            ast::TyKind::Pat(_ty, _pat) => todo!(),
-            ast::TyKind::UnsafeBinder(..) => todo!(),
-            ast::TyKind::Dummy => todo!(),
-            ast::TyKind::Err(_) => todo!(),
+            ast::TyKind::Pat(..) | ast::TyKind::PinnedRef(..) | ast::TyKind::UnsafeBinder(..) => {
+                return Err(FormatErrorKind::UnsupportedSyntax.into())
+            }
+            ast::TyKind::Dummy | ast::TyKind::Err(_) => panic!("unexpected TyKind"),
         }
         if let Some(tail) = tail {
             self.tail(tail)?;
@@ -100,8 +103,7 @@ impl AstFormatter {
         self.out.token(":")?;
         let indent_guard = self.space_or_wrap_indent_then(|| {
             // todo single line?
-            self.generic_bounds(bounds, None)?;
-            Ok(())
+            self.generic_bounds(bounds, None)
         })?;
         if let Some(indent_guard) = indent_guard {
             indent_guard.close();

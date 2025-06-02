@@ -23,7 +23,6 @@ impl AstFormatter {
 
         match pat.kind {
             ast::PatKind::Expr(ref expr) => self.expr_tail(expr, take_tail())?,
-            ast::PatKind::Wild => self.out.token("_")?,
             ast::PatKind::Ident(ast::BindingMode(by_ref, mutbl), ident, ref pat) => {
                 self.mutability(mutbl)?;
                 match by_ref {
@@ -39,9 +38,46 @@ impl AstFormatter {
                     self.pat(pat)?;
                 }
             }
+            ast::PatKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,
+            ast::PatKind::Or(ref pats) => {
+                self.simple_infix_chain("|", pats, |pat| self.pat(pat), false, take_tail())?
+            }
+            ast::PatKind::Paren(ref inner) => {
+                // todo breakpoint
+                self.out.token("(")?;
+                self.pat(inner)?;
+                self.out.token(")")?;
+            }
+            ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false, take_tail())?,
+            ast::PatKind::Range(ref start, ref end, ref end_kind) => {
+                let sigil = match end_kind.node {
+                    ast::RangeEnd::Excluded => "..",
+                    ast::RangeEnd::Included(ast::RangeSyntax::DotDotDot) => "...",
+                    ast::RangeEnd::Included(ast::RangeSyntax::DotDotEq) => "..=",
+                };
+                self.range(start.as_deref(), sigil, end.as_deref(), take_tail())?;
+            }
+            ast::PatKind::Ref(ref pat, mutability) => {
+                self.out.token("&")?;
+                self.mutability(mutability)?;
+                self.pat(pat)?;
+            }
+            ast::PatKind::Rest => self.out.token("..")?,
+            ast::PatKind::Slice(ref elements) => self.list(
+                Braces::Square,
+                elements,
+                Self::pat_list_item,
+                ListOptions::new().tail(take_tail()),
+            )?,
             ast::PatKind::Struct(ref qself, ref path, ref fields, rest) => {
                 self.struct_pat(qself, path, fields, rest, take_tail())?
             }
+            ast::PatKind::Tuple(ref fields) => self.list(
+                Braces::Parens,
+                fields,
+                Self::pat_list_item,
+                ListOptions::new().tail(take_tail()),
+            )?,
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 // todo tail?
                 self.qpath(qself, path, false, None)?;
@@ -52,43 +88,7 @@ impl AstFormatter {
                     ListOptions::new().tail(take_tail()),
                 )?;
             }
-            ast::PatKind::Or(ref pats) => {
-                self.simple_infix_chain("|", pats, |pat| self.pat(pat), false, take_tail())?
-            }
-            ast::PatKind::Path(ref qself, ref path) => self.qpath(qself, path, false, take_tail())?,
-            ast::PatKind::Tuple(ref fields) => self.list(
-                Braces::Parens,
-                fields,
-                Self::pat_list_item,
-                ListOptions::new().tail(take_tail()),
-            )?,
-            ast::PatKind::Ref(ref pat, mutability) => {
-                self.out.token("&")?;
-                self.mutability(mutability)?;
-                self.pat(pat)?;
-            }
-            ast::PatKind::Range(ref start, ref end, ref end_kind) => {
-                let sigil = match end_kind.node {
-                    ast::RangeEnd::Excluded => "..",
-                    ast::RangeEnd::Included(ast::RangeSyntax::DotDotDot) => "...",
-                    ast::RangeEnd::Included(ast::RangeSyntax::DotDotEq) => "..=",
-                };
-                self.range(start.as_deref(), sigil, end.as_deref(), take_tail())?;
-            }
-            ast::PatKind::Slice(ref elements) => self.list(
-                Braces::Square,
-                elements,
-                Self::pat_list_item,
-                ListOptions::new().tail(take_tail()),
-            )?,
-            ast::PatKind::Rest => self.out.token("..")?,
-            ast::PatKind::Paren(ref inner) => {
-                // todo breakpoint
-                self.out.token("(")?;
-                self.pat(inner)?;
-                self.out.token(")")?;
-            }
-            ast::PatKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,
+            ast::PatKind::Wild => self.out.token("_")?,
             ast::PatKind::Box(_)
             | ast::PatKind::Deref(_)
             | ast::PatKind::Guard(..)

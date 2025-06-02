@@ -2,7 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
-use crate::error::FormatResult;
+use crate::error::{FormatErrorKind, FormatResult};
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
@@ -114,7 +114,10 @@ impl AstFormatter {
                 assert_eq!(turbofish, false);
                 self.parenthesized_args(parenthesized_args, tail)?
             }
-            ast::GenericArgs::ParenthesizedElided(_span) => todo!(),
+            // feature(return_type_notation)
+            ast::GenericArgs::ParenthesizedElided(_span) => {
+                return Err(FormatErrorKind::UnsupportedSyntax.into())
+            }
         }
         Ok(())
     }
