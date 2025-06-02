@@ -321,7 +321,7 @@ impl AstFormatter {
         match *ext {
             ast::Extern::None => {}
             ast::Extern::Implicit(_) => self.out.token_space("extern")?,
-            ast::Extern::Explicit(ref abi, _) => {
+            ast::Extern::Explicit(abi, _) => {
                 self.out.token_space("extern")?;
                 self.strlit(abi)?;
                 self.out.space()?;

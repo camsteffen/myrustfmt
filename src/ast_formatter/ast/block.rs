@@ -10,7 +10,7 @@ use rustc_span::Pos;
 
 impl AstFormatter {
     pub fn block_expr(&self, omit_open_brace: bool, block: &ast::Block) -> FormatResult {
-        self.block_with_items(omit_open_brace, &block.stmts, |stmt| self.stmt(stmt))
+        self.block_with_item_sorting(omit_open_brace, &block.stmts, |stmt| self.stmt(stmt))
     }
 
     pub fn block_expr_allow_horizontal(
@@ -71,7 +71,7 @@ impl AstFormatter {
         )
     }
 
-    pub fn block_with_items<T: MaybeItem>(
+    pub fn block_with_item_sorting<T: MaybeItem>(
         &self,
         omit_open_brace: bool,
         list: &[T],

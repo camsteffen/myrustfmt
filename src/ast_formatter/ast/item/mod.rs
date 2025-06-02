@@ -57,22 +57,21 @@ impl AstFormatter {
                 self.use_tree(use_tree, self.tail_token(";").as_ref())?;
             }
             ast::ItemKind::Static(ref static_item) => {
-                self.out.token_space("static")?;
-                self.ident(static_item.ident)?;
-                self.out.token_space(":")?;
-                self.ty(&static_item.ty)?;
-                if let Some(expr) = &static_item.expr {
-                    self.out.space_token_space("=")?;
-                    self.expr(expr)?;
-                }
-                self.out.token(";")?;
+                self.static_item(static_item)?
             }
             ast::ItemKind::Const(ref const_item) => self.const_item(const_item)?,
             ast::ItemKind::Fn(ref fn_) => self.fn_(fn_)?,
             ast::ItemKind::Mod(safety, ident, ref mod_kind) => {
                 self.mod_item(safety, ident, mod_kind)?
             }
-            ast::ItemKind::ForeignMod(_) => todo!(),
+            ast::ItemKind::ForeignMod(ref foreign_mod) => {
+                self.out.token_space("extern")?;
+                if let Some(abi) = foreign_mod.abi {
+                    self.strlit(abi)?;
+                    self.out.space()?;
+                }
+                self.block(false, &foreign_mod.items, |item| self.foreign_item(item))?;
+            }
             ast::ItemKind::GlobalAsm(_) => todo!(),
             ast::ItemKind::TyAlias(ref ty_alias) => {
                 self.token_ident_generic_params("type", ty_alias.ident, &ty_alias.generics)?;
@@ -177,7 +176,7 @@ impl AstFormatter {
         match mod_kind {
             ast::ModKind::Loaded(items, ast::Inline::Yes, ..) => {
                 self.out.space()?;
-                self.block_with_items(false, items, |item| self.item(item))?;
+                self.block_with_item_sorting(false, items, |item| self.item(item))?;
             }
             ast::ModKind::Loaded(_, ast::Inline::No, ..) | ast::ModKind::Unloaded => {
                 self.out.token(";")?;
@@ -269,6 +268,18 @@ impl AstFormatter {
             ast::AssocItemKind::DelegationMac(_delegation_mac) => todo!(),
         }
     }
+    
+    fn foreign_item(&self, foreign_item: &ast::ForeignItem) -> FormatResult {
+        self.item_generic(foreign_item, |kind| {
+            match kind {
+                ast::ForeignItemKind::Fn(fn_) => self.fn_(fn_)?,
+                ast::ForeignItemKind::MacCall(mac_call) => self.mac_call(mac_call)?,
+                ast::ForeignItemKind::Static(static_item) => self.static_item(static_item)?,
+                ast::ForeignItemKind::TyAlias(ty_alias) => self.ty_alias(ty_alias)?,
+            }
+            Ok(())
+        })
+    }
 
     fn ty_alias(&self, ty_alias: &ast::TyAlias) -> FormatResult {
         self.token_ident_generic_params("type", ty_alias.ident, &ty_alias.generics)?;
@@ -276,6 +287,19 @@ impl AstFormatter {
         if let Some(ty) = &ty_alias.ty {
             self.out.space_token_space("=")?;
             self.ty(ty)?;
+        }
+        self.out.token(";")?;
+        Ok(())
+    }
+    
+    fn static_item(&self, static_item: &ast::StaticItem) -> FormatResult {
+        self.out.token_space("static")?;
+        self.ident(static_item.ident)?;
+        self.out.token_space(":")?;
+        self.ty(&static_item.ty)?;
+        if let Some(expr) = &static_item.expr {
+            self.out.space_token_space("=")?;
+            self.expr(expr)?;
         }
         self.out.token(";")?;
         Ok(())
