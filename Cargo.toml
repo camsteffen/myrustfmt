@@ -2,14 +2,10 @@
 name = "myrustfmt"
 version = "0.1.0"
 edition = "2024"
-#build = "build.rs"
 
 [dependencies]
-derive-where = "1.4.0"
 enumset = "1.1.6"
 tracing = "0.1.35"
-thiserror = "2.0.8"
-serde = { version = "1.0.217", features = ["derive"] }
 getopts = "0.2.21"
 # https://youtrack.jetbrains.com/issue/RUST-946/Cant-find-libsyntax-from-rust-sources-in-external-librairies
 # rustc --print sysroot
@@ -27,7 +23,6 @@ getopts = "0.2.21"
 datatest-stable = "0.3.2"
 diff = "0.1.13"
 regex = "1.11.1"
-serde_yaml = "0.9.33"
 tracing-subscriber = "0.3.19"
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 
