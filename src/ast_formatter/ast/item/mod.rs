@@ -34,7 +34,7 @@ impl MaybeItem for ast::Stmt {
 
 impl AstFormatter {
     pub fn item(&self, item: &ast::Item) -> FormatResult {
-        self.item_generic(item, |kind| self.item_kind(kind, item))
+        self.item_generic(item, |kind| self.item_kind(kind))
     }
 
     fn item_generic<K>(
@@ -49,19 +49,14 @@ impl AstFormatter {
         })
     }
 
-    pub fn item_kind(&self, kind: &ast::ItemKind, item: &ast::Item) -> FormatResult {
+    pub fn item_kind(&self, kind: &ast::ItemKind) -> FormatResult {
         match *kind {
-            ast::ItemKind::ExternCrate(name, ident) => self.extern_crate(name, ident)?,
-            ast::ItemKind::Use(ref use_tree) => {
-                self.out.token_space("use")?;
-                self.use_tree(use_tree, self.tail_token(";").as_ref())?;
-            }
-            ast::ItemKind::Static(ref static_item) => self.static_item(static_item)?,
             ast::ItemKind::Const(ref const_item) => self.const_item(const_item)?,
-            ast::ItemKind::Fn(ref fn_) => self.fn_(fn_)?,
-            ast::ItemKind::Mod(safety, ident, ref mod_kind) => {
-                self.mod_item(safety, ident, mod_kind)?
+            ast::ItemKind::Enum(ident, ref def, ref generics) => {
+                self.enum_(ident, &def.variants, generics)?
             }
+            ast::ItemKind::ExternCrate(name, ident) => self.extern_crate(name, ident)?,
+            ast::ItemKind::Fn(ref fn_) => self.fn_(fn_)?,
             ast::ItemKind::ForeignMod(ref foreign_mod) => {
                 self.out.token_space("extern")?;
                 if let Some(abi) = foreign_mod.abi {
@@ -70,24 +65,6 @@ impl AstFormatter {
                 }
                 self.block(false, &foreign_mod.items, |item| self.foreign_item(item))?;
             }
-            ast::ItemKind::GlobalAsm(_) => todo!(),
-            ast::ItemKind::TyAlias(ref ty_alias) => {
-                self.token_ident_generic_params("type", ty_alias.ident, &ty_alias.generics)?;
-                if let Some(ty) = &ty_alias.ty {
-                    self.out.space_token_space("=")?;
-                    self.ty(ty)?;
-                }
-                self.out.token(";")?;
-            }
-            ast::ItemKind::Enum(ident, ref def, ref generics) => {
-                self.enum_(ident, &def.variants, generics)?
-            }
-            ast::ItemKind::Struct(ident, ref variants, ref generics) => {
-                self.struct_item(ident, variants, generics)?
-            }
-            ast::ItemKind::Union(..) => todo!(),
-            ast::ItemKind::Trait(ref trait_) => self.trait_(trait_)?,
-            ast::ItemKind::TraitAlias(..) => todo!(),
             ast::ItemKind::Impl(ref impl_) => self.impl_(impl_)?,
             ast::ItemKind::MacCall(ref mac_call) => {
                 self.mac_call(mac_call)?;
@@ -96,9 +73,32 @@ impl AstFormatter {
                 }
             }
             // todo
-            ast::ItemKind::MacroDef(..) => self.out.copy_span(item.span)?,
-            ast::ItemKind::Delegation(_) => todo!(),
-            ast::ItemKind::DelegationMac(_) => todo!(),
+            ast::ItemKind::MacroDef(..) => return Err(FormatErrorKind::UnsupportedSyntax.into()),
+            ast::ItemKind::Mod(safety, ident, ref mod_kind) => {
+                self.mod_item(safety, ident, mod_kind)?
+            }
+            ast::ItemKind::Static(ref static_item) => self.static_item(static_item)?,
+            ast::ItemKind::Struct(ident, ref variants, ref generics) => {
+                self.struct_item(ident, variants, generics)?
+            }
+            ast::ItemKind::Trait(ref trait_) => self.trait_(trait_)?,
+            ast::ItemKind::TraitAlias(..) => todo!(),
+            ast::ItemKind::TyAlias(ref ty_alias) => {
+                self.token_ident_generic_params("type", ty_alias.ident, &ty_alias.generics)?;
+                if let Some(ty) = &ty_alias.ty {
+                    self.out.space_token_space("=")?;
+                    self.ty(ty)?;
+                }
+                self.out.token(";")?;
+            }
+            ast::ItemKind::Union(..) => todo!(),
+            ast::ItemKind::Use(ref use_tree) => {
+                self.out.token_space("use")?;
+                self.use_tree(use_tree, self.tail_token(";").as_ref())?;
+            }
+            ast::ItemKind::Delegation(_)
+            | ast::ItemKind::DelegationMac(_)
+            | ast::ItemKind::GlobalAsm(_) => return Err(FormatErrorKind::UnsupportedSyntax.into()),
         }
         Ok(())
     }
