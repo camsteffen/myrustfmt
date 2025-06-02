@@ -92,12 +92,16 @@ where
         });
 
         let horizontal_height = match horizontal_result {
+            Ok(1) => return Ok(()),
+            Ok(height) => height,
             Err(mut e) => {
                 if let FormatErrorKind::ListOverflow { cause } = e.kind {
-                    assert!(self.af.constraints().single_line.get());
+                    assert!(self.af.constraints().single_line.get(), "ListOverflow error should only occur in single-line mode");
                     // avoid reporting ListOverflow to outer lists
                     e.kind = *cause;
-                    // other strategies won't do any better
+                    // Since this is not a width related error and single line mode is enabled, we
+                    // know that other strategies will not succeed either. Also, we need to be able
+                    // to measure the width of the first line of output in this case.
                     return Err(e);
                 }
                 return self
@@ -107,8 +111,6 @@ where
                     .next(|| self.contents_vertical())
                     .result_with_checkpoint(&checkpoint);
             }
-            Ok(1) => return Ok(()),
-            Ok(height) => height,
         };
 
         if self.opt.rest.is_none()

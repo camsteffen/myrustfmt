@@ -191,6 +191,7 @@ impl AstFormatter {
             lcx: ListItemContext,
         | -> FormatResult {
             if lcx.strategy == ListStrategy::Horizontal && lcx.index == args.len() - 1 {
+                // todo also disallow blocks?
                 let mut vstructs = VStruct::ControlFlow | VStruct::NonBlockIndent;
                 if args.len() > 1 {
                     vstructs |= VStruct::List | VStruct::Match;
