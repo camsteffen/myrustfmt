@@ -97,7 +97,6 @@ impl AstFormatter {
         Ok(())
     }
 
-    // todo share logic with local which also wraps to avoid multi-line
     // todo should we count lines or simply observe whether it's multi-line?
     fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
         let checkpoint = self.out.checkpoint();

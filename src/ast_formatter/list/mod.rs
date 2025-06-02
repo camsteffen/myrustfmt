@@ -59,7 +59,13 @@ where
             match self.opt.shape {
                 // trying to not fallback to vertical because we need to see the width of the line when we fail because overflow is not allowed
                 ListShape::Flexible => self.contents_flexible()?,
-                ListShape::Horizontal => self.contents_horizontal()?,
+                ListShape::Horizontal => self.contents_horizontal().map_err(|mut err| {
+                    if let FormatErrorKind::ListOverflow { cause } = err.kind {
+                        // avoid reporting ListOverflow to outer lists
+                        err.kind = *cause;
+                    }
+                    err
+                })?,
                 ListShape::Vertical => self.contents_vertical()?,
             }
             Ok(())
@@ -85,18 +91,25 @@ where
             Ok(height)
         });
 
-        let Ok(horizontal_height) = horizontal_result else {
-            return self
-                .af
-                .backtrack()
-                .next_opt(self.contents_wrap_to_fit_fn_opt())
-                .next(|| self.contents_vertical())
-                .result_with_checkpoint(&checkpoint);
+        let horizontal_height = match horizontal_result {
+            Err(mut e) => {
+                if let FormatErrorKind::ListOverflow { cause } = e.kind {
+                    assert!(self.af.constraints().single_line.get());
+                    // avoid reporting ListOverflow to outer lists
+                    e.kind = *cause;
+                    // other strategies won't do any better
+                    return Err(e);
+                }
+                return self
+                    .af
+                    .backtrack()
+                    .next_opt(self.contents_wrap_to_fit_fn_opt())
+                    .next(|| self.contents_vertical())
+                    .result_with_checkpoint(&checkpoint);
+            }
+            Ok(1) => return Ok(()),
+            Ok(height) => height,
         };
-
-        if horizontal_height == 1 {
-            return Ok(());
-        }
 
         if self.opt.rest.is_none()
             && self

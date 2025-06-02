@@ -61,7 +61,7 @@ impl AstFormatter {
         let Err(e) = format() else {
             return Ok(());
         };
-        match e.kind {
+        match e.kind.root_cause() {
             FormatErrorKind::LineCommentNotAllowed => {
                 let (line, col) = self.out.line_col();
                 // todo emit a more appropriate error for bad comments
@@ -78,9 +78,12 @@ impl AstFormatter {
             }
             // these are not expected
             FormatErrorKind::NewlineNotAllowed
-            | FormatErrorKind::WidthLimitExceeded
-            | FormatErrorKind::NextStrategy => {
+            | FormatErrorKind::NextStrategy
+            | FormatErrorKind::WidthLimitExceeded => {
                 return Err(e);
+            }
+            FormatErrorKind::ListOverflow { cause: _ } | FormatErrorKind::VStruct { cause: _ } => {
+                unreachable!()
             }
         }
         #[cfg(debug_assertions)]

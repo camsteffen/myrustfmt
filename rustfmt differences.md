@@ -18,6 +18,7 @@
 
 `match`
  * A match arm may not start with `loop`
+ * Does not add a semicolon after `return`, `break` etc. This is only done for statements and not expressions.
 
 `let` statements
  * If the expression does not fit in the first line, prefer introducing line breaks within the first

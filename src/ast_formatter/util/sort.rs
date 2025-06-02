@@ -34,13 +34,11 @@ pub fn version_sort(a: &str, b: &str) -> Ordering {
             (Chunk::Number(a), Chunk::Number(b)) => {
                 cmp_by_key(a, b, |s| s.parse::<u32>().expect("numeric chunk should be a valid u32"))
             }
-            (Chunk::NonNumber(str_a), Chunk::NonNumber(str_b)) => cmp_iter_by(
-                str_a.bytes(),
-                str_b.bytes(),
-                |byte_a, byte_b| {
+            (Chunk::NonNumber(str_a), Chunk::NonNumber(str_b)) => {
+                cmp_iter_by(str_a.bytes(), str_b.bytes(), |byte_a, byte_b| {
                     cmp_by_key(byte_a, byte_b, |b| b != b'_').then_with(|| byte_a.cmp(&byte_b))
-                },
-            ),
+                })
+            }
         }
     })
     .then_with(|| {

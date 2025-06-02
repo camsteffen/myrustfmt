@@ -46,15 +46,48 @@ impl FormatError {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum FormatErrorKind {
     LineCommentNotAllowed,
+    /// List tried to overflow when single-line constraint is enabled
+    ListOverflow { cause: Box<FormatErrorKind> },
     MultiLineCommentNotAllowed,
     /// Returned when we know that there is a fallback strategy that is preferred
     NextStrategy,
     NewlineNotAllowed,
     WidthLimitExceeded,
     UnsupportedSyntax,
+    VStruct { cause: Box<FormatErrorKind> },
+}
+
+impl FormatErrorKind {
+    pub fn root_cause(&self) -> &Self {
+        match self {
+            FormatErrorKind::ListOverflow { cause } | FormatErrorKind::VStruct { cause } => {
+                cause.root_cause()
+            }
+            FormatErrorKind::LineCommentNotAllowed
+            | FormatErrorKind::MultiLineCommentNotAllowed
+            | FormatErrorKind::NewlineNotAllowed
+            | FormatErrorKind::NextStrategy
+            | FormatErrorKind::UnsupportedSyntax
+            | FormatErrorKind::WidthLimitExceeded => self,
+        }
+    }
+
+    pub fn is_vertical(&self) -> bool {
+        match self {
+            FormatErrorKind::LineCommentNotAllowed
+            | FormatErrorKind::ListOverflow { .. }
+            | FormatErrorKind::MultiLineCommentNotAllowed
+            | FormatErrorKind::NewlineNotAllowed
+            | FormatErrorKind::VStruct { .. } => true,
+
+            FormatErrorKind::NextStrategy
+            | FormatErrorKind::WidthLimitExceeded
+            | FormatErrorKind::UnsupportedSyntax => false,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -86,13 +119,16 @@ fn write_constraint_error(
     path: Option<&Path>,
 ) -> std::fmt::Result {
     write!(f, "{}, ", error_formatting_at(source, pos, path))?;
-    match e.kind {
+    match e.kind.root_cause() {
         FormatErrorKind::LineCommentNotAllowed => write!(f, "line comment not allowed")?,
         FormatErrorKind::MultiLineCommentNotAllowed => write!(f, "multi-line comment not allowed")?,
         kind @ FormatErrorKind::NextStrategy => write!(f, "unhandled {kind:?}")?,
         FormatErrorKind::NewlineNotAllowed => write!(f, "newline not allowed")?,
         FormatErrorKind::WidthLimitExceeded => write!(f, "width limit exceeded")?,
         FormatErrorKind::UnsupportedSyntax => write!(f, "unsupported syntax")?,
+        FormatErrorKind::ListOverflow { cause: _ } | FormatErrorKind::VStruct { cause: _ } => {
+            unreachable!()
+        }
     }
     if cfg!(debug_assertions) && path.is_none() {
         write!(f, "\nSource:\n{source}")?;

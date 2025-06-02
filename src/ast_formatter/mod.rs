@@ -49,6 +49,9 @@ impl AstFormatter {
             Err(e) => {
                 // todo don't panic?
                 // todo make it possible to panic inside ErrorEmitter instead?
+                if cfg!(debug_assertions) {
+                    self.out.debug_buffer();
+                }
                 panic!(
                     "This is a bug :(\n{}",
                     e.display(

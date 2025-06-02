@@ -195,7 +195,17 @@ impl AstFormatter {
                 if args.len() > 1 {
                     vstructs |= VStruct::List | VStruct::Match;
                 }
-                af.disallow_vstructs(vstructs, || af.expr_tail(expr, tail))?;
+                af.disallow_vstructs(vstructs, || af.expr_tail(expr, tail))
+                    .map_err(|mut err| {
+                        if err.kind.is_vertical()
+                            && !matches!(err.kind, FormatErrorKind::VStruct {..})
+                        {
+                            err.kind = FormatErrorKind::ListOverflow {
+                                cause: Box::new(err.kind),
+                            };
+                        }
+                        err
+                    })?;
             } else {
                 af.expr_tail(expr, tail)?;
             }
