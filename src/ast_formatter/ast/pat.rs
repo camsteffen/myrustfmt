@@ -62,8 +62,6 @@ impl AstFormatter {
                 Self::pat_list_item,
                 ListOptions::new().tail(take_tail()),
             )?,
-            ast::PatKind::Box(_) => todo!(),
-            ast::PatKind::Deref(_) => todo!(),
             ast::PatKind::Ref(ref pat, mutability) => {
                 self.out.token("&")?;
                 self.mutability(mutability)?;
@@ -84,7 +82,6 @@ impl AstFormatter {
                 ListOptions::new().tail(take_tail()),
             )?,
             ast::PatKind::Rest => self.out.token("..")?,
-            ast::PatKind::Never => todo!(),
             ast::PatKind::Paren(ref inner) => {
                 // todo breakpoint
                 self.out.token("(")?;
@@ -92,9 +89,10 @@ impl AstFormatter {
                 self.out.token(")")?;
             }
             ast::PatKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,
-            ast::PatKind::Guard(ref _pat, ref _cond) => {
-                return Err(FormatErrorKind::UnsupportedSyntax.into())
-            }
+            ast::PatKind::Box(_)
+            | ast::PatKind::Deref(_)
+            | ast::PatKind::Guard(..)
+            | ast::PatKind::Never => return Err(FormatErrorKind::UnsupportedSyntax.into()),
             ast::PatKind::Err(_) | ast::PatKind::Missing => panic!("unexpected PatKind"),
         }
 
