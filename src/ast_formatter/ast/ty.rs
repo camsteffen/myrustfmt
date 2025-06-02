@@ -24,7 +24,7 @@ impl AstFormatter {
                 self.out.token("[")?;
                 self.ty(ty)?;
                 self.out.token_space(";")?;
-                self.anon_const(length)?;
+                self.expr(&length.value)?;
                 self.out.token("]")?;
             }
             ast::TyKind::Ptr(_mut_ty) => todo!(),
@@ -67,7 +67,7 @@ impl AstFormatter {
                 self.ty(ty)?;
                 self.out.token(")")?;
             }
-            ast::TyKind::Typeof(anon_const) => self.anon_const(anon_const)?,
+            ast::TyKind::Typeof(anon_const) => self.expr(&anon_const.value)?,
             ast::TyKind::Infer => self.out.token("_")?,
             ast::TyKind::ImplicitSelf => self.out.token("self")?,
             ast::TyKind::MacCall(_mac_call) => todo!(),
@@ -126,7 +126,7 @@ impl AstFormatter {
 
     pub fn generic_arg(&self, arg: &ast::GenericArg, tail: Tail) -> FormatResult {
         match &arg {
-            ast::GenericArg::Const(anon_const) => self.anon_const_tail(anon_const, tail),
+            ast::GenericArg::Const(anon_const) => self.expr_tail(&anon_const.value, tail),
             ast::GenericArg::Lifetime(lifetime) => {
                 self.lifetime(lifetime)?;
                 self.tail(tail)?;

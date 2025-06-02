@@ -1,8 +1,6 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::tail::Tail;
-use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
 use crate::error::FormatResult;
-use crate::num::HSize;
+use crate::num::{HSize, VSize};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -13,71 +11,38 @@ impl AstFormatter {
     }
 
     fn local_after_attrs(&self, local: &ast::Local) -> FormatResult {
-        let ast::Local { pat, kind, ty, .. } = local;
         let (first_line, start_col) = self.out.line_col();
         self.out.token_space("let")?;
         self.pat_tail(
-            pat,
-            (ty.is_none() && kind.init().is_none())
-                .then_some(&self.tail_token_inner(";")),
+            &local.pat,
+            self.tail_fn(|af| af.local_after_pat(local, first_line, start_col))
+                .as_ref(),
         )?;
-        if let Some(ty) = ty {
-            self.out.token_space(":")?;
-            // todo tail with expression?
-            self.ty_tail(
-                ty,
-                kind.init().is_none().then_some(&self.tail_token_inner(";")),
-            )?;
-        }
-        let Some((init, else_)) = kind.init_else_opt() else {
-            return Ok(());
-        };
-        self.local_init(init, else_.is_none().then_some(&self.tail_token_inner(";")))?;
-        let Some(else_) = else_ else { return Ok(()) };
-        let is_single_line_init = self.out.line() == first_line;
-        self.local_else(else_, is_single_line_init, start_col)?;
         Ok(())
     }
 
-    fn local_init(&self, expr: &ast::Expr, tail: Tail) -> FormatResult {
-        self.out.space_token("=")?;
-        let checkpoint_after_eq = self.out.checkpoint();
-
-        let (force_wrap, lookahead) = if self.out.with_recover_width(|| self.out.space()).is_err() {
-            (true, None)
-        } else {
-            let checkpoint_after_space = self.out.checkpoint();
-            match self.simulate_wrap_indent(false, || self.expr_tail(expr, tail)) {
-                SimulateWrapResult::Ok => return Ok(()),
-                SimulateWrapResult::NoWrap => (false, None),
-                SimulateWrapResult::Wrap { single_line } => (
-                    true,
-                    single_line.then(|| self.out.capture_lookahead(&checkpoint_after_space)),
-                ),
-            }
+    fn local_after_pat(
+        &self,
+        local: &ast::Local,
+        first_line: VSize,
+        start_col: HSize,
+    ) -> FormatResult {
+        let ast::Local { kind, ty, .. } = local;
+        let init_else = |af: &AstFormatter| {
+            let Some((init, else_)) = kind.init_else_opt() else {
+                return af.out.token(";");
+            };
+            af.assign_expr(init, else_.is_none().then_some(&af.tail_token_inner(";")))?;
+            let Some(else_) = else_ else { return Ok(()) };
+            let is_single_line_init = af.out.line() == first_line;
+            af.local_else(else_, is_single_line_init, start_col)?;
+            Ok(())
         };
-
-        self.backtrack()
-            .next_if(!force_wrap, || {
-                self.space_could_wrap_indent(|| {
-                    self.expr(expr)?;
-                    self.tail(tail)?;
-                    Ok(())
-                })
-            })
-            .next(|| {
-                self.indented(|| {
-                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                    if let Some(lookahead) = lookahead {
-                        self.out.restore_lookahead(lookahead);
-                    } else {
-                        self.expr(expr)?;
-                        self.tail(tail)?;
-                    }
-                    Ok(())
-                })
-            })
-            .result_with_checkpoint(&checkpoint_after_eq)?;
+        if let Some(ty) = ty {
+            self.out.token_space(":")?;
+            return self.ty_tail(ty, self.tail_fn(init_else).as_ref());
+        }
+        init_else(self)?;
         Ok(())
     }
 
@@ -95,15 +60,9 @@ impl AstFormatter {
         let same_line_else = || -> FormatResult {
             self.out.space_token_space("else")?;
             self.out.token("{")?;
-            let else_block_horizontal = 'horizontal: {
-                let expr_only_else = if is_single_line_init {
-                    self.try_into_expr_only_block(else_)
-                } else {
-                    None
-                };
-                let Some(expr_only_else) = expr_only_else else {
-                    break 'horizontal None;
-                };
+            let else_block_horizontal = if is_single_line_init
+                && let Some(expr_only_else) = self.try_into_expr_only_block(else_)
+            {
                 Some(move || {
                     self.with_single_line(|| {
                         self.with_width_limit_from_start(
@@ -117,6 +76,8 @@ impl AstFormatter {
                         )
                     })
                 })
+            } else {
+                None
             };
             self.backtrack()
                 .next_opt(else_block_horizontal)

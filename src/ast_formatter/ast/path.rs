@@ -147,7 +147,7 @@ impl AstFormatter {
             ast::AssocItemConstraintKind::Equality { term } => {
                 self.out.space_token_space("=")?;
                 match term {
-                    ast::Term::Const(anon_const) => self.anon_const_tail(anon_const, tail),
+                    ast::Term::Const(anon_const) => self.expr_tail(&anon_const.value, tail),
                     ast::Term::Ty(ty) => self.ty_tail(ty, tail),
                 }
             }

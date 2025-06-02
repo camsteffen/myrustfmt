@@ -14,6 +14,7 @@
 * Large expressions in parentheses are broken into a separate line
 * Single-item arrays and tuples are not combinable with multi-line expressions. The element is wrapped and indented.
 * A single call argument cannot be combined with control flow expressions
+* Only argument lists can overflow. Not arrays or tuples.
 
 `match`
  * A match arm may not start with `loop`

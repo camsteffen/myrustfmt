@@ -79,10 +79,9 @@ impl AstFormatter {
             }
             ast::ItemKind::Static(ref static_item) => self.static_item(static_item)?,
             ast::ItemKind::Struct(ident, ref variants, ref generics) => {
-                self.struct_item(ident, variants, generics)?
+                self.struct_or_union("struct", ident, variants, generics)?
             }
             ast::ItemKind::Trait(ref trait_) => self.trait_(trait_)?,
-            ast::ItemKind::TraitAlias(..) => todo!(),
             ast::ItemKind::TyAlias(ref ty_alias) => {
                 self.token_ident_generic_params("type", ty_alias.ident, &ty_alias.generics)?;
                 if let Some(ty) = &ty_alias.ty {
@@ -91,14 +90,19 @@ impl AstFormatter {
                 }
                 self.out.token(";")?;
             }
-            ast::ItemKind::Union(..) => todo!(),
+            ast::ItemKind::Union(ident, ref variants, ref generics) => {
+                self.struct_or_union("union", ident, variants, generics)?
+            }
             ast::ItemKind::Use(ref use_tree) => {
                 self.out.token_space("use")?;
                 self.use_tree(use_tree, self.tail_token(";").as_ref())?;
             }
             ast::ItemKind::Delegation(_)
             | ast::ItemKind::DelegationMac(_)
-            | ast::ItemKind::GlobalAsm(_) => return Err(FormatErrorKind::UnsupportedSyntax.into()),
+            | ast::ItemKind::GlobalAsm(_)
+            | ast::ItemKind::TraitAlias(..) => {
+                return Err(FormatErrorKind::UnsupportedSyntax.into())
+            }
         }
         Ok(())
     }
@@ -188,10 +192,10 @@ impl AstFormatter {
             self.vis(&variant.vis)?;
             self.ident(variant.ident)?;
             self.variant_data(&variant.data, true, true)?;
-            if let Some(_discriminant) = &variant.disr_expr {
-                todo!()
-            }
-            self.tail(tail)?;
+            let Some(discriminant) = &variant.disr_expr else {
+                return self.tail(tail);
+            };
+            self.assign_expr(&discriminant.value, tail)?;
             Ok(())
         })
     }
@@ -312,8 +316,9 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn struct_item(
+    fn struct_or_union(
         &self,
+        token: &'static str,
         ident: Ident,
         variants: &ast::VariantData,
         generics: &ast::Generics,
@@ -323,7 +328,7 @@ impl AstFormatter {
             ast::VariantData::Tuple(..) => (true, true),
             ast::VariantData::Unit(_) => (false, true),
         };
-        self.token_ident_generic_params("struct", ident, generics)?;
+        self.token_ident_generic_params(token, ident, generics)?;
         self.where_clause(&generics.where_clause, has_body)?;
         self.variant_data(variants, false, generics.where_clause.is_empty())?;
         if has_semi {

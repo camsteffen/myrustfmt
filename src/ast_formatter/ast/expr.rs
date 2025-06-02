@@ -48,7 +48,7 @@ impl AstFormatter {
             )?,
             ast::ExprKind::ConstBlock(ref anon_const) => {
                 self.out.token_space("const")?;
-                self.anon_const_tail(anon_const, take_tail())?;
+                self.expr_tail(&anon_const.value, take_tail())?;
             }
             ast::ExprKind::Call(ref func, ref args) => self.call(func, args, take_tail())?,
             postfix_expr_kind!() => self.postfix_chain(expr, take_tail())?,
@@ -186,14 +186,6 @@ impl AstFormatter {
             Some(block) => self.block_expr(false, block),
             None => self.expr_add_block(expr),
         }
-    }
-
-    pub fn anon_const(&self, anon_const: &ast::AnonConst) -> FormatResult {
-        self.expr(&anon_const.value)
-    }
-
-    pub fn anon_const_tail(&self, anon_const: &ast::AnonConst, tail: Tail) -> FormatResult {
-        self.expr_tail(&anon_const.value, tail)
     }
 
     pub fn label(&self, label: Option<ast::Label>, has_colon: bool) -> FormatResult {

@@ -1,13 +1,13 @@
 // test-kind: before-after
-// max-width: 15
+// max-width: 25
 
 fn test() {
-    let x = aaaaaaaaaa;
+    let (aaaa, bbbb) = aaaaaaaaaaaaaaaaaaaa;
 }
 
 // :after:
 
 fn test() {
-    let x =
-        aaaaaaaaaa;
+    let (aaaa, bbbb) =
+        aaaaaaaaaaaaaaaaaaaa;
 }

@@ -1,3 +1,4 @@
+mod assign;
 pub mod ast;
 mod constraint_effects;
 pub mod debug;
