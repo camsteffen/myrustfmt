@@ -5,7 +5,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::options::{ListOptions, ListShape};
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
-use crate::error::FormatResult;
+use crate::error::{ConstraintError, ConstraintErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -255,25 +255,30 @@ impl AstFormatter {
     }
 
     fn assoc_item(&self, item: &ast::AssocItem) -> FormatResult {
-        self.item_generic(item, |kind| self.assoc_item_kind(kind))
-    }
-
-    fn assoc_item_kind(&self, kind: &ast::AssocItemKind) -> FormatResult {
-        match kind {
-            ast::AssocItemKind::Const(const_item) => self.const_item(const_item),
-            ast::AssocItemKind::Fn(fn_) => self.fn_(fn_),
-            ast::AssocItemKind::Type(ty_alias) => self.ty_alias(ty_alias),
-            ast::AssocItemKind::MacCall(_mac_call) => todo!(),
-            ast::AssocItemKind::Delegation(_delegation) => todo!(),
-            ast::AssocItemKind::DelegationMac(_delegation_mac) => todo!(),
-        }
+        self.item_generic(item, |kind| {
+            match kind {
+                ast::AssocItemKind::Const(const_item) => self.const_item(const_item)?,
+                ast::AssocItemKind::Fn(fn_) => self.fn_(fn_)?,
+                ast::AssocItemKind::Type(ty_alias) => self.ty_alias(ty_alias)?,
+                ast::AssocItemKind::MacCall(mac_call) => {
+                    self.mac_call(mac_call)?;
+                    self.out.token(";")?;
+                },
+                ast::AssocItemKind::Delegation(_) => return Err(ConstraintErrorKind::UnsupportedSyntax.into()),
+                ast::AssocItemKind::DelegationMac(_) => return Err(ConstraintErrorKind::UnsupportedSyntax.into()),
+            }
+            Ok(())
+        })
     }
     
     fn foreign_item(&self, foreign_item: &ast::ForeignItem) -> FormatResult {
         self.item_generic(foreign_item, |kind| {
             match kind {
                 ast::ForeignItemKind::Fn(fn_) => self.fn_(fn_)?,
-                ast::ForeignItemKind::MacCall(mac_call) => self.mac_call(mac_call)?,
+                ast::ForeignItemKind::MacCall(mac_call) => {
+                    self.mac_call(mac_call)?;
+                    self.out.token(";")?;
+                },
                 ast::ForeignItemKind::Static(static_item) => self.static_item(static_item)?,
                 ast::ForeignItemKind::TyAlias(ty_alias) => self.ty_alias(ty_alias)?,
             }

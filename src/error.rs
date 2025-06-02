@@ -54,6 +54,7 @@ pub enum ConstraintErrorKind {
     NextStrategy,
     NewlineNotAllowed,
     WidthLimitExceeded,
+    UnsupportedSyntax,
 }
 
 #[derive(Clone, Copy, Debug)]
