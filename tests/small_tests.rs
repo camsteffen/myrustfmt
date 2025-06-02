@@ -176,7 +176,13 @@ fn small_test(test: &Test) -> TestResult {
                 "before -> after",
                 test.expect_errors,
             )?;
-            format_max_width_expected(after, max_width, after, "after (idempotency)", false)?;
+            format_max_width_expected(
+                after,
+                max_width,
+                after,
+                "after (idempotency)",
+                test.expect_errors,
+            )?;
         }
     }
     Ok(())

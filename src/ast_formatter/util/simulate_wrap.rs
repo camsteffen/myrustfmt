@@ -48,7 +48,6 @@ impl AstFormatter {
                     (result, used_extra_width)
                 }
             };
-            // todo test all possibilities
             match (result, used_extra_width) {
                 // simple case - we can use the result as is
                 (Ok(()), false) => SimulateWrapResult::Ok,
