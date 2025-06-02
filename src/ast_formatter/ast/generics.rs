@@ -2,7 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
-use crate::error::FormatResult;
+use crate::error::{FormatErrorKind, FormatResult};
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 
@@ -84,8 +84,14 @@ impl AstFormatter {
                         self.out.token_space(":")?;
                         self.generic_bounds(&pred.bounds, None)?;
                     }
-                    ast::WherePredicateKind::RegionPredicate(_) => todo!(),
-                    ast::WherePredicateKind::EqPredicate(_) => todo!(),
+                    ast::WherePredicateKind::RegionPredicate(pred) => {
+                        self.lifetime(&pred.lifetime)?;
+                        self.out.token_space(":")?;
+                        self.generic_bounds(&pred.bounds, None)?;
+                    }
+                    ast::WherePredicateKind::EqPredicate(_) => {
+                        return Err(FormatErrorKind::UnsupportedSyntax.into())
+                    }
                 }
                 if is_before_body || i < where_clause.predicates.len() - 1 {
                     self.out.token_maybe_missing(",")?;
