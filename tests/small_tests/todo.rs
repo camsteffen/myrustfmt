@@ -1,5 +1,11 @@
 // test-kind: no-change
 
+fn test() {
+    match x {
+        (x if y, y) => x,
+    }
+}
+
 // #2158
 trait Foo {
     type ItRev = <MergingUntypedTimeSeries<SliceSeries<SliceWindow>> as UntypedTimeSeries>::IterRev;

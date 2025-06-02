@@ -78,21 +78,7 @@ impl AstFormatter {
         self.indented(|| {
             for (i, pred) in where_clause.predicates.iter().enumerate() {
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                match &pred.kind {
-                    ast::WherePredicateKind::BoundPredicate(pred) => {
-                        self.ty(&pred.bounded_ty)?;
-                        self.out.token_space(":")?;
-                        self.generic_bounds(&pred.bounds, None)?;
-                    }
-                    ast::WherePredicateKind::RegionPredicate(pred) => {
-                        self.lifetime(&pred.lifetime)?;
-                        self.out.token_space(":")?;
-                        self.generic_bounds(&pred.bounds, None)?;
-                    }
-                    ast::WherePredicateKind::EqPredicate(_) => {
-                        return Err(FormatErrorKind::UnsupportedSyntax.into())
-                    }
-                }
+                self.where_predicate(pred)?;
                 if is_before_body || i < where_clause.predicates.len() - 1 {
                     self.out.token_maybe_missing(",")?;
                 }
@@ -103,5 +89,24 @@ impl AstFormatter {
             self.out.newline_indent(VerticalWhitespaceMode::Break)?;
         }
         Ok(true)
+    }
+
+    fn where_predicate(&self, pred: &ast::WherePredicate) -> FormatResult {
+        match &pred.kind {
+            ast::WherePredicateKind::BoundPredicate(pred) => {
+                self.ty(&pred.bounded_ty)?;
+                self.out.token_space(":")?;
+                self.generic_bounds(&pred.bounds, None)?;
+            }
+            ast::WherePredicateKind::RegionPredicate(pred) => {
+                self.lifetime(&pred.lifetime)?;
+                self.out.token_space(":")?;
+                self.generic_bounds(&pred.bounds, None)?;
+            }
+            ast::WherePredicateKind::EqPredicate(_) => {
+                return Err(FormatErrorKind::UnsupportedSyntax.into());
+            }
+        }
+        Ok(())
     }
 }

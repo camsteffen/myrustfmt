@@ -7,6 +7,7 @@
     fn_delegation,
     gen_blocks,
     generator_trait,
+    guard_patterns,
     postfix_match,
     trait_alias,
     try_blocks,

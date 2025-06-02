@@ -6,7 +6,7 @@ use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
-use crate::error::FormatResult;
+use crate::error::{FormatErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 
 impl AstFormatter {
@@ -23,7 +23,6 @@ impl AstFormatter {
 
         match pat.kind {
             ast::PatKind::Expr(ref expr) => self.expr_tail(expr, take_tail())?,
-            ast::PatKind::Guard(ref _pat, ref _cond) => todo!(),
             ast::PatKind::Wild => self.out.token("_")?,
             ast::PatKind::Ident(ast::BindingMode(by_ref, mutbl), ident, ref pat) => {
                 self.mutability(mutbl)?;
@@ -93,8 +92,10 @@ impl AstFormatter {
                 self.out.token(")")?;
             }
             ast::PatKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,
-            ast::PatKind::Missing => todo!(),
-            ast::PatKind::Err(_) => todo!(),
+            ast::PatKind::Guard(ref _pat, ref _cond) => {
+                return Err(FormatErrorKind::UnsupportedSyntax.into())
+            }
+            ast::PatKind::Err(_) | ast::PatKind::Missing => panic!("unexpected PatKind"),
         }
 
         if let Some(tail) = tail {
