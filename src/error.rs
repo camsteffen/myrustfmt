@@ -6,7 +6,7 @@ use std::backtrace::Backtrace;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
 
-pub type FormatResult<T = ()> = Result<T, ConstraintError>;
+pub type FormatResult<T = ()> = Result<T, FormatError>;
 
 pub trait FormatResultExt {
     #[allow(unused)]
@@ -23,15 +23,15 @@ impl<T> FormatResultExt for FormatResult<T> {
 }
 
 #[derive(Debug)]
-pub struct ConstraintError {
-    pub kind: ConstraintErrorKind,
+pub struct FormatError {
+    pub kind: FormatErrorKind,
     #[cfg(debug_assertions)]
     pub backtrace: Box<Backtrace>,
 }
 
-impl ConstraintError {
-    pub fn new(kind: ConstraintErrorKind) -> ConstraintError {
-        ConstraintError {
+impl FormatError {
+    pub fn new(kind: FormatErrorKind) -> FormatError {
+        FormatError {
             kind,
             #[cfg(debug_assertions)]
             backtrace: Box::new(Backtrace::capture()),
@@ -47,7 +47,7 @@ impl ConstraintError {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ConstraintErrorKind {
+pub enum FormatErrorKind {
     LineCommentNotAllowed,
     MultiLineCommentNotAllowed,
     /// Returned when we know that there is a fallback strategy that is preferred
@@ -80,20 +80,19 @@ pub fn error_formatting_at(source: &str, pos: BytePos, path: Option<&Path>) -> S
 
 fn write_constraint_error(
     f: &mut Formatter,
-    e: &ConstraintError,
+    e: &FormatError,
     source: &str,
     pos: BytePos,
     path: Option<&Path>,
 ) -> std::fmt::Result {
     write!(f, "{}, ", error_formatting_at(source, pos, path))?;
     match e.kind {
-        ConstraintErrorKind::LineCommentNotAllowed => write!(f, "line comment not allowed")?,
-        ConstraintErrorKind::MultiLineCommentNotAllowed => {
-            write!(f, "multi-line comment not allowed")?
-        }
-        kind @ ConstraintErrorKind::NextStrategy => write!(f, "unhandled {kind:?}")?,
-        ConstraintErrorKind::NewlineNotAllowed => write!(f, "newline not allowed")?,
-        ConstraintErrorKind::WidthLimitExceeded => write!(f, "width limit exceeded")?,
+        FormatErrorKind::LineCommentNotAllowed => write!(f, "line comment not allowed")?,
+        FormatErrorKind::MultiLineCommentNotAllowed => write!(f, "multi-line comment not allowed")?,
+        kind @ FormatErrorKind::NextStrategy => write!(f, "unhandled {kind:?}")?,
+        FormatErrorKind::NewlineNotAllowed => write!(f, "newline not allowed")?,
+        FormatErrorKind::WidthLimitExceeded => write!(f, "width limit exceeded")?,
+        FormatErrorKind::UnsupportedSyntax => write!(f, "unsupported syntax")?,
     }
     if cfg!(debug_assertions) && path.is_none() {
         write!(f, "\nSource:\n{source}")?;
@@ -158,38 +157,38 @@ fn write_parse_error(
     Ok(())
 }
 
-impl ConstraintError {
+impl FormatError {
     pub fn display(&self, source: &str, pos: BytePos, path: Option<&Path>) -> impl Display {
         display_from_fn(move |f| write_constraint_error(f, self, source, pos, path))
     }
 }
 
-impl From<ConstraintErrorKind> for ConstraintError {
-    fn from(kind: ConstraintErrorKind) -> Self {
-        ConstraintError::new(kind)
+impl From<FormatErrorKind> for FormatError {
+    fn from(kind: FormatErrorKind) -> Self {
+        FormatError::new(kind)
     }
 }
 
-impl From<NewlineNotAllowedError> for ConstraintErrorKind {
+impl From<NewlineNotAllowedError> for FormatErrorKind {
     fn from(_: NewlineNotAllowedError) -> Self {
-        ConstraintErrorKind::NewlineNotAllowed
+        FormatErrorKind::NewlineNotAllowed
     }
 }
 
-impl From<NewlineNotAllowedError> for ConstraintError {
+impl From<NewlineNotAllowedError> for FormatError {
     fn from(_: NewlineNotAllowedError) -> Self {
-        ConstraintErrorKind::NewlineNotAllowed.into()
+        FormatErrorKind::NewlineNotAllowed.into()
     }
 }
 
-impl From<WidthLimitExceededError> for ConstraintErrorKind {
+impl From<WidthLimitExceededError> for FormatErrorKind {
     fn from(_: WidthLimitExceededError) -> Self {
-        ConstraintErrorKind::WidthLimitExceeded
+        FormatErrorKind::WidthLimitExceeded
     }
 }
 
-impl From<WidthLimitExceededError> for ConstraintError {
+impl From<WidthLimitExceededError> for FormatError {
     fn from(e: WidthLimitExceededError) -> Self {
-        ConstraintErrorKind::from(e).into()
+        FormatErrorKind::from(e).into()
     }
 }

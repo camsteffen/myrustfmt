@@ -1,5 +1,5 @@
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
-use crate::error::{ConstraintErrorKind, FormatResult};
+use crate::error::{FormatErrorKind, FormatResult};
 use crate::util::cell_ext::CellExt;
 
 #[derive(Debug)]
@@ -58,8 +58,7 @@ impl AstFormatter {
                 // If we used extra width and encountered a newline-related error, we can infer that
                 // wrapping allows for more code to fit in the first line.
                 (Err(e), true)
-                    if e.kind == ConstraintErrorKind::WidthLimitExceeded
-                        || wrap_for_longer_first_line =>
+                    if e.kind == FormatErrorKind::WidthLimitExceeded || wrap_for_longer_first_line =>
                 {
                     SimulateWrapResult::Wrap { single_line: false }
                 }

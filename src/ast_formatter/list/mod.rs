@@ -11,7 +11,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::options::{ListOptions, ListShape, ListWrapToFit};
 use crate::ast_formatter::tail::Tail;
 use crate::constraints::VStruct;
-use crate::error::{ConstraintErrorKind, FormatResult};
+use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::HSize;
 use crate::whitespace::VerticalWhitespaceMode;
 
@@ -76,7 +76,7 @@ where
                 .as_ref()
                 .is_some_and(|f| self.list.iter().any(f))
             {
-                return Err(ConstraintErrorKind::NextStrategy.into());
+                return Err(FormatErrorKind::NextStrategy.into());
             }
             self.contents_horizontal()?;
             // N.B. measure before writing the tail

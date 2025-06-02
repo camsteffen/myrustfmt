@@ -5,7 +5,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::options::{ListOptions, ListShape};
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
-use crate::error::{ConstraintError, ConstraintErrorKind, FormatResult};
+use crate::error::{FormatErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -56,9 +56,7 @@ impl AstFormatter {
                 self.out.token_space("use")?;
                 self.use_tree(use_tree, self.tail_token(";").as_ref())?;
             }
-            ast::ItemKind::Static(ref static_item) => {
-                self.static_item(static_item)?
-            }
+            ast::ItemKind::Static(ref static_item) => self.static_item(static_item)?,
             ast::ItemKind::Const(ref const_item) => self.const_item(const_item)?,
             ast::ItemKind::Fn(ref fn_) => self.fn_(fn_)?,
             ast::ItemKind::Mod(safety, ident, ref mod_kind) => {
@@ -263,14 +261,18 @@ impl AstFormatter {
                 ast::AssocItemKind::MacCall(mac_call) => {
                     self.mac_call(mac_call)?;
                     self.out.token(";")?;
-                },
-                ast::AssocItemKind::Delegation(_) => return Err(ConstraintErrorKind::UnsupportedSyntax.into()),
-                ast::AssocItemKind::DelegationMac(_) => return Err(ConstraintErrorKind::UnsupportedSyntax.into()),
+                }
+                ast::AssocItemKind::Delegation(_) => {
+                    return Err(FormatErrorKind::UnsupportedSyntax.into())
+                }
+                ast::AssocItemKind::DelegationMac(_) => {
+                    return Err(FormatErrorKind::UnsupportedSyntax.into())
+                }
             }
             Ok(())
         })
     }
-    
+
     fn foreign_item(&self, foreign_item: &ast::ForeignItem) -> FormatResult {
         self.item_generic(foreign_item, |kind| {
             match kind {
@@ -278,7 +280,7 @@ impl AstFormatter {
                 ast::ForeignItemKind::MacCall(mac_call) => {
                     self.mac_call(mac_call)?;
                     self.out.token(";")?;
-                },
+                }
                 ast::ForeignItemKind::Static(static_item) => self.static_item(static_item)?,
                 ast::ForeignItemKind::TyAlias(ty_alias) => self.ty_alias(ty_alias)?,
             }
@@ -296,7 +298,7 @@ impl AstFormatter {
         self.out.token(";")?;
         Ok(())
     }
-    
+
     fn static_item(&self, static_item: &ast::StaticItem) -> FormatResult {
         self.out.token_space("static")?;
         self.ident(static_item.ident)?;

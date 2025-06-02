@@ -2,8 +2,7 @@ pub mod checkpoint;
 
 use crate::constraints::Constraints;
 use crate::error::{
-    ConstraintError, ConstraintErrorKind, FormatResult, NewlineNotAllowedError,
-    WidthLimitExceededError,
+    FormatError, FormatErrorKind, FormatResult, NewlineNotAllowedError, WidthLimitExceededError,
 };
 use crate::error_emitter::BufferedErrorEmitter;
 use crate::num::{HSize, VSize};
@@ -123,9 +122,7 @@ impl ConstraintWriter {
         // If there is a fallback formatting strategy, then raise an error to trigger the
         // fallback. Otherwise, emit an error and keep going.
         if self.is_enforcing_width() {
-            Err(
-                ConstraintError::new(ConstraintErrorKind::WidthLimitExceeded),
-            )
+            Err(FormatError::new(FormatErrorKind::WidthLimitExceeded))
         } else {
             let line = self.line.get();
             if self.last_width_exceeded_line.get() != Some(line) {

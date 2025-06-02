@@ -10,7 +10,7 @@ use crate::ast_formatter::util::debug::expr_kind_name;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::ast_utils::{plain_block, postfix_expr_kind};
 use crate::constraints::VStruct;
-use crate::error::{ConstraintErrorKind, FormatResult};
+use crate::error::{FormatErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -251,7 +251,7 @@ impl AstFormatter {
                             }) else {
                                 return Ok(());
                             };
-                            if err.kind != ConstraintErrorKind::WidthLimitExceeded {
+                            if err.kind != FormatErrorKind::WidthLimitExceeded {
                                 return Err(err);
                             }
                             let expr_width = end_start - expr_start;

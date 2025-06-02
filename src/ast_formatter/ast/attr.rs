@@ -4,7 +4,7 @@ use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::tail::Tail;
 use crate::ast_utils::is_rustfmt_skip;
 use crate::constraints::VStruct;
-use crate::error::{ConstraintErrorKind, FormatResult};
+use crate::error::{FormatErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -62,19 +62,24 @@ impl AstFormatter {
             return Ok(());
         };
         match e.kind {
-            ConstraintErrorKind::LineCommentNotAllowed => {
+            FormatErrorKind::LineCommentNotAllowed => {
                 let (line, col) = self.out.line_col();
                 // todo emit a more appropriate error for bad comments
                 self.errors.line_comment_not_allowed(line, col);
             }
-            ConstraintErrorKind::MultiLineCommentNotAllowed => {
+            FormatErrorKind::MultiLineCommentNotAllowed => {
                 let (line, col) = self.out.line_col();
                 // todo emit a more appropriate error for bad comments
                 self.errors.multi_line_comment_not_allowed(line, col);
             }
-            ConstraintErrorKind::NewlineNotAllowed
-            | ConstraintErrorKind::WidthLimitExceeded
-            | ConstraintErrorKind::NextStrategy => {
+            FormatErrorKind::UnsupportedSyntax => {
+                let (line, col) = self.out.line_col();
+                self.errors.unsupported_syntax(line, col);
+            }
+            // these are not expected
+            FormatErrorKind::NewlineNotAllowed
+            | FormatErrorKind::WidthLimitExceeded
+            | FormatErrorKind::NextStrategy => {
                 return Err(e);
             }
         }

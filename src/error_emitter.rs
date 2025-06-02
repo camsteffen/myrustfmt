@@ -8,6 +8,7 @@ pub enum Error {
     LineCommentNotAllowed { line: VSize, col: HSize },
     MaxWidthExceeded { line: VSize },
     MultiLineCommentNotAllowed { line: VSize, col: HSize },
+    UnsupportedSyntax { line: VSize, col: HSize },
 }
 
 pub struct BufferedErrorEmitter {
@@ -82,27 +83,19 @@ impl BufferedErrorEmitter {
     // actual errors
 
     pub fn line_comment_not_allowed(&self, line: VSize, col: HSize) {
-        if self.is_buffering() {
-            self.buffer(Error::LineCommentNotAllowed { line, col });
-        } else {
-            self.emitter.line_comment_not_allowed(line, col);
-        }
+        self.buffer_or_emit(Error::LineCommentNotAllowed { line, col });
     }
 
     pub fn max_width_exceeded(&self, line: VSize) {
-        if self.is_buffering() {
-            self.buffer(Error::MaxWidthExceeded { line });
-        } else {
-            self.emitter.width_exceeded(line);
-        }
+        self.buffer_or_emit(Error::MaxWidthExceeded { line });
     }
 
     pub fn multi_line_comment_not_allowed(&self, line: VSize, col: HSize) {
-        if self.is_buffering() {
-            self.buffer(Error::MultiLineCommentNotAllowed { line, col });
-        } else {
-            self.emitter.multi_line_comment_not_allowed(line, col);
-        }
+        self.buffer_or_emit(Error::MultiLineCommentNotAllowed { line, col });
+    }
+
+    pub fn unsupported_syntax(&self, line: VSize, col: HSize) {
+        self.buffer_or_emit(Error::UnsupportedSyntax { line, col });
     }
 
     // private
@@ -120,6 +113,14 @@ impl BufferedErrorEmitter {
         self.buffer.with_taken(|b| b.push(error));
     }
 
+    fn buffer_or_emit(&self, error: Error) {
+        if self.is_buffering() {
+            self.buffer(error);
+        } else {
+            self.emit(error);
+        }
+    }
+
     fn emit(&self, error: Error) {
         match error {
             Error::LineCommentNotAllowed { line, col } => {
@@ -129,6 +130,7 @@ impl BufferedErrorEmitter {
             Error::MultiLineCommentNotAllowed { line, col } => {
                 self.emitter.multi_line_comment_not_allowed(line, col)
             }
+            Error::UnsupportedSyntax { line, col } => self.emitter.unsupported_syntax(line, col),
         }
     }
 
@@ -167,6 +169,12 @@ impl ErrorEmitter {
     pub fn multi_line_comment_not_allowed(&self, line: VSize, col: HSize) {
         self.error_count.increment();
         eprint!("Multi-line comment not allowed");
+        self.at(line, col);
+    }
+
+    pub fn unsupported_syntax(&self, line: VSize, col: HSize) {
+        self.error_count.increment();
+        eprint!("Unsupported syntax");
         self.at(line, col);
     }
 

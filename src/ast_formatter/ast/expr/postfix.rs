@@ -2,7 +2,7 @@ use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
 use crate::constraints::VStruct;
-use crate::error::{ConstraintErrorKind, FormatResult};
+use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::HSize;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -130,7 +130,7 @@ impl AstFormatter {
             Ok(vertical_height) => {
                 if vertical_height <= overflow_height {
                     // use vertical strategy
-                    Err(ConstraintErrorKind::NextStrategy.into())
+                    Err(FormatErrorKind::NextStrategy.into())
                 } else {
                     self.out.restore_checkpoint(&checkpoint);
                     self.out.restore_lookahead(overflow_lookahead);

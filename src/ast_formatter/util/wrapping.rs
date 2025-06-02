@@ -1,6 +1,6 @@
 use crate::ast_formatter::util::indent::IndentGuard;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
-use crate::error::{ConstraintErrorKind, FormatResult};
+use crate::error::{FormatErrorKind, FormatResult};
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
@@ -62,7 +62,7 @@ impl AstFormatter {
             return Ok(Some(self.begin_indent()));
         }
         match result {
-            Err(e) if matches!(e.kind, ConstraintErrorKind::WidthLimitExceeded) => {
+            Err(e) if matches!(e.kind, FormatErrorKind::WidthLimitExceeded) => {
                 self.out.restore_checkpoint(&checkpoint);
                 let indent_guard = self.begin_indent();
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;

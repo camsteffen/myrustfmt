@@ -1,4 +1,4 @@
-use crate::error::{ConstraintErrorKind, FormatResult};
+use crate::error::{FormatErrorKind, FormatResult};
 use crate::source_formatter::SourceFormatter;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_lexer::{FrontmatterAllowed, Token, TokenKind};
@@ -121,13 +121,13 @@ impl SourceFormatter {
                 }
                 WhitespaceAction::NewlineNotAllowed { distance } => {
                     self.source_reader.advance(distance);
-                    return Err(ConstraintErrorKind::NewlineNotAllowed.into());
+                    return Err(FormatErrorKind::NewlineNotAllowed.into());
                 }
                 WhitespaceAction::LineCommentNotAllowed => {
-                    return Err(ConstraintErrorKind::LineCommentNotAllowed.into());
+                    return Err(FormatErrorKind::LineCommentNotAllowed.into());
                 }
                 WhitespaceAction::MultiLineCommentNotAllowed => {
-                    return Err(ConstraintErrorKind::MultiLineCommentNotAllowed.into());
+                    return Err(FormatErrorKind::MultiLineCommentNotAllowed.into());
                 }
                 WhitespaceAction::Skip => self.source_reader.advance(len),
             }
