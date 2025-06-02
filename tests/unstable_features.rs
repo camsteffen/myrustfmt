@@ -2,6 +2,7 @@
 // These are features that the formatter does not support.
 // The intent is to be notified by a compiler warning when a feature is stabilized.
 #![feature(
+    closure_lifetime_binder,
     ergonomic_clones,
     fn_delegation,
     gen_blocks,

@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
-use crate::error::FormatResult;
+use crate::error::{FormatErrorKind, FormatResult};
 
 use crate::ast_formatter::list::options::{ListOptions, ListShape};
 use crate::constraints::VStruct;
@@ -50,12 +50,14 @@ impl AstFormatter {
         self.has_vstruct(VStruct::Closure, || {
             let first_line = self.out.line();
             match closure.binder {
+                ast::ClosureBinder::For { .. } => {
+                    return Err(FormatErrorKind::UnsupportedSyntax.into())
+                }
                 ast::ClosureBinder::NotPresent => {}
-                ast::ClosureBinder::For { .. } => todo!(),
             }
             match closure.capture_clause {
                 ast::CaptureBy::Ref => {}
-                ast::CaptureBy::Use { .. } => todo!(),
+                ast::CaptureBy::Use { .. } => return Err(FormatErrorKind::UnsupportedSyntax.into()),
                 ast::CaptureBy::Value { .. } => self.out.token_space("move")?,
             }
             self.constness(closure.constness)?;

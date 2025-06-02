@@ -22,14 +22,13 @@ impl AstFormatter {
         )
     }
 
+    // todo breakpoints
     fn generic_param(
         &self,
         param: &ast::GenericParam,
         tail: Tail,
         _lcx: ListItemContext,
     ) -> FormatResult {
-        self.ident(param.ident)?;
-        self.generic_bounds_optional(&param.bounds)?;
         match param.kind {
             ast::GenericParamKind::Const {
                 ref ty,
@@ -37,13 +36,24 @@ impl AstFormatter {
                 ..
             } => {
                 self.out.token_space("const")?;
-                if let Some(_default) = default {
-                    todo!()
-                }
-                self.ty_tail(ty, tail)?;
+                self.ident(param.ident)?;
+                self.out.token_space(":")?;
+                self.ty(ty)?;
+                let Some(default) = default else {
+                    return self.tail(tail);
+                };
+                self.out.space_token_space("=")?;
+                self.expr_tail(&default.value, tail)?;
             }
-            ast::GenericParamKind::Lifetime => self.tail(tail)?,
+            ast::GenericParamKind::Lifetime => {
+                self.ident(param.ident)?;
+                self.generic_bounds_optional(&param.bounds)?;
+                self.tail(tail)?
+            }
             ast::GenericParamKind::Type { ref default } => {
+                self.ident(param.ident)?;
+                // todo this on other types too?
+                self.generic_bounds_optional(&param.bounds)?;
                 if let Some(default) = default {
                     self.out.space_token_space("=")?;
                     self.ty_tail(default, tail)?;

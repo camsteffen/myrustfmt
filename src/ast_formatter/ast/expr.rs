@@ -131,10 +131,18 @@ impl AstFormatter {
         tail: Tail,
     ) -> FormatResult {
         match borrow_kind {
-            ast::BorrowKind::Raw => todo!(),
-            ast::BorrowKind::Ref => self.out.token("&")?,
+            ast::BorrowKind::Raw => {
+                self.out.token_space("&raw")?;
+                match mutability {
+                    ast::Mutability::Mut => self.out.token_space("mut")?,
+                    ast::Mutability::Not => self.out.token_space("const")?,
+                }
+            }
+            ast::BorrowKind::Ref => {
+                self.out.token("&")?;
+                self.mutability(mutability)?;
+            }
         }
-        self.mutability(mutability)?;
         self.expr_tail(expr, tail)?;
         Ok(())
     }
