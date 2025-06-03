@@ -51,9 +51,9 @@ pub enum FormatErrorKind {
     LineCommentNotAllowed,
     /// List tried to overflow when single-line constraint is enabled
     ListOverflow { cause: Box<FormatErrorKind> },
+    /// Used to explicitly fail the current strategy for implementation-specific reasons
+    Logical,
     MultiLineCommentNotAllowed,
-    /// Returned when we know that there is a fallback strategy that is preferred
-    NextStrategy,
     NewlineNotAllowed,
     WidthLimitExceeded,
     UnsupportedSyntax,
@@ -69,7 +69,7 @@ impl FormatErrorKind {
             FormatErrorKind::LineCommentNotAllowed
             | FormatErrorKind::MultiLineCommentNotAllowed
             | FormatErrorKind::NewlineNotAllowed
-            | FormatErrorKind::NextStrategy
+            | FormatErrorKind::Logical
             | FormatErrorKind::UnsupportedSyntax
             | FormatErrorKind::WidthLimitExceeded => self,
         }
@@ -83,7 +83,7 @@ impl FormatErrorKind {
             | FormatErrorKind::NewlineNotAllowed
             | FormatErrorKind::VStruct { .. } => true,
 
-            FormatErrorKind::NextStrategy
+            FormatErrorKind::Logical
             | FormatErrorKind::WidthLimitExceeded
             | FormatErrorKind::UnsupportedSyntax => false,
         }
@@ -122,7 +122,7 @@ fn write_constraint_error(
     match e.kind.root_cause() {
         FormatErrorKind::LineCommentNotAllowed => write!(f, "line comment not allowed")?,
         FormatErrorKind::MultiLineCommentNotAllowed => write!(f, "multi-line comment not allowed")?,
-        kind @ FormatErrorKind::NextStrategy => write!(f, "unhandled {kind:?}")?,
+        kind @ FormatErrorKind::Logical => write!(f, "unhandled {kind:?}")?,
         FormatErrorKind::NewlineNotAllowed => write!(f, "newline not allowed")?,
         FormatErrorKind::WidthLimitExceeded => write!(f, "width limit exceeded")?,
         FormatErrorKind::UnsupportedSyntax => write!(f, "unsupported syntax")?,

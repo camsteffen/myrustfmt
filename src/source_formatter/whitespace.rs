@@ -42,9 +42,9 @@ impl SourceFormatter {
         self.whitespace_and_comments(WhitespaceMode::Horizontal { space: true })
     }
 
-    /// Try to write a space but also allow newlines if comments are present.
-    /// Returns true if any newlines were present.
-    /// If there are newlines present, this function includes a trailing newline and indentation.
+    /// Write a space but allow newlines instead if comments are present.
+    /// Returns true if newlines were written.
+    /// If there are newlines, a trailing newline and indentation is ensured.
     pub fn space_allow_newlines(&self) -> FormatResult<bool> {
         let first_line = self.line();
         self.whitespace_and_comments(WhitespaceMode::Flexible {

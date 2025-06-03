@@ -82,7 +82,7 @@ where
                 .as_ref()
                 .is_some_and(|f| self.list.iter().any(f))
             {
-                return Err(FormatErrorKind::NextStrategy.into());
+                return Err(FormatErrorKind::Logical.into());
             }
             self.contents_horizontal()?;
             // N.B. measure before writing the tail

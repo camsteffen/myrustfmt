@@ -13,6 +13,9 @@ const POSTFIX_CHAIN_MAX_WIDTH: HSize = 60;
 /// of the chain is at least this much.
 const POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH: HSize = 15;
 
+/// If overflow output is this tall or more, keep it without comparing to vertical
+const OVERFLOW_ONLY_HEIGHT: u32 = 7;
+
 struct PostfixItem<'a> {
     /// The first item in the chain has the root expression, which is not a postfix expression.
     /// Subsequent items have a dot-notation item here, like `.field` or `.method()`.
@@ -89,17 +92,12 @@ impl AstFormatter {
     ) -> FormatResult {
         let first_line = self.out.line();
         let checkpoint = self.out.checkpoint();
-        let overflow_height = self.out.with_recover_width(|| -> FormatResult<_> {
-            self.with_chain_item_max_width(start_col, || {
-                self.postfix_item_tail(overflowable, None, true)
-            })?;
-            // todo can we prove that the overflow is so long that a separate line won't be shorter?
-            let overflow_height = self.out.line() - first_line + 1;
-            self.tail(tail)?;
-            Ok(overflow_height)
+        self.with_chain_item_max_width(start_col, || {
+            self.postfix_item_tail(overflowable, None, true)
         })?;
-        if overflow_height == 1 {
-            // it all fits on one line
+        let overflow_height = self.out.line() - first_line + 1;
+        self.tail(tail)?;
+        if overflow_height == 1 || overflow_height >= OVERFLOW_ONLY_HEIGHT {
             return Ok(());
         }
         let overflow_lookahead = self.out.capture_lookahead(&checkpoint);
@@ -108,26 +106,25 @@ impl AstFormatter {
         // todo share logic with match arm
         // todo should we check if the wrap allows a *longer* first line, like match arm?
         // todo account for having less width if the fallback will add a block
-        let result = self.out.with_recover_width(|| {
-            self.indented(|| {
-                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                self.postfix_item(overflowable)?;
-                let height = self.out.line() - first_line + 1;
-                self.tail(tail)?;
-                Ok(height)
-            })
+        let wrap_result = self.indented(|| {
+            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+            let wrap_first_line = self.out.line();
+            self.postfix_item(overflowable)?;
+            let height = self.out.line() - wrap_first_line + 1;
+            self.tail(tail)?;
+            Ok(height)
         });
 
-        match result {
+        match wrap_result {
             Err(_) => {
                 self.out.restore_checkpoint(&checkpoint);
                 self.out.restore_lookahead(overflow_lookahead);
                 Ok(())
             }
             Ok(vertical_height) => {
-                if vertical_height <= overflow_height {
-                    // use vertical strategy
-                    Err(FormatErrorKind::NextStrategy.into())
+                if vertical_height < overflow_height {
+                    // prefer vertical formatting
+                    Err(FormatErrorKind::Logical.into())
                 } else {
                     self.out.restore_checkpoint(&checkpoint);
                     self.out.restore_lookahead(overflow_lookahead);
@@ -135,8 +132,6 @@ impl AstFormatter {
                 }
             }
         }
-        // todo perhaps there is a concept of "fallback cost" that can be passed down
-        //   - if you err out, there will be a cost of increased indent and added lines
     }
 
     fn postfix_chain_vertical(&self, chain: &[PostfixItem], tail: Tail) -> FormatResult {

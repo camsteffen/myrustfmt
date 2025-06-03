@@ -78,7 +78,7 @@ impl AstFormatter {
             }
             // these are not expected
             FormatErrorKind::NewlineNotAllowed
-            | FormatErrorKind::NextStrategy
+            | FormatErrorKind::Logical
             | FormatErrorKind::WidthLimitExceeded => {
                 return Err(e);
             }
