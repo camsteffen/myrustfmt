@@ -14,20 +14,6 @@ impl SourceFormatter {
         })
     }
 
-    /// Try to write a space but also allow any comments
-    pub fn space_allow_comments(&self) -> FormatResult<bool> {
-        let first_line = self.line();
-        self.whitespace_and_comments(WhitespaceMode::Flexible {
-            vertical_mode: VerticalWhitespaceMode::Break,
-            space_if_horizontal: true,
-        })?;
-        let is_multiline = self.out.line() > first_line;
-        if is_multiline {
-            self.indent();
-        }
-        Ok(is_multiline)
-    }
-
     /// Skip over whitespace, allow horizontal comments, disallow newlines.
     /// In other words, usually do nothing but allow for comments.
     /// SourceFormatter is responsible for invoking this between tokens.
@@ -51,9 +37,25 @@ impl SourceFormatter {
         Ok(())
     }
 
-    /// Write a space, allow horizontal comments
+    /// Writes a space, allows single-line block comments only.
     pub fn space(&self) -> FormatResult {
         self.whitespace_and_comments(WhitespaceMode::Horizontal { space: true })
+    }
+
+    /// Try to write a space but also allow newlines if comments are present.
+    /// Returns true if any newlines were present.
+    /// If there are newlines present, this function includes a trailing newline and indentation.
+    pub fn space_allow_newlines(&self) -> FormatResult<bool> {
+        let first_line = self.line();
+        self.whitespace_and_comments(WhitespaceMode::Flexible {
+            vertical_mode: VerticalWhitespaceMode::Break,
+            space_if_horizontal: true,
+        })?;
+        let has_newlines = self.out.line() > first_line;
+        if has_newlines {
+            self.indent();
+        }
+        Ok(has_newlines)
     }
 }
 

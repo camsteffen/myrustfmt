@@ -26,7 +26,7 @@ impl AstFormatter {
             Braces::Parens,
             self.tail_fn(|af| {
                 if is_block_after_decl {
-                    af.out.space_allow_comments()?;
+                    af.out.space_allow_newlines()?;
                     af.out.token("{")?;
                 }
                 Ok(())
@@ -77,7 +77,7 @@ impl AstFormatter {
                 &closure.fn_decl,
                 Braces::Pipe,
                 self.tail_fn(|af| {
-                    af.out.space_allow_comments()?;
+                    af.out.space_allow_newlines()?;
                     body(af)?;
                     Ok(())
                 })
@@ -199,7 +199,7 @@ impl AstFormatter {
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 true
             } else {
-                self.out.space_allow_comments()?
+                self.out.space_allow_newlines()?
             };
             if wrapped {
                 self.fn_ret_ty(&fn_decl.output, None)?;

@@ -75,7 +75,7 @@ impl AstFormatter {
                 if plain_block(body)
                     .is_some_and(|block| self.is_block_empty(block))
                 {
-                    self.out.space()?;
+                    self.out.space_allow_newlines()?;
                     self.expr(body)?;
                     return Ok(());
                 }

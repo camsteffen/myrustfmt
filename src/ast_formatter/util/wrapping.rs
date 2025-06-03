@@ -24,7 +24,7 @@ impl AstFormatter {
     pub fn space_or_wrap_then(&self, then: impl Fn() -> FormatResult) -> FormatResult {
         let checkpoint = self.out.checkpoint();
         let first_line = self.out.line();
-        self.out.space_allow_comments()?;
+        self.out.space_allow_newlines()?;
         let result = self.out.with_recover_width(&then);
         if self.out.line() == first_line && result.is_err() {
             self.out.restore_checkpoint(&checkpoint);
@@ -43,7 +43,7 @@ impl AstFormatter {
         let checkpoint = self.out.checkpoint();
         let first_line = self.out.line();
         let indent_guard = self.begin_indent();
-        if self.out.space_allow_comments()? {
+        if self.out.space_allow_newlines()? {
             // wrap forced by comments
             then()?;
             return Ok(Some(indent_guard));
