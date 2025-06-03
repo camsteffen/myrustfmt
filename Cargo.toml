@@ -35,5 +35,5 @@ intellij-hack = []
 other-feature = []
 
 [[test]]
-name = "small_tests"
+name = "output_tests"
 harness = false

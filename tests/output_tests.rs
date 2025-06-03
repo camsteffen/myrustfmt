@@ -11,7 +11,7 @@ use tracing_subscriber::EnvFilter;
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 datatest_stable::harness! {
-    { test = small_test_file, root = "tests/small_tests", pattern = r".rs" },
+    { test = output_test, root = "tests/output_tests", pattern = r".rs" },
 }
 
 fn init_tracing() {
@@ -20,7 +20,7 @@ fn init_tracing() {
         .try_init();
 }
 
-fn small_test_file(path: &Path) -> TestResult {
+fn output_test(path: &Path) -> TestResult {
     init_tracing();
     let test = read_test(path)?;
     run_test(&test)?;

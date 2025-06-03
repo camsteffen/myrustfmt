@@ -16,19 +16,15 @@ impl AstFormatter {
     }
 
     fn arm(&self, arm: &ast::Arm) -> FormatResult {
-        self.with_attrs(&arm.attrs, arm.span, || self.arm_after_attrs(arm))
+        self.with_attrs(&arm.attrs, arm.span, || self.arm_after_attrs(arm))?;
+        // N.B. the span does not include the comma
+        self.out.skip_token_if_present(",")?;
+        Ok(())
     }
 
     fn arm_after_attrs(&self, arm: &ast::Arm) -> FormatResult {
-        let first_line = self.out.line();
         if let Some(guard) = arm.guard.as_deref() {
-            self.pat(&arm.pat)?;
-            self.backtrack()
-                .next_if(self.out.line() == first_line, || {
-                    self.out.with_recover_width(|| self.arm_guard_same_line(arm, guard))
-                })
-                .next(|| self.arm_guard_separate_line(arm, guard))
-                .result()?;
+            self.arm_with_guard(arm, guard)?;
         } else if let Some(body) = arm.body.as_deref() {
             self.pat_tail(
                 &arm.pat,
@@ -43,45 +39,51 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn arm_guard_same_line(&self, arm: &ast::Arm, guard: &ast::Expr) -> FormatResult {
-        self.with_single_line(|| -> FormatResult {
-            self.out.space()?;
-            self.arm_guard(guard)?;
+    fn arm_with_guard(&self, arm: &ast::Arm, guard: &ast::Expr) -> FormatResult {
+        let first_line = self.out.line();
+        self.pat(&arm.pat)?;
+        let do_guard = || -> FormatResult {
+            self.out.token_space("if")?;
+            self.expr(guard)?;
             Ok(())
-        })?;
-        if let Some(body) = arm.body.as_deref() {
-            self.out.space_token_space("=>")?;
-            self.arm_body(body)?;
-        }
-        Ok(())
-    }
-
-    fn arm_guard_separate_line(&self, arm: &ast::Arm, guard: &ast::Expr) -> FormatResult {
-        self.indented(|| {
-            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-            self.arm_guard(guard)?;
-            Ok(())
-        })?;
-        let Some(body) = arm.body.as_deref() else {
-            return Ok(());
         };
-        self.out.space_token("=>")?;
-        if plain_block(body)
-            .is_some_and(|block| self.is_block_empty(block))
-        {
-            self.out.space()?;
-            self.expr(body)?;
-            return Ok(());
-        }
-        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-        self.expr_force_plain_block(body)?;
-        self.out.skip_token_if_present(",")?;
-        Ok(())
-    }
-
-    fn arm_guard(&self, guard: &ast::Expr) -> FormatResult {
-        self.out.token_space("if")?;
-        self.expr(guard)?;
+        self.backtrack()
+            .next_if(self.out.line() == first_line, || {
+                self.out.with_recover_width(|| {
+                    self.with_single_line(|| -> FormatResult {
+                        self.out.space()?;
+                        do_guard()?;
+                        Ok(())
+                    })?;
+                    if let Some(body) = arm.body.as_deref() {
+                        self.out.space_token_space("=>")?;
+                        self.arm_body(body)?;
+                    }
+                    Ok(())
+                })
+            })
+            .next(|| {
+                self.indented(|| {
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                    do_guard()?;
+                    Ok(())
+                })?;
+                let Some(body) = arm.body.as_deref() else {
+                    return Ok(());
+                };
+                self.out.space_token("=>")?;
+                if plain_block(body)
+                    .is_some_and(|block| self.is_block_empty(block))
+                {
+                    self.out.space()?;
+                    self.expr(body)?;
+                    return Ok(());
+                }
+                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                self.expr_force_plain_block(body)?;
+                Ok(())
+            })
+            .result()?;
         Ok(())
     }
 
@@ -92,9 +94,7 @@ impl AstFormatter {
             } else {
                 self.arm_body_maybe_add_block(body)
             }
-        })?;
-        self.out.skip_token_if_present(",")?;
-        Ok(())
+        })
     }
 
     fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
@@ -108,7 +108,7 @@ impl AstFormatter {
             SimulateWrapResult::Ok => {
                 if self
                     .out
-                    .with_recover_width(|| self.out.token_insert(","))
+                    .with_recover_width(|| self.out.token_maybe_missing(","))
                     .is_err()
                 {
                     (true, None)
