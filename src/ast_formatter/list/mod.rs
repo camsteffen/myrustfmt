@@ -109,7 +109,7 @@ where
                     .backtrack()
                     .next_opt(self.contents_wrap_to_fit_fn_opt())
                     .next(|| self.contents_vertical())
-                    .result_with_checkpoint(&checkpoint);
+                    .result_with_checkpoint(&checkpoint, true);
             }
         };
 

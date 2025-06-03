@@ -44,9 +44,14 @@ impl<'s, T> Backtrack<'_, 's, T> {
         self.result_inner(None)
     }
 
-    pub fn result_with_checkpoint(self, checkpoint: &Checkpoint) -> FormatResult<T> {
-        // todo is this redundant?
-        self.af.out.restore_checkpoint(checkpoint);
+    pub fn result_with_checkpoint(
+        self,
+        checkpoint: &Checkpoint,
+        initial_restore: bool,
+    ) -> FormatResult<T> {
+        if initial_restore {
+            self.af.out.restore_checkpoint(checkpoint);
+        }
         self.result_inner(Some(checkpoint))
     }
 

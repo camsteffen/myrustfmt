@@ -30,7 +30,7 @@ impl AstFormatter {
                 &arm.pat,
                 self.tail_fn(|af| {
                     af.out.space_token_space("=>")?;
-                    af.arm_body(body)?;
+                    af.arm_body_maybe_remove_block(body)?;
                     Ok(())
                 })
                 .as_ref(),
@@ -47,47 +47,49 @@ impl AstFormatter {
             self.expr(guard)?;
             Ok(())
         };
+        let single_line_guard = || {
+            self.with_single_line(|| -> FormatResult {
+                self.out.space()?;
+                do_guard()?;
+                Ok(())
+            })?;
+            if let Some(body) = arm.body.as_deref() {
+                self.out.space_token_space("=>")?;
+                self.arm_body_maybe_remove_block(body)?;
+            }
+            Ok(())
+        };
+        let next_line_guard = || {
+            self.indented(|| {
+                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                do_guard()?;
+                Ok(())
+            })?;
+            let Some(body) = arm.body.as_deref() else {
+                return Ok(());
+            };
+            self.out.space_token("=>")?;
+            if plain_block(body)
+                .is_some_and(|block| self.is_block_empty(block))
+            {
+                self.out.space_allow_newlines()?;
+                self.expr(body)?;
+                return Ok(());
+            }
+            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+            self.expr_force_plain_block(body)?;
+            Ok(())
+        };
         self.backtrack()
             .next_if(self.out.line() == first_line, || {
-                self.out.with_recover_width(|| {
-                    self.with_single_line(|| -> FormatResult {
-                        self.out.space()?;
-                        do_guard()?;
-                        Ok(())
-                    })?;
-                    if let Some(body) = arm.body.as_deref() {
-                        self.out.space_token_space("=>")?;
-                        self.arm_body(body)?;
-                    }
-                    Ok(())
-                })
+                self.out.with_recover_width(single_line_guard)
             })
-            .next(|| {
-                self.indented(|| {
-                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                    do_guard()?;
-                    Ok(())
-                })?;
-                let Some(body) = arm.body.as_deref() else {
-                    return Ok(());
-                };
-                self.out.space_token("=>")?;
-                if plain_block(body)
-                    .is_some_and(|block| self.is_block_empty(block))
-                {
-                    self.out.space_allow_newlines()?;
-                    self.expr(body)?;
-                    return Ok(());
-                }
-                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                self.expr_force_plain_block(body)?;
-                Ok(())
-            })
+            .next(next_line_guard)
             .result()?;
         Ok(())
     }
 
-    fn arm_body(&self, body: &ast::Expr) -> FormatResult {
+    fn arm_body_maybe_remove_block(&self, body: &ast::Expr) -> FormatResult {
         self.skip_single_expr_blocks(body, |body| {
             if plain_block(body).is_some() {
                 self.expr(body)
@@ -117,9 +119,7 @@ impl AstFormatter {
                 }
             }
         };
-        if lookahead.is_none() {
-            self.out.restore_checkpoint(&checkpoint);
-        }
+        let initial_restore = lookahead.is_none();
         self.backtrack()
             .next_if(!force_block, || {
                 self.disallow_vstructs(VStruct::ControlFlow | VStruct::NonBlockIndent, || {
@@ -136,7 +136,7 @@ impl AstFormatter {
                     Ok(())
                 })
             })
-            .result_with_checkpoint(&checkpoint)?;
+            .result_with_checkpoint(&checkpoint, initial_restore)?;
         Ok(())
     }
 }

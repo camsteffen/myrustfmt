@@ -44,7 +44,7 @@ impl AstFormatter {
                     Ok(())
                 })
             })
-            .result_with_checkpoint(&checkpoint_after_eq)?;
+            .result_with_checkpoint(&checkpoint_after_eq, true)?;
         Ok(())
     }
 }
