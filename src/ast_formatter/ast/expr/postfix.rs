@@ -35,7 +35,7 @@ impl AstFormatter {
         let multi_line_root = loop {
             let next = chain.split_off_first().unwrap();
             if chain.is_empty() {
-                return self.postfix_item_tail(next, tail, false);
+                return self.postfix_item_tail(next, tail);
             }
             self.has_vstruct(VStruct::NonBlockIndent, || self.postfix_item(next))?;
             if self.out.line() != start_line {
@@ -92,9 +92,7 @@ impl AstFormatter {
     ) -> FormatResult {
         let first_line = self.out.line();
         let checkpoint = self.out.checkpoint();
-        self.with_chain_item_max_width(start_col, || {
-            self.postfix_item_tail(overflowable, None, true)
-        })?;
+        self.with_chain_item_max_width(start_col, || self.postfix_item(overflowable))?;
         let overflow_height = self.out.line() - first_line + 1;
         self.tail(tail)?;
         if overflow_height == 1 || overflow_height >= OVERFLOW_ONLY_HEIGHT {
@@ -155,20 +153,11 @@ impl AstFormatter {
     }
 
     fn postfix_item(&self, item: &PostfixItem) -> FormatResult {
-        self.postfix_item_tail(item, None, false)
+        self.postfix_item_tail(item, None)
     }
 
-    fn postfix_item_tail(
-        &self,
-        item: &PostfixItem,
-        tail: Tail,
-        single_line_tail: bool,
-    ) -> FormatResult {
-        let non_dot_items = |af: &Self| {
-            af.with_single_line_if(single_line_tail, || {
-                af.postfix_non_dot_items(&item.non_dot_items, tail)
-            })
-        };
+    fn postfix_item_tail(&self, item: &PostfixItem, tail: Tail) -> FormatResult {
+        let non_dot_items = |af: &Self| af.postfix_non_dot_items(&item.non_dot_items, tail);
         match item.root_or_dot_item.kind {
             ast::ExprKind::Await(..) => {
                 self.out.token(".")?;
