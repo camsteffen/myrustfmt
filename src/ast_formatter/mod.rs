@@ -26,7 +26,9 @@ pub fn format_module(
     path: Option<PathBuf>,
     config: &Config,
 ) -> FormatModuleResult {
-    let errors = Rc::new(BufferedErrorEmitter::new(ErrorEmitter::new(path.clone())));
+    let errors = Rc::new(
+        BufferedErrorEmitter::new(ErrorEmitter::new(path.clone(), config.capture_error_output)),
+    );
     // todo need Arc?
     let out = SourceFormatter::new(
         path,
@@ -61,10 +63,16 @@ impl AstFormatter {
                     )
                 );
             }
-            Ok(()) => FormatModuleResult {
-                error_count: self.errors.error_count(),
-                formatted: self.out.finish(),
-            },
+            Ok(()) => {
+                let Self { errors, out } = self;
+                let formatted = out.finish();
+                let (error_count, error_output) = Rc::into_inner(errors).unwrap().finish();
+                FormatModuleResult {
+                    error_count,
+                    error_output,
+                    formatted,
+                }
+            }
         }
     }
 

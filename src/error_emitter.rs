@@ -1,6 +1,8 @@
 use crate::num::{HSize, VSize};
 use crate::util::cell_ext::{CellExt, CellNumberExt};
 use std::cell::Cell;
+use std::fmt::Display;
+use std::fmt::Write;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -18,14 +20,6 @@ pub struct BufferedErrorEmitter {
     emitter: ErrorEmitter,
 }
 
-impl Drop for BufferedErrorEmitter {
-    fn drop(&mut self) {
-        if !std::thread::panicking() {
-            assert_eq!(self.checkpoint_count.get(), 0);
-        }
-    }
-}
-
 pub struct Checkpoint {
     buffer_len: usize,
     index: u32,
@@ -38,6 +32,20 @@ impl BufferedErrorEmitter {
             buffer: Cell::new(Vec::new()),
             emitter,
         }
+    }
+
+    pub fn finish(self) -> (u32, Option<String>) {
+        let Self {
+            checkpoint_count,
+            buffer,
+            emitter,
+        } = self;
+        assert_eq!(checkpoint_count.get(), 0);
+        assert!(buffer.into_inner().is_empty());
+        (
+            emitter.error_count.get(),
+            emitter.captured.map(Cell::into_inner),
+        )
     }
 
     pub fn error_count(&self) -> u32 {
@@ -144,13 +152,15 @@ impl BufferedErrorEmitter {
 }
 
 pub struct ErrorEmitter {
+    captured: Option<Cell<String>>,
     error_count: Cell<u32>,
     path: Option<PathBuf>,
 }
 
 impl ErrorEmitter {
-    pub fn new(path: Option<PathBuf>) -> ErrorEmitter {
+    pub fn new(path: Option<PathBuf>, capture: bool) -> ErrorEmitter {
         ErrorEmitter {
+            captured: capture.then(|| Cell::new(String::new())),
             error_count: Cell::new(0),
             path,
         }
@@ -162,36 +172,45 @@ impl ErrorEmitter {
 
     pub fn line_comment_not_allowed(&self, line: VSize, col: HSize) {
         self.error_count.increment();
-        eprint!("Line comment not allowed");
+        self.write("Line comment not allowed");
         self.at(line, col);
     }
 
     pub fn multi_line_comment_not_allowed(&self, line: VSize, col: HSize) {
         self.error_count.increment();
-        eprint!("Multi-line comment not allowed");
+        self.write("Multi-line comment not allowed");
         self.at(line, col);
     }
 
     pub fn unsupported_syntax(&self, line: VSize, col: HSize) {
         self.error_count.increment();
-        eprint!("Unsupported syntax");
+        self.write("Unsupported syntax");
         self.at(line, col);
     }
 
     fn width_exceeded(&self, line: VSize) {
         self.error_count.increment();
-        eprint!("Max width exceeded at ");
+        self.write("Max width exceeded at ");
         match &self.path {
-            None => eprintln!("line {line}"),
-            Some(path) => eprintln!("{}:{line}", path.display()),
+            None => self.write(format_args!("line {line}\n")),
+            Some(path) => self.write(format_args!("{}:{line}\n", path.display())),
         }
     }
 
     fn at(&self, line: VSize, col: HSize) {
         let (line, col) = (line + 1, col + 1);
         match &self.path {
-            None => eprintln!(" at {line}:{col}"),
-            Some(path) => eprintln!(" at {}:{line}:{col}", path.display()),
+            None => self.write(format_args!(" at {line}:{col}\n")),
+            Some(path) => self.write(
+                format_args!(" at {path}:{line}:{col}\n", path = path.display()),
+            ),
+        }
+    }
+
+    fn write(&self, output: impl Display) {
+        eprint!("{output}");
+        if let Some(captured) = &self.captured {
+            captured.with_taken(|s| write!(s, "{output}").unwrap());
         }
     }
 }

@@ -4,8 +4,8 @@
 use myrustfmt::config::Config;
 use myrustfmt::format_str;
 use std::error::Error;
-use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::{fs, io};
 use tracing_subscriber::EnvFilter;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -20,9 +20,33 @@ fn init_tracing() {
         .try_init();
 }
 
-fn small_test_file(test_source_path: &Path) -> TestResult {
+fn small_test_file(path: &Path) -> TestResult {
     init_tracing();
-    let string = fs::read_to_string(test_source_path)?;
+    let test = read_test(path)?;
+    run_test(&test)?;
+    Ok(())
+}
+
+fn read_test(path: &Path) -> TestResult<Test> {
+    let string = fs::read_to_string(path)?;
+    let (test_kind_raw, max_width, body) = parse_test_header(&string)?;
+    let kind = parse_test_body(test_kind_raw, max_width, body)?;
+    let name = path.file_stem().unwrap().to_str().unwrap().to_owned();
+    let expected_stderr_path = path.with_extension("stderr");
+    let expected_stderr = match fs::read_to_string(&expected_stderr_path) {
+        Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+        Err(e) => panic!("Error reading stderr file: {e}"),
+        Ok(content) => Some(content),
+    };
+    Ok(Test {
+        name,
+        kind,
+        expected_stderr,
+        expected_stderr_path,
+    })
+}
+
+fn parse_test_header(string: &str) -> TestResult<(TestKindRaw, Option<u16>, &str)> {
     let mut lines = string.split_inclusive('\n');
     let mut lines_peekable = lines.by_ref().peekable();
     let mut test_kind = None::<TestKindRaw>;
@@ -49,7 +73,7 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
             "note" => {}
             "test-kind" => {
                 if test_kind.is_some() {
-                    return Err("test-kind already declared".into());
+                    return Err("test-kind already specified".into());
                 }
                 test_kind = Some(match value {
                     "before-after" => TestKindRaw::BeforeAfter,
@@ -62,7 +86,10 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
             _ => return Err(format!("invalid name: {name:?}").into()),
         }
     }
-    match lines_peekable.peek().copied() {
+    let Some(test_kind_raw) = test_kind else {
+        return Err("expected test-kind".into());
+    };
+    match lines_peekable.next() {
         Some("\n") => {}
         next => {
             return Err(
@@ -71,13 +98,18 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
             );
         }
     }
-    let Some(test_kind_raw) = test_kind else {
-        return Err("expected test-kind".into());
-    };
-    let source = lines.remainder().unwrap_or("");
+    let body = lines.remainder().unwrap_or("");
+    Ok((test_kind_raw, max_width, body))
+}
+
+fn parse_test_body(
+    test_kind_raw: TestKindRaw,
+    max_width: Option<u16>,
+    body: &str,
+) -> TestResult<TestKind> {
     let kind = match test_kind_raw {
         TestKindRaw::BeforeAfter => {
-            let (before, after) = parse_before_after(source)?;
+            let (before, after) = parse_before_after(body)?;
             TestKind::BeforeAfter {
                 before,
                 after,
@@ -86,41 +118,25 @@ fn small_test_file(test_source_path: &Path) -> TestResult {
         }
         TestKindRaw::Breakpoint => {
             assert!(max_width.is_none(), "cannot use max-width with this test kind");
-            let (before, after) = parse_before_after(source)?;
+            let (before, after) = parse_before_after(body)?;
             TestKind::Breakpoint { before, after }
         }
         TestKindRaw::BreakpointError => {
             assert!(max_width.is_none(), "cannot use max-width with this test kind");
-            expect_no_after(source)?;
+            expect_no_after(body)?;
             TestKind::BreakpointError {
-                formatted: source.to_owned(),
+                formatted: body.to_owned(),
             }
         }
         TestKindRaw::NoChange => {
             assert!(max_width.is_none(), "cannot use max-width with this test kind");
-            expect_no_after(source)?;
+            expect_no_after(body)?;
             TestKind::NoChange {
-                formatted: source.to_owned(),
+                formatted: body.to_owned(),
             }
         }
     };
-    // todo use file contents
-    let expect_errors = test_source_path
-        .with_extension("stderr")
-        .try_exists()
-        .unwrap();
-    let test = Test {
-        name: test_source_path
-            .file_stem()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_owned(),
-        kind,
-        expect_errors,
-    };
-    small_test(&test)?;
-    Ok(())
+    Ok(kind)
 }
 
 fn expect_no_after(source: &str) -> TestResult {
@@ -144,23 +160,38 @@ fn parse_before_after(source: &str) -> TestResult<(String, String)> {
     Ok((before, after))
 }
 
-fn small_test(test: &Test) -> TestResult {
+fn run_test(test: &Test) -> TestResult {
     eprintln!("Test: {}", &test.name);
     match test.kind {
         TestKind::Breakpoint {
             ref before,
             ref after,
         } => {
-            assert!(!test.expect_errors);
-            breakpoint_test(before, after, false)?
+            assert!(test.expected_stderr.is_none());
+            breakpoint_test(before, after, None, None)?
         }
         TestKind::BreakpointError { ref formatted } => {
-            assert!(test.expect_errors);
-            breakpoint_test(formatted, formatted, true)?
+            let expected_stderr = test
+                .expected_stderr
+                .as_deref()
+                .expect("breakpoint-error test should have a stderr file");
+            breakpoint_test(
+                formatted,
+                formatted,
+                Some(expected_stderr),
+                Some(&test.expected_stderr_path),
+            )?
         }
         TestKind::NoChange { ref formatted } => {
             let formatted = formatted.trim();
-            format_max_width_expected(formatted, None, formatted, "formatted", test.expect_errors)?;
+            format_max_width_expected(
+                formatted,
+                None,
+                formatted,
+                "formatted",
+                test.expected_stderr.as_deref(),
+                Some(&test.expected_stderr_path),
+            )?;
         }
         TestKind::BeforeAfter {
             ref before,
@@ -174,14 +205,16 @@ fn small_test(test: &Test) -> TestResult {
                 max_width,
                 after,
                 "before -> after",
-                test.expect_errors,
+                test.expected_stderr.as_deref(),
+                Some(&test.expected_stderr_path),
             )?;
             format_max_width_expected(
                 after,
                 max_width,
                 after,
                 "after (idempotency)",
-                test.expect_errors,
+                test.expected_stderr.as_deref(),
+                Some(&test.expected_stderr_path),
             )?;
         }
     }
@@ -191,7 +224,8 @@ fn small_test(test: &Test) -> TestResult {
 struct Test {
     name: String,
     kind: TestKind,
-    expect_errors: bool,
+    expected_stderr: Option<String>,
+    expected_stderr_path: PathBuf,
 }
 
 enum TestKind {
@@ -218,7 +252,12 @@ enum TestKindRaw {
     NoChange,
 }
 
-fn breakpoint_test(before: &str, after: &str, expect_errors_after: bool) -> TestResult {
+fn breakpoint_test(
+    before: &str,
+    after: &str,
+    expected_stderr_after: Option<&str>,
+    expected_stderr_after_path: Option<&Path>,
+) -> TestResult {
     let before = before.trim();
     let after = after.trim();
     let initial_used_width = before.lines().map(|line| line.len() as u16).max().unwrap();
@@ -227,7 +266,8 @@ fn breakpoint_test(before: &str, after: &str, expect_errors_after: bool) -> Test
         Some(initial_used_width),
         before,
         "before max width reduction",
-        false,
+        None,
+        None,
     )?;
     println!("after width reduction...");
     format_max_width_expected(
@@ -235,7 +275,8 @@ fn breakpoint_test(before: &str, after: &str, expect_errors_after: bool) -> Test
         Some(initial_used_width - 1),
         after,
         "after max width reduction",
-        expect_errors_after,
+        expected_stderr_after,
+        expected_stderr_after_path,
     )?;
     Ok(())
 }
@@ -245,40 +286,82 @@ fn format_max_width_expected(
     max_width: Option<u16>,
     expected: &str,
     name: &str,
-    expect_errors: bool,
+    expected_stderr: Option<&str>,
+    expected_stderr_path: Option<&Path>,
 ) -> TestResult {
-    let mut config = Config::default();
+    let mut config = Config::default().capture_error_output(true);
     if let Some(max_width) = max_width {
         config = config.max_width(max_width)
     }
     let result = format_str(source, config).unwrap();
     let expected = format!("{expected}\n");
     expect_formatted_equals(&result.formatted, &expected, name)?;
-    handle_format_errors(result.error_count, expect_errors)?;
+    let error_output = result.error_output.unwrap();
+    handle_format_errors(&error_output, expected_stderr, expected_stderr_path)?;
     Ok(())
 }
 
-fn handle_format_errors(error_count: u32, expect_errors: bool) -> TestResult {
-    match error_count {
-        0 if expect_errors => Err("expected errors".into()),
-        1.. if !expect_errors => Err("errors occurred".into()),
-        _ => Ok(()),
+fn handle_format_errors(
+    error_output: &str,
+    expected_stderr: Option<&str>,
+    expected_stderr_path: Option<&Path>,
+) -> TestResult {
+    let bless_path = || {
+        if let Some(expected_stderr_path) = expected_stderr_path
+            && std::env::var("BLESS").as_deref() == Ok("1")
+        {
+            Some(expected_stderr_path)
+        } else {
+            None
+        }
+    };
+    match (error_output, expected_stderr) {
+        ("", None) => {}
+        ("", Some(_)) => {
+            if let Some(expected_stderr_path) = bless_path() {
+                fs::remove_file(expected_stderr_path).unwrap();
+                return Ok(());
+            }
+            return Err("Expected errors but no errors occurred.".into());
+        }
+        (_, None) => {
+            if let Some(expected_stderr_path) = bless_path() {
+                fs::write(expected_stderr_path, error_output).unwrap();
+                return Ok(());
+            }
+            return Err("Errors occurred".into());
+        }
+        (error_output, Some(expected_stderr)) => {
+            if error_output != expected_stderr {
+                if let Some(expected_stderr_path) = bless_path() {
+                    fs::write(expected_stderr_path, error_output).unwrap();
+                    return Ok(());
+                }
+                print_diff(expected_stderr, error_output);
+                return Err("Error output does not match".into());
+            }
+        }
     }
+    Ok(())
 }
 
 fn expect_formatted_equals(formatted: &str, expected: &str, name: &str) -> TestResult {
     if formatted == expected {
         return Ok(());
     }
-    for line in diff::lines(expected, formatted) {
+    print_diff(expected, formatted);
+    Err(
+        format!("\"{name}\" formatted does not match expected")
+            .into(),
+    )
+}
+
+fn print_diff(left: &str, right: &str) {
+    for line in diff::lines(left, right) {
         match line {
             diff::Result::Left(s) => println!("- {s}"),
             diff::Result::Right(s) => println!("+ {s}"),
             diff::Result::Both(s, _) => println!("  {s}"),
         }
     }
-    Err(
-        format!("\"{name}\" formatted does not match expected")
-            .into(),
-    )
 }
