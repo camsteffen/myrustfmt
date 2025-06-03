@@ -52,7 +52,6 @@ impl AstFormatter {
             }
             ast::GenericParamKind::Type { ref default } => {
                 self.ident(param.ident)?;
-                // todo this on other types too?
                 self.generic_bounds_optional(&param.bounds)?;
                 if let Some(default) = default {
                     self.out.space_token_space("=")?;

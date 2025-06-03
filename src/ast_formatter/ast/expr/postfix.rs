@@ -30,12 +30,6 @@ impl AstFormatter {
         // items that start within the first indent-width on the first line
         let indent_margin = self.out.total_indent.get() + INDENT_WIDTH;
         let multi_line_root = loop {
-            // let line_before_comments = self.out.line();
-            // self.out.comments(VerticalWhitespaceMode::Break)?;
-            // if self.out.line() != first_line {
-            //     // todo test
-            //     break line_before_comments != first_line;
-            // }
             let next = chain.split_off_first().unwrap();
             if chain.is_empty() {
                 return self.postfix_item_tail(next, tail, false);
@@ -54,8 +48,11 @@ impl AstFormatter {
             self.postfix_chain_vertical(chain, tail)
         } else {
             self.backtrack()
-                // todo recover width?
-                .next(|| self.postfix_chain_horizontal(chain, start_col, tail))
+                .next(|| {
+                    self.out.with_recover_width(|| {
+                        self.postfix_chain_horizontal(chain, start_col, tail)
+                    })
+                })
                 .next(|| {
                     self.has_vstruct(VStruct::NonBlockIndent, || {
                         self.indented(|| self.postfix_chain_vertical(chain, tail))

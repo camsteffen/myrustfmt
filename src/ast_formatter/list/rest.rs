@@ -10,7 +10,7 @@ impl<'a> ListRest<'a> {
         match rest {
             ast::PatFieldsRest::None => None,
             ast::PatFieldsRest::Rest => Some(ListRest { base: None }),
-            ast::PatFieldsRest::Recovered(_) => todo!(),
+            ast::PatFieldsRest::Recovered(_) => panic!("unexpected PatFieldsRest::Recovered"),
         }
     }
 

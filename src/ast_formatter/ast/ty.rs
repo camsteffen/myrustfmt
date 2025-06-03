@@ -163,11 +163,41 @@ impl AstFormatter {
     }
 
     fn poly_trait_ref(&self, poly_trait_ref: &ast::PolyTraitRef) -> FormatResult {
-        for _param in &poly_trait_ref.bound_generic_params {
-            todo!();
+        let ast::PolyTraitRef {
+            bound_generic_params,
+            modifiers,
+            trait_ref,
+            span: _,
+        } = poly_trait_ref;
+        if !bound_generic_params.is_empty() {
+            self.out.token("for")?;
+            self.generic_params(&poly_trait_ref.bound_generic_params)?;
+            // todo wrap? comments?
+            self.out.space()?;
         }
-        // poly_trait_ref.modifiers;
-        self.trait_ref(&poly_trait_ref.trait_ref)?;
+        let ast::TraitBoundModifiers {
+            constness,
+            asyncness,
+            polarity,
+        } = modifiers;
+        match constness {
+            ast::BoundConstness::Never => {}
+            ast::BoundConstness::Always(_) => self.out.token_space("const")?,
+            ast::BoundConstness::Maybe(_) => {
+                self.out.token("~")?;
+                self.out.token_space("const")?;
+            }
+        }
+        match asyncness {
+            ast::BoundAsyncness::Normal => {}
+            ast::BoundAsyncness::Async(_) => self.out.token_space("async")?,
+        }
+        match polarity {
+            ast::BoundPolarity::Positive => {}
+            ast::BoundPolarity::Negative(_) => self.out.token("!")?,
+            ast::BoundPolarity::Maybe(_) => self.out.token("?")?,
+        }
+        self.trait_ref(&trait_ref)?;
         Ok(())
     }
 }

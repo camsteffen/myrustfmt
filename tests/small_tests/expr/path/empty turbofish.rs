@@ -2,10 +2,12 @@
 
 fn test() {
     foo::<>;
+    foo::</*heh*/>;
 }
 
 // :after:
 
 fn test() {
     foo;
+    foo/*heh*/;
 }

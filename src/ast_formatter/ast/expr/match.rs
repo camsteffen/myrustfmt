@@ -97,7 +97,6 @@ impl AstFormatter {
         Ok(())
     }
 
-    // todo should we count lines or simply observe whether it's multi-line?
     fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
         let checkpoint = self.out.checkpoint();
         let (force_block, lookahead) = match self.simulate_wrap_indent(true, || self.expr(body)) {
@@ -121,7 +120,6 @@ impl AstFormatter {
         if lookahead.is_none() {
             self.out.restore_checkpoint(&checkpoint);
         }
-        // todo exclude comma for block-like expressions?
         self.backtrack()
             .next_if(!force_block, || {
                 self.disallow_vstructs(VStruct::ControlFlow | VStruct::NonBlockIndent, || {
