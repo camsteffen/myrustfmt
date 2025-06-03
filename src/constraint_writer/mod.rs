@@ -133,12 +133,12 @@ impl ConstraintWriter {
         }
     }
 
-    pub fn current_max_width(&self) -> HSize {
-        self.constraints.max_width_at(self.line())
+    pub fn end_col(&self) -> HSize {
+        self.constraints.end_col(self.line())
     }
 
     pub fn remaining_width(&self) -> Result<HSize, WidthLimitExceededError> {
-        self.current_max_width()
+        self.end_col()
             .checked_sub(self.col().try_into().unwrap())
             .ok_or(WidthLimitExceededError)
     }

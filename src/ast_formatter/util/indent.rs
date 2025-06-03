@@ -1,6 +1,7 @@
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::error::FormatResult;
 use crate::source_formatter::SourceFormatter;
+use crate::util::cell_ext::CellExt;
 
 pub struct IndentGuard<'a> {
     out: &'a SourceFormatter,
@@ -27,9 +28,15 @@ impl AstFormatter {
         IndentGuard { out }
     }
 
-    pub fn indented<T>(&self, format: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
+    pub fn indented<T>(&self, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         let _guard = self.begin_indent();
-        format()
+        scope()
+    }
+
+    pub fn deindented<T>(&self, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
+        self.out
+            .total_indent
+            .with_replaced(self.out.total_indent.get() - INDENT_WIDTH, scope)
     }
 
     pub fn indented_optional(

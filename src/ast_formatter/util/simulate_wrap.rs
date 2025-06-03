@@ -37,7 +37,7 @@ impl AstFormatter {
                     (result, false)
                 }
                 Some(extra_width) => {
-                    let max_width = self.out.current_max_width();
+                    let max_width = self.constraints().max_width.get();
                     let max_width_extra = max_width.saturating_add(extra_width);
                     let result = self.with_single_line(|| {
                         self.constraints()
@@ -53,15 +53,16 @@ impl AstFormatter {
                 (Ok(()), false) => SimulateWrapResult::Ok,
                 // the output will fit in a single line if wrapped
                 (Ok(()), true) => SimulateWrapResult::Wrap { single_line: true },
-                // If we used extra width and still exceeded the max width, wrapping is preferred in
-                // order to exceed the max width by a lesser amount.
+                // If we used extra width and still exceeded the max width or a width limit,
+                // wrapping is preferred in order to exceed the max width by a lesser amount.
                 // If we used extra width and encountered a newline-related error, we can infer that
                 // wrapping allows for more code to fit in the first line.
                 (Err(e), true)
-                    if e.kind == FormatErrorKind::WidthLimitExceeded || wrap_for_longer_first_line =>
-                {
-                    SimulateWrapResult::Wrap { single_line: false }
-                }
+                    if e.kind == FormatErrorKind::WidthLimitExceeded
+                        || wrap_for_longer_first_line =>
+                    {
+                        SimulateWrapResult::Wrap { single_line: false }
+                    }
                 // In all other cases, we don't necessarily want to wrap
                 (Err(_), _) => SimulateWrapResult::NoWrap,
             }

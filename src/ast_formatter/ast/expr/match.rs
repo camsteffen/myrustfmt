@@ -42,15 +42,11 @@ impl AstFormatter {
     fn arm_with_guard(&self, arm: &ast::Arm, guard: &ast::Expr) -> FormatResult {
         let first_line = self.out.line();
         self.pat(&arm.pat)?;
-        let do_guard = || -> FormatResult {
-            self.out.token_space("if")?;
-            self.expr(guard)?;
-            Ok(())
-        };
         let single_line_guard = || {
             self.with_single_line(|| -> FormatResult {
                 self.out.space()?;
-                do_guard()?;
+                self.out.token_space("if")?;
+                self.expr(guard)?;
                 Ok(())
             })?;
             if let Some(body) = arm.body.as_deref() {
@@ -62,27 +58,35 @@ impl AstFormatter {
         let next_line_guard = || {
             self.indented(|| {
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                do_guard()?;
+                self.out.token_space("if")?;
+                self.expr_tail(
+                    guard,
+                    self.tail_fn(|af| {
+                        let Some(body) = arm.body.as_deref() else {
+                            return Ok(());
+                        };
+                        af.out.space_token("=>")?;
+                        af.deindented(|| {
+                            if plain_block(body)
+                                .is_some_and(|block| af.is_block_empty(block))
+                            {
+                                af.out.space_allow_newlines()?;
+                                af.expr(body)?;
+                            } else {
+                                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                                self.expr_force_plain_block(body)?;
+                            }
+                            Ok(())
+                        })
+                    })
+                    .as_ref(),
+                )?;
                 Ok(())
-            })?;
-            let Some(body) = arm.body.as_deref() else {
-                return Ok(());
-            };
-            self.out.space_token("=>")?;
-            if plain_block(body)
-                .is_some_and(|block| self.is_block_empty(block))
-            {
-                self.out.space_allow_newlines()?;
-                self.expr(body)?;
-                return Ok(());
-            }
-            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-            self.expr_force_plain_block(body)?;
-            Ok(())
+            })
         };
         self.backtrack()
             .next_if(self.out.line() == first_line, || {
-                self.out.with_recover_width(single_line_guard)
+                self.could_wrap_indent(single_line_guard)
             })
             .next(next_line_guard)
             .result()?;

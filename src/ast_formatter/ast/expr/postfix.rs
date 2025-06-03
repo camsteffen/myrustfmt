@@ -90,9 +90,14 @@ impl AstFormatter {
         start_col: HSize,
         tail: Tail,
     ) -> FormatResult {
+        // self.with_chain_width_limit(start_col, || {
+        //     self.simulate_wrap_indent(true, || {
+        //         self.postfix_item(overflowable)
+        //     })
+        // })
         let first_line = self.out.line();
         let checkpoint = self.out.checkpoint();
-        self.with_chain_item_max_width(start_col, || self.postfix_item(overflowable))?;
+        self.with_chain_width_limit(start_col, || self.postfix_item(overflowable))?;
         let overflow_height = self.out.line() - first_line + 1;
         self.tail(tail)?;
         if overflow_height == 1 || overflow_height >= OVERFLOW_ONLY_HEIGHT {
@@ -141,7 +146,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn with_chain_item_max_width(
+    fn with_chain_width_limit(
         &self,
         start_col: HSize,
         format: impl Fn() -> FormatResult,
@@ -188,9 +193,9 @@ impl AstFormatter {
     }
 
     fn postfix_items(&self, items: &[PostfixItem], start_col: HSize) -> FormatResult {
-        items.iter().try_for_each(|item| {
-            self.with_chain_item_max_width(start_col, || self.postfix_item(item))
-        })
+        items
+            .iter()
+            .try_for_each(|item| self.with_chain_width_limit(start_col, || self.postfix_item(item)))
     }
 
     fn postfix_non_dot_items(&self, postfix_tail: &[&ast::Expr], tail: Tail) -> FormatResult {

@@ -69,7 +69,7 @@ impl Constraints {
         }
     }
 
-    pub fn max_width_at(&self, line: VSize) -> HSize {
+    pub fn end_col(&self, line: VSize) -> HSize {
         if let Some(width_limit) = self.width_limit.get() && width_limit.line == line {
             self.max_width.get().min(width_limit.end_col.get())
         } else {
