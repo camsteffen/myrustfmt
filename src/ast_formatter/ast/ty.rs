@@ -122,8 +122,28 @@ impl AstFormatter {
         match bound {
             ast::GenericBound::Outlives(lifetime) => self.lifetime(lifetime),
             ast::GenericBound::Trait(poly_trait_ref) => self.poly_trait_ref(poly_trait_ref),
-            ast::GenericBound::Use(_capture_args, _span) => todo!(),
+            ast::GenericBound::Use(capture_args, _) => {
+                self.out.token("use")?;
+                self.list(
+                    Braces::Angle,
+                    capture_args,
+                    |af, arg, tail, _lcx| af.precise_capturing_arg(arg, tail),
+                    ListOptions::new(),
+                )?;
+                Ok(())
+            }
         }
+    }
+
+    fn precise_capturing_arg(&self, arg: &ast::PreciseCapturingArg, tail: Tail) -> FormatResult {
+        match arg {
+            ast::PreciseCapturingArg::Arg(path, _) => self.path_tail(path, false, tail)?,
+            ast::PreciseCapturingArg::Lifetime(lifetime) => {
+                self.lifetime(lifetime)?;
+                self.tail(tail)?;
+            }
+        }
+        Ok(())
     }
 
     pub fn generic_arg(&self, arg: &ast::GenericArg, tail: Tail) -> FormatResult {
