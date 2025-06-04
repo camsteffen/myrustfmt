@@ -109,6 +109,34 @@ impl AstFormatter {
         // todo share logic with match arm
         // todo should we check if the wrap allows a *longer* first line, like match arm?
         // todo account for having less width if the fallback will add a block
+        
+        /*
+        Only do horizontal if zero method call args
+        Prefer vertical chain if wrap indent causes longer first line
+          (either by allowing horizontal method call arguments
+            OR by allowing longer first line within method call argument overflow)
+            
+        Perhaps the most questionable case is the following, where the vertical chain is preferred,
+        even though has more lines than the horizontal chain with overflow. This generally involves
+        some list (in this case a list of struct fields) that may or may not be formatted in one
+        line. On the plus side, there is some value in splitting the outer thing (the chain) into
+        multiple lines instead of the inner thing (the struct).
+        
+        // Good:
+        person
+            .city
+            .country
+            .planet
+            .galaxy(Foo { bar, baz });
+        
+        // Bad:
+        person.city.country.planet.galaxy(Foo {
+            bar,
+            baz,
+        });
+        
+       
+         */
         let wrap_result = self.indented(|| {
             self.out.newline_indent(VerticalWhitespaceMode::Break)?;
             let wrap_first_line = self.out.line();
@@ -125,7 +153,7 @@ impl AstFormatter {
                 Ok(())
             }
             Ok(vertical_height) => {
-                if vertical_height < overflow_height {
+                if vertical_height < overflow_height && false {
                     // prefer vertical formatting
                     Err(FormatErrorKind::Logical.into())
                 } else {
