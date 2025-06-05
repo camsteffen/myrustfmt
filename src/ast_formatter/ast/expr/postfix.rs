@@ -116,10 +116,10 @@ impl AstFormatter {
           (either by allowing horizontal method call arguments
             OR by allowing longer first line within method call argument overflow)
             
-        Perhaps the most questionable case is the following, where the vertical chain is preferred,
-        even though has more lines than the horizontal chain with overflow. This generally involves
-        some list (in this case a list of struct fields) that may or may not be formatted in one
-        line. On the plus side, there is some value in splitting the outer thing (the chain) into
+        Perhaps the most questionable case is the one shown below, where the vertical chain is
+        preferred even though has more lines than the horizontal chain with overflow. This case
+        generally involves some list (i.e. the struct fields) that may or may not be formatted in
+        one line. On the plus side, it is arguably better to split the outer thing (the chain) into
         multiple lines instead of the inner thing (the struct).
         
         // Good:
