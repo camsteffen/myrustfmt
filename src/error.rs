@@ -16,7 +16,7 @@ pub trait FormatResultExt {
 impl<T> FormatResultExt for FormatResult<T> {
     fn debug_err(self) -> Self {
         if let Err(e) = &self {
-            eprintln!("{}", &e.backtrace);
+            eprintln!("Error: {:?}\nBacktrace:\n{}", e.kind, &e.backtrace);
         }
         self
     }
