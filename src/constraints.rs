@@ -116,14 +116,16 @@ impl Constraints {
         if self.single_line.get() || !self.disallowed_vstructs.get().contains(vstruct) {
             return scope();
         }
-        self.single_line.with_replaced(true, scope).map_err(
-            |mut err| {
+        self.single_line
+            .with_replaced(true, scope)
+            .map_err(|mut err| {
                 if err.kind.is_vertical() {
-                    err.kind = FormatErrorKind::VStruct { cause: Box::new(err.kind) };
+                    err.kind = FormatErrorKind::VStruct {
+                        cause: Box::new(err.kind),
+                    };
                 }
                 err
-            },
-        )
+            })
     }
 
     pub fn with_width_limit<T>(&self, width_limit: WidthLimit, scope: impl FnOnce() -> T) -> T {

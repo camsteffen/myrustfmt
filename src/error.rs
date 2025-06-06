@@ -88,6 +88,19 @@ impl FormatErrorKind {
             | FormatErrorKind::UnsupportedSyntax => false,
         }
     }
+
+    pub fn is_fatal(&self) -> bool {
+        match self {
+            FormatErrorKind::LineCommentNotAllowed
+            | FormatErrorKind::ListOverflow { .. }
+            | FormatErrorKind::MultiLineCommentNotAllowed
+            | FormatErrorKind::NewlineNotAllowed
+            | FormatErrorKind::VStruct { .. }
+            | FormatErrorKind::Logical
+            | FormatErrorKind::WidthLimitExceeded => false,
+            FormatErrorKind::UnsupportedSyntax => true,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]

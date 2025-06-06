@@ -1,4 +1,5 @@
 use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
 use crate::constraints::VStruct;
@@ -12,9 +13,6 @@ const POSTFIX_CHAIN_MAX_WIDTH: HSize = 60;
 /// Don't apply chain max width unless the chain item's distance from the start
 /// of the chain is at least this much.
 const POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH: HSize = 15;
-
-/// If overflow output is this tall or more, keep it without comparing to vertical
-const OVERFLOW_ONLY_HEIGHT: u32 = 7;
 
 struct PostfixItem<'a> {
     /// The first item in the chain has the root expression, which is not a postfix expression.
@@ -90,79 +88,49 @@ impl AstFormatter {
         start_col: HSize,
         tail: Tail,
     ) -> FormatResult {
-        // self.with_chain_width_limit(start_col, || {
-        //     self.simulate_wrap_indent(true, || {
-        //         self.postfix_item(overflowable)
-        //     })
-        // })
-        let first_line = self.out.line();
-        let checkpoint = self.out.checkpoint();
-        self.with_chain_width_limit(start_col, || self.postfix_item(overflowable))?;
-        let overflow_height = self.out.line() - first_line + 1;
-        self.tail(tail)?;
-        if overflow_height == 1 || overflow_height >= OVERFLOW_ONLY_HEIGHT {
-            return Ok(());
-        }
-        let overflow_lookahead = self.out.capture_lookahead(&checkpoint);
-
-        // try writing the overflowable on the next line to measure its height in separate lines format
-        // todo share logic with match arm
-        // todo should we check if the wrap allows a *longer* first line, like match arm?
-        // todo account for having less width if the fallback will add a block
-        
         /*
-        Only do horizontal if zero method call args
-        Prefer vertical chain if wrap indent causes longer first line
-          (either by allowing horizontal method call arguments
-            OR by allowing longer first line within method call argument overflow)
-            
+        Prefer a vertical chain if it allows more code to fit in the first line of the last
+        (method call) item. More specifically, this is either because the method call arguments can
+        be formatted horizontally, OR it is because the last argument of the method call can
+        overflow with more code on the first line.
+ 
         Perhaps the most questionable case is the one shown below, where the vertical chain is
-        preferred even though has more lines than the horizontal chain with overflow. This case
+        preferred even though it has more lines than the horizontal chain with overflow. This case
         generally involves some list (i.e. the struct fields) that may or may not be formatted in
         one line. On the plus side, it is arguably better to split the outer thing (the chain) into
         multiple lines instead of the inner thing (the struct).
         
-        // Good:
+        // Good (vertical chain without overflow):
         person
             .city
             .country
             .planet
             .galaxy(Foo { bar, baz });
         
-        // Bad:
+        // Bad (horizontal chain with overflow):
         person.city.country.planet.galaxy(Foo {
             bar,
             baz,
         });
-        
-       
-         */
-        let wrap_result = self.indented(|| {
-            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-            let wrap_first_line = self.out.line();
-            self.postfix_item(overflowable)?;
-            let height = self.out.line() - wrap_first_line + 1;
-            self.tail(tail)?;
-            Ok(height)
-        });
+        */
+        let checkpoint = self.out.checkpoint();
+        // N.B. the width limit must be applied before simulate_wrap_indent
+        let wrap_result = self.with_chain_width_limit(start_col, || {
+            Ok(
+                self.simulate_wrap_indent(true, || self.postfix_item(overflowable)),
+            )
+        })?;
 
         match wrap_result {
-            Err(_) => {
+            SimulateWrapResult::Ok => self.tail(tail)?,
+            SimulateWrapResult::NoWrap => {
                 self.out.restore_checkpoint(&checkpoint);
-                self.out.restore_lookahead(overflow_lookahead);
-                Ok(())
+                self.with_chain_width_limit(start_col, || self.postfix_item(overflowable))?;
+                self.tail(tail)?;
             }
-            Ok(vertical_height) => {
-                if vertical_height < overflow_height && false {
-                    // prefer vertical formatting
-                    Err(FormatErrorKind::Logical.into())
-                } else {
-                    self.out.restore_checkpoint(&checkpoint);
-                    self.out.restore_lookahead(overflow_lookahead);
-                    Ok(())
-                }
-            }
+            SimulateWrapResult::Wrap { .. } => return Err(FormatErrorKind::Logical.into()),
         }
+        Ok(())
     }
 
     fn postfix_chain_vertical(&self, chain: &[PostfixItem], tail: Tail) -> FormatResult {
@@ -174,13 +142,17 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn with_chain_width_limit(
+    fn has_chain_width_limit(&self, start_col: HSize) -> bool {
+        (self.out.col() - start_col) >= POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH
+    }
+
+    fn with_chain_width_limit<T>(
         &self,
         start_col: HSize,
-        format: impl Fn() -> FormatResult,
-    ) -> FormatResult {
-        let offset = self.out.col() - start_col;
-        let limit = (offset >= POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH)
+        format: impl Fn() -> FormatResult<T>,
+    ) -> FormatResult<T> {
+        let limit = self
+            .has_chain_width_limit(start_col)
             .then_some(POSTFIX_CHAIN_MAX_WIDTH);
         self.with_width_limit_from_start_opt(start_col, limit, format)
     }

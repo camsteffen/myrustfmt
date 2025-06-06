@@ -129,10 +129,10 @@ fn parse_test_body(
             }
         }
         TestKindRaw::NoChange => {
-            assert!(max_width.is_none(), "cannot use max-width with this test kind");
             expect_no_after(body)?;
             TestKind::NoChange {
                 formatted: body.to_owned(),
+                max_width,
             }
         }
     };
@@ -182,11 +182,11 @@ fn run_test(test: &Test) -> TestResult {
                 Some(&test.expected_stderr_path),
             )?
         }
-        TestKind::NoChange { ref formatted } => {
+        TestKind::NoChange { ref formatted, max_width } => {
             let formatted = formatted.trim();
             format_max_width_expected(
                 formatted,
-                None,
+                max_width,
                 formatted,
                 "formatted",
                 test.expected_stderr.as_deref(),
@@ -237,7 +237,7 @@ enum TestKind {
     /// with exactly a large enough max width to test that it is not changed.
     Breakpoint { before: String, after: String },
     BreakpointError { formatted: String },
-    NoChange { formatted: String },
+    NoChange { formatted: String, max_width: Option<u16> },
     BeforeAfter {
         before: String,
         after: String,

@@ -72,7 +72,14 @@ impl<'s, T> Backtrack<'_, 's, T> {
         };
         let mut result = first();
         for strategy in iter {
-            if result.is_ok() {
+            let is_done = match &result {
+                Ok(_) => true,
+                Err(e) => {
+                    e.kind.is_fatal()
+                        || e.kind.is_vertical() && self.af.constraints().single_line.get()
+                }
+            };
+            if is_done {
                 break;
             }
             self.af.out.restore_checkpoint(&checkpoint);

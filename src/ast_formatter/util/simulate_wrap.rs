@@ -28,30 +28,40 @@ impl AstFormatter {
         wrap_for_longer_first_line: bool,
         scope: impl FnOnce() -> FormatResult,
     ) -> SimulateWrapResult {
+        let with_single_line_and_no_width_limit = || {
+            self.with_single_line(|| {
+                self.constraints().width_limit.with_replaced(None, scope)
+            })
+        };
         self.out.with_recover_width(|| {
             let col = self.out.col();
             let wrap_indent_col = self.out.total_indent.get() + INDENT_WIDTH;
             let (result, used_extra_width) = match col.checked_sub(wrap_indent_col) {
                 None | Some(0) => {
-                    let result = self.with_single_line(scope);
+                    let result = with_single_line_and_no_width_limit();
                     (result, false)
                 }
                 Some(extra_width) => {
                     let max_width = self.constraints().max_width.get();
                     let max_width_extra = max_width.saturating_add(extra_width);
-                    let result = self.with_single_line(|| {
-                        self.constraints()
-                            .max_width
-                            .with_replaced(max_width_extra, scope)
-                    });
+                    let result = self
+                        .constraints()
+                        .max_width
+                        .with_replaced(max_width_extra, with_single_line_and_no_width_limit);
                     let used_extra_width = self.out.col() > max_width;
                     (result, used_extra_width)
                 }
             };
-            match (result, used_extra_width) {
+            let exceeded_width_limit = self
+                .constraints()
+                .width_limit
+                .get()
+                .is_some_and(|wl| wl.line == self.out.line() && self.out.col() > wl.end_col.get());
+            match (result, used_extra_width || exceeded_width_limit) {
                 // simple case - we can use the result as is
                 (Ok(()), false) => SimulateWrapResult::Ok,
                 // the output will fit in a single line if wrapped
+                // todo don't wrap for single line if it's a closure or block
                 (Ok(()), true) => SimulateWrapResult::Wrap { single_line: true },
                 // If we used extra width and still exceeded the max width or a width limit,
                 // wrapping is preferred in order to exceed the max width by a lesser amount.
