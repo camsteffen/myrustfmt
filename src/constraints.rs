@@ -119,10 +119,9 @@ impl Constraints {
         self.single_line
             .with_replaced(true, scope)
             .map_err(|mut err| {
-                // todo test all cases
-                if let FormatErrorKind::Vertical(cause)
-                | FormatErrorKind::ListItemOverflow { cause }
-                | FormatErrorKind::BadListOverflow { cause } = err.kind
+                // todo test all cases - is ListOverflow needed?
+                if let FormatErrorKind::Vertical(cause) | FormatErrorKind::ListOverflow { cause } = err
+                    .kind
                 {
                     err.kind = FormatErrorKind::VStruct { cause };
                 }

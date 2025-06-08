@@ -6,6 +6,7 @@ use crate::num::HSize;
 pub enum ListShape {
     #[default]
     Flexible,
+    FlexibleWithOverflow,
     Horizontal,
     Vertical,
 }
@@ -18,7 +19,6 @@ pub enum ListWrapToFit {
 }
 
 pub struct ListOptions<'ast, 'tail, Item> {
-    pub(super) enable_overflow: bool,
     pub(super) rest: Option<ListRest<'ast>>,
     pub(super) shape: ListShape,
     pub(super) tail: Tail<'tail, 'ast>,
@@ -35,7 +35,6 @@ pub struct ListOptions<'ast, 'tail, Item> {
 impl<'ast, 'tail, Item> ListOptions<'ast, 'tail, Item> {
     pub fn new() -> Self {
         ListOptions {
-            enable_overflow: false,
             rest: None,
             shape: ListShape::default(),
             tail: None,
@@ -45,13 +44,6 @@ impl<'ast, 'tail, Item> ListOptions<'ast, 'tail, Item> {
             omit_open_brace: false,
             single_line_max_contents_width: None,
             wrap_to_fit: ListWrapToFit::default(),
-        }
-    }
-
-    pub fn enable_overflow(self) -> Self {
-        ListOptions {
-            enable_overflow: true,
-            ..self
         }
     }
 

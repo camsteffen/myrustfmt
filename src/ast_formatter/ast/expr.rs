@@ -193,9 +193,9 @@ impl AstFormatter {
 
     pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
         let mut list_opt = ListOptions::<P<ast::Expr>>::new()
-            .enable_overflow()
             .item_prefers_overflow(|expr| matches!(expr.kind, ast::ExprKind::Closure(_)))
             .omit_open_brace()
+            .shape(ListShape::FlexibleWithOverflow)
             .tail(tail);
         let is_only_closure = args.len() == 1 && matches!(args[0].kind, ast::ExprKind::Closure(_));
         if !is_only_closure {

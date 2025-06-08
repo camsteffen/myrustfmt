@@ -56,23 +56,18 @@ where
                 self.af.tail(self.opt.tail)?;
                 return Ok(());
             }
-            let result = match self.opt.shape {
+            match self.opt.shape {
                 // trying to not fallback to vertical because we need to see the width of the line when we fail because overflow is not allowed
-                ListShape::Flexible => self.contents_flexible(),
-                ListShape::Horizontal => self.contents_horizontal(),
-                ListShape::Vertical => self.contents_vertical(),
+                ListShape::Flexible => self.contents_flexible(false)?,
+                ListShape::FlexibleWithOverflow => self.contents_flexible(true)?,
+                ListShape::Horizontal => self.contents_horizontal(false)?,
+                ListShape::Vertical => self.contents_vertical()?,
             };
-            result.map_err(|mut err| {
-                if let FormatErrorKind::ListItemOverflow { cause } = err.kind {
-                    err.kind = FormatErrorKind::ListOverflow { cause };
-                }
-                err
-            })?;
             Ok(())
         })
     }
 
-    fn contents_flexible(&self) -> FormatResult {
+    fn contents_flexible(&self, overflow: bool) -> FormatResult {
         let first_line = self.af.out.line();
         let checkpoint = self.af.out.checkpoint();
         let horizontal_result = self.af.out.with_recover_width(|| -> FormatResult<_> {
@@ -84,7 +79,7 @@ where
             {
                 return Err(FormatErrorKind::Logical.into());
             }
-            self.contents_horizontal()?;
+            self.contents_horizontal(overflow)?;
             // N.B. measure before writing the tail
             let height = self.af.out.line() - first_line + 1;
             self.af.tail(self.opt.tail)?;
@@ -94,15 +89,16 @@ where
         let horizontal_height = match horizontal_result {
             Ok(1) => return Ok(()),
             Ok(height) => height,
-            Err(e) => {
-                if self.opt.enable_overflow && let FormatErrorKind::ListItemOverflow { .. } = e.kind
-                {
-                    assert!(self.af.constraints().single_line.get(), "ListItemOverflow should only occur in single line mode");
-                    // Since this is not a width related error and single line mode is enabled, we
-                    // know that other strategies will not succeed either. Also, we need to be able
-                    // to measure the width of the first line of output in this case.
-                    return Err(e);
-                }
+            Err(mut e) if let FormatErrorKind::ListItemOverflow { cause } = e.kind => {
+                assert!(self.af.constraints().single_line.get(), "ListItemOverflow should only occur in single line mode");
+                // this lets us distinguish when the overflow is coming from a nested list
+                e.kind = FormatErrorKind::ListOverflow { cause };
+                // Since this is not a width related error and single line mode is enabled, we
+                // know that other strategies will not succeed either. Also, we need to be able
+                // to measure the width of the first line of output in this case.
+                return Err(e);
+            }
+            Err(_) => {
                 return self
                     .af
                     .backtrack()
@@ -163,7 +159,7 @@ where
         }
     }
 
-    fn contents_horizontal(&self) -> FormatResult {
+    fn contents_horizontal(&self, overflow: bool) -> FormatResult {
         let Self {
             af,
             opt,
@@ -188,7 +184,7 @@ where
                     },
                 )
             };
-            if opt.enable_overflow && index == len - 1 {
+            if overflow && index == len - 1 {
                 do_arg().map_err(|mut err| {
                     match err.kind {
                         // We formatted the first line and stopped because we are in single-line
@@ -204,13 +200,7 @@ where
                     err
                 })
             } else {
-                af.with_single_line(do_arg).map_err(|mut err| {
-                    if let FormatErrorKind::ListItemOverflow { cause } = err.kind {
-                        assert!(self.af.constraints().single_line.get(), "ListItemOverflow should only occur in single line mode");
-                        err.kind = FormatErrorKind::BadListOverflow { cause };
-                    }
-                    err
-                })
+                af.with_single_line(do_arg)
             }
         };
 
