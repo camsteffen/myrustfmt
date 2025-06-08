@@ -59,15 +59,9 @@ where
             match self.opt.shape {
                 // trying to not fallback to vertical because we need to see the width of the line when we fail because overflow is not allowed
                 ListShape::Flexible => self.contents_flexible()?,
-                ListShape::Horizontal => self.contents_horizontal().map_err(|mut err| {
-                    if let FormatErrorKind::ListOverflow { cause } = err.kind {
-                        // avoid reporting ListOverflow to outer lists
-                        err.kind = *cause;
-                    }
-                    err
-                })?,
+                ListShape::Horizontal => self.contents_horizontal()?,
                 ListShape::Vertical => self.contents_vertical()?,
-            }
+            };
             Ok(())
         })
     }
@@ -94,11 +88,9 @@ where
         let horizontal_height = match horizontal_result {
             Ok(1) => return Ok(()),
             Ok(height) => height,
-            Err(mut e) => {
-                if let FormatErrorKind::ListOverflow { cause } = e.kind {
-                    assert!(self.af.constraints().single_line.get(), "ListOverflow error should only occur in single-line mode");
-                    // avoid reporting ListOverflow to outer lists
-                    e.kind = *cause;
+            Err(e) => {
+                if self.opt.enable_overflow && let FormatErrorKind::HorizontalListOverflow { .. } = e.kind {
+                    assert!(self.af.constraints().single_line.get(), "{}", e.backtrace);
                     // Since this is not a width related error and single line mode is enabled, we
                     // know that other strategies will not succeed either. Also, we need to be able
                     // to measure the width of the first line of output in this case.

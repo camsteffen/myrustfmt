@@ -3,6 +3,10 @@
 fn test() {
     match x {
         (x if y, y) => x,
+        // should wrap the whole function call
+        (Chunk::Number(a), Chunk::Number(b)) => {
+            cmp_by_key(a, b, |s| s.parse::<u32>().expect("numeric chunk should be a valid u32"))
+        },
     }
 }
 

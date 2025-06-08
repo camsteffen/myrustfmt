@@ -28,11 +28,8 @@ impl AstFormatter {
         wrap_for_longer_first_line: bool,
         scope: impl FnOnce() -> FormatResult,
     ) -> SimulateWrapResult {
-        let with_single_line_and_no_width_limit = || {
-            self.with_single_line(|| {
-                self.constraints().width_limit.with_replaced(None, scope)
-            })
-        };
+        let with_single_line_and_no_width_limit =
+            || self.with_single_line(|| self.constraints().width_limit.with_replaced(None, scope));
         self.out.with_recover_width(|| {
             let col = self.out.col();
             let wrap_indent_col = self.out.total_indent.get() + INDENT_WIDTH;

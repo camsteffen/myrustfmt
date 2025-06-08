@@ -1,4 +1,4 @@
-use crate::error::{FormatErrorKind, FormatResult};
+use crate::error::{FormatResult, VerticalError};
 use crate::source_formatter::SourceFormatter;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_lexer::{FrontmatterAllowed, Token, TokenKind};
@@ -93,6 +93,7 @@ impl SourceFormatter {
         let source = self.source_reader.remaining();
         let tokens = tokenize(source);
         let actions = actions_from_tokens(tokens, mode, source);
+        // todo make an "advance" action and don't return len
         for (action, len) in actions {
             match action {
                 WhitespaceAction::CopyComment => {
@@ -123,13 +124,13 @@ impl SourceFormatter {
                 }
                 WhitespaceAction::NewlineNotAllowed { distance } => {
                     self.source_reader.advance(distance);
-                    return Err(FormatErrorKind::NewlineNotAllowed.into());
+                    return Err(VerticalError::Newline.into());
                 }
                 WhitespaceAction::LineCommentNotAllowed => {
-                    return Err(FormatErrorKind::LineCommentNotAllowed.into());
+                    return Err(VerticalError::LineComment.into());
                 }
                 WhitespaceAction::MultiLineCommentNotAllowed => {
-                    return Err(FormatErrorKind::MultiLineCommentNotAllowed.into());
+                    return Err(VerticalError::MultiLineComment.into());
                 }
                 WhitespaceAction::Skip => self.source_reader.advance(len),
             }

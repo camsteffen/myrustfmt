@@ -4,7 +4,7 @@ use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::tail::Tail;
 use crate::ast_utils::is_rustfmt_skip;
 use crate::constraints::VStruct;
-use crate::error::{FormatErrorKind, FormatResult};
+use crate::error::{FormatErrorKind, FormatResult, VerticalError};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -58,39 +58,36 @@ impl AstFormatter {
         let checkpoint = self.out.checkpoint_without_buffer_errors();
         #[cfg(debug_assertions)]
         let error_count_before = self.errors.error_count();
-        let Err(e) = format() else {
+        let Err(err) = format() else {
             return Ok(());
         };
-        match e.kind.root_cause() {
-            FormatErrorKind::LineCommentNotAllowed => {
-                let (line, col) = self.out.line_col();
-                // todo emit a more appropriate error for bad comments
-                self.errors.line_comment_not_allowed(line, col);
-            }
-            FormatErrorKind::MultiLineCommentNotAllowed => {
-                let (line, col) = self.out.line_col();
-                // todo emit a more appropriate error for bad comments
-                self.errors.multi_line_comment_not_allowed(line, col);
+        let (line, col) = self.out.line_col();
+        match err.kind {
+            // todo test all these outputs
+            FormatErrorKind::HorizontalListOverflow { cause: vertical }
+                |FormatErrorKind::NestedHorizontalListOverflow { cause: vertical }
+            |FormatErrorKind::Vertical(vertical)
+            // todo propagate VStruct?
+            | FormatErrorKind::VStruct { cause: vertical } => match vertical {
+                VerticalError::LineComment => self.errors.line_comment_not_allowed(line, col),
+                VerticalError::MultiLineComment => self.errors.multi_line_comment_not_allowed(line, col),
+                // todo why return here?
+                VerticalError::Newline => return Err(err),
             }
             FormatErrorKind::UnsupportedSyntax => {
-                let (line, col) = self.out.line_col();
                 self.errors.unsupported_syntax(line, col);
             }
             // these are not expected
-            FormatErrorKind::NewlineNotAllowed
-            | FormatErrorKind::Logical
+            FormatErrorKind::Logical
             | FormatErrorKind::WidthLimitExceeded => {
-                return Err(e);
-            }
-            FormatErrorKind::ListOverflow { cause: _ } | FormatErrorKind::VStruct { cause: _ } => {
-                unreachable!()
+                return Err(err);
             }
         }
         #[cfg(debug_assertions)]
         assert!(
             self.errors.error_count() > error_count_before,
             "an error should be emitted before copy fallback\nstack trace:\n{}",
-            e.backtrace
+            err.backtrace
         );
         self.out.restore_checkpoint(&checkpoint);
         self.with_replace_width_limit(None, || self.out.copy_span(span))?;

@@ -46,61 +46,27 @@ impl FormatError {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FormatErrorKind {
-    LineCommentNotAllowed,
-    /// List tried to overflow when single-line constraint is enabled
-    ListOverflow { cause: Box<FormatErrorKind> },
+    /// Occurs when we attempt to overflow the last item in a horizontal list while single line mode
+    /// is enabled.
+    HorizontalListOverflow { cause: VerticalError },
+    /// Like HorizontalListOverflow, but occurs in a list within a list
+    NestedHorizontalListOverflow { cause: VerticalError },
     /// Used to explicitly fail the current strategy for implementation-specific reasons
     Logical,
-    MultiLineCommentNotAllowed,
-    NewlineNotAllowed,
-    WidthLimitExceeded,
     UnsupportedSyntax,
-    VStruct { cause: Box<FormatErrorKind> },
+    Vertical(VerticalError),
+    VStruct { cause: VerticalError },
+    WidthLimitExceeded,
 }
 
-impl FormatErrorKind {
-    pub fn root_cause(&self) -> &Self {
-        match self {
-            FormatErrorKind::ListOverflow { cause } | FormatErrorKind::VStruct { cause } => {
-                cause.root_cause()
-            }
-            FormatErrorKind::LineCommentNotAllowed
-            | FormatErrorKind::MultiLineCommentNotAllowed
-            | FormatErrorKind::NewlineNotAllowed
-            | FormatErrorKind::Logical
-            | FormatErrorKind::UnsupportedSyntax
-            | FormatErrorKind::WidthLimitExceeded => self,
-        }
-    }
-
-    pub fn is_vertical(&self) -> bool {
-        match self {
-            FormatErrorKind::LineCommentNotAllowed
-            | FormatErrorKind::ListOverflow { .. }
-            | FormatErrorKind::MultiLineCommentNotAllowed
-            | FormatErrorKind::NewlineNotAllowed
-            | FormatErrorKind::VStruct { .. } => true,
-
-            FormatErrorKind::Logical
-            | FormatErrorKind::WidthLimitExceeded
-            | FormatErrorKind::UnsupportedSyntax => false,
-        }
-    }
-
-    pub fn is_fatal(&self) -> bool {
-        match self {
-            FormatErrorKind::LineCommentNotAllowed
-            | FormatErrorKind::ListOverflow { .. }
-            | FormatErrorKind::MultiLineCommentNotAllowed
-            | FormatErrorKind::NewlineNotAllowed
-            | FormatErrorKind::VStruct { .. }
-            | FormatErrorKind::Logical
-            | FormatErrorKind::WidthLimitExceeded => false,
-            FormatErrorKind::UnsupportedSyntax => true,
-        }
-    }
+/// Occurs when we attempt to write a newline while single line mode is enabled.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum VerticalError {
+    LineComment,
+    MultiLineComment,
+    Newline,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -132,16 +98,18 @@ fn write_constraint_error(
     path: Option<&Path>,
 ) -> std::fmt::Result {
     write!(f, "{}, ", error_formatting_at(source, pos, path))?;
-    match e.kind.root_cause() {
-        FormatErrorKind::LineCommentNotAllowed => write!(f, "line comment not allowed")?,
-        FormatErrorKind::MultiLineCommentNotAllowed => write!(f, "multi-line comment not allowed")?,
+    match e.kind {
+        FormatErrorKind::Vertical(vertical)
+        | FormatErrorKind::HorizontalListOverflow { cause: vertical }
+        | FormatErrorKind::NestedHorizontalListOverflow { cause: vertical }
+        | FormatErrorKind::VStruct { cause: vertical } => match vertical {
+            VerticalError::LineComment => write!(f, "line comment not allowed")?,
+            VerticalError::MultiLineComment => write!(f, "multi-line comment not allowed")?,
+            VerticalError::Newline => write!(f, "newline not allowed")?,
+        },
         kind @ FormatErrorKind::Logical => write!(f, "unhandled {kind:?}")?,
-        FormatErrorKind::NewlineNotAllowed => write!(f, "newline not allowed")?,
         FormatErrorKind::WidthLimitExceeded => write!(f, "width limit exceeded")?,
         FormatErrorKind::UnsupportedSyntax => write!(f, "unsupported syntax")?,
-        FormatErrorKind::ListOverflow { cause: _ } | FormatErrorKind::VStruct { cause: _ } => {
-            unreachable!()
-        }
     }
     if cfg!(debug_assertions) && path.is_none() {
         write!(f, "\nSource:\n{source}")?;
@@ -220,13 +188,13 @@ impl From<FormatErrorKind> for FormatError {
 
 impl From<NewlineNotAllowedError> for FormatErrorKind {
     fn from(_: NewlineNotAllowedError) -> Self {
-        FormatErrorKind::NewlineNotAllowed
+        FormatErrorKind::Vertical(VerticalError::Newline)
     }
 }
 
 impl From<NewlineNotAllowedError> for FormatError {
-    fn from(_: NewlineNotAllowedError) -> Self {
-        FormatErrorKind::NewlineNotAllowed.into()
+    fn from(error: NewlineNotAllowedError) -> Self {
+        FormatErrorKind::from(error).into()
     }
 }
 
@@ -239,5 +207,11 @@ impl From<WidthLimitExceededError> for FormatErrorKind {
 impl From<WidthLimitExceededError> for FormatError {
     fn from(e: WidthLimitExceededError) -> Self {
         FormatErrorKind::from(e).into()
+    }
+}
+
+impl From<VerticalError> for FormatError {
+    fn from(err: VerticalError) -> Self {
+        FormatErrorKind::Vertical(err).into()
     }
 }

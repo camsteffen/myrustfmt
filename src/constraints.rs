@@ -119,10 +119,12 @@ impl Constraints {
         self.single_line
             .with_replaced(true, scope)
             .map_err(|mut err| {
-                if err.kind.is_vertical() {
-                    err.kind = FormatErrorKind::VStruct {
-                        cause: Box::new(err.kind),
-                    };
+                // todo test all cases
+                if let FormatErrorKind::Vertical(cause)
+                | FormatErrorKind::HorizontalListOverflow { cause }
+                | FormatErrorKind::NestedHorizontalListOverflow { cause } = err.kind
+                {
+                    err.kind = FormatErrorKind::VStruct { cause };
                 }
                 err
             })

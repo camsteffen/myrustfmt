@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::error::FormatResult;
+use crate::error::{FormatErrorKind, FormatResult};
 use crate::source_formatter::checkpoint::Checkpoint;
 
 impl AstFormatter {
@@ -74,10 +74,11 @@ impl<'s, T> Backtrack<'_, 's, T> {
         for strategy in iter {
             let is_done = match &result {
                 Ok(_) => true,
-                Err(e) => {
-                    e.kind.is_fatal()
-                        || e.kind.is_vertical() && self.af.constraints().single_line.get()
-                }
+                Err(e) => match e.kind {
+                    FormatErrorKind::UnsupportedSyntax => true,
+                    FormatErrorKind::Vertical(_) => self.af.constraints().single_line.get(),
+                    _ => false,
+                },
             };
             if is_done {
                 break;

@@ -192,35 +192,6 @@ impl AstFormatter {
     }
 
     pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
-        let format_arg = |
-            af: &AstFormatter,
-            expr: &P<ast::Expr>,
-            tail: Tail,
-            lcx: ListItemContext,
-        | -> FormatResult {
-            if lcx.strategy == ListStrategy::Horizontal && lcx.index == args.len() - 1 {
-                // todo also disallow blocks and struct literals?
-                let mut vstructs = VStruct::ControlFlow | VStruct::NonBlockIndent;
-                if args.len() > 1 {
-                    vstructs |= VStruct::List | VStruct::Match;
-                }
-                af.disallow_vstructs(vstructs, || af.expr_tail(expr, tail))
-                    .map_err(|mut err| {
-                        if err.kind.is_vertical()
-                            && !matches!(err.kind, FormatErrorKind::VStruct {..})
-                        {
-                            err.kind = FormatErrorKind::ListOverflow {
-                                cause: Box::new(err.kind),
-                            };
-                        }
-                        err
-                    })?;
-            } else {
-                af.expr_tail(expr, tail)?;
-            }
-            Ok(())
-        };
-
         let mut list_opt = ListOptions::<P<ast::Expr>>::new()
             .enable_overflow()
             .item_prefers_overflow(|expr| matches!(expr.kind, ast::ExprKind::Closure(_)))
@@ -231,8 +202,51 @@ impl AstFormatter {
             list_opt = list_opt
                 .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
         }
-
-        self.list(Braces::Parens, args, format_arg, list_opt)
+        self.list(Braces::Parens, args, |
+            af,
+            expr,
+            tail,
+            lcx,
+        | {
+            af.call_arg(expr, args.len(), tail, lcx)
+        }, list_opt)
+    }
+    
+    fn call_arg(&self, expr: &ast::Expr, args_len: usize, tail: Tail, lcx: ListItemContext) -> FormatResult {
+        if lcx.strategy == ListStrategy::Horizontal && lcx.index == args_len - 1 {
+            // todo also disallow blocks and struct literals?
+            let mut vstructs = VStruct::ControlFlow | VStruct::NonBlockIndent;
+            if args_len > 1 {
+                vstructs |= VStruct::List | VStruct::Match;
+            }
+            self.disallow_vstructs(vstructs, || self.expr_tail(expr, tail))
+                .map_err(|mut err| {
+                    match err.kind {
+                        // We formatted the first line and stopped because we are in single-line
+                        // mode, otherwise we could have continued without error.
+                        FormatErrorKind::Vertical(cause) => {
+                            assert!(self.constraints().single_line.get(), "HorizontalListOverflow should only occur in single line mode");
+                            err.kind = FormatErrorKind::HorizontalListOverflow {
+                                cause,
+                            };
+                        }
+                        // A nested list tried to overflow - this list must be formatted vertically
+                        FormatErrorKind::HorizontalListOverflow {cause} => {
+                            assert!(self.constraints().single_line.get(), "HorizontalListOverflow should only occur in single line mode");
+                            err.kind = FormatErrorKind::NestedHorizontalListOverflow {
+                                cause,
+                            };
+                        }
+                        // VStruct error - this list must be formatted vertically
+                        FormatErrorKind::VStruct {..} => {}
+                        _ => {}
+                    }
+                    err
+                })?;
+        } else {
+            self.expr_tail(expr, tail)?;
+        }
+        Ok(())
     }
 
     fn cast(&self, target: &ast::Expr, ty: &ast::Ty, tail: Tail) -> FormatResult {
