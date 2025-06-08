@@ -91,11 +91,8 @@ where
             Ok(height) => height,
             Err(mut e) if let FormatErrorKind::ListItemOverflow { cause } = e.kind => {
                 assert!(self.af.constraints().single_line.get(), "ListItemOverflow should only occur in single line mode");
-                // this lets us distinguish when the overflow is coming from a nested list
                 e.kind = FormatErrorKind::ListOverflow { cause };
-                // Since this is not a width related error and single line mode is enabled, we
-                // know that other strategies will not succeed either. Also, we need to be able
-                // to measure the width of the first line of output in this case.
+                // Horizontal formatting would have succeeded if single line mode were not enabled.
                 return Err(e);
             }
             Err(_) => {
@@ -169,57 +166,32 @@ where
             ..
         } = self;
         let rest = opt.rest;
-
         let len = list.len();
-
-        let format_index = |index, tail: Tail| {
-            let do_arg = || {
-                format_item(
-                    af,
-                    &list[index],
-                    tail,
-                    ListItemContext {
-                        index,
-                        strategy: ListStrategy::Horizontal,
-                    },
-                )
-            };
-            if overflow && index == len - 1 {
-                do_arg().map_err(|mut err| {
-                    match err.kind {
-                        // We formatted the first line and stopped because we are in single-line
-                        // mode, otherwise we could have continued without error.
-                        FormatErrorKind::Vertical(cause) => {
-                            assert!(self.af.constraints().single_line.get(), "FormatErrorKind::Vertical error should only occur in single line mode");
-                            err.kind = FormatErrorKind::ListItemOverflow { cause };
-                        }
-                        // VStruct error - this list must be formatted vertically
-                        FormatErrorKind::VStruct { .. } => {}
-                        _ => {}
-                    }
-                    err
-                })
-            } else {
-                af.with_single_line(do_arg)
-            }
-        };
-
-        let do_pad = |af: &AstFormatter| -> FormatResult {
+        let pad = |af: &AstFormatter| -> FormatResult {
             if braces.pad() {
                 af.out.space()?;
             }
             Ok(())
         };
-        do_pad(af)?;
+        let item = |index: usize, tail: Tail| -> FormatResult {
+            format_item(
+                af,
+                &list[index],
+                tail,
+                ListItemContext {
+                    index,
+                    strategy: ListStrategy::Horizontal,
+                },
+            )
+        };
         let close = |af: &AstFormatter| {
-            do_pad(af)?;
+            pad(af)?;
             af.out.token(braces.end())?;
             Ok(())
         };
+        pad(af)?;
         // N.B. tails are created outside of width limit
-        let close_tail = af.tail_fn(close);
-        let close_tail = close_tail.as_ref();
-        let last_tail = af.tail_fn(move |af| {
+        let list_item_tail = af.tail_fn(move |af| {
             if !rest.is_none() || opt.force_trailing_comma {
                 af.out.token(",")?;
             } else {
@@ -230,25 +202,44 @@ where
             }
             Ok(())
         });
-        let last_tail = last_tail.as_ref();
+        let last_item_tail = list_item_tail.as_ref();
+        let end_tail = af.tail_fn(close);
+        let end_tail = end_tail.as_ref();
         af.with_width_limit_opt(opt.single_line_max_contents_width, move || {
             if len == 0 {
                 if let Some(rest) = rest {
-                    list_rest(af, rest, close_tail)?;
+                    list_rest(af, rest, end_tail)?;
                 }
                 return Ok(());
             }
             let (until_last, last) = (0..(len - 1), len - 1);
             for index in until_last {
-                format_index(index, None)?;
+                af.with_single_line(|| item(index, None))?;
                 af.out.token_maybe_missing(",")?;
                 af.out.space()?;
             }
-            // A tail is only necessary with the last item since it may overflow
-            format_index(last, last_tail)?;
+            if overflow {
+                item(last, last_item_tail).map_err(|mut err| {
+                    match err.kind {
+                        // We formatted the first line and stopped because we are in single-line
+                        // mode, otherwise we could have continued without error.
+                        FormatErrorKind::Vertical(cause) => {
+                            assert!(self.af.constraints().single_line.get(), "FormatErrorKind::Vertical error should only occur in single line mode");
+                            err.kind = FormatErrorKind::ListItemOverflow { cause };
+                        }
+                        // VStruct error - this list must be formatted vertically
+                        // (it's here explicitly to show the necessity of this variant)
+                        FormatErrorKind::VStruct { .. } => {}
+                        _ => {}
+                    }
+                    err
+                })?;
+            } else {
+                af.with_single_line(|| item(last, last_item_tail))?;
+            }
             if let Some(rest) = rest {
                 af.out.space()?;
-                list_rest(af, rest, close_tail)?;
+                list_rest(af, rest, end_tail)?;
             }
             Ok(())
         })

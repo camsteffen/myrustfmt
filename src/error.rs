@@ -48,6 +48,9 @@ impl FormatError {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FormatErrorKind {
+    /// ListItemOverflow becomes ListOverflow when the error propagates out of the list.
+    /// This allows us to know when an overflow occurs in a list within a list. This forces the
+    /// outer list to use vertical formatting.
     ListOverflow { cause: VerticalError },
     /// Occurs when we attempt to overflow the last item in a horizontal list while single line mode
     /// is enabled.
