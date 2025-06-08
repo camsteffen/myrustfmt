@@ -21,15 +21,15 @@ impl Drop for Checkpoint<'_> {
 }
 
 impl SourceFormatter {
-    pub fn checkpoint(&self) -> Checkpoint {
+    pub fn checkpoint(&self) -> Checkpoint<'_> {
         self.checkpoint_inner(true)
     }
 
-    pub fn checkpoint_without_buffer_errors(&self) -> Checkpoint {
+    pub fn checkpoint_without_buffer_errors(&self) -> Checkpoint<'_> {
         self.checkpoint_inner(false)
     }
 
-    pub fn checkpoint_inner(&self, buffer_errors: bool) -> Checkpoint {
+    pub fn checkpoint_inner(&self, buffer_errors: bool) -> Checkpoint<'_> {
         let error_emitter_checkpoint = buffer_errors.then(|| self.error_emitter.checkpoint());
         Checkpoint {
             error_emitter_checkpoint,

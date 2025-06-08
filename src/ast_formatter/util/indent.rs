@@ -22,7 +22,7 @@ impl Drop for IndentGuard<'_> {
 }
 
 impl AstFormatter {
-    pub fn begin_indent(&self) -> IndentGuard {
+    pub fn begin_indent(&self) -> IndentGuard<'_> {
         let out = &self.out;
         out.total_indent.set(out.total_indent.get() + INDENT_WIDTH);
         IndentGuard { out }

@@ -73,17 +73,16 @@ impl AstFormatter {
                 af.closure_body(&closure.body, has_return_type, single_line_header, tail)?;
                 Ok(())
             };
-            let wrapped_return_type = self
-                .fn_decl(
-                    &closure.fn_decl,
-                    Braces::Pipe,
-                    self.tail_fn(|af| {
-                        af.out.space_allow_newlines()?;
-                        body(af)?;
-                        Ok(())
-                    })
-                    .as_ref(),
-                )?;
+            let wrapped_return_type = self.fn_decl(
+                &closure.fn_decl,
+                Braces::Pipe,
+                self.tail_fn(|af| {
+                    af.out.space_allow_newlines()?;
+                    body(af)?;
+                    Ok(())
+                })
+                .as_ref(),
+            )?;
             if wrapped_return_type {
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 body(self)?;

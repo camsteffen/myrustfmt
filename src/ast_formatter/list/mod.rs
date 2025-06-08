@@ -56,12 +56,18 @@ where
                 self.af.tail(self.opt.tail)?;
                 return Ok(());
             }
-            match self.opt.shape {
+            let result = match self.opt.shape {
                 // trying to not fallback to vertical because we need to see the width of the line when we fail because overflow is not allowed
-                ListShape::Flexible => self.contents_flexible()?,
-                ListShape::Horizontal => self.contents_horizontal()?,
-                ListShape::Vertical => self.contents_vertical()?,
+                ListShape::Flexible => self.contents_flexible(),
+                ListShape::Horizontal => self.contents_horizontal(),
+                ListShape::Vertical => self.contents_vertical(),
             };
+            result.map_err(|mut err| {
+                if let FormatErrorKind::ListItemOverflow { cause } = err.kind {
+                    err.kind = FormatErrorKind::ListOverflow { cause };
+                }
+                err
+            })?;
             Ok(())
         })
     }
@@ -89,8 +95,9 @@ where
             Ok(1) => return Ok(()),
             Ok(height) => height,
             Err(e) => {
-                if self.opt.enable_overflow && let FormatErrorKind::HorizontalListOverflow { .. } = e.kind {
-                    assert!(self.af.constraints().single_line.get(), "{}", e.backtrace);
+                if self.opt.enable_overflow && let FormatErrorKind::ListItemOverflow { .. } = e.kind
+                {
+                    assert!(self.af.constraints().single_line.get(), "ListItemOverflow should only occur in single line mode");
                     // Since this is not a width related error and single line mode is enabled, we
                     // know that other strategies will not succeed either. Also, we need to be able
                     // to measure the width of the first line of output in this case.
@@ -170,7 +177,7 @@ where
         let len = list.len();
 
         let format_index = |index, tail: Tail| {
-            af.with_single_line_if(index < len - 1 || !opt.enable_overflow, || {
+            let do_arg = || {
                 format_item(
                     af,
                     &list[index],
@@ -180,7 +187,31 @@ where
                         strategy: ListStrategy::Horizontal,
                     },
                 )
-            })
+            };
+            if opt.enable_overflow && index == len - 1 {
+                do_arg().map_err(|mut err| {
+                    match err.kind {
+                        // We formatted the first line and stopped because we are in single-line
+                        // mode, otherwise we could have continued without error.
+                        FormatErrorKind::Vertical(cause) => {
+                            assert!(self.af.constraints().single_line.get(), "FormatErrorKind::Vertical error should only occur in single line mode");
+                            err.kind = FormatErrorKind::ListItemOverflow { cause };
+                        }
+                        // VStruct error - this list must be formatted vertically
+                        FormatErrorKind::VStruct { .. } => {}
+                        _ => {}
+                    }
+                    err
+                })
+            } else {
+                af.with_single_line(do_arg).map_err(|mut err| {
+                    if let FormatErrorKind::ListItemOverflow { cause } = err.kind {
+                        assert!(self.af.constraints().single_line.get(), "ListItemOverflow should only occur in single line mode");
+                        err.kind = FormatErrorKind::BadListOverflow { cause };
+                    }
+                    err
+                })
+            }
         };
 
         let do_pad = |af: &AstFormatter| -> FormatResult {

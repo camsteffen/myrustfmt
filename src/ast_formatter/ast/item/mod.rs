@@ -52,8 +52,8 @@ impl AstFormatter {
     pub fn item_kind(&self, kind: &ast::ItemKind) -> FormatResult {
         match *kind {
             ast::ItemKind::Const(ref const_item) => self.const_item(const_item)?,
-            ast::ItemKind::Enum(ident, ref def, ref generics) => {
-                self.enum_(ident, &def.variants, generics)?
+            ast::ItemKind::Enum(ident, ref generics, ref def) => {
+                self.enum_(ident, generics, &def.variants)?
             }
             ast::ItemKind::ExternCrate(name, ident) => self.extern_crate(name, ident)?,
             ast::ItemKind::Fn(ref fn_) => self.fn_(fn_)?,
@@ -78,7 +78,7 @@ impl AstFormatter {
                 self.mod_item(safety, ident, mod_kind)?
             }
             ast::ItemKind::Static(ref static_item) => self.static_item(static_item)?,
-            ast::ItemKind::Struct(ident, ref variants, ref generics) => {
+            ast::ItemKind::Struct(ident, ref generics, ref variants) => {
                 self.struct_or_union("struct", ident, variants, generics)?
             }
             ast::ItemKind::Trait(ref trait_) => self.trait_(trait_)?,
@@ -90,7 +90,7 @@ impl AstFormatter {
                 }
                 self.out.token(";")?;
             }
-            ast::ItemKind::Union(ident, ref variants, ref generics) => {
+            ast::ItemKind::Union(ident, ref generics, ref variants) => {
                 self.struct_or_union("union", ident, variants, generics)?
             }
             ast::ItemKind::Use(ref use_tree) => {
@@ -145,8 +145,8 @@ impl AstFormatter {
     fn enum_(
         &self,
         ident: Ident,
-        variants: &[ast::Variant],
         generics: &ast::Generics,
+        variants: &[ast::Variant],
     ) -> FormatResult {
         self.token_ident_generic_params("enum", ident, generics)?;
         self.out.space()?;

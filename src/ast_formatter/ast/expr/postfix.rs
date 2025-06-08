@@ -235,7 +235,7 @@ impl AstFormatter {
     }
 }
 
-fn build_postfix_chain(expr: &ast::Expr) -> Vec<PostfixItem> {
+fn build_postfix_chain(expr: &ast::Expr) -> Vec<PostfixItem<'_>> {
     let mut current = expr;
     let mut items = Vec::new();
     let mut non_dot_items = Vec::new();

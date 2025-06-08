@@ -228,7 +228,16 @@ fn format_module_file(
             .as_ref()
             .expect("the SourceFile should have src"),
     );
+    std::panic::set_hook({
+        let path = path.to_path_buf();
+        let prev_panic_hook = std::panic::take_hook();
+        Box::new(move |info| {
+            eprintln!("\nPanic occurred while formatting {}", path.display());
+            prev_panic_hook(info);
+        })
+    });
     let result = format_module(&module, source_file, Some(path.to_path_buf()), config);
+    let _ = std::panic::take_hook();
     match on_format_module.on_format_module(path, result, &source) {
         ControlFlow::Continue(()) => Ok(submodules),
         ControlFlow::Break(()) => Err(()),

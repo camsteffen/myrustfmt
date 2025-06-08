@@ -121,8 +121,8 @@ impl Constraints {
             .map_err(|mut err| {
                 // todo test all cases
                 if let FormatErrorKind::Vertical(cause)
-                | FormatErrorKind::HorizontalListOverflow { cause }
-                | FormatErrorKind::NestedHorizontalListOverflow { cause } = err.kind
+                | FormatErrorKind::ListItemOverflow { cause }
+                | FormatErrorKind::BadListOverflow { cause } = err.kind
                 {
                     err.kind = FormatErrorKind::VStruct { cause };
                 }

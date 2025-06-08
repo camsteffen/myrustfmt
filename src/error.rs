@@ -48,11 +48,12 @@ impl FormatError {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FormatErrorKind {
+    ListOverflow { cause: VerticalError },
     /// Occurs when we attempt to overflow the last item in a horizontal list while single line mode
     /// is enabled.
-    HorizontalListOverflow { cause: VerticalError },
+    ListItemOverflow { cause: VerticalError },
     /// Like HorizontalListOverflow, but occurs in a list within a list
-    NestedHorizontalListOverflow { cause: VerticalError },
+    BadListOverflow { cause: VerticalError },
     /// Used to explicitly fail the current strategy for implementation-specific reasons
     Logical,
     UnsupportedSyntax,
@@ -100,8 +101,9 @@ fn write_constraint_error(
     write!(f, "{}, ", error_formatting_at(source, pos, path))?;
     match e.kind {
         FormatErrorKind::Vertical(vertical)
-        | FormatErrorKind::HorizontalListOverflow { cause: vertical }
-        | FormatErrorKind::NestedHorizontalListOverflow { cause: vertical }
+        | FormatErrorKind::ListOverflow { cause: vertical }
+        | FormatErrorKind::ListItemOverflow { cause: vertical }
+        | FormatErrorKind::BadListOverflow { cause: vertical }
         | FormatErrorKind::VStruct { cause: vertical } => match vertical {
             VerticalError::LineComment => write!(f, "line comment not allowed")?,
             VerticalError::MultiLineComment => write!(f, "multi-line comment not allowed")?,

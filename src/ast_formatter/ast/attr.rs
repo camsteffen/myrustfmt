@@ -64,22 +64,24 @@ impl AstFormatter {
         let (line, col) = self.out.line_col();
         match err.kind {
             // todo test all these outputs
-            FormatErrorKind::HorizontalListOverflow { cause: vertical }
-                |FormatErrorKind::NestedHorizontalListOverflow { cause: vertical }
-            |FormatErrorKind::Vertical(vertical)
+            FormatErrorKind::ListOverflow { cause: vertical }
+            | FormatErrorKind::ListItemOverflow { cause: vertical }
+            | FormatErrorKind::BadListOverflow { cause: vertical }
+            | FormatErrorKind::Vertical(vertical)
             // todo propagate VStruct?
             | FormatErrorKind::VStruct { cause: vertical } => match vertical {
                 VerticalError::LineComment => self.errors.line_comment_not_allowed(line, col),
-                VerticalError::MultiLineComment => self.errors.multi_line_comment_not_allowed(line, col),
+                VerticalError::MultiLineComment => {
+                    self.errors.multi_line_comment_not_allowed(line, col)
+                }
                 // todo why return here?
                 VerticalError::Newline => return Err(err),
-            }
+            },
             FormatErrorKind::UnsupportedSyntax => {
                 self.errors.unsupported_syntax(line, col);
             }
             // these are not expected
-            FormatErrorKind::Logical
-            | FormatErrorKind::WidthLimitExceeded => {
+            FormatErrorKind::Logical | FormatErrorKind::WidthLimitExceeded => {
                 return Err(err);
             }
         }
