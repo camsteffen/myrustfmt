@@ -143,7 +143,7 @@ impl AstFormatter {
                 // At this point we can calculate the height of a vertical chain
                 let vertical_chain_height = 1 + wrappable_items as VSize;
                 if let Some((horizontal_args_height, horizontal_args_lookahead)) = horizontal_args {
-                    if vertical_chain_height < horizontal_args_height {
+                    if vertical_chain_height <= horizontal_args_height {
                         // A vertical chain is shorter than a horizontal chain with overflow
                         return Err(FormatErrorKind::Logical.into());
                     }
@@ -277,9 +277,9 @@ impl AstFormatter {
     }
 
     fn postfix_items(&self, items: &[PostfixItem], start_col: HSize) -> FormatResult {
-        items.iter().try_for_each(|item| {
-            self.with_chain_width_limit(start_col, || self.postfix_item(item))
-        })
+        items
+            .iter()
+            .try_for_each(|item| self.with_chain_width_limit(start_col, || self.postfix_item(item)))
     }
 
     fn postfix_non_dot_items(&self, postfix_tail: &[&ast::Expr], tail: Tail) -> FormatResult {

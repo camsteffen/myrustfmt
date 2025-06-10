@@ -16,9 +16,11 @@ fn rustfmt_tests() {
 }
 
 fn rustfmt_tests_visit_path(path: &Path) {
-    let mut paths = Vec::from_iter(fs::read_dir(path).unwrap().map(|entry| {
-        entry.unwrap().path()
-    }));
+    let mut paths = Vec::from_iter(
+        fs::read_dir(path)
+            .unwrap()
+            .map(|entry| entry.unwrap().path()),
+    );
     paths.sort_unstable();
     for path in paths {
         if path.is_dir() {
@@ -61,9 +63,9 @@ fn read_config_values(file_name: &Path) -> Vec<(String, String)> {
     BufReader::new(fs::File::open(file_name).unwrap())
         .lines()
         .map_while(|line| {
-            regex.captures(&line.unwrap()).map(|capture| {
-                (capture[1].to_owned(), capture[2].to_owned())
-            })
+            regex
+                .captures(&line.unwrap())
+                .map(|capture| (capture[1].to_owned(), capture[2].to_owned()))
         })
         .collect()
 }

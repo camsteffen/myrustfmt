@@ -197,9 +197,11 @@ pub fn format_module_file_roots(
         };
         while let Some((path, relative)) = queue.pop_front() {
             let submodules = format_module_file(&path, relative, &config, &mut on_format_module)?;
-            queue.extend(submodules.into_iter().map(|submod| {
-                (submod.path, submod.relative)
-            }));
+            queue.extend(
+                submodules
+                    .into_iter()
+                    .map(|submod| (submod.path, submod.relative)),
+            );
         }
         if on_format_module.has_errors {
             return Err(());

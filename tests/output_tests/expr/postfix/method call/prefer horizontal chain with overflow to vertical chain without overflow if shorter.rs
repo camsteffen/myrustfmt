@@ -1,16 +1,17 @@
 // test-kind: before-after
-// max-width: 33
+// max-width: 40
 
 fn test() {
     rooty
         .aaaa
-        .bbbb(a, b, c, || xyz);
+        .bbbb
+        .cccc(a, b, c, || xyz);
 }
 
 // :after:
 
 fn test() {
-    rooty.aaaa.bbbb(a, b, c, || {
+    rooty.aaaa.bbbb.cccc(a, b, c, || {
         xyz
     });
 }
