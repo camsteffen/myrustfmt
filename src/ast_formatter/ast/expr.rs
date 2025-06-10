@@ -370,7 +370,10 @@ impl AstFormatter {
                 Ok(())
             };
 
-            self.backtrack().next_opt(single_line).next(multi_line).result()
+            self.backtrack()
+                .next_opt(single_line)
+                .next(multi_line)
+                .result()
         })
     }
 

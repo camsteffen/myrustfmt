@@ -103,6 +103,7 @@ impl AstFormatter {
     ) -> FormatResult {
         let checkpoint = self.out.checkpoint();
 
+        // todo do horizontal args on-demand as the result is needed below
         // First just try to format the method call horizontally.
         let horizontal_args_result = self.with_chain_width_limit(start_col, || {
             self.method_call(
@@ -120,11 +121,14 @@ impl AstFormatter {
                 let lookahead = self.out.capture_lookahead(&checkpoint);
                 Some((height, lookahead))
             }
-            Err(_) => {
-                // Horizontal args is not possible.
-                self.out.restore_checkpoint(&checkpoint);
-                None
-            }
+            Err(e) => match e.kind {
+                FormatErrorKind::UnsupportedSyntax => return Err(e),
+                FormatErrorKind::WidthLimitExceeded if method_call.args.is_empty() => return Err(e),
+                _ => {
+                    self.out.restore_checkpoint(&checkpoint);
+                    None
+                }
+            },
         };
 
         // We may or may not have been able to format the method call horizontally. Either way,

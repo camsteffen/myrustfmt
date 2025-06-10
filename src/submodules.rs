@@ -25,7 +25,10 @@ pub fn get_submodules(
     path: &Path,
     relative: Option<Ident>,
 ) -> Vec<Submodule> {
-    let dir = path.parent().expect("the file path should have a parent").to_path_buf();
+    let dir = path
+        .parent()
+        .expect("the file path should have a parent")
+        .to_path_buf();
     let mut visitor = SubmoduleVisitor {
         psess,
         dir,

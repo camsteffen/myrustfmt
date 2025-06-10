@@ -85,7 +85,9 @@ pub enum ParseError {
 }
 
 pub fn error_formatting_at(source: &str, pos: BytePos, path: Option<&Path>) -> String {
-    let path_str = path.map(|p| format!("{}:", p.display())).unwrap_or_default();
+    let path_str = path
+        .map(|p| format!("{}:", p.display()))
+        .unwrap_or_default();
     let (line, col) = line_col(source, pos);
     format!("Error formatting at {path_str}{line}:{col}")
 }
