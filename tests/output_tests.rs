@@ -63,9 +63,9 @@ fn parse_test_header(string: &str) -> TestResult<(TestKindRaw, Option<u16>, &str
             return Err("expected a leading space in header comment".into());
         };
         let comment = comment.strip_suffix('\n').unwrap();
-        let (name, value) = comment.split_once(": ").ok_or(
-            "expected \": \" in header comment",
-        )?;
+        let (name, value) = comment
+            .split_once(": ")
+            .ok_or("expected \": \" in header comment")?;
         match name {
             "max-width" => {
                 max_width = Some(value.parse().map_err(|_| "invalid max-width value")?);
@@ -356,7 +356,8 @@ fn expect_formatted_equals(formatted: &str, expected: &str, name: &str) -> TestR
     }
     print_diff(expected, formatted);
     Err(
-        format!("\"{name}\" formatted does not match expected").into(),
+        format!("\"{name}\" formatted does not match expected")
+            .into(),
     )
 }
 

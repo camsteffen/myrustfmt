@@ -144,9 +144,8 @@ impl AstFormatter {
                     af.tail(tail)?;
                     Ok(())
                 },
-                ListOptions::new().single_line_max_contents_width(
-                    RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width,
-                ),
+                ListOptions::new()
+                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
             )?,
             ast::MetaItemKind::NameValue(lit) => {
                 self.out.space_token_space("=")?;

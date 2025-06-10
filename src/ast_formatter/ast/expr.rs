@@ -204,9 +204,8 @@ impl AstFormatter {
             .tail(tail);
         let is_only_closure = args.len() == 1 && matches!(args[0].kind, ast::ExprKind::Closure(_));
         if !is_only_closure {
-            list_opt = list_opt.single_line_max_contents_width(
-                RUSTFMT_CONFIG_DEFAULTS.fn_call_width,
-            );
+            list_opt = list_opt
+                .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
         }
         self.list(
             Braces::Parens,

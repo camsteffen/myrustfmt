@@ -31,10 +31,9 @@ impl AstFormatter {
         self.indented(|| {
             self.out.newline(VerticalWhitespaceMode::Top)?;
             self.out.indent();
-            self.constraints().disallowed_vstructs.with_replaced(
-                VStructSet::new(),
-                contents,
-            )?;
+            self.constraints()
+                .disallowed_vstructs
+                .with_replaced(VStructSet::new(), contents)?;
             self.out.newline(VerticalWhitespaceMode::Bottom)?;
             Ok(())
         })?;

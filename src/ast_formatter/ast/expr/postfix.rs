@@ -151,8 +151,8 @@ impl AstFormatter {
                     self.out.restore_checkpoint(&checkpoint);
                     self.out.restore_lookahead(horizontal_args_lookahead);
                 } else {
-                    let vertical_args_height = (1 + method_call.args.len()) as VSize;
-                    if vertical_chain_height < vertical_args_height {
+                    let vertical_args_height = (2 + method_call.args.len()) as VSize;
+                    if vertical_chain_height <= vertical_args_height {
                         return Err(FormatErrorKind::Logical.into());
                     }
                     // Use a horizontal chain with vertical method call arguments.
@@ -217,9 +217,9 @@ impl AstFormatter {
         start_col: HSize,
         format: impl Fn() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        let limit = self.has_chain_width_limit(start_col).then_some(
-            POSTFIX_CHAIN_MAX_WIDTH,
-        );
+        let limit = self
+            .has_chain_width_limit(start_col)
+            .then_some(POSTFIX_CHAIN_MAX_WIDTH);
         self.with_width_limit_from_start_opt(start_col, limit, format)
     }
 

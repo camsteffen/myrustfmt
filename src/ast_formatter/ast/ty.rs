@@ -70,9 +70,9 @@ impl AstFormatter {
                 Braces::Parens,
                 elements,
                 |af, ty, tail, _lcx| af.ty_tail(ty, tail),
-                ListOptions::new().force_trailing_comma(elements.len() == 1).tail(
-                    take_tail(),
-                ),
+                ListOptions::new()
+                    .force_trailing_comma(elements.len() == 1)
+                    .tail(take_tail()),
             )?,
             ast::TyKind::Typeof(anon_const) => self.expr(&anon_const.value)?,
             ast::TyKind::Pat(..) | ast::TyKind::PinnedRef(..) | ast::TyKind::UnsafeBinder(..) => {

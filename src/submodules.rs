@@ -118,10 +118,9 @@ impl SubmoduleVisitor<'_> {
     fn mod_error(&self, error: ModError) -> ! {
         match error {
             ModError::FileNotFound(ident, _default_path, _secondary_path) => {
-                self.psess.dcx().span_err(
-                    ident.span,
-                    "file not found for module",
-                );
+                self.psess
+                    .dcx()
+                    .span_err(ident.span, "file not found for module");
                 todo!();
             }
             ModError::MultipleCandidates(ident, default_path, secondary_path) => {

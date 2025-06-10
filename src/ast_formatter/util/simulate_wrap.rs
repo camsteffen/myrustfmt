@@ -47,10 +47,10 @@ impl AstFormatter {
                 Some(extra_width) => {
                     let max_width = self.constraints().max_width.get();
                     let max_width_extra = max_width.saturating_add(extra_width);
-                    let result = self.constraints().max_width.with_replaced(
-                        max_width_extra,
-                        with_single_line_and_no_width_limit,
-                    );
+                    let result = self
+                        .constraints()
+                        .max_width
+                        .with_replaced(max_width_extra, with_single_line_and_no_width_limit);
                     let used_extra_width = self.out.col() > max_width;
                     (result, used_extra_width)
                 }
