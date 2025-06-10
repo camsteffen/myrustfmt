@@ -73,20 +73,23 @@ impl AstFormatter {
     ) -> FormatResult {
         let wrappable_items = chain.len();
         let (last, before_last) = chain.split_last().unwrap();
-        let ast::ExprKind::MethodCall(method_call) = &last.root_or_dot_item.kind else {
-            // this chain is not overflowable, so simply format it on one line
-            self.with_single_line(|| self.postfix_items(chain, start_col))?;
-            self.tail(tail)?;
-            return Ok(());
-        };
-        self.with_single_line(|| self.postfix_items(before_last, start_col))?;
-        self.postfix_chain_horizontal_last_method_call(
-            last,
-            method_call,
-            start_col,
-            wrappable_items,
-            tail,
-        )?;
+        match &last.root_or_dot_item.kind {
+            ast::ExprKind::MethodCall(method_call) => {
+                self.with_single_line(|| self.postfix_items(before_last, start_col))?;
+                self.postfix_chain_horizontal_last_method_call(
+                    last,
+                    method_call,
+                    start_col,
+                    wrappable_items,
+                    tail,
+                )?;
+            }
+            // other postfix expression kinds are not overflowable
+            _ => {
+                self.with_single_line(|| self.postfix_items(chain, start_col))?;
+                self.tail(tail)?;
+            }
+        }
         Ok(())
     }
 
@@ -132,6 +135,9 @@ impl AstFormatter {
             )
         })?;
 
+        // This is a very complex decision tree! One unifying theme is that vertical chains are
+        // preferred when they do not increase the overall height. The principle is to prefer
+        // splitting outer structures over inner structures.
         match wrap_result {
             // If it fits in one line normally, we should have early returned above.
             SimulateWrapResult::Ok => {
