@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::WidthLimit;
+use crate::constraints::{VStructSet, WidthLimit};
 use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
 
@@ -25,6 +25,7 @@ pub struct TailS<'a> {
     // todo would it be better to explicitly capture and apply constraints where needed?
     // todo what about RecoverableConstraints?
     // todo what about disallowed vstructs?
+    disallowed_vstructs: VStructSet,
     single_line: bool,
     width_limit: Option<WidthLimit>,
 }
@@ -44,6 +45,7 @@ impl AstFormatter {
     ) -> TailS<'a> {
         TailS {
             func: Box::new(tail),
+            disallowed_vstructs: self.constraints().disallowed_vstructs.get(),
             single_line: self.constraints().single_line.get(),
             width_limit: self.constraints().width_limit.get(),
         }
@@ -61,10 +63,12 @@ impl AstFormatter {
 impl AstFormatter {
     pub fn tail(&self, tail: Tail) -> FormatResult {
         let Some(tail) = tail else { return Ok(()) };
-        self.constraints()
-            .single_line
-            .with_replaced(tail.single_line, || {
-                self.with_replace_width_limit(tail.width_limit, || (tail.func)(self))
-            })
+        self.constraints().disallowed_vstructs.with_replaced(tail.disallowed_vstructs, || {
+            self.constraints()
+                .single_line
+                .with_replaced(tail.single_line, || {
+                    self.with_replace_width_limit(tail.width_limit, || (tail.func)(self))
+                })
+        })
     }
 }

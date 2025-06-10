@@ -19,7 +19,8 @@ impl AstFormatter {
             params,
             Self::generic_param,
             ListOptions::new(),
-        )
+        )?;
+        Ok(())
     }
 
     // todo breakpoints

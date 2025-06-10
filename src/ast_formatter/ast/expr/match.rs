@@ -105,12 +105,7 @@ impl AstFormatter {
 
     fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
         let checkpoint = self.out.checkpoint();
-        let (force_block, lookahead) = match self.simulate_wrap_indent(true, || self.expr(body)) {
-            SimulateWrapResult::Wrap { single_line } => (
-                true,
-                single_line.then(|| self.out.capture_lookahead(&checkpoint)),
-            ),
-            SimulateWrapResult::NoWrap => (false, None),
+        let (force_block, lookahead) = match self.simulate_wrap_indent(|| self.expr(body)) {
             SimulateWrapResult::Ok => {
                 if self
                     .out
@@ -122,6 +117,9 @@ impl AstFormatter {
                     return Ok(());
                 }
             }
+            SimulateWrapResult::NoWrap => (false, None),
+            SimulateWrapResult::WrapForLongerFirstLine | SimulateWrapResult::WrapForLessExcessWidth => (true, None),
+            SimulateWrapResult::WrapForSingleLine => (true, Some(self.out.capture_lookahead(&checkpoint))),
         };
         let initial_restore = lookahead.is_none();
         self.backtrack()

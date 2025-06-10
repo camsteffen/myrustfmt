@@ -14,13 +14,11 @@ impl AstFormatter {
             (true, None)
         } else {
             let checkpoint_after_space = self.out.checkpoint();
-            match self.simulate_wrap_indent(false, || self.expr_tail(expr, tail)) {
+            match self.simulate_wrap_indent(|| self.expr_tail(expr, tail)) {
                 SimulateWrapResult::Ok => return Ok(()),
-                SimulateWrapResult::NoWrap => (false, None),
-                SimulateWrapResult::Wrap { single_line } => (
-                    true,
-                    single_line.then(|| self.out.capture_lookahead(&checkpoint_after_space)),
-                ),
+                SimulateWrapResult::NoWrap | SimulateWrapResult::WrapForLongerFirstLine => (false, None),
+                SimulateWrapResult::WrapForLessExcessWidth => (true, None),
+                SimulateWrapResult::WrapForSingleLine => (true, Some(self.out.capture_lookahead(&checkpoint_after_space))),
             }
         };
 

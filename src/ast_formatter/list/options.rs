@@ -8,6 +8,7 @@ pub enum ListShape {
     Flexible,
     FlexibleWithOverflow,
     Horizontal,
+    HorizontalWithOverflow,
     Vertical,
 }
 

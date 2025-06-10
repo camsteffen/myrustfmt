@@ -7,7 +7,7 @@ use std::num::NonZero;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Constraints {
-    pub disallowed_vstructs: Cell<EnumSet<VStruct>>,
+    pub disallowed_vstructs: Cell<VStructSet>,
     // max_width and width_limit are very similar in effect, but they need to be separate values for
     // a couple of reasons:
     //  1. width_limit can fall out of scope, and then the max_width is used as a fallback.
@@ -31,6 +31,8 @@ pub struct WidthLimit {
     pub end_col: NonZero<HSize>,
     pub line: VSize,
 }
+
+pub type VStructSet = EnumSet<VStruct>;
 
 /// "Vertical structures". Various formatting shapes that may be disallowed in certain contexts and
 /// formatting strategies. It's "vertical" because this describes shapes that span multiple lines.
@@ -61,7 +63,7 @@ pub enum VStruct {
 impl Constraints {
     pub fn new(max_width: HSize) -> Constraints {
         Constraints {
-            disallowed_vstructs: Cell::new(EnumSet::empty()),
+            disallowed_vstructs: Cell::new(VStructSet::empty()),
             max_width: Cell::new(max_width),
             recover_width: Cell::new(None),
             single_line: Cell::new(false),
@@ -81,7 +83,7 @@ impl Constraints {
 
     pub fn allow_vstructs(
         &self,
-        values: impl Into<EnumSet<VStruct>>,
+        values: impl Into<VStructSet>,
         scope: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
         let mut next = self.disallowed_vstructs.get();
@@ -91,7 +93,7 @@ impl Constraints {
 
     pub fn disallow_vstructs(
         &self,
-        values: impl Into<EnumSet<VStruct>>,
+        values: impl Into<VStructSet>,
         scope: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
         let mut next = self.disallowed_vstructs.get();

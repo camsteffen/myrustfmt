@@ -390,13 +390,13 @@ impl AstFormatter {
                             RUSTFMT_CONFIG_DEFAULTS.struct_variant_width,
                         ),
                 )?;
-                Ok(())
             }
             ast::VariantData::Tuple(fields, _) => {
-                self.list(Braces::Parens, fields, Self::field_def, ListOptions::new())
+                self.list(Braces::Parens, fields, Self::field_def, ListOptions::new())?
             }
-            ast::VariantData::Unit(_) => Ok(()),
+            ast::VariantData::Unit(_) => {}
         }
+        Ok(())
     }
 
     fn field_def(&self, field: &ast::FieldDef, tail: Tail, _lcx: ListItemContext) -> FormatResult {

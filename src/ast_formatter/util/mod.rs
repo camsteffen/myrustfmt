@@ -3,6 +3,7 @@ pub mod ast;
 mod constraint_effects;
 pub mod debug;
 mod enclosed;
+// mod expr_size_hint;
 mod indent;
 mod infix;
 pub mod simulate_wrap;

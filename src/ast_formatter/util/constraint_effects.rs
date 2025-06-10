@@ -1,9 +1,8 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::{Constraints, VStruct, WidthLimit};
+use crate::constraints::{Constraints, VStruct, VStructSet, WidthLimit};
 use crate::error::{FormatResult, WidthLimitExceededError};
 use crate::num::HSize;
 use crate::util::cell_ext::CellExt;
-use enumset::EnumSet;
 use std::num::NonZero;
 
 macro_rules! delegate_to_constraints {
@@ -20,8 +19,8 @@ delegate_to_constraints! {
     pub fn with_replace_width_limit<T>(&self, width_limit: Option<WidthLimit>, scope: impl FnOnce() -> T) -> T;
 
     // vertical structures
-    pub fn allow_vstructs(&self, values: impl Into<EnumSet<VStruct>>, scope: impl FnOnce() -> FormatResult) -> FormatResult;
-    pub fn disallow_vstructs(&self, values: impl Into<EnumSet<VStruct>>, scope: impl FnOnce() -> FormatResult) -> FormatResult;
+    pub fn allow_vstructs(&self, values: impl Into<VStructSet>, scope: impl FnOnce() -> FormatResult) -> FormatResult;
+    pub fn disallow_vstructs(&self, values: impl Into<VStructSet>, scope: impl FnOnce() -> FormatResult) -> FormatResult;
     pub fn has_vstruct<T>(&self, vstruct: VStruct, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
 }
 

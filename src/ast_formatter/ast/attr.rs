@@ -133,20 +133,22 @@ impl AstFormatter {
         self.path(&meta.path, false)?;
         match &meta.kind {
             ast::MetaItemKind::Word => {}
-            ast::MetaItemKind::List(items) => self.list(
-                Braces::Parens,
-                items,
-                |af, item, tail, _lcx| {
-                    match item {
-                        ast::MetaItemInner::MetaItem(item) => af.meta_item(item)?,
-                        ast::MetaItemInner::Lit(lit) => af.meta_item_lit(lit)?,
-                    }
-                    af.tail(tail)?;
-                    Ok(())
-                },
-                ListOptions::new()
-                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
-            )?,
+            ast::MetaItemKind::List(items) => {
+                self.list(
+                    Braces::Parens,
+                    items,
+                    |af, item, tail, _lcx| {
+                        match item {
+                            ast::MetaItemInner::MetaItem(item) => af.meta_item(item)?,
+                            ast::MetaItemInner::Lit(lit) => af.meta_item_lit(lit)?,
+                        }
+                        af.tail(tail)?;
+                        Ok(())
+                    },
+                    ListOptions::new()
+                        .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
+                )?
+            },
             ast::MetaItemKind::NameValue(lit) => {
                 self.out.space_token_space("=")?;
                 self.meta_item_lit(lit)?;

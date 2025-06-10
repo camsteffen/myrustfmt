@@ -4,17 +4,27 @@ use crate::util::cell_ext::CellExt;
 
 #[derive(Debug)]
 pub enum SimulateWrapResult {
+    /// The result may be used as-is. It fits in one line.
     Ok,
+    /// Wrapping does not provide any benefit
     NoWrap,
-    Wrap { single_line: bool },
+    /// Wrapping allows the code to fit in one line.
+    WrapForSingleLine,
+    /// Wrapping allows more code to fit in the first line, but it is multiple lines.
+    WrapForLongerFirstLine,
+    /// Wrapping exceeds the max width, but by a lesser amount.
+    WrapForLessExcessWidth,
 }
 
 impl AstFormatter {
     /// Format with this function when choosing between continuing on the same line or wrapping to
-    /// the next line and adding an indentation. It will format on the same line, but will increase
-    /// the max width by the amount of extra horizontal space that _would_ be gained by wrapping.
-    /// See [`SimulateWrapResult`] for all the possible outcomes.
+    /// the next line and adding an indentation (think "ENTER, TAB").
     /// 
+    /// This will _not_ add a newline or indent, but will increase the max width by the amount of
+    /// extra horizontal space that _would_ be gained by wrapping. It also will turn off any width
+    /// limit that is enabled for the current line. Finally, it uses single line mode to limit the
+    /// experiment to the first line.
+    ///
     /// N.B. This function relies on a subtle invariant that the given formatting scope will emit
     /// the entire first line except for trailing comments before returning a newline-related error
     /// when applicable.
@@ -25,15 +35,14 @@ impl AstFormatter {
     /// handled in the same way.
     pub fn simulate_wrap_indent(
         &self,
-        wrap_for_longer_first_line: bool,
         scope: impl FnOnce() -> FormatResult,
     ) -> SimulateWrapResult {
         let with_single_line_and_no_width_limit =
             || self.with_single_line(|| self.constraints().width_limit.with_replaced(None, scope));
-        self.out.with_recover_width(|| {
+        let (result, used_extra_width) = self.out.with_recover_width(|| {
             let col = self.out.col();
             let wrap_indent_col = self.out.total_indent.get() + INDENT_WIDTH;
-            let (result, used_extra_width) = match col.checked_sub(wrap_indent_col) {
+            match col.checked_sub(wrap_indent_col) {
                 None | Some(0) => {
                     let result = with_single_line_and_no_width_limit();
                     (result, false)
@@ -48,31 +57,31 @@ impl AstFormatter {
                     let used_extra_width = self.out.col() > max_width;
                     (result, used_extra_width)
                 }
-            };
-            let exceeded_width_limit = self
-                .constraints()
-                .width_limit
-                .get()
-                .is_some_and(|wl| wl.line == self.out.line() && self.out.col() > wl.end_col.get());
-            match (result, used_extra_width || exceeded_width_limit) {
-                // simple case - we can use the result as is
-                (Ok(()), false) => SimulateWrapResult::Ok,
-                // the output will fit in a single line if wrapped
-                // todo don't wrap for single line if it's a closure or block
-                (Ok(()), true) => SimulateWrapResult::Wrap { single_line: true },
-                // If we used extra width and still exceeded the max width or a width limit,
-                // wrapping is preferred in order to exceed the max width by a lesser amount.
-                // If we used extra width and encountered a newline-related error, we can infer that
-                // wrapping allows for more code to fit in the first line.
-                (Err(e), true)
-                    if e.kind == FormatErrorKind::WidthLimitExceeded
-                        || wrap_for_longer_first_line =>
-                    {
-                        SimulateWrapResult::Wrap { single_line: false }
-                    }
-                // In all other cases, we don't necessarily want to wrap
-                (Err(_), _) => SimulateWrapResult::NoWrap,
             }
-        })
+        });
+        let exceeded_width_limit = self
+            .constraints()
+            .width_limit
+            .get()
+            .is_some_and(|wl| wl.line == self.out.line() && self.out.col() > wl.end_col.get());
+        match result {
+            Ok(()) => {
+                if used_extra_width || exceeded_width_limit {
+                    SimulateWrapResult::WrapForSingleLine
+                } else {
+                    SimulateWrapResult::Ok
+                }
+            }
+            Err(err) => {
+                if err.kind == FormatErrorKind::WidthLimitExceeded {
+                    SimulateWrapResult::WrapForLessExcessWidth
+                } else if used_extra_width || exceeded_width_limit {
+                    // todo vertical error only
+                    SimulateWrapResult::WrapForLongerFirstLine
+                } else {
+                    SimulateWrapResult::NoWrap
+                }
+            }
+        }
     }
 }

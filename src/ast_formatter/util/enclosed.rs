@@ -2,13 +2,14 @@ use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
 use crate::whitespace::VerticalWhitespaceMode;
-use enumset::EnumSet;
+use crate::constraints::VStructSet;
 
 impl AstFormatter {
     pub fn enclosed_empty_after_opening(&self, closing_brace: &'static str) -> FormatResult {
         let first_line = self.out.line();
         self.indented(|| self.out.comments(VerticalWhitespaceMode::Break))?;
-        if self.out.line() != first_line {
+        let multi_line = self.out.line() != first_line;
+        if multi_line {
             self.out.indent();
         }
         self.out.token(closing_brace)?;
@@ -32,7 +33,7 @@ impl AstFormatter {
             self.out.indent();
             self.constraints()
                 .disallowed_vstructs
-                .with_replaced(EnumSet::new(), contents)?;
+                .with_replaced(VStructSet::new(), contents)?;
             self.out.newline(VerticalWhitespaceMode::Bottom)?;
             Ok(())
         })?;

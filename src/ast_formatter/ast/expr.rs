@@ -186,16 +186,16 @@ impl AstFormatter {
         let first_line = self.out.line();
         self.expr_tail(func, self.tail_token("(").as_ref())?;
         self.has_vstruct_if(self.out.line() > first_line, VStruct::NonBlockIndent, || {
-            self.call_args_after_open_paren(args, tail)
+            self.call_args_after_open_paren(args, ListShape::FlexibleWithOverflow, tail)
         })?;
         Ok(())
     }
 
-    pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
+    pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], list_shape: ListShape, tail: Tail) -> FormatResult {
         let mut list_opt = ListOptions::<P<ast::Expr>>::new()
             .item_prefers_overflow(|expr| matches!(expr.kind, ast::ExprKind::Closure(_)))
             .omit_open_brace()
-            .shape(ListShape::FlexibleWithOverflow)
+            .shape(list_shape)
             .tail(tail);
         let is_only_closure = args.len() == 1 && matches!(args[0].kind, ast::ExprKind::Closure(_));
         if !is_only_closure {
@@ -219,7 +219,8 @@ impl AstFormatter {
                 Ok(())
             },
             list_opt,
-        )
+        )?;
+        Ok(())
     }
 
     fn cast(&self, target: &ast::Expr, ty: &ast::Ty, tail: Tail) -> FormatResult {

@@ -63,21 +63,25 @@ impl AstFormatter {
                 self.pat(pat)?;
             }
             ast::PatKind::Rest => self.out.token("..")?,
-            ast::PatKind::Slice(ref elements) => self.list(
-                Braces::Square,
-                elements,
-                Self::pat_list_item,
-                ListOptions::new().tail(take_tail()),
-            )?,
+            ast::PatKind::Slice(ref elements) => {
+                self.list(
+                    Braces::Square,
+                    elements,
+                    Self::pat_list_item,
+                    ListOptions::new().tail(take_tail()),
+                )?
+            },
             ast::PatKind::Struct(ref qself, ref path, ref fields, rest) => {
                 self.struct_pat(qself, path, fields, rest, take_tail())?
             }
-            ast::PatKind::Tuple(ref fields) => self.list(
-                Braces::Parens,
-                fields,
-                Self::pat_list_item,
-                ListOptions::new().tail(take_tail()),
-            )?,
+            ast::PatKind::Tuple(ref fields) => {
+                self.list(
+                    Braces::Parens,
+                    fields,
+                    Self::pat_list_item,
+                    ListOptions::new().tail(take_tail()),
+                )?
+            },
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 // todo tail?
                 self.qpath(qself, path, false, None)?;
@@ -126,7 +130,8 @@ impl AstFormatter {
                 .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
                 .rest(ListRest::from_pat_fields_rest(rest))
                 .tail(tail),
-        )
+        )?;
+        Ok(())
     }
 
     fn pat_field(
