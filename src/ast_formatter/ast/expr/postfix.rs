@@ -144,7 +144,7 @@ impl AstFormatter {
                 let vertical_chain_height = 1 + wrappable_items as VSize;
                 if let Some((horizontal_args_height, horizontal_args_lookahead)) = horizontal_args {
                     if vertical_chain_height <= horizontal_args_height {
-                        // A vertical chain is shorter than a horizontal chain with overflow
+                        // A vertical chain is at least as short as a horizontal chain with overflow
                         return Err(FormatErrorKind::Logical.into());
                     }
                     // Use a horizontal chain with horizontal method call arguments with overflow
@@ -175,9 +175,10 @@ impl AstFormatter {
 
             // We have a choice between vertical method call arguments or a vertical chain.
             // The last method call argument overflows in either case, and the indentation level
-            // within the overflow is the same. A vertical chain is preferred if it is shorter.
+            // within the overflow is the same. A vertical chain is preferred if it is the same
+            // height or shorter.
             SimulateWrapResult::WrapForLongerFirstLine
-                if wrappable_items < method_call.args.len() + 1 =>
+                if wrappable_items <= method_call.args.len() + 1 =>
             {
                 return Err(FormatErrorKind::Logical.into());
             }

@@ -1,7 +1,7 @@
 // test-kind: breakpoint
 
 fn test() {
-    one.two.three.four.five(a, || {
+    one.two.three.four.five.six(a, || {
         x;
     });
 }
@@ -9,7 +9,7 @@ fn test() {
 // :after:
 
 fn test() {
-    one.two.three.four.five(
+    one.two.three.four.five.six(
         a,
         || {
             x;

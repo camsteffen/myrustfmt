@@ -1,7 +1,7 @@
 // test-kind: breakpoint
 
 fn test() {
-    fooooooooooooo.bbbbbbbbbbbbbbbbbbbb.cccccccccccccccc(
+    fooooooooooooo.bbbbbbbbbbbbbbbbbbbb.cccccccc.dddddddd(
         || match x {
             _ => {}
         },
@@ -13,7 +13,8 @@ fn test() {
 fn test() {
     fooooooooooooo
         .bbbbbbbbbbbbbbbbbbbb
-        .cccccccccccccccc(|| match x {
+        .cccccccc
+        .dddddddd(|| match x {
             _ => {}
         });
 }

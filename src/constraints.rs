@@ -118,8 +118,9 @@ impl Constraints {
         if self.single_line.get() || !self.disallowed_vstructs.get().contains(vstruct) {
             return scope();
         }
-        self.single_line.with_replaced(true, scope).map_err(
-            |mut err| {
+        self.single_line
+            .with_replaced(true, scope)
+            .map_err(|mut err| {
                 // todo test all cases - is ListOverflow needed?
                 if let FormatErrorKind::Vertical(cause) | FormatErrorKind::ListOverflow { cause } = err
                     .kind
@@ -127,8 +128,7 @@ impl Constraints {
                     err.kind = FormatErrorKind::VStruct { cause };
                 }
                 err
-            },
-        )
+            })
     }
 
     pub fn with_width_limit<T>(&self, width_limit: WidthLimit, scope: impl FnOnce() -> T) -> T {
