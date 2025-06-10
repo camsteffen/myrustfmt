@@ -3,10 +3,10 @@ mod list_item_context;
 pub mod options;
 mod rest;
 
-use std::cell::Cell;
 pub use self::braces::Braces;
 pub use self::list_item_context::{ListItemContext, ListStrategy};
 pub use self::rest::ListRest;
+use std::cell::Cell;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::options::{ListOptions, ListShape, ListWrapToFit};
@@ -63,13 +63,13 @@ where
                 ListShape::FlexibleWithOverflow => self.list_flexible(true)?,
                 ListShape::Horizontal => {
                     self.list_horizontal(false)?;
-                },
+                }
                 ListShape::HorizontalWithOverflow => {
                     self.list_horizontal(true)?;
-                },
+                }
                 ListShape::Vertical => {
                     self.list_vertical()?;
-                },
+                }
             };
             Ok(())
         })
@@ -78,26 +78,20 @@ where
     fn list_flexible(&self, overflow: bool) -> FormatResult {
         let checkpoint = self.af.out.checkpoint();
         let wrap_to_fit_or_vertical = || {
-            self
-                .af
+            self.af
                 .backtrack()
                 .next_opt(self.list_wrap_to_fit_fn_opt())
                 .next(|| self.list_vertical())
                 .result_with_checkpoint(&checkpoint, true)?;
             Ok(())
         };
-        if self
-            .opt
-            .item_requires_own_line
-            .as_ref()
-            .is_some_and(|f| self.list.iter().any(f))
-        {
+        if self.opt.item_requires_own_line.as_ref().is_some_and(|f| {
+            self.list.iter().any(f)
+        }) {
             return wrap_to_fit_or_vertical();
         }
-        
-        let horizontal_result = self.af.out.with_recover_width(|| 
-            self.list_horizontal(overflow)
-        );
+
+        let horizontal_result = self.af.out.with_recover_width(|| self.list_horizontal(overflow));
 
         let horizontal_height = match horizontal_result {
             Ok(1) => return Ok(()),
@@ -108,27 +102,23 @@ where
                 // Horizontal formatting would have succeeded if single line mode were not enabled.
                 return Err(e);
             }
-            Err(_) => {
-                return wrap_to_fit_or_vertical()
-            }
+            Err(_) => return wrap_to_fit_or_vertical(),
         };
 
         if self.opt.rest.is_none()
-            && self
-                .opt
-                .item_prefers_overflow
-                .as_ref()
-                .is_some_and(|f| f(self.list.last().unwrap()))
+            && self.opt.item_prefers_overflow.as_ref().is_some_and(|f| {
+                f(self.list.last().unwrap())
+            })
         {
             return Ok(());
         }
 
         // todo don't lookahead if there isn't any width gained by wrapping
         let horizontal_lookahead = self.af.out.capture_lookahead(&checkpoint);
-        let vertical_result = self.af.out.with_recover_width(|| -> FormatResult<_> {
-            self.list_vertical()
-        });
-        let use_vertical = vertical_result.is_ok_and(|height| height <= horizontal_height);
+        let vertical_result =
+            self.af.out.with_recover_width(|| -> FormatResult<_> { self.list_vertical() });
+        let use_vertical = vertical_result
+            .is_ok_and(|height| height <= horizontal_height);
         if !use_vertical {
             self.af.out.restore_checkpoint(&checkpoint);
             self.af.out.restore_lookahead(horizontal_lookahead);
@@ -295,10 +285,9 @@ where
                     Ok(())
                 };
                 let is_own_line = prev_must_have_own_line
-                    || opt
-                        .item_requires_own_line
-                        .as_ref()
-                        .is_some_and(|f| f(&list[index]));
+                    || opt.item_requires_own_line.as_ref().is_some_and(|f| {
+                        f(&list[index])
+                    });
                 if is_own_line {
                     prev_must_have_own_line = !prev_must_have_own_line;
                 }

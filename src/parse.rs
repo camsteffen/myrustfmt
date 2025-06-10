@@ -64,8 +64,9 @@ pub fn parse_module(
         };
     }
 
-    let source_file = Arc::into_inner(source_file)
-        .expect("should have a unique reference to the SourceFile");
+    let source_file = Arc::into_inner(source_file).expect(
+        "should have a unique reference to the SourceFile",
+    );
 
     Ok(ParseModuleResult {
         module,

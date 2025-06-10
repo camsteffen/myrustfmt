@@ -43,11 +43,9 @@ enum Element<'a> {
 }
 
 fn iter(use_tree: &ast::UseTree) -> impl Iterator<Item = Element<'_>> {
-    let prefix = use_tree
-        .prefix
-        .segments
-        .iter()
-        .map(|s| Element::Segment(s.ident.name));
+    let prefix = use_tree.prefix.segments.iter().map(|s| {
+        Element::Segment(s.ident.name)
+    });
     prefix.chain(std::iter::once(()).filter_map(|()| match &use_tree.kind {
         ast::UseTreeKind::Simple(_) => None,
         ast::UseTreeKind::Glob => Some(Element::Glob),

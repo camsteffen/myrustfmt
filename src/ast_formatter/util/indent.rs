@@ -14,9 +14,9 @@ impl IndentGuard<'_> {
 impl Drop for IndentGuard<'_> {
     fn drop(&mut self) {
         if !std::thread::panicking() {
-            self.out
-                .total_indent
-                .set(self.out.total_indent.get() - INDENT_WIDTH);
+            self.out.total_indent.set(
+                self.out.total_indent.get() - INDENT_WIDTH,
+            );
         }
     }
 }
@@ -34,9 +34,10 @@ impl AstFormatter {
     }
 
     pub fn deindented<T>(&self, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        self.out
-            .total_indent
-            .with_replaced(self.out.total_indent.get() - INDENT_WIDTH, scope)
+        self.out.total_indent.with_replaced(
+            self.out.total_indent.get() - INDENT_WIDTH,
+            scope,
+        )
     }
 
     pub fn indented_optional(

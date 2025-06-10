@@ -54,9 +54,9 @@ impl ConstraintWriter {
 
     // todo make sure any math using two values of this are guaranteed to be on the same line
     pub fn col(&self) -> HSize {
-        (self.len() - self.last_line_start.get())
-            .try_into()
-            .expect("line length exceeds HSize::MAX")
+        (self.len() - self.last_line_start.get()).try_into().expect(
+            "line length exceeds HSize::MAX",
+        )
     }
 
     pub fn line_col(&self) -> (VSize, HSize) {
@@ -64,18 +64,16 @@ impl ConstraintWriter {
     }
 
     pub fn with_recover_width<T>(&self, scope: impl FnOnce() -> T) -> T {
-        self.constraints()
-            .recover_width
-            .with_replaced(Some(self.line()), scope)
+        self.constraints().recover_width.with_replaced(
+            Some(self.line()),
+            scope,
+        )
     }
 
     pub fn is_enforcing_width(&self) -> bool {
-        if self
-            .constraints
-            .width_limit
-            .get()
-            .is_some_and(|limit| limit.line == self.line())
-        {
+        if self.constraints.width_limit.get().is_some_and(|limit| {
+            limit.line == self.line()
+        }) {
             return true;
         }
         if self.constraints.recover_width.get() == Some(self.line()) {
@@ -138,9 +136,9 @@ impl ConstraintWriter {
     }
 
     pub fn remaining_width(&self) -> Result<HSize, WidthLimitExceededError> {
-        self.end_col()
-            .checked_sub(self.col().try_into().unwrap())
-            .ok_or(WidthLimitExceededError)
+        self.end_col().checked_sub(self.col().try_into().unwrap()).ok_or(
+            WidthLimitExceededError,
+        )
     }
 
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T {

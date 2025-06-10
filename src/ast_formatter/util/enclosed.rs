@@ -1,8 +1,8 @@
 use crate::ast_formatter::AstFormatter;
+use crate::constraints::VStructSet;
 use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
 use crate::whitespace::VerticalWhitespaceMode;
-use crate::constraints::VStructSet;
 
 impl AstFormatter {
     pub fn enclosed_empty_after_opening(&self, closing_brace: &'static str) -> FormatResult {
@@ -31,9 +31,10 @@ impl AstFormatter {
         self.indented(|| {
             self.out.newline(VerticalWhitespaceMode::Top)?;
             self.out.indent();
-            self.constraints()
-                .disallowed_vstructs
-                .with_replaced(VStructSet::new(), contents)?;
+            self.constraints().disallowed_vstructs.with_replaced(
+                VStructSet::new(),
+                contents,
+            )?;
             self.out.newline(VerticalWhitespaceMode::Bottom)?;
             Ok(())
         })?;

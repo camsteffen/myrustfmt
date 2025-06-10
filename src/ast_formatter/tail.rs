@@ -63,12 +63,14 @@ impl AstFormatter {
 impl AstFormatter {
     pub fn tail(&self, tail: Tail) -> FormatResult {
         let Some(tail) = tail else { return Ok(()) };
-        self.constraints().disallowed_vstructs.with_replaced(tail.disallowed_vstructs, || {
-            self.constraints()
-                .single_line
-                .with_replaced(tail.single_line, || {
-                    self.with_replace_width_limit(tail.width_limit, || (tail.func)(self))
-                })
-        })
+        self.constraints()
+            .disallowed_vstructs
+            .with_replaced(tail.disallowed_vstructs, || {
+                self.constraints()
+                    .single_line
+                    .with_replaced(tail.single_line, || {
+                        self.with_replace_width_limit(tail.width_limit, || (tail.func)(self))
+                    })
+            })
     }
 }

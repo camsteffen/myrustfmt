@@ -43,9 +43,9 @@ impl AstFormatter {
     }
 
     pub fn with_single_line<T>(&self, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        self.constraints()
-            .single_line
-            .with_replaced(true, || self.out.with_recover_width(scope))
+        self.constraints().single_line.with_replaced(true, || {
+            self.out.with_recover_width(scope)
+        })
     }
 
     pub fn with_single_line_if<T>(

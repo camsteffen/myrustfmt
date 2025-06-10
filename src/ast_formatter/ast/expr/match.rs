@@ -118,8 +118,11 @@ impl AstFormatter {
                 }
             }
             SimulateWrapResult::NoWrap => (false, None),
-            SimulateWrapResult::WrapForLongerFirstLine | SimulateWrapResult::WrapForLessExcessWidth => (true, None),
-            SimulateWrapResult::WrapForSingleLine => (true, Some(self.out.capture_lookahead(&checkpoint))),
+            SimulateWrapResult::WrapForSingleLine => {
+                (true, Some(self.out.capture_lookahead(&checkpoint)))
+            }
+            SimulateWrapResult::WrapForLongerFirstLine
+            | SimulateWrapResult::WrapForLessExcessWidth => (true, None),
         };
         let initial_restore = lookahead.is_none();
         self.backtrack()

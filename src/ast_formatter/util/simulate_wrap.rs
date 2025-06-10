@@ -33,10 +33,7 @@ impl AstFormatter {
     /// for a different formatting strategy with more code on the first line, or the extra width was
     /// strictly required to fit the code at all. This function is useful when these two cases are
     /// handled in the same way.
-    pub fn simulate_wrap_indent(
-        &self,
-        scope: impl FnOnce() -> FormatResult,
-    ) -> SimulateWrapResult {
+    pub fn simulate_wrap_indent(&self, scope: impl FnOnce() -> FormatResult) -> SimulateWrapResult {
         let with_single_line_and_no_width_limit =
             || self.with_single_line(|| self.constraints().width_limit.with_replaced(None, scope));
         let (result, used_extra_width) = self.out.with_recover_width(|| {
@@ -50,20 +47,18 @@ impl AstFormatter {
                 Some(extra_width) => {
                     let max_width = self.constraints().max_width.get();
                     let max_width_extra = max_width.saturating_add(extra_width);
-                    let result = self
-                        .constraints()
-                        .max_width
-                        .with_replaced(max_width_extra, with_single_line_and_no_width_limit);
+                    let result = self.constraints().max_width.with_replaced(
+                        max_width_extra,
+                        with_single_line_and_no_width_limit,
+                    );
                     let used_extra_width = self.out.col() > max_width;
                     (result, used_extra_width)
                 }
             }
         });
-        let exceeded_width_limit = self
-            .constraints()
-            .width_limit
-            .get()
-            .is_some_and(|wl| wl.line == self.out.line() && self.out.col() > wl.end_col.get());
+        let exceeded_width_limit = self.constraints().width_limit.get().is_some_and(|wl| {
+            wl.line == self.out.line() && self.out.col() > wl.end_col.get()
+        });
         match result {
             Ok(()) => {
                 if used_extra_width || exceeded_width_limit {

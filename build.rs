@@ -39,10 +39,7 @@ fn channel() -> String {
 }
 
 fn commit_hash() -> Option<String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .output()
-        .ok()?;
+    let output = Command::new("git").args(["rev-parse", "HEAD"]).output().ok()?;
     let mut stdout = output.status.success().then_some(output.stdout)?;
     stdout.truncate(10);
     String::from_utf8(stdout).ok()

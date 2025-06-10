@@ -13,9 +13,9 @@ pub fn version_sort(a: &str, b: &str) -> Ordering {
             let mut chars = remaining.chars();
             let is_digit = chars.next()?.is_ascii_digit();
             let after_first = chars.as_str();
-            let end = after_first
-                .find(|c: char| c.is_ascii_digit() != is_digit)
-                .unwrap_or(after_first.len());
+            let end = after_first.find(|c: char| c.is_ascii_digit() != is_digit).unwrap_or(
+                after_first.len(),
+            );
             let len = remaining.len() - after_first.len() + end;
             let chunk_str;
             (chunk_str, remaining) = remaining.split_at(len);

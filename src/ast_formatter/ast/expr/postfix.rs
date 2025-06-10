@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use crate::ast_formatter::list::options::ListShape;
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
@@ -8,7 +8,7 @@ use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::{HSize, VSize};
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
-use crate::ast_formatter::list::options::ListShape;
+use std::cell::Cell;
 
 // In rustfmt, this is called chain_width, and is 60 by default
 const POSTFIX_CHAIN_MAX_WIDTH: HSize = 60;
@@ -80,7 +80,13 @@ impl AstFormatter {
             return Ok(());
         };
         self.with_single_line(|| self.postfix_items(before_last, start_col))?;
-        self.postfix_chain_horizontal_last_method_call(last, method_call, start_col, wrappable_items, tail)?;
+        self.postfix_chain_horizontal_last_method_call(
+            last,
+            method_call,
+            start_col,
+            wrappable_items,
+            tail,
+        )?;
         Ok(())
     }
 
@@ -96,7 +102,12 @@ impl AstFormatter {
 
         // First just try to format the method call horizontally.
         let horizontal_args_result = self.with_chain_width_limit(start_col, || {
-            self.method_call(method_call, ListShape::HorizontalWithOverflow, overflowable, tail)
+            self.method_call(
+                method_call,
+                ListShape::HorizontalWithOverflow,
+                overflowable,
+                tail,
+            )
         });
         let horizontal_args = match horizontal_args_result {
             // If it fits in one line, we're done!
@@ -110,7 +121,7 @@ impl AstFormatter {
                 // Horizontal args is not possible.
                 self.out.restore_checkpoint(&checkpoint);
                 None
-            },
+            }
         };
 
         // We may or may not have been able to format the method call horizontally. Either way,
@@ -123,8 +134,10 @@ impl AstFormatter {
 
         match wrap_result {
             // If it fits in one line normally, we should have early returned above.
-            SimulateWrapResult::Ok => panic!("chain simulate_wrap_indent should not fit in one line"),
-            
+            SimulateWrapResult::Ok => {
+                panic!("chain simulate_wrap_indent should not fit in one line")
+            }
+
             // The method call fits in one line if we format the chain vertically
             SimulateWrapResult::WrapForSingleLine => {
                 // At this point we can calculate the height of a vertical chain
@@ -132,7 +145,7 @@ impl AstFormatter {
                 if let Some((horizontal_args_height, horizontal_args_lookahead)) = horizontal_args {
                     if vertical_chain_height < horizontal_args_height {
                         // A vertical chain is shorter than a horizontal chain with overflow
-                        return Err(FormatErrorKind::Logical.into())
+                        return Err(FormatErrorKind::Logical.into());
                     }
                     // Use a horizontal chain with horizontal method call arguments with overflow
                     self.out.restore_checkpoint(&checkpoint);
@@ -140,31 +153,35 @@ impl AstFormatter {
                 } else {
                     let vertical_args_height = (1 + method_call.args.len()) as VSize;
                     if vertical_chain_height < vertical_args_height {
-                        return Err(FormatErrorKind::Logical.into())
+                        return Err(FormatErrorKind::Logical.into());
                     }
                     // Use a horizontal chain with vertical method call arguments.
                     self.out.restore_checkpoint(&checkpoint);
                     self.method_call(method_call, ListShape::Vertical, overflowable, tail)?;
                 }
             }
-            
+
             // No reason not to use horizontal method call arguments
             SimulateWrapResult::NoWrap
             // A longer first line in the overflow isn't enough to prefer a vertical chain when we
             // can do a horizontal chain with horizontal method call arguments. A vertical chain
             // would increase the indentation level of the overflowed content.
-            | SimulateWrapResult::WrapForLongerFirstLine if let Some((_, horizontal_args_lookahead)) = horizontal_args => {
+            | SimulateWrapResult::WrapForLongerFirstLine
+                if let Some((_, horizontal_args_lookahead)) = horizontal_args =>
+            {
                 self.out.restore_checkpoint(&checkpoint);
                 self.out.restore_lookahead(horizontal_args_lookahead);
             }
-            
+
             // We have a choice between vertical method call arguments or a vertical chain.
             // The last method call argument overflows in either case, and the indentation level
             // within the overflow is the same. A vertical chain is preferred if it is shorter.
-            SimulateWrapResult::WrapForLongerFirstLine if wrappable_items < method_call.args.len() + 1 =>{
-                return Err(FormatErrorKind::Logical.into())
+            SimulateWrapResult::WrapForLongerFirstLine
+                if wrappable_items < method_call.args.len() + 1 =>
+            {
+                return Err(FormatErrorKind::Logical.into());
             }
-            
+
             // We couldn't do horizontal method call arguments, but we can still try vertical, and
             // at this point we don't have any reason not to use it if possible.
             SimulateWrapResult::WrapForLongerFirstLine | SimulateWrapResult::NoWrap => {
@@ -173,7 +190,7 @@ impl AstFormatter {
                     self.method_call(method_call, ListShape::Vertical, overflowable, tail)
                 })?;
             }
-            
+
             // Use a vertical chain if it has less excess width.
             SimulateWrapResult::WrapForLessExcessWidth => {
                 return Err(FormatErrorKind::Logical.into())
@@ -200,9 +217,9 @@ impl AstFormatter {
         start_col: HSize,
         format: impl Fn() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        let limit = self
-            .has_chain_width_limit(start_col)
-            .then_some(POSTFIX_CHAIN_MAX_WIDTH);
+        let limit = self.has_chain_width_limit(start_col).then_some(
+            POSTFIX_CHAIN_MAX_WIDTH,
+        );
         self.with_width_limit_from_start_opt(start_col, limit, format)
     }
 
@@ -234,7 +251,13 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn method_call(&self, method_call: &ast::MethodCall, list_shape: ListShape, postfix_item: &PostfixItem, tail: Tail) -> FormatResult<VSize> {
+    fn method_call(
+        &self,
+        method_call: &ast::MethodCall,
+        list_shape: ListShape,
+        postfix_item: &PostfixItem,
+        tail: Tail,
+    ) -> FormatResult<VSize> {
         let first_line = self.out.line();
         let height = Cell::new(0);
         self.out.token(".")?;
@@ -247,15 +270,16 @@ impl AstFormatter {
             self.tail_fn(|af| {
                 height.set(af.out.line() - first_line + 1);
                 af.postfix_non_dot_items(&postfix_item.non_dot_items, tail)
-            }).as_ref(),
+            })
+            .as_ref(),
         )?;
         Ok(height.get())
     }
 
     fn postfix_items(&self, items: &[PostfixItem], start_col: HSize) -> FormatResult {
-        items
-            .iter()
-            .try_for_each(|item| self.with_chain_width_limit(start_col, || self.postfix_item(item)))
+        items.iter().try_for_each(|item| {
+            self.with_chain_width_limit(start_col, || self.postfix_item(item))
+        })
     }
 
     fn postfix_non_dot_items(&self, postfix_tail: &[&ast::Expr], tail: Tail) -> FormatResult {

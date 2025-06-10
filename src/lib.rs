@@ -79,8 +79,7 @@ impl FormatModuleResult {
         } = self;
         if error_count > 0 {
             return Err(
-                format!("Some errors occurred. Formatted:\n{}", formatted)
-                    .into(),
+                format!("Some errors occurred. Formatted:\n{}", formatted).into(),
             );
         }
         Ok(formatted)
@@ -197,11 +196,9 @@ pub fn format_module_file_roots(
         };
         while let Some((path, relative)) = queue.pop_front() {
             let submodules = format_module_file(&path, relative, &config, &mut on_format_module)?;
-            queue.extend(
-                submodules
-                    .into_iter()
-                    .map(|submod| (submod.path, submod.relative)),
-            );
+            queue.extend(submodules.into_iter().map(|submod| {
+                (submod.path, submod.relative)
+            }));
         }
         if on_format_module.has_errors {
             return Err(());
@@ -216,19 +213,17 @@ fn format_module_file(
     config: &Config,
     on_format_module: &mut OnFormatModule,
 ) -> Result<Vec<Submodule>, ()> {
-    let result = parse_module(CrateSource::File(path), relative)
-        .map_err(|ErrorGuaranteed { .. }| ())?;
+    let result = parse_module(CrateSource::File(path), relative).map_err(
+        |ErrorGuaranteed { .. }| (),
+    )?;
     let ParseModuleResult {
         module,
         source_file,
         submodules,
     } = result;
-    let source = Arc::clone(
-        source_file
-            .src
-            .as_ref()
-            .expect("the SourceFile should have src"),
-    );
+    let source = Arc::clone(source_file.src.as_ref().expect(
+        "the SourceFile should have src",
+    ));
     std::panic::set_hook({
         let path = path.to_path_buf();
         let prev_panic_hook = std::panic::take_hook();

@@ -32,10 +32,9 @@ impl SourceReader {
     }
 
     pub fn source(&self) -> &str {
-        self.source_file
-            .src
-            .as_ref()
-            .expect("SourceFile should have src")
+        self.source_file.src.as_ref().expect(
+            "SourceFile should have src",
+        )
     }
 
     pub fn advance(&self, len: u32) {

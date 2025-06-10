@@ -1,0 +1,4 @@
+    // nested overflow should not be allowed
+    ⋮ 199│            queue.extend(submodules.into_iter().map(|submod| {
+    ⋮ 200│                (submod.path, submod.relative)
+    ⋮ 201│            }));

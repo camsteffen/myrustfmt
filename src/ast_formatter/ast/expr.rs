@@ -191,7 +191,12 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn call_args_after_open_paren(&self, args: &[P<ast::Expr>], list_shape: ListShape, tail: Tail) -> FormatResult {
+    pub fn call_args_after_open_paren(
+        &self,
+        args: &[P<ast::Expr>],
+        list_shape: ListShape,
+        tail: Tail,
+    ) -> FormatResult {
         let mut list_opt = ListOptions::<P<ast::Expr>>::new()
             .item_prefers_overflow(|expr| matches!(expr.kind, ast::ExprKind::Closure(_)))
             .omit_open_brace()
@@ -199,8 +204,9 @@ impl AstFormatter {
             .tail(tail);
         let is_only_closure = args.len() == 1 && matches!(args[0].kind, ast::ExprKind::Closure(_));
         if !is_only_closure {
-            list_opt = list_opt
-                .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
+            list_opt = list_opt.single_line_max_contents_width(
+                RUSTFMT_CONFIG_DEFAULTS.fn_call_width,
+            );
         }
         self.list(
             Braces::Parens,
@@ -365,10 +371,7 @@ impl AstFormatter {
                 Ok(())
             };
 
-            self.backtrack()
-                .next_opt(single_line)
-                .next(multi_line)
-                .result()
+            self.backtrack().next_opt(single_line).next(multi_line).result()
         })
     }
 
