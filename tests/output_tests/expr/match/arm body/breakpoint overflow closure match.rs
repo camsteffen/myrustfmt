@@ -1,4 +1,5 @@
 // test-kind: breakpoint
+// note: Always add a block to arm body if it yields a longer first line.
 
 fn test() {
     match x {

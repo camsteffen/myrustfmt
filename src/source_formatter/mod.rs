@@ -56,6 +56,8 @@ delegate_to_constraint_writer! {
     #[allow(unused)]
     #[track_caller]
     pub fn debug_buffer(&self);
+    #[allow(unused)]
+    pub fn with_taken_buffer(&self, f: impl FnOnce(&mut String));
 }
 
 impl SourceFormatter {

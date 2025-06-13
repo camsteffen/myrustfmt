@@ -1,11 +1,11 @@
 mod assign;
-pub mod ast;
+pub(super) mod ast;
 mod constraint_effects;
-pub mod debug;
+pub(super) mod debug;
 mod enclosed;
-// mod expr_size_hint;
+pub(super) mod error;
 mod indent;
 mod infix;
-pub mod simulate_wrap;
-pub mod sort;
+pub(super) mod simulate_wrap;
+pub(super) mod sort;
 mod wrapping;

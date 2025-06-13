@@ -8,20 +8,6 @@ use std::path::Path;
 
 pub type FormatResult<T = ()> = Result<T, FormatError>;
 
-pub trait FormatResultExt {
-    #[allow(unused)]
-    fn debug_err(self) -> Self;
-}
-
-impl<T> FormatResultExt for FormatResult<T> {
-    fn debug_err(self) -> Self {
-        if let Err(e) = &self {
-            eprintln!("Error: {:?}\nBacktrace:\n{}", e.kind, &e.backtrace);
-        }
-        self
-    }
-}
-
 #[derive(Debug)]
 pub struct FormatError {
     pub kind: FormatErrorKind,
@@ -48,17 +34,14 @@ impl FormatError {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FormatErrorKind {
-    /// ListItemOverflow becomes ListOverflow when the error propagates out of the list.
-    /// This allows us to know when an overflow occurs in a list within a list. This forces the
-    /// outer list to use vertical formatting.
-    ListOverflow { cause: VerticalError },
     /// Occurs when we attempt to overflow the last item in a horizontal list while single line mode
     /// is enabled.
-    ListItemOverflow { cause: VerticalError },
+    ListOverflow { cause: VerticalError },
     /// Used to explicitly fail the current strategy for implementation-specific reasons
     Logical,
     UnsupportedSyntax,
     Vertical(VerticalError),
+    // todo do we actually need cause here or on other variants? debug only?
     VStruct { cause: VerticalError },
     WidthLimitExceeded,
 }
@@ -103,7 +86,6 @@ fn write_constraint_error(
     match e.kind {
         FormatErrorKind::Vertical(vertical)
         | FormatErrorKind::ListOverflow { cause: vertical }
-        | FormatErrorKind::ListItemOverflow { cause: vertical }
         | FormatErrorKind::VStruct { cause: vertical } => match vertical {
             VerticalError::LineComment => write!(f, "line comment not allowed")?,
             VerticalError::MultiLineComment => write!(f, "multi-line comment not allowed")?,

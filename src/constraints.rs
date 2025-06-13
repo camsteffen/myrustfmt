@@ -115,16 +115,13 @@ impl Constraints {
         vstruct: VStruct,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        if self.single_line.get() || !self.disallowed_vstructs.get().contains(vstruct) {
+        if !self.disallowed_vstructs.get().contains(vstruct) {
             return scope();
         }
         self.single_line
             .with_replaced(true, scope)
             .map_err(|mut err| {
-                // todo test all cases - is ListOverflow needed?
-                if let FormatErrorKind::Vertical(cause) | FormatErrorKind::ListOverflow { cause } = err
-                    .kind
-                {
+                if let FormatErrorKind::Vertical(cause) = err.kind {
                     err.kind = FormatErrorKind::VStruct { cause };
                 }
                 err

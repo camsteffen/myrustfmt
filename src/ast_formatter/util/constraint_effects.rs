@@ -1,6 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::constraints::{Constraints, VStruct, VStructSet, WidthLimit};
-use crate::error::{FormatResult, WidthLimitExceededError};
+use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::HSize;
 use crate::util::cell_ext::CellExt;
 use std::num::NonZero;
@@ -59,11 +59,13 @@ impl AstFormatter {
         self.with_single_line(scope)
     }
 
-    pub fn with_width_limit<T>(&self, width_limit: HSize, scope: impl FnOnce() -> T) -> T {
-        let (line, col) = self.out.line_col();
-        let end_col = NonZero::new(col + width_limit).unwrap();
-        self.constraints()
-            .with_width_limit(WidthLimit { end_col, line }, scope)
+    pub fn with_width_limit<T>(
+        &self,
+        width_limit: HSize,
+        scope: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
+        let end_col = self.out.col() + width_limit;
+        self.with_width_limit_end(end_col, scope)
     }
 
     pub fn with_width_limit_opt<T>(
@@ -77,16 +79,40 @@ impl AstFormatter {
         }
     }
 
+    pub fn with_width_limit_end<T>(
+        &self,
+        end_col: HSize,
+        scope: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
+        let line = self.out.line();
+        if self.out.col() > end_col {
+            return Err(FormatErrorKind::WidthLimitExceeded.into());
+        }
+        let end_col = NonZero::new(end_col)
+            .expect("width limit end should not be zero");
+        let limit = WidthLimit { end_col, line };
+        self.constraints().with_width_limit(limit, scope)
+    }
+
+    pub fn with_width_limit_end_opt<T>(
+        &self,
+        end_col: Option<HSize>,
+        scope: impl FnOnce() -> FormatResult<T>,
+    ) -> FormatResult<T> {
+        let Some(end_col) = end_col else {
+            return scope();
+        };
+        self.with_width_limit_end(end_col, scope)
+    }
+
     pub fn with_width_limit_from_start<T>(
         &self,
         start_col: HSize,
         width_limit: HSize,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
-        let Some(remaining) = width_limit.checked_sub(self.out.col() - start_col) else {
-            return Err(WidthLimitExceededError.into());
-        };
-        self.with_width_limit(remaining, scope)
+        let end_col = start_col + width_limit;
+        self.with_width_limit_end(end_col, scope)
     }
 
     pub fn with_width_limit_from_start_opt<T>(

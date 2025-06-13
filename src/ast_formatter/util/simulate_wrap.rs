@@ -1,8 +1,9 @@
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::error::{FormatErrorKind, FormatResult};
+use crate::num::HSize;
 use crate::util::cell_ext::CellExt;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum SimulateWrapResult {
     /// The result may be used as-is. It fits in one line.
     Ok,
@@ -33,12 +34,16 @@ impl AstFormatter {
     /// for a different formatting strategy with more code on the first line, or the extra width was
     /// strictly required to fit the code at all. This function is useful when these two cases are
     /// handled in the same way.
-    pub fn simulate_wrap_indent(&self, scope: impl FnOnce() -> FormatResult) -> SimulateWrapResult {
+    pub fn simulate_wrap_indent(
+        &self,
+        offset: HSize,
+        scope: impl FnOnce() -> FormatResult,
+    ) -> SimulateWrapResult {
         let with_single_line_and_no_width_limit =
             || self.with_single_line(|| self.constraints().width_limit.with_replaced(None, scope));
         let (result, used_extra_width) = self.out.with_recover_width(|| {
             let col = self.out.col();
-            let wrap_indent_col = self.out.total_indent.get() + INDENT_WIDTH;
+            let wrap_indent_col = self.out.total_indent.get() + INDENT_WIDTH + offset;
             match col.checked_sub(wrap_indent_col) {
                 None | Some(0) => {
                     let result = with_single_line_and_no_width_limit();

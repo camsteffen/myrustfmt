@@ -105,7 +105,7 @@ impl AstFormatter {
 
     fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
         let checkpoint = self.out.checkpoint();
-        let (force_block, lookahead) = match self.simulate_wrap_indent(|| self.expr(body)) {
+        let (force_block, lookahead) = match self.simulate_wrap_indent(0, || self.expr(body)) {
             SimulateWrapResult::Ok => {
                 if self
                     .out

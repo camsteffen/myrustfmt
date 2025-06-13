@@ -1,5 +1,4 @@
 use crate::constraint_writer::ConstraintWriter;
-use crate::constraints::Constraints;
 use crate::num::VSize;
 use crate::util::cell_ext::CellExt;
 
@@ -14,8 +13,6 @@ pub struct ConstraintWriterSelfCheckpoint {
     line: VSize,
     last_line_start: usize,
     last_width_exceeded_line: Option<VSize>,
-    #[cfg(debug_assertions)]
-    constraints: Constraints,
 }
 
 #[derive(Debug)]
@@ -35,8 +32,6 @@ impl ConstraintWriter {
     pub fn self_checkpoint(&self) -> ConstraintWriterSelfCheckpoint {
         let Self {
             buffer: _,
-            #[cfg(debug_assertions)]
-            ref constraints,
             errors: _,
             ref last_line_start,
             ref last_width_exceeded_line,
@@ -47,8 +42,6 @@ impl ConstraintWriter {
             line: line.get(),
             last_line_start: last_line_start.get(),
             last_width_exceeded_line: last_width_exceeded_line.get(),
-            #[cfg(debug_assertions)]
-            constraints: constraints.clone(),
         }
     }
 
@@ -66,9 +59,7 @@ impl ConstraintWriter {
             last_line_start,
             last_width_exceeded_line,
             line,
-            ref constraints,
         } = *checkpoint;
-        debug_assert_eq!(&self.constraints, constraints);
         self.last_line_start.set(last_line_start);
         self.last_width_exceeded_line.set(last_width_exceeded_line);
         self.line.set(line);

@@ -14,7 +14,7 @@ impl AstFormatter {
             (true, None)
         } else {
             let checkpoint_after_space = self.out.checkpoint();
-            match self.simulate_wrap_indent(|| self.expr_tail(expr, tail)) {
+            match self.simulate_wrap_indent(0, || self.expr_tail(expr, tail)) {
                 SimulateWrapResult::Ok => return Ok(()),
                 SimulateWrapResult::NoWrap | SimulateWrapResult::WrapForLongerFirstLine => {
                     (false, None)

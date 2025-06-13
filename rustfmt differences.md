@@ -16,6 +16,11 @@
 * A single call argument cannot be combined with control flow expressions
 * Only argument lists can overflow. Not arrays or tuples.
 
+Postfix chains (or "dot chains")
+ * Horizontal chains are preferred over vertical chains when they are shorter even when a vertical chain
+   would allow the last item to fit on one line.
+ * The chain width is not enforced for items that start within the first 15 chars of the chain
+
 `match`
  * A match arm may not start with `loop`
  * Does not add a semicolon after `return`, `break` etc. This is only done for statements and not expressions.

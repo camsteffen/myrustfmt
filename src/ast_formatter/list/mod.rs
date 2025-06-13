@@ -12,7 +12,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::options::{ListOptions, ListShape, ListWrapToFit};
 use crate::ast_formatter::tail::Tail;
 use crate::constraints::VStruct;
-use crate::error::{FormatErrorKind, FormatResult};
+use crate::error::{FormatError, FormatErrorKind, FormatResult, WidthLimitExceededError};
 use crate::num::{HSize, VSize};
 use crate::whitespace::VerticalWhitespaceMode;
 
@@ -62,10 +62,10 @@ where
                 ListShape::Flexible => self.list_flexible(false)?,
                 ListShape::FlexibleWithOverflow => self.list_flexible(true)?,
                 ListShape::Horizontal => {
-                    self.list_horizontal(false)?;
+                    self.list_horizontal(false).map_err(|e| e.error)?;
                 }
                 ListShape::HorizontalWithOverflow => {
-                    self.list_horizontal(true)?;
+                    self.list_horizontal(true).map_err(|e| e.error)?;
                 }
                 ListShape::Vertical => {
                     self.list_vertical()?;
@@ -77,18 +77,18 @@ where
 
     fn list_flexible(&self, overflow: bool) -> FormatResult {
         let checkpoint = self.af.out.checkpoint();
-        let wrap_to_fit_or_vertical = || {
+        let wrap_to_fit_or_vertical = |restore: bool| {
             self.af
                 .backtrack()
                 .next_opt(self.list_wrap_to_fit_fn_opt())
                 .next(|| self.list_vertical())
-                .result_with_checkpoint(&checkpoint, true)?;
+                .result_with_checkpoint(&checkpoint, restore)?;
             Ok(())
         };
         if self.opt.item_requires_own_line.as_ref().is_some_and(|f| {
             self.list.iter().any(f)
         }) {
-            return wrap_to_fit_or_vertical();
+            return wrap_to_fit_or_vertical(false);
         }
 
         let horizontal_result = self.af.out.with_recover_width(|| self.list_horizontal(overflow));
@@ -96,13 +96,12 @@ where
         let horizontal_height = match horizontal_result {
             Ok(1) => return Ok(()),
             Ok(height) => height,
-            Err(mut e) if let FormatErrorKind::ListItemOverflow { cause } = e.kind => {
-                assert!(self.af.constraints().single_line.get(), "ListItemOverflow should only occur in single line mode");
-                e.kind = FormatErrorKind::ListOverflow { cause };
+            Err(e) if e.is_overflow => {
+                assert!(self.af.constraints().single_line.get(), "list overflow error should only occur in single line mode");
                 // Horizontal formatting would have succeeded if single line mode were not enabled.
-                return Err(e);
+                return Err(e.error);
             }
-            Err(_) => return wrap_to_fit_or_vertical(),
+            Err(_) => return wrap_to_fit_or_vertical(true),
         };
 
         if self.opt.rest.is_none()
@@ -126,23 +125,7 @@ where
         Ok(())
     }
 
-    fn list_wrap_to_fit_fn_opt(&self) -> Option<impl Fn() -> FormatResult<VSize>> {
-        if self.list.len() <= 1 && self.opt.rest.is_none() {
-            return None;
-        }
-        match self.opt.wrap_to_fit {
-            ListWrapToFit::Yes { max_element_width } => {
-                assert!(
-                    self.opt.rest.is_none(),
-                    "rest cannot be used with wrap-to-fit"
-                );
-                Some(move || self.list_wrap_to_fit(max_element_width))
-            }
-            ListWrapToFit::No => None,
-        }
-    }
-
-    fn list_horizontal(&self, overflow: bool) -> FormatResult<VSize> {
+    fn list_horizontal(&self, overflow: bool) -> Result<VSize, ListHorizontalError> {
         let Self {
             af,
             opt,
@@ -196,7 +179,8 @@ where
         let last_item_tail = list_item_tail.as_ref();
         let end_tail = af.tail_fn(close);
         let end_tail = end_tail.as_ref();
-        af.with_width_limit_opt(opt.single_line_max_contents_width, move || {
+        let mut is_overflow = false;
+        af.with_width_limit_opt(opt.single_line_max_contents_width, || {
             if len == 0 {
                 if let Some(rest) = rest {
                     list_rest(af, rest, end_tail)?;
@@ -215,9 +199,11 @@ where
                     match err.kind {
                         // We formatted the first line and stopped because we are in single-line
                         // mode, otherwise we could have continued without error.
+                        // todo seems like we need VStruct, but hanging indent is an exception...
                         FormatErrorKind::Vertical(cause) => {
                             assert!(self.af.constraints().single_line.get(), "FormatErrorKind::Vertical error should only occur in single line mode");
-                            err.kind = FormatErrorKind::ListItemOverflow { cause };
+                            err.kind = FormatErrorKind::ListOverflow { cause };
+                            is_overflow = true;
                         }
                         // VStruct error - this list must be formatted vertically
                         // (it's here explicitly to show the necessity of this variant)
@@ -234,8 +220,25 @@ where
                 list_rest(af, rest, end_tail)?;
             }
             Ok(())
-        })?;
+        })
+        .map_err(|error| ListHorizontalError { error, is_overflow })?;
         Ok(height.get())
+    }
+
+    fn list_wrap_to_fit_fn_opt(&self) -> Option<impl Fn() -> FormatResult<VSize>> {
+        if self.list.len() <= 1 && self.opt.rest.is_none() {
+            return None;
+        }
+        match self.opt.wrap_to_fit {
+            ListWrapToFit::Yes { max_element_width } => {
+                assert!(
+                    self.opt.rest.is_none(),
+                    "rest cannot be used with wrap-to-fit"
+                );
+                Some(move || self.list_wrap_to_fit(max_element_width))
+            }
+            ListWrapToFit::No => None,
+        }
     }
 
     /*
@@ -368,4 +371,26 @@ fn list_rest(af: &AstFormatter, rest: ListRest, tail: Tail) -> FormatResult {
         af.tail(tail)?;
     }
     Ok(())
+}
+
+#[derive(Debug)]
+struct ListHorizontalError {
+    error: FormatError,
+    /// True if the _current_ list is an overflow error
+    is_overflow: bool,
+}
+
+impl From<FormatError> for ListHorizontalError {
+    fn from(error: FormatError) -> Self {
+        ListHorizontalError {
+            error,
+            is_overflow: false,
+        }
+    }
+}
+
+impl From<WidthLimitExceededError> for ListHorizontalError {
+    fn from(error: WidthLimitExceededError) -> Self {
+        FormatError::from(error).into()
+    }
 }

@@ -65,7 +65,6 @@ impl AstFormatter {
         match err.kind {
             // todo test all these outputs
             FormatErrorKind::ListOverflow { cause: vertical }
-            | FormatErrorKind::ListItemOverflow { cause: vertical }
             | FormatErrorKind::Vertical(vertical)
             // todo propagate VStruct?
             | FormatErrorKind::VStruct { cause: vertical } => match vertical {
