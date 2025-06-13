@@ -98,9 +98,7 @@ fn collect_binary_expr_chain<'a>(
                 let operator = operators.pop().unwrap();
                 chain.push((operator, current));
             }
-            let Some(expr) = stack.pop() else {
-                break;
-            };
+            let Some(expr) = stack.pop() else { break };
             current = expr;
         }
     }

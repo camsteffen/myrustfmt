@@ -328,8 +328,8 @@ impl AstFormatter {
                 let ast::ExprKind::Block(else_block, _) = &else_.kind else {
                     return None;
                 };
-                let block_expr = self.try_into_expr_only_block(block)?;
-                let else_expr = self.try_into_expr_only_block(else_block)?;
+                let block_expr = self.try_into_optional_block(block)?;
+                let else_expr = self.try_into_optional_block(else_block)?;
 
                 Some(move || {
                     self.with_single_line(|| {
@@ -337,9 +337,9 @@ impl AstFormatter {
                             start_col,
                             RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
                             || {
-                                self.expr_only_block_after_open_brace(block_expr)?;
+                                self.optional_block_horizontal_after_open_brace(block_expr)?;
                                 self.out.space_token_space("else")?;
-                                self.expr_only_block(else_expr)?;
+                                self.optional_block_horizontal(else_expr)?;
                                 self.tail(tail)?;
                                 Ok(())
                             },
@@ -469,9 +469,7 @@ impl AstFormatter {
                 start,
                 Some(&self.tail_fn(|af| {
                     af.out.token(sigil)?;
-                    let Some(end) = end else {
-                        return af.tail(tail);
-                    };
+                    let Some(end) = end else { return af.tail(tail) };
                     self.has_vstruct_if(af.out.line() > first_line, VStruct::NonBlockIndent, || {
                         af.expr_tail(end, tail)
                     })?;
@@ -612,7 +610,7 @@ impl AstFormatter {
     pub fn expr_force_plain_block(&self, expr: &ast::Expr) -> FormatResult {
         match plain_block(expr) {
             Some(block) => self.block_expr(false, block),
-            None => self.expr_add_block(expr),
+            None => self.add_block_expr(expr),
         }
     }
 }

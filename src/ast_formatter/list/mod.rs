@@ -169,7 +169,7 @@ where
             if !rest.is_none() || opt.force_trailing_comma {
                 af.out.token(",")?;
             } else {
-                af.out.skip_token_if_present(",")?;
+                af.out.token_skip_if_present(",")?;
             }
             if rest.is_none() {
                 close(af)?;

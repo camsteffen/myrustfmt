@@ -119,7 +119,7 @@ impl AstFormatter {
                     })
                 })
                 .next(|| {
-                    self.expr_add_block(body)?;
+                    self.add_block_expr(body)?;
                     self.tail(tail)?;
                     Ok(())
                 })

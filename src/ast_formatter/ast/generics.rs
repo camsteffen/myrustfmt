@@ -9,8 +9,8 @@ use rustc_ast::ast;
 impl AstFormatter {
     pub fn generic_params(&self, params: &[ast::GenericParam]) -> FormatResult {
         if params.is_empty() {
-            if self.out.skip_token_if_present("<")? {
-                self.out.skip_token(">")?;
+            if self.out.token_skip_if_present("<")? {
+                self.out.token_skip(">")?;
             }
             return Ok(());
         }
@@ -104,7 +104,7 @@ impl AstFormatter {
                 self.generic_bounds(&pred.bounds, None)?;
             }
             ast::WherePredicateKind::EqPredicate(_) => {
-                return Err(FormatErrorKind::UnsupportedSyntax.into());
+                return Err(FormatErrorKind::UnsupportedSyntax.into())
             }
         }
         Ok(())

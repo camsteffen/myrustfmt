@@ -101,7 +101,7 @@ impl AstFormatter {
             | ast::ItemKind::DelegationMac(_)
             | ast::ItemKind::GlobalAsm(_)
             | ast::ItemKind::TraitAlias(..) => {
-                return Err(FormatErrorKind::UnsupportedSyntax.into())
+                return Err(FormatErrorKind::UnsupportedSyntax.into());
             }
         }
         Ok(())

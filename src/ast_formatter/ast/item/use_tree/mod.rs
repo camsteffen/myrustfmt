@@ -22,12 +22,12 @@ impl AstFormatter {
             ast::UseTreeKind::Nested { ref items, span: _ } => {
                 self.out.token("::")?;
                 if let [(item, _)] = &items[..] {
-                    self.out.skip_token("{")?;
+                    self.out.token_skip("{")?;
                     self.use_tree(
                         item,
                         Some(&self.tail_fn(|af| {
-                            af.out.skip_token_if_present(",")?;
-                            af.out.skip_token("}")?;
+                            af.out.token_skip_if_present(",")?;
+                            af.out.token_skip("}")?;
                             af.tail(tail)?;
                             Ok(())
                         })),

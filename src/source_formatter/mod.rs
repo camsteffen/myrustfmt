@@ -83,22 +83,6 @@ impl SourceFormatter {
         self.out.finish()
     }
 
-    pub fn skip_token(&self, token: &'static str) -> FormatResult {
-        self.horizontal_whitespace()?;
-        self.source_reader.eat_token(token);
-        Ok(())
-    }
-
-    pub fn skip_token_if_present(&self, token: &str) -> FormatResult<bool> {
-        // todo is this checkpoint avoidable?
-        let checkpoint = self.checkpoint();
-        let found = self.horizontal_whitespace().is_ok() && self.source_reader.try_eat_token(token);
-        if !found {
-            self.restore_checkpoint(&checkpoint);
-        }
-        Ok(found)
-    }
-
     pub fn copy_next_token(&self) -> FormatResult {
         self.horizontal_whitespace()?;
         let token = self.source_reader.eat_next_token();
@@ -143,7 +127,7 @@ impl SourceFormatter {
 
     /// Write a token that might be missing from source
     pub fn token_maybe_missing(&self, token: &'static str) -> FormatResult {
-        self.skip_token_if_present(token)?;
+        self.token_skip_if_present(token)?;
         self.token_insert(token)?;
         Ok(())
     }
@@ -154,6 +138,22 @@ impl SourceFormatter {
         let token = self.source_reader.eat_span(span);
         self.out.token(token)?;
         Ok(())
+    }
+
+    pub fn token_skip(&self, token: &'static str) -> FormatResult {
+        self.horizontal_whitespace()?;
+        self.source_reader.eat_token(token);
+        Ok(())
+    }
+
+    pub fn token_skip_if_present(&self, token: &str) -> FormatResult<bool> {
+        // todo is this checkpoint avoidable?
+        let checkpoint = self.checkpoint();
+        let found = self.horizontal_whitespace().is_ok() && self.source_reader.try_eat_token(token);
+        if !found {
+            self.restore_checkpoint(&checkpoint);
+        }
+        Ok(found)
     }
 
     pub fn copy_span(&self, span: Span) -> FormatResult {

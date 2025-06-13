@@ -31,6 +31,10 @@ macro_rules! jump_expr_kind {
 }
 pub(crate) use jump_expr_kind;
 
+pub fn is_jump_expr(expr: &ast::Expr) -> bool {
+    matches!(expr.kind, jump_expr_kind!())
+}
+
 // note: ExprKind::Cast isn't here since it is lower precedence and so it doesn't chain
 macro_rules! postfix_meta {
     ($mac:path) => {

@@ -91,12 +91,10 @@ fn parse_test_header(string: &str) -> TestResult<(TestKindRaw, Option<u16>, &str
     };
     match lines_peekable.next() {
         Some("\n") => {}
-        next => {
-            return Err(
-                format!("expected a blank line after header comments, found {next:?}")
-                    .into(),
-            );
-        }
+        next => return Err(
+            format!("expected a blank line after header comments, found {next:?}")
+                .into(),
+        ),
     }
     let body = lines.remainder().unwrap_or("");
     Ok((test_kind_raw, max_width, body))

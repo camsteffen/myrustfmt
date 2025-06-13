@@ -92,10 +92,10 @@ impl AstFormatter {
         match generic_args {
             ast::GenericArgs::AngleBracketed(args) if args.args.is_empty() => {
                 if turbofish {
-                    self.out.skip_token("::")?;
+                    self.out.token_skip("::")?;
                 }
-                self.out.skip_token("<")?;
-                self.out.skip_token(">")?;
+                self.out.token_skip("<")?;
+                self.out.token_skip(">")?;
                 self.tail(tail)?;
             }
             ast::GenericArgs::AngleBracketed(args) => {

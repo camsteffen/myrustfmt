@@ -58,9 +58,7 @@ impl AstFormatter {
         let checkpoint = self.out.checkpoint_without_buffer_errors();
         #[cfg(debug_assertions)]
         let error_count_before = self.errors.error_count();
-        let Err(err) = format() else {
-            return Ok(());
-        };
+        let Err(err) = format() else { return Ok(()) };
         let (line, col) = self.out.line_col();
         match err.kind {
             // todo test all these outputs
@@ -79,9 +77,7 @@ impl AstFormatter {
                 self.errors.unsupported_syntax(line, col);
             }
             // these are not expected
-            FormatErrorKind::Logical | FormatErrorKind::WidthLimitExceeded => {
-                return Err(err);
-            }
+            FormatErrorKind::Logical | FormatErrorKind::WidthLimitExceeded => return Err(err),
         }
         #[cfg(debug_assertions)]
         assert!(

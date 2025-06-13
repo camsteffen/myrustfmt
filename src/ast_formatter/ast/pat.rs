@@ -16,7 +16,7 @@ impl AstFormatter {
 
     pub fn pat_tail(&self, pat: &ast::Pat, tail: Tail) -> FormatResult {
         // todo is this right?
-        self.out.skip_token_if_present("|")?;
+        self.out.token_skip_if_present("|")?;
 
         let mut tail = Some(tail);
         let mut take_tail = || tail.take().unwrap();

@@ -62,7 +62,7 @@ impl AstFormatter {
             self.out.space_token_space("else")?;
             self.out.token("{")?;
             let else_block_horizontal = if is_single_line_init
-                && let Some(expr_only_else) = self.try_into_expr_only_block(else_)
+                && let Some(expr_only_else) = self.try_into_optional_block(else_)
             {
                 Some(move || {
                     self.with_single_line(|| {
@@ -70,7 +70,7 @@ impl AstFormatter {
                             start_col,
                             RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
                             || {
-                                self.expr_only_block_after_open_brace(expr_only_else)?;
+                                self.optional_block_horizontal_after_open_brace(expr_only_else)?;
                                 self.out.token(";")?;
                                 Ok(())
                             },

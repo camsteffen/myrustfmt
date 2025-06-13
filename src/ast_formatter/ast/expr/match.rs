@@ -18,7 +18,7 @@ impl AstFormatter {
     fn arm(&self, arm: &ast::Arm) -> FormatResult {
         self.with_attrs(&arm.attrs, arm.span, || self.arm_after_attrs(arm))?;
         // N.B. the span does not include the comma
-        self.out.skip_token_if_present(",")?;
+        self.out.token_skip_if_present(",")?;
         Ok(())
     }
 
@@ -128,14 +128,15 @@ impl AstFormatter {
                 })
             })
             .next(|| {
-                self.add_block(|| {
-                    if let Some(lookahead) = lookahead {
+                if let Some(lookahead) = lookahead {
+                    self.add_block(|| {
                         self.out.restore_lookahead(lookahead);
-                    } else {
-                        self.expr(body)?;
-                    }
-                    Ok(())
-                })
+                        Ok(())
+                    })?;
+                } else {
+                    self.add_block_expr(body)?;
+                }
+                Ok(())
             })
             .result_with_checkpoint(&checkpoint, initial_restore)?;
         Ok(())
