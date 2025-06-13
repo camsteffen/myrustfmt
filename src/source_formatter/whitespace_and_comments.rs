@@ -128,7 +128,6 @@ impl WhitespaceContext<'_> {
         }
 
         if last_is_line_comment {
-            // add a trailing newline
             self.emit_newline(0, false, false)?;
         }
         match self.mode {
