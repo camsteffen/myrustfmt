@@ -1,6 +1,6 @@
 pub mod checkpoint;
 mod source_reader;
-mod whitespace;
+mod whitespace_and_comments;
 
 use self::source_reader::SourceReader;
 use crate::constraint_writer::ConstraintWriter;
