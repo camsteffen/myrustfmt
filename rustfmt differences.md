@@ -50,6 +50,9 @@ Chains
 * Separate line chains are preferred over overflow if the number of lines is the same
   * Rationale: it's better for higher level structures to use line breaks than more deeply nested structures
 
+Comments
+ * Removes trailing spaces from all comments, including doc comments and line comments with preceding code
+
 rustfmt Bugs:
 * fn_call_width is reduced by 2 when the last argument overflows into multiple lines
 * chain_width is reduced by 1 when the chain ends with `?`

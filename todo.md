@@ -26,3 +26,6 @@ let source = Arc::clone(source_file.src.as_ref().expect(
 ));
 
 TDD every tail usage
+
+have an explicit rustfmt replacement mode that works with cargo fmt;
+otherwise don't support the extra parameters
