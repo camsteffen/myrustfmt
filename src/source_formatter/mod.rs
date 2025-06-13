@@ -9,6 +9,7 @@ use crate::constraints::Constraints;
 use crate::error::FormatResult;
 use crate::error_emitter::{BufferedErrorEmitter, Error};
 use crate::num::{HSize, VSize};
+use crate::source_formatter::checkpoint::Checkpoint;
 use crate::util::chars::is_closer_char;
 use rustc_span::{BytePos, SourceFile, Span};
 use std::cell::Cell;
@@ -16,8 +17,8 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 
-#[derive(Debug)]
-pub struct Lookahead {
+pub struct Lookahead<'c, 'ca> {
+    checkpoint: &'c Checkpoint<'ca>,
     error_buffer: Vec<Error>,
     source_pos: BytePos,
     writer_lookahead: ConstraintWriterLookahead,

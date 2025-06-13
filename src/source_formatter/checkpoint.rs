@@ -54,7 +54,7 @@ impl SourceFormatter {
         self.source_reader.pos.set(source_pos);
     }
 
-    pub fn capture_lookahead(&self, from: &Checkpoint) -> Lookahead {
+    pub fn capture_lookahead<'c, 'ca>(&self, from: &'c Checkpoint<'ca>) -> Lookahead<'c, 'ca> {
         let error_buffer = match &from.error_emitter_checkpoint {
             Some(error_emitter_checkpoint) => {
                 self.error_emitter
@@ -66,19 +66,21 @@ impl SourceFormatter {
         let source_pos = self.source_reader.pos.get();
         self.source_reader.pos.set(from.source_pos);
         Lookahead {
+            checkpoint: from,
             error_buffer,
             source_pos,
             writer_lookahead,
         }
     }
 
-    pub fn restore_lookahead(&self, checkpoint: &Checkpoint, lookahead: Lookahead) {
-        self.restore_checkpoint(checkpoint);
+    pub fn restore_lookahead(&self, lookahead: Lookahead) {
         let Lookahead {
+            checkpoint,
             error_buffer,
             source_pos,
             writer_lookahead,
         } = lookahead;
+        self.restore_checkpoint(checkpoint);
         self.error_emitter.push_vec(error_buffer);
         self.out.restore_lookahead(writer_lookahead);
         self.source_reader.pos.set(source_pos);

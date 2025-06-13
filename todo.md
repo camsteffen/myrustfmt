@@ -1,5 +1,3 @@
-add/remove semicolon in match arm with return/break/etc.
-
 enforce chain width with overflowing closure
 
 this case feels weird, does not match rustfmt

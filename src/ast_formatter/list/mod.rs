@@ -119,7 +119,7 @@ where
         let use_vertical = vertical_result
             .is_ok_and(|height| height <= horizontal_height);
         if !use_vertical {
-            self.af.out.restore_lookahead(&checkpoint, horizontal_lookahead);
+            self.af.out.restore_lookahead(horizontal_lookahead);
         }
         Ok(())
     }

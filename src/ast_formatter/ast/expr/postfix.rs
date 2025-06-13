@@ -187,7 +187,7 @@ impl AstFormatter {
                         return Err(FormatErrorKind::Logical.into());
                     }
                     // Use a horizontal chain with horizontal method call arguments with overflow
-                    self.out.restore_lookahead(&checkpoint, horizontal_args_lookahead);
+                    self.out.restore_lookahead(horizontal_args_lookahead);
                 } else {
                     let vertical_args_height = (2 + method_call.args.len()) as VSize;
                     if vertical_chain_height <= vertical_args_height {
@@ -212,7 +212,7 @@ impl AstFormatter {
             | SimulateWrapResult::WrapForLongerFirstLine
                 if let Some((_, horizontal_args_lookahead)) = horizontal_args =>
             {
-                self.out.restore_lookahead(&checkpoint, horizontal_args_lookahead);
+                self.out.restore_lookahead(horizontal_args_lookahead);
             }
 
             // We have a choice between vertical method call arguments or a vertical chain.
