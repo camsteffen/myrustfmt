@@ -62,7 +62,8 @@ impl SourceFormatter {
         WhitespaceContext {
             sf: self,
             mode,
-            is_required_whitespace_emitted: false,
+            has_emitted_newline: false,
+            has_emitted_space: false,
         }
         .whitespace_and_comments()
     }
@@ -94,7 +95,8 @@ impl WhitespaceMode {
 struct WhitespaceContext<'a> {
     sf: &'a SourceFormatter,
     mode: WhitespaceMode,
-    is_required_whitespace_emitted: bool,
+    has_emitted_newline: bool,
+    has_emitted_space: bool,
 }
 
 impl WhitespaceContext<'_> {
@@ -128,18 +130,21 @@ impl WhitespaceContext<'_> {
         if last_is_line_comment {
             // add a trailing newline
             self.emit_newline(0, false, false)?;
-        } else if !self.is_required_whitespace_emitted {
-            match self.mode {
-                WhitespaceMode::Horizontal { space }
-                | WhitespaceMode::Flexible {
-                    space_if_horizontal: space,
-                    ..
-                } => {
-                    if space {
-                        sf.out.token(" ")?;
-                    }
+        }
+        match self.mode {
+            WhitespaceMode::Horizontal { space }
+            | WhitespaceMode::Flexible {
+                space_if_horizontal: space,
+                ..
+            } => {
+                if space && !(self.has_emitted_newline || self.has_emitted_space) {
+                    sf.out.token(" ")?;
                 }
-                WhitespaceMode::Vertical(_) => sf.out.newline()?,
+            }
+            WhitespaceMode::Vertical(_) => {
+                if !self.has_emitted_newline {
+                    sf.out.newline()?
+                }
             }
         }
         Ok(())
@@ -240,19 +245,14 @@ impl WhitespaceContext<'_> {
         if indent {
             self.sf.indent();
         }
-        self.is_required_whitespace_emitted = true;
+        self.has_emitted_newline = true;
         self.advance_source(input_len);
         Ok(())
     }
 
     fn emit_space(&mut self, input_len: u32) -> FormatResult {
         self.sf.out.token(" ")?;
-        match self.mode {
-            WhitespaceMode::Horizontal { .. } | WhitespaceMode::Flexible { .. } => {
-                self.is_required_whitespace_emitted = true;
-            }
-            WhitespaceMode::Vertical(_) => {}
-        }
+        self.has_emitted_space = true;
         self.advance_source(input_len);
         Ok(())
     }
