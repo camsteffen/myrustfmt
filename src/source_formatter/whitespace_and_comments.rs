@@ -17,7 +17,6 @@ impl SourceFormatter {
     /// Skip over whitespace, allow horizontal comments, disallow newlines.
     /// In other words, usually do nothing but allow for comments.
     /// SourceFormatter is responsible for invoking this between tokens.
-    // todo maybe AstFormatter should call this
     pub(super) fn horizontal_whitespace(&self) -> FormatResult {
         self.whitespace_and_comments(WhitespaceMode::Horizontal { space: false })
     }

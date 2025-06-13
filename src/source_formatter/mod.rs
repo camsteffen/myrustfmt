@@ -10,7 +10,7 @@ use crate::error::FormatResult;
 use crate::error_emitter::{BufferedErrorEmitter, Error};
 use crate::num::{HSize, VSize};
 use crate::util::chars::is_closer_char;
-use rustc_span::{BytePos, Pos, SourceFile, Span};
+use rustc_span::{BytePos, SourceFile, Span};
 use std::cell::Cell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -148,7 +148,7 @@ impl SourceFormatter {
         Ok(())
     }
 
-    /// Copy a token from source
+    /// Copy a token from source. Must be known to not have newlines.
     pub fn token_from_source(&self, span: Span) -> FormatResult {
         self.horizontal_whitespace()?;
         let token = self.source_reader.eat_span(span);
@@ -156,28 +156,23 @@ impl SourceFormatter {
         Ok(())
     }
 
-    fn copy(&self, len: u32) -> FormatResult {
-        let segment = self.source_reader.eat_len(len);
+    pub fn copy_span(&self, span: Span) -> FormatResult {
+        self.horizontal_whitespace()?;
+        let segment = self.source_reader.eat_span(span);
         self.out.write_str(segment)?;
         Ok(())
     }
 
+    /// Copies a segment from source without enforcing constraints
     fn copy_unchecked(&self, len: u32) {
         let segment = self.source_reader.eat_len(len);
         self.out.write_str_unchecked(segment);
     }
 
-    pub fn copy_span(&self, span: Span) -> FormatResult {
-        self.horizontal_whitespace()?;
-        self.source_reader.expect_pos(span.lo());
-        self.copy(span.hi().to_u32() - span.lo().to_u32())?;
-        Ok(())
-    }
-
     pub fn last_line_is_closers(&self) -> bool {
         self.with_last_line(|line| {
             let after_indent = &line[self.total_indent.get().try_into().unwrap()..];
-            after_indent.chars().all(is_closer_char)
+            after_indent.bytes().all(is_closer_char)
         })
     }
 }

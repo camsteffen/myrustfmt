@@ -1,3 +1,3 @@
-pub fn is_closer_char(c: char) -> bool {
-    matches!(c, '(' | ')' | ']' | '}' | '?' | '>')
+pub fn is_closer_char(c: u8) -> bool {
+    matches!(c, b'(' | b')' | b']' | b'}' | b'?' | b'>')
 }

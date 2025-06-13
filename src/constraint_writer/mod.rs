@@ -81,6 +81,7 @@ impl ConstraintWriter {
         false
     }
 
+    /// A token must not have newlines
     pub fn token(&self, token: &str) -> FormatResult {
         self.buffer.with_taken(|b| b.push_str(token));
         self.check_width_constraints()

@@ -42,12 +42,6 @@ impl SourceReader {
         assert!(self.pos.get().to_usize() <= self.source().len(), "source position advanced passed EOF");
     }
 
-    pub fn expect_pos(&self, pos: BytePos) {
-        if pos != self.pos.get() {
-            self.parse_error(ParseError::ExpectedPosition(pos));
-        }
-    }
-
     pub fn eat_len(&self, len: u32) -> &str {
         let start = self.pos.get().to_usize();
         self.advance(len);
@@ -56,7 +50,9 @@ impl SourceReader {
     }
 
     pub fn eat_span(&self, span: Span) -> &str {
-        self.expect_pos(span.lo());
+        if span.lo() != self.pos.get() {
+            self.parse_error(ParseError::ExpectedPosition(span.lo()));
+        }
         let len = span.hi().to_u32() - span.lo().to_u32();
         self.eat_len(len)
     }
