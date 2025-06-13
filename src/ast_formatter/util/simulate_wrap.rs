@@ -20,7 +20,7 @@ pub enum SimulateWrapResult {
 impl AstFormatter {
     /// Format with this function when choosing between continuing on the same line or wrapping to
     /// the next line and adding an indentation (think "ENTER, TAB").
-    /// 
+    ///
     /// This will _not_ add a newline or indent, but will increase the max width by the amount of
     /// extra horizontal space that _would_ be gained by wrapping. It also will turn off any width
     /// limit that is enabled for the current line. Finally, it uses single line mode to limit the

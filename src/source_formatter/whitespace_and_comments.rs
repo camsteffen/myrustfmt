@@ -82,10 +82,6 @@ enum WhitespaceMode {
 }
 
 impl WhitespaceMode {
-    fn is_horizontal(self) -> bool {
-        matches!(self, WhitespaceMode::Horizontal { .. })
-    }
-
     fn vertical_mode(self) -> Option<VerticalWhitespaceMode> {
         match self {
             WhitespaceMode::Horizontal { .. } => None,
@@ -123,15 +119,25 @@ impl WhitespaceContext<'_> {
                 _ => unreachable!(),
             };
             if is_comment {
-                if mode.is_horizontal() {
+                if matches!(mode, WhitespaceMode::Horizontal { .. }) {
                     if is_line_comment {
                         return Err(VerticalError::LineComment.into());
                     } else if token_str.contains('\n') {
                         return Err(VerticalError::MultiLineComment.into());
                     }
                 }
-                // width limits don't apply to comments
-                self.copy_comment(token.len)?;
+                if let Some((i, _)) = token_str
+                    .char_indices()
+                    .rev()
+                    .take_while(|(_, c)| c.is_whitespace())
+                    .last()
+                {
+                    self.copy_comment(i as u32)?;
+                    // skip trailing whitespace
+                    self.advance_source(token.len - i as u32);
+                } else {
+                    self.copy_comment(token.len)?;
+                }
             } else {
                 let has_comments_after = tokens.peek().is_some();
                 let is_newline =
@@ -177,17 +183,12 @@ impl WhitespaceContext<'_> {
                 error_on_newline,
                 space,
             } => {
-                if error_on_newline {
-                    if let Some(newline_pos) = token_str.find('\n') {
-                        if newline_pos > 0 {
-                            // since token_len is u32, newline_pos is bound by u32
-                            let _: u32 = token_len;
-                            let distance = u32::try_from(newline_pos).unwrap();
-                            // todo add a test - probably necessary for accurate error output
-                            self.advance_source(distance);
-                        }
-                        return Err(VerticalError::Newline.into());
+                if error_on_newline && let Some(newline_pos) = token_str.find('\n') {
+                    if newline_pos > 0 {
+                        // todo add a test - probably necessary for accurate error output
+                        self.advance_source(newline_pos as u32);
                     }
+                    return Err(VerticalError::Newline.into());
                 }
                 if !space {
                     self.advance_source(token_len);
@@ -227,6 +228,7 @@ impl WhitespaceContext<'_> {
     }
 
     fn copy_comment(&self, len: u32) -> FormatResult {
+        // width limits don't apply to comments
         self.sf
             .constraints()
             .with_replace_width_limit(None, || self.sf.copy(len))

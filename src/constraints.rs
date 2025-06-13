@@ -51,7 +51,7 @@ pub enum VStruct {
     /// "block indent" means that the first and last lines of the node are not indented, and all
     /// lines in between are indented. This variant describes anything that deviates from that
     /// pattern.
-    /// 
+    ///
     /// Some examples:
     ///  * Nodes with attributes
     ///  * Control flow expressions where the header is multiple lines
