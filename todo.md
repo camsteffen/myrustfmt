@@ -1,5 +1,3 @@
-Does it make sense to overflow blocks?
-
 trailing spaces in comments, doc comments
 
 add/remove semicolon in match arm with return/break/etc.

@@ -34,6 +34,7 @@ Function calls
    closure could fit on one line.
  * A multi-line if/else in a call argument is wrapped instead of continuing after the parenthesis
  * When breaking nested function calls into multiple lines, prefers to add breaks towards the outermost call
+ * Blocks cannot overflow
 
 Closures
 * Closures require a block for multi-line expressions more consistently, specifically `loop` and struct literals are included.

@@ -186,12 +186,12 @@ impl AstFormatter {
         let first_line = self.out.line();
         self.expr_tail(func, self.tail_token("(").as_ref())?;
         self.has_vstruct_if(self.out.line() > first_line, VStruct::NonBlockIndent, || {
-            self.call_args_after_open_paren(args, ListShape::FlexibleWithOverflow, tail)
+            self.call_args(args, ListShape::FlexibleWithOverflow, tail)
         })?;
         Ok(())
     }
 
-    pub fn call_args_after_open_paren(
+    pub fn call_args(
         &self,
         args: &[P<ast::Expr>],
         list_shape: ListShape,
@@ -212,10 +212,12 @@ impl AstFormatter {
             args,
             |af, expr, tail, lcx| {
                 if lcx.strategy == ListStrategy::Horizontal && lcx.index == args.len() - 1 {
-                    // todo also disallow blocks and struct literals?
                     let mut vstructs = VStruct::ControlFlow | VStruct::NonBlockIndent;
                     if args.len() > 1 {
-                        vstructs |= VStruct::List | VStruct::Match;
+                        // todo maybe just look for closure explicitly?
+                        // todo or can we collapse some of these variants?
+                        // really it's anything that isn't a closure
+                        vstructs |= VStruct::Block | VStruct::List | VStruct::Match;
                     }
                     af.disallow_vstructs(vstructs, || af.expr_tail(expr, tail))?;
                 } else {

@@ -327,7 +327,7 @@ impl AstFormatter {
     ) -> FormatResult<VSize> {
         let first_line = self.out.line();
         let height = Cell::new(0);
-        self.call_args_after_open_paren(
+        self.call_args(
             &method_call.args,
             list_shape,
             self.tail_fn(|af| {

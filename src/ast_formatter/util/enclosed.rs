@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::constraints::VStructSet;
+use crate::constraints::{VStruct, VStructSet};
 use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
 use crate::whitespace::VerticalWhitespaceMode;
@@ -28,16 +28,18 @@ impl AstFormatter {
 
     /// Writes contents between braces with indentation
     pub fn enclosed_contents(&self, scope: impl FnOnce() -> FormatResult) -> FormatResult {
-        self.indented(|| {
-            self.out.newline(VerticalWhitespaceMode::Top)?;
+        self.has_vstruct(VStruct::Block, || {
+            self.indented(|| {
+                self.out.newline(VerticalWhitespaceMode::Top)?;
+                self.out.indent();
+                self.constraints()
+                    .disallowed_vstructs
+                    .with_replaced(VStructSet::new(), scope)?;
+                self.out.newline(VerticalWhitespaceMode::Bottom)?;
+                Ok(())
+            })?;
             self.out.indent();
-            self.constraints()
-                .disallowed_vstructs
-                .with_replaced(VStructSet::new(), scope)?;
-            self.out.newline(VerticalWhitespaceMode::Bottom)?;
             Ok(())
-        })?;
-        self.out.indent();
-        Ok(())
+        })
     }
 }

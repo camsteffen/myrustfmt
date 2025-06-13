@@ -70,7 +70,9 @@ impl AstFormatter {
                     ast::FnRetTy::Ty(_) => true,
                 };
                 let single_line_header = af.out.line() == first_line;
-                af.closure_body(&closure.body, has_return_type, single_line_header, tail)?;
+                self.allow_vstructs(VStruct::Block | VStruct::Match, || {
+                    af.closure_body(&closure.body, has_return_type, single_line_header, tail)
+                })?;
                 Ok(())
             };
             let wrapped_return_type = self.fn_decl(
@@ -115,9 +117,7 @@ impl AstFormatter {
                             | VStruct::ControlFlow
                             | VStruct::List
                             | VStruct::NonBlockIndent;
-                        self.disallow_vstructs(disallowed_vstructs, || {
-                            self.allow_vstructs(VStruct::Match, || self.expr_tail(body, tail))
-                        })
+                        self.disallow_vstructs(disallowed_vstructs, || self.expr_tail(body, tail))
                     })
                 })
                 .next(|| {

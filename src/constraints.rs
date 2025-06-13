@@ -38,7 +38,9 @@ pub type VStructSet = EnumSet<VStruct>;
 /// formatting strategies. It's "vertical" because this describes shapes that span multiple lines.
 #[derive(Debug, EnumSetType)]
 pub enum VStruct {
-    /// Closures when they span multiple lines.
+    /// Blocks when they span multiple lines
+    Block,
+    /// Closures when they span multiple lines
     Closure,
     /// Control flow expressions (if/for/loop/while)
     ControlFlow,
