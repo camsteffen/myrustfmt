@@ -10,20 +10,14 @@ impl AstFormatter {
         self.out.space_token("=")?;
         let checkpoint_after_eq = self.out.checkpoint();
 
-        let (force_wrap, lookahead) = if self.out.with_recover_width(|| self.out.space()).is_err() {
-            (true, None)
+        let force_wrap = if self.out.with_recover_width(|| self.out.space()).is_err() {
+            true
         } else {
-            let checkpoint_after_space = self.out.checkpoint();
             match self.simulate_wrap_indent(0, || self.expr_tail(expr, tail)) {
                 SimulateWrapResult::Ok => return Ok(()),
-                SimulateWrapResult::NoWrap | SimulateWrapResult::WrapForLongerFirstLine => {
-                    (false, None)
-                }
-                SimulateWrapResult::WrapForSingleLine => (
-                    true,
-                    Some(self.out.capture_lookahead(&checkpoint_after_space)),
-                ),
-                SimulateWrapResult::WrapForLessExcessWidth => (true, None),
+                SimulateWrapResult::NoWrap | SimulateWrapResult::WrapForLongerFirstLine => false,
+                SimulateWrapResult::WrapForSingleLine
+                | SimulateWrapResult::WrapForLessExcessWidth => true,
             }
         };
 
@@ -38,12 +32,7 @@ impl AstFormatter {
             .next(|| {
                 self.indented(|| {
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                    if let Some(lookahead) = lookahead {
-                        self.out.restore_lookahead(lookahead);
-                    } else {
-                        self.expr(expr)?;
-                        self.tail(tail)?;
-                    }
+                    self.expr_tail(expr, tail)?;
                     Ok(())
                 })
             })

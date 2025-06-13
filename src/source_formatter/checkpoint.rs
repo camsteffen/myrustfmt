@@ -72,7 +72,8 @@ impl SourceFormatter {
         }
     }
 
-    pub fn restore_lookahead(&self, lookahead: Lookahead) {
+    pub fn restore_lookahead(&self, checkpoint: &Checkpoint, lookahead: Lookahead) {
+        self.restore_checkpoint(checkpoint);
         let Lookahead {
             error_buffer,
             source_pos,
