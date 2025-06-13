@@ -101,44 +101,31 @@ impl AstFormatter {
 
     fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
         let checkpoint = self.out.checkpoint();
-        let (force_block, lookahead) = match self.simulate_wrap_indent(0, || self.expr(body)) {
+        let force_block = match self.simulate_wrap_indent(0, || self.expr(body)) {
             SimulateWrapResult::Ok => {
                 if self
                     .out
                     .with_recover_width(|| self.out.token_maybe_missing(","))
                     .is_err()
                 {
-                    (true, None)
+                    true
                 } else {
                     return Ok(());
                 }
             }
-            SimulateWrapResult::NoWrap => (false, None),
-            SimulateWrapResult::WrapForSingleLine => {
-                (true, Some(self.out.capture_lookahead(&checkpoint)))
-            }
-            SimulateWrapResult::WrapForLongerFirstLine
-            | SimulateWrapResult::WrapForLessExcessWidth => (true, None),
+            SimulateWrapResult::NoWrap => false,
+            SimulateWrapResult::WrapForSingleLine
+            | SimulateWrapResult::WrapForLongerFirstLine
+            | SimulateWrapResult::WrapForLessExcessWidth => true,
         };
-        let initial_restore = lookahead.is_none();
         self.backtrack()
             .next_if(!force_block, || {
                 self.disallow_vstructs(VStruct::ControlFlow | VStruct::NonBlockIndent, || {
                     self.expr_tail(body, Some(&self.tail_fn(|af| af.out.token_insert(","))))
                 })
             })
-            .next(|| {
-                if let Some(lookahead) = lookahead {
-                    self.add_block(|| {
-                        self.out.restore_lookahead(lookahead);
-                        Ok(())
-                    })?;
-                } else {
-                    self.add_block_expr(body)?;
-                }
-                Ok(())
-            })
-            .result_with_checkpoint(&checkpoint, initial_restore)?;
+            .next(|| self.add_block(|| self.expr_stmt(body)))
+            .result_with_checkpoint(&checkpoint, true)?;
         Ok(())
     }
 }

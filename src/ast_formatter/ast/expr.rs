@@ -8,7 +8,7 @@ use crate::ast_formatter::list::{Braces, ListItemContext, ListStrategy};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
-use crate::ast_utils::{plain_block, postfix_expr_kind};
+use crate::ast_utils::{is_jump_expr, plain_block, postfix_expr_kind};
 use crate::constraints::VStruct;
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -610,7 +610,18 @@ impl AstFormatter {
     pub fn expr_force_plain_block(&self, expr: &ast::Expr) -> FormatResult {
         match plain_block(expr) {
             Some(block) => self.block_expr(false, block),
-            None => self.add_block_expr(expr),
+            None => self.add_block(|| self.expr_stmt(expr)),
         }
+    }
+
+    pub fn expr_stmt(&self, expr: &ast::Expr) -> FormatResult {
+        self.expr_tail(expr, Some(&self.tail_fn(|af| af.expr_stmt_semi(expr))))
+    }
+
+    pub fn expr_stmt_semi(&self, expr: &ast::Expr) -> FormatResult {
+        if is_jump_expr(expr) {
+            self.out.token_insert(";")?;
+        }
+        Ok(())
     }
 }

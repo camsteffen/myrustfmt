@@ -60,7 +60,7 @@ impl AstFormatter {
                 match syntax {
                     ast::TraitObjectSyntax::Dyn => self.out.token_space("dyn")?,
                     ast::TraitObjectSyntax::DynStar => {
-                        return Err(FormatErrorKind::UnsupportedSyntax.into())
+                        return Err(FormatErrorKind::UnsupportedSyntax.into());
                     }
                     ast::TraitObjectSyntax::None => {}
                 }
@@ -76,7 +76,7 @@ impl AstFormatter {
             )?,
             ast::TyKind::Typeof(anon_const) => self.expr(&anon_const.value)?,
             ast::TyKind::Pat(..) | ast::TyKind::PinnedRef(..) | ast::TyKind::UnsafeBinder(..) => {
-                return Err(FormatErrorKind::UnsupportedSyntax.into())
+                return Err(FormatErrorKind::UnsupportedSyntax.into());
             }
             ast::TyKind::Dummy | ast::TyKind::Err(_) => panic!("unexpected TyKind"),
         }

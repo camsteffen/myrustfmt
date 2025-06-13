@@ -267,10 +267,10 @@ impl AstFormatter {
                     self.out.token(";")?;
                 }
                 ast::AssocItemKind::Delegation(_) => {
-                    return Err(FormatErrorKind::UnsupportedSyntax.into())
+                    return Err(FormatErrorKind::UnsupportedSyntax.into());
                 }
                 ast::AssocItemKind::DelegationMac(_) => {
-                    return Err(FormatErrorKind::UnsupportedSyntax.into())
+                    return Err(FormatErrorKind::UnsupportedSyntax.into());
                 }
             }
             Ok(())

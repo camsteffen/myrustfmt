@@ -103,11 +103,7 @@ impl AstFormatter {
         match &stmt.kind {
             ast::StmtKind::Let(local) => self.local(local),
             ast::StmtKind::Item(item) => self.item(item),
-            ast::StmtKind::Expr(expr) => {
-                let tail = is_jump_expr(expr)
-                    .then(|| self.tail_fn(|af| af.out.token_insert(";")));
-                self.expr_tail(expr, tail.as_ref())
-            }
+            ast::StmtKind::Expr(expr) => self.expr_stmt(expr),
             ast::StmtKind::Semi(expr) => self.expr_tail(expr, Some(&self.tail_token(";"))),
             ast::StmtKind::Empty => self.out.token(";"),
             ast::StmtKind::MacCall(mac_call_stmt) => {
@@ -129,18 +125,6 @@ impl AstFormatter {
         self.enclosed_contents(contents)?;
         self.out.token_insert("}")?;
         Ok(())
-    }
-
-    // todo test removing and adding blocks when there are comments
-    /// Wraps an expression in a vertical block
-    pub fn add_block_expr(&self, expr: &ast::Expr) -> FormatResult {
-        self.add_block(|| {
-            self.expr(expr)?;
-            if is_jump_expr(expr) {
-                self.out.token_insert(";")?;
-            }
-            Ok(())
-        })
     }
 
     /// `{{{ expr }}}` -> `expr`

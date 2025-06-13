@@ -241,7 +241,7 @@ impl AstFormatter {
 
             // Use a vertical chain if it has less excess width.
             SimulateWrapResult::WrapForLessExcessWidth => {
-                return Err(FormatErrorKind::Logical.into())
+                return Err(FormatErrorKind::Logical.into());
             }
         }
         Ok(())

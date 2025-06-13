@@ -116,7 +116,7 @@ impl AstFormatter {
             }
             // feature(return_type_notation)
             ast::GenericArgs::ParenthesizedElided(_span) => {
-                return Err(FormatErrorKind::UnsupportedSyntax.into())
+                return Err(FormatErrorKind::UnsupportedSyntax.into());
             }
         }
         Ok(())

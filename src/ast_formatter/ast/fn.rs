@@ -50,7 +50,7 @@ impl AstFormatter {
             let first_line = self.out.line();
             match closure.binder {
                 ast::ClosureBinder::For { .. } => {
-                    return Err(FormatErrorKind::UnsupportedSyntax.into())
+                    return Err(FormatErrorKind::UnsupportedSyntax.into());
                 }
                 ast::ClosureBinder::NotPresent => {}
             }
@@ -119,7 +119,7 @@ impl AstFormatter {
                     })
                 })
                 .next(|| {
-                    self.add_block_expr(body)?;
+                    self.add_block(|| self.expr_stmt(body))?;
                     self.tail(tail)?;
                     Ok(())
                 })
