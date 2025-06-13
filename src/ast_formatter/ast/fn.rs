@@ -24,14 +24,13 @@ impl AstFormatter {
         let wrapped_return_type = self.fn_decl(
             &sig.decl,
             Braces::Parens,
-            self.tail_fn(|af| {
+            Some(&self.tail_fn(|af| {
                 if is_block_after_decl {
                     af.out.space_allow_newlines()?;
                     af.out.token("{")?;
                 }
                 Ok(())
-            })
-            .as_ref(),
+            })),
         )?;
         if is_block_after_decl && wrapped_return_type {
             self.out.newline_indent(VerticalWhitespaceMode::Break)?;
@@ -78,12 +77,11 @@ impl AstFormatter {
             let wrapped_return_type = self.fn_decl(
                 &closure.fn_decl,
                 Braces::Pipe,
-                self.tail_fn(|af| {
+                Some(&self.tail_fn(|af| {
                     af.out.space_allow_newlines()?;
                     body(af)?;
                     Ok(())
-                })
-                .as_ref(),
+                })),
             )?;
             if wrapped_return_type {
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
@@ -295,7 +293,7 @@ impl AstFormatter {
             tail
         } else {
             colon_ty_tail = self.tail_fn(colon_ty);
-            colon_ty_tail.as_ref()
+            Some(&colon_ty_tail)
         };
         self.pat_tail(&param.pat, tail)?;
         Ok(())

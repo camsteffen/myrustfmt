@@ -95,7 +95,7 @@ impl AstFormatter {
             }
             ast::ItemKind::Use(ref use_tree) => {
                 self.out.token_space("use")?;
-                self.use_tree(use_tree, self.tail_token(";").as_ref())?;
+                self.use_tree(use_tree, Some(&self.tail_token(";")))?;
             }
             ast::ItemKind::Delegation(_)
             | ast::ItemKind::DelegationMac(_)
@@ -133,12 +133,12 @@ impl AstFormatter {
         self.ident(const_item.ident)?;
         self.out.token_space(":")?;
         let Some(expr) = &const_item.expr else {
-            self.ty_tail(&const_item.ty, self.tail_token(";").as_ref())?;
+            self.ty_tail(&const_item.ty, Some(&self.tail_token(";")))?;
             return Ok(());
         };
         self.ty(&const_item.ty)?;
         self.out.space_token_space("=")?;
-        self.expr_tail(expr, self.tail_token(";").as_ref())?;
+        self.expr_tail(expr, Some(&self.tail_token(";")))?;
         Ok(())
     }
 

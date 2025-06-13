@@ -28,12 +28,11 @@ impl AstFormatter {
         } else if let Some(body) = arm.body.as_deref() {
             self.pat_tail(
                 &arm.pat,
-                self.tail_fn(|af| {
+                Some(&self.tail_fn(|af| {
                     af.out.space_token_space("=>")?;
                     af.arm_body_maybe_remove_block(body)?;
                     Ok(())
-                })
-                .as_ref(),
+                })),
             )?;
         }
         Ok(())
@@ -61,15 +60,13 @@ impl AstFormatter {
                 self.out.token_space("if")?;
                 self.expr_tail(
                     guard,
-                    self.tail_fn(|af| {
+                    Some(&self.tail_fn(|af| {
                         let Some(body) = arm.body.as_deref() else {
                             return Ok(());
                         };
                         af.out.space_token("=>")?;
                         af.deindented(|| {
-                            if plain_block(body)
-                                .is_some_and(|block| af.is_block_empty(block))
-                            {
+                            if plain_block(body).is_some_and(|block| af.is_block_empty(block)) {
                                 af.out.space_allow_newlines()?;
                                 af.expr(body)?;
                             } else {
@@ -78,8 +75,7 @@ impl AstFormatter {
                             }
                             Ok(())
                         })
-                    })
-                    .as_ref(),
+                    })),
                 )?;
                 Ok(())
             })
@@ -128,7 +124,7 @@ impl AstFormatter {
         self.backtrack()
             .next_if(!force_block, || {
                 self.disallow_vstructs(VStruct::ControlFlow | VStruct::NonBlockIndent, || {
-                    self.expr_tail(body, self.tail_fn(|af| af.out.token_insert(",")).as_ref())
+                    self.expr_tail(body, Some(&self.tail_fn(|af| af.out.token_insert(","))))
                 })
             })
             .next(|| {

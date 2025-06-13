@@ -293,7 +293,7 @@ impl AstFormatter {
             }
             // root expression
             _ => {
-                self.expr_tail(item.root_or_dot_item, self.tail_fn(postfix_tail).as_ref())?;
+                self.expr_tail(item.root_or_dot_item, Some(&self.tail_fn(postfix_tail)))?;
             }
         }
         Ok(())
@@ -314,7 +314,7 @@ impl AstFormatter {
 
     fn method_call_dot_path(&self, method_call: &ast::MethodCall) -> FormatResult {
         self.out.token(".")?;
-        self.path_segment(&method_call.seg, true, self.tail_token("(").as_ref())?;
+        self.path_segment(&method_call.seg, true, Some(&self.tail_token("(")))?;
         Ok(())
     }
 
@@ -330,11 +330,10 @@ impl AstFormatter {
         self.call_args(
             &method_call.args,
             list_shape,
-            self.tail_fn(|af| {
+            Some(&self.tail_fn(|af| {
                 height.set(af.out.line() - first_line + 1);
                 af.postfix_tail(&postfix_item.postfix_tail, tail)
-            })
-            .as_ref(),
+            })),
         )?;
         Ok(height.get())
     }

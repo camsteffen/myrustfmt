@@ -3,7 +3,6 @@ use crate::constraints::{VStructSet, WidthLimit};
 use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
 
-// The reference is not inside the Option so we don't have to call `.as_ref()` when creating a Tail
 pub type Tail<'a, 'b> = Option<&'a TailS<'b>>;
 
 /// A Tail squeezes the code before it leftward to make room for itself.
@@ -32,17 +31,7 @@ pub struct TailS<'a> {
 
 // Tail creation
 impl AstFormatter {
-    pub fn tail_fn<'a>(
-        &self,
-        tail: impl Fn(&AstFormatter) -> FormatResult + 'a,
-    ) -> Option<TailS<'a>> {
-        Some(self.tail_fn_inner(tail))
-    }
-
-    pub fn tail_fn_inner<'a>(
-        &self,
-        tail: impl Fn(&AstFormatter) -> FormatResult + 'a,
-    ) -> TailS<'a> {
+    pub fn tail_fn<'a>(&self, tail: impl Fn(&AstFormatter) -> FormatResult + 'a) -> TailS<'a> {
         TailS {
             func: Box::new(tail),
             disallowed_vstructs: self.constraints().disallowed_vstructs.get(),
@@ -51,12 +40,8 @@ impl AstFormatter {
         }
     }
 
-    pub fn tail_token<'a>(&self, token: &'static str) -> Option<TailS<'a>> {
-        Some(self.tail_token_inner(token))
-    }
-
-    pub fn tail_token_inner<'a>(&self, token: &'static str) -> TailS<'a> {
-        self.tail_fn_inner(move |af| af.out.token(token))
+    pub fn tail_token<'a>(&self, token: &'static str) -> TailS<'a> {
+        self.tail_fn(move |af| af.out.token(token))
     }
 }
 

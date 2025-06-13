@@ -1,5 +1,3 @@
-trailing spaces in comments, doc comments
-
 add/remove semicolon in match arm with return/break/etc.
 
 enforce chain width with overflowing closure

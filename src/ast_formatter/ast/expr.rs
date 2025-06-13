@@ -184,7 +184,7 @@ impl AstFormatter {
 
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
         let first_line = self.out.line();
-        self.expr_tail(func, self.tail_token("(").as_ref())?;
+        self.expr_tail(func, Some(&self.tail_token("(")))?;
         self.has_vstruct_if(self.out.line() > first_line, VStruct::NonBlockIndent, || {
             self.call_args(args, ListShape::FlexibleWithOverflow, tail)
         })?;
@@ -284,12 +284,11 @@ impl AstFormatter {
                         self.out.space_token_space("in")?;
                         self.expr_tail(
                             iter,
-                            self.tail_fn(|af| {
+                            Some(&self.tail_fn(|af| {
                                 af.out.space()?;
                                 af.out.token("{")?;
                                 Ok(())
-                            })
-                            .as_ref(),
+                            })),
                         )?;
                         Ok(false)
                     })
@@ -417,7 +416,7 @@ impl AstFormatter {
                     let expr_start = self.out.col();
                     self.expr_tail(
                         inner,
-                        self.tail_fn(|af| {
+                        Some(&self.tail_fn(|af| {
                             let end_start = self.out.col();
                             let before_end = self.out.checkpoint();
                             let Err(err) = self.out.with_recover_width(|| -> FormatResult {
@@ -444,8 +443,7 @@ impl AstFormatter {
                             af.out.token(")")?;
                             self.tail(tail)?;
                             Ok(())
-                        })
-                        .as_ref(),
+                        })),
                     )
                 })
             })
@@ -469,7 +467,7 @@ impl AstFormatter {
             let first_line = self.out.line();
             self.expr_tail(
                 start,
-                self.tail_fn(|af| {
+                Some(&self.tail_fn(|af| {
                     af.out.token(sigil)?;
                     let Some(end) = end else {
                         return af.tail(tail);
@@ -478,8 +476,7 @@ impl AstFormatter {
                         af.expr_tail(end, tail)
                     })?;
                     Ok(())
-                })
-                .as_ref(),
+                })),
             )?;
         } else {
             self.out.token(sigil)?;
@@ -495,14 +492,13 @@ impl AstFormatter {
         self.out.token("[")?;
         self.expr_tail(
             element,
-            self.tail_fn(|af| {
+            Some(&self.tail_fn(|af| {
                 af.out.token_space(";")?;
                 af.expr(&count.value)?;
                 af.out.token("]")?;
                 self.tail(tail)?;
                 Ok(())
-            })
-            .as_ref(),
+            })),
         )?;
         Ok(())
     }

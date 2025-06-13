@@ -14,12 +14,11 @@ impl AstFormatter {
     ) -> FormatResult {
         self.expr_tail(
             left,
-            self.tail_fn(|af| {
+            Some(&self.tail_fn(|af| {
                 af.out.space_token_space(op)?;
                 af.expr_tail(right, tail)?;
                 Ok(())
-            })
-            .as_ref(),
+            })),
         )
     }
 

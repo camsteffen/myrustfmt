@@ -15,8 +15,9 @@ impl AstFormatter {
         self.out.token_space("let")?;
         self.pat_tail(
             &local.pat,
-            self.tail_fn(|af| af.local_after_pat(local, first_line, start_col))
-                .as_ref(),
+            Some(
+                &self.tail_fn(|af| af.local_after_pat(local, first_line, start_col)),
+            ),
         )?;
         Ok(())
     }
@@ -32,7 +33,7 @@ impl AstFormatter {
             let Some((init, else_)) = kind.init_else_opt() else {
                 return af.out.token(";");
             };
-            af.assign_expr(init, else_.is_none().then_some(&af.tail_token_inner(";")))?;
+            af.assign_expr(init, else_.is_none().then(|| af.tail_token(";")).as_ref())?;
             let Some(else_) = else_ else { return Ok(()) };
             let is_single_line_init = af.out.line() == first_line;
             af.local_else(else_, is_single_line_init, start_col)?;
@@ -40,7 +41,7 @@ impl AstFormatter {
         };
         if let Some(ty) = ty {
             self.out.token_space(":")?;
-            return self.ty_tail(ty, self.tail_fn(init_else).as_ref());
+            return self.ty_tail(ty, Some(&self.tail_fn(init_else)));
         }
         init_else(self)?;
         Ok(())
