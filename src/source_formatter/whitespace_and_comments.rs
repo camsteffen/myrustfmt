@@ -111,20 +111,21 @@ impl WhitespaceContext<'_> {
 
         while let Some((token_str, is_comment, is_line_comment)) = tokens.next() {
             let is_last = tokens.peek().is_none();
+            let is_newline;
             if is_comment {
                 self.comment_token(token_str, is_line_comment)?;
+                is_newline = false;
                 seen_comments = true;
             } else {
-                let has_comments_after = !is_last;
-                let is_newline =
-                    self.whitespace_token(token_str, seen_comments, has_comments_after)?;
-                if self.mode.vertical_mode() == Some(VerticalWhitespaceMode::SingleNewline)
-                    && is_newline
-                {
-                    break;
-                }
+                is_newline =
+                    self.whitespace_token(token_str, seen_comments, !is_last)?;
             }
             last_is_line_comment = is_line_comment;
+            if self.mode.vertical_mode() == Some(VerticalWhitespaceMode::SingleNewline)
+                && is_newline
+            {
+                break;
+            }
         }
 
         if last_is_line_comment {
@@ -157,7 +158,7 @@ impl WhitespaceContext<'_> {
                 return Err(VerticalError::MultiLineComment.into());
             }
         }
-        if let Some((i, _)) = str
+        if is_line_comment && let Some((i, _)) = str
             .char_indices()
             .rev()
             .take_while(|(_, c)| c.is_whitespace())

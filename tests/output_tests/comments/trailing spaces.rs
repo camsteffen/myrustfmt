@@ -4,6 +4,9 @@
 ///  
 struct X; // comment  
 // comment  
+/*  
+ * hi guys  
+ */  
 struct Y;
 
 // :after:
@@ -12,4 +15,7 @@ struct Y;
 ///
 struct X; // comment
 // comment
+/*
+ * hi guys
+ */
 struct Y;
