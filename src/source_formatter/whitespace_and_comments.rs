@@ -1,7 +1,7 @@
 use crate::error::{FormatResult, VerticalError};
 use crate::source_formatter::SourceFormatter;
 use crate::whitespace::VerticalWhitespaceMode;
-use rustc_lexer::{FrontmatterAllowed, Token, TokenKind};
+use rustc_lexer::{FrontmatterAllowed, TokenKind};
 
 impl SourceFormatter {
     /// Allows any comments or nothing.
@@ -99,57 +99,32 @@ struct WhitespaceContext<'a> {
 
 impl WhitespaceContext<'_> {
     fn whitespace_and_comments<'a>(&mut self) -> FormatResult {
-        let Self { sf, mode, .. } = *self;
+        let sf = self.sf;
 
-        let mut remaining_source = sf.source_reader.remaining();
-        let tokens = tokenize_whitespace_and_comments(remaining_source);
+        let tokens = tokenize_whitespace_and_comments(sf.source_reader.remaining());
         let mut tokens = tokens.peekable();
 
         let mut seen_comments = false;
         let mut last_is_line_comment = false;
 
-        while let Some(token) = tokens.next() {
-            let token_str;
-            (token_str, remaining_source) = remaining_source
-                .split_at(token.len.try_into().unwrap());
-            let (is_comment, is_line_comment) = match token.kind {
-                TokenKind::LineComment { .. } => (true, true),
-                TokenKind::BlockComment { .. } => (true, false),
-                TokenKind::Whitespace => (false, false),
-                _ => unreachable!(),
-            };
+        while let Some((token_str, is_comment, is_line_comment)) = tokens.next() {
+            let is_last = tokens.peek().is_none();
             if is_comment {
-                if matches!(mode, WhitespaceMode::Horizontal { .. }) {
-                    if is_line_comment {
-                        return Err(VerticalError::LineComment.into());
-                    } else if token_str.contains('\n') {
-                        return Err(VerticalError::MultiLineComment.into());
-                    }
-                }
-                if let Some((i, _)) = token_str
-                    .char_indices()
-                    .rev()
-                    .take_while(|(_, c)| c.is_whitespace())
-                    .last()
-                {
-                    self.copy_comment(i as u32)?;
-                    // skip trailing whitespace
-                    self.advance_source(token.len - i as u32);
-                } else {
-                    self.copy_comment(token.len)?;
-                }
+                self.comment_token(token_str, is_line_comment)?;
+                seen_comments = true;
             } else {
-                let has_comments_after = tokens.peek().is_some();
+                let has_comments_after = !is_last;
                 let is_newline =
-                    self.whitespace_token(token_str, token.len, seen_comments, has_comments_after)?;
-                if mode.vertical_mode() == Some(VerticalWhitespaceMode::SingleNewline) && is_newline
+                    self.whitespace_token(token_str, seen_comments, has_comments_after)?;
+                if self.mode.vertical_mode() == Some(VerticalWhitespaceMode::SingleNewline)
+                    && is_newline
                 {
                     break;
                 }
             }
-            seen_comments |= is_comment;
             last_is_line_comment = is_line_comment;
         }
+
         if last_is_line_comment {
             // add a trailing newline
             self.emit_newline(0, false, false)?;
@@ -170,20 +145,43 @@ impl WhitespaceContext<'_> {
         Ok(())
     }
 
+    fn comment_token(&self, str: &str, is_line_comment: bool) -> FormatResult {
+        if matches!(self.mode, WhitespaceMode::Horizontal { .. }) {
+            if is_line_comment {
+                return Err(VerticalError::LineComment.into());
+            } else if str.contains('\n') {
+                return Err(VerticalError::MultiLineComment.into());
+            }
+        }
+        if let Some((i, _)) = str
+            .char_indices()
+            .rev()
+            .take_while(|(_, c)| c.is_whitespace())
+            .last()
+        {
+            self.copy_comment(i as u32)?;
+            // skip trailing whitespace
+            self.advance_source((str.len() - i) as u32);
+        } else {
+            self.copy_comment(str.len() as u32)?;
+        }
+        Ok(())
+    }
+
     fn whitespace_token(
         &mut self,
-        token_str: &str,
-        token_len: u32,
+        str: &str,
         has_comments_before: bool,
         has_comments_after: bool,
     ) -> FormatResult<bool> {
+        let len = str.len() as u32;
         let mut is_newline = false;
         match whitespace_token_strategy(self.mode, has_comments_before, has_comments_after) {
             WhitespaceTokenStrategy::Horizontal {
                 error_on_newline,
                 space,
             } => {
-                if error_on_newline && let Some(newline_pos) = token_str.find('\n') {
+                if error_on_newline && let Some(newline_pos) = str.find('\n') {
                     if newline_pos > 0 {
                         // todo add a test - probably necessary for accurate error output
                         self.advance_source(newline_pos as u32);
@@ -191,29 +189,29 @@ impl WhitespaceContext<'_> {
                     return Err(VerticalError::Newline.into());
                 }
                 if !space {
-                    self.advance_source(token_len);
+                    self.advance_source(len);
                     return Ok(is_newline);
                 }
-                self.emit_space(token_len)?;
+                self.emit_space(len)?;
             }
             WhitespaceTokenStrategy::Vertical { allow_blank_line } => {
-                let double = allow_blank_line && token_str.matches('\n').nth(1).is_some();
-                self.emit_newline(token_len, double, has_comments_after)?;
+                let double = allow_blank_line && str.matches('\n').nth(1).is_some();
+                self.emit_newline(len, double, has_comments_after)?;
                 is_newline = true;
             }
             WhitespaceTokenStrategy::Flexible {
                 allow_blank_line,
                 space_if_horizontal,
             } => {
-                let mut newlines = token_str.matches('\n');
+                let mut newlines = str.matches('\n');
                 if newlines.next().is_some() {
                     let double = allow_blank_line && newlines.next().is_some();
-                    self.emit_newline(token_len, double, has_comments_after)?;
+                    self.emit_newline(len, double, has_comments_after)?;
                     is_newline = true;
                 } else if space_if_horizontal {
-                    self.emit_space(token_len)?;
+                    self.emit_space(len)?;
                 } else {
-                    self.advance_source(token_len);
+                    self.advance_source(len);
                 }
             }
         }
@@ -260,7 +258,7 @@ impl WhitespaceContext<'_> {
     }
 }
 
-fn tokenize_whitespace_and_comments(source: &str) -> impl Iterator<Item = Token> {
+fn tokenize_whitespace_and_comments(source: &str) -> impl Iterator<Item = (&str, bool, bool)> {
     let mut cursor = rustc_lexer::Cursor::new(source, FrontmatterAllowed::No);
     std::iter::from_fn(move || {
         let remaining = cursor.as_str();
@@ -270,12 +268,14 @@ fn tokenize_whitespace_and_comments(source: &str) -> impl Iterator<Item = Token>
             return None;
         }
         let token = cursor.advance_token();
-        match token.kind {
-            TokenKind::BlockComment { .. }
-            | TokenKind::LineComment { .. }
-            | TokenKind::Whitespace => Some(token),
-            _ => None,
-        }
+        let (is_comment, is_line_comment) = match token.kind {
+            TokenKind::BlockComment { .. } => (true, false),
+            TokenKind::LineComment { .. } => (true, true),
+            TokenKind::Whitespace => (false, false),
+            _ => return None,
+        };
+        let token_str = &remaining[..token.len as usize];
+        Some((token_str, is_comment, is_line_comment))
     })
 }
 
