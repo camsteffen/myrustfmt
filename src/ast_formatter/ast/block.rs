@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::ast::item::MaybeItem;
 use crate::ast_formatter::tail::Tail;
-use crate::ast_utils::{is_jump_expr, jump_expr_kind, plain_block};
+use crate::ast_utils::{is_jump_expr, plain_block};
 use crate::error::FormatResult;
 use crate::util::whitespace_utils::{is_whitespace, is_whitespace_or_semicolon};
 use crate::whitespace::VerticalWhitespaceMode;
@@ -104,10 +104,8 @@ impl AstFormatter {
             ast::StmtKind::Let(local) => self.local(local),
             ast::StmtKind::Item(item) => self.item(item),
             ast::StmtKind::Expr(expr) => {
-                let tail = match expr.kind {
-                    jump_expr_kind!() => Some(self.tail_fn(|af| af.out.token_insert(";"))),
-                    _ => None,
-                };
+                let tail = is_jump_expr(expr)
+                    .then(|| self.tail_fn(|af| af.out.token_insert(";")));
                 self.expr_tail(expr, tail.as_ref())
             }
             ast::StmtKind::Semi(expr) => self.expr_tail(expr, Some(&self.tail_token(";"))),

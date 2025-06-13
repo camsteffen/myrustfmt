@@ -1,38 +1,16 @@
 use rustc_ast::ast;
 use rustc_span::sym;
 
-// todo needed?
-// macro_rules! block_like_expr_kind {
-//     () => {
-//         ast::ExprKind::Block(..)
-//             | ast::ExprKind::ConstBlock(_)
-//             | ast::ExprKind::Gen(..)
-//             | ast::ExprKind::TryBlock(..)
-//     };
-// }
-// pub(crate) use block_like_expr_kind;
-
-macro_rules! jump_expr_kind {
-    () => {
-        ::rustc_ast::ast::ExprKind::Become(..)
-            | ::rustc_ast::ast::ExprKind::Break(..)
-            | ::rustc_ast::ast::ExprKind::Continue(..)
-            | ::rustc_ast::ast::ExprKind::Ret(..)
-            | ::rustc_ast::ast::ExprKind::Yeet(..)
-            | ::rustc_ast::ast::ExprKind::Yield(..)
-    };
-    (Some($target:pat)) => {
-        ::rustc_ast::ast::ExprKind::Become($target)
-            | ::rustc_ast::ast::ExprKind::Break(_, Some($target))
-            | ::rustc_ast::ast::ExprKind::Ret(Some($target))
-            | ::rustc_ast::ast::ExprKind::Yeet(Some($target))
-            | ::rustc_ast::ast::ExprKind::Yield(Some($target))
-    };
-}
-pub(crate) use jump_expr_kind;
-
 pub fn is_jump_expr(expr: &ast::Expr) -> bool {
-    matches!(expr.kind, jump_expr_kind!())
+    match expr.kind {
+        ast::ExprKind::Become(..)
+        | ast::ExprKind::Break(..)
+        | ast::ExprKind::Continue(..)
+        | ast::ExprKind::Ret(..)
+        | ast::ExprKind::Yeet(..)
+        | ast::ExprKind::Yield(..) => true,
+        _ => false,
+    }
 }
 
 // note: ExprKind::Cast isn't here since it is lower precedence and so it doesn't chain
