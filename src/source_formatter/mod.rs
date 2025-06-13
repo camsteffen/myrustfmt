@@ -85,22 +85,18 @@ impl SourceFormatter {
 
     pub fn skip_token(&self, token: &'static str) -> FormatResult {
         self.horizontal_whitespace()?;
-        self.source_reader.eat(token);
+        self.source_reader.eat_token(token);
         Ok(())
     }
 
     pub fn skip_token_if_present(&self, token: &str) -> FormatResult<bool> {
         // todo is this checkpoint avoidable?
         let checkpoint = self.checkpoint();
-        let ws_result = self.horizontal_whitespace();
-        if self.source_reader.remaining().starts_with(token) {
-            ws_result?;
-            self.source_reader.advance(token.len().try_into().unwrap());
-            Ok(true)
-        } else {
+        let found = self.horizontal_whitespace().is_ok() && self.source_reader.try_eat_token(token);
+        if !found {
             self.restore_checkpoint(&checkpoint);
-            Ok(false)
         }
+        Ok(found)
     }
 
     pub fn copy_next_token(&self) -> FormatResult {
@@ -116,7 +112,7 @@ impl SourceFormatter {
     /// N.B. a token is indivisible (e.g. "::<" is two tokens since you can write it as "::  <")
     pub fn token(&self, token: &'static str) -> FormatResult {
         self.horizontal_whitespace()?;
-        self.source_reader.eat(token);
+        self.source_reader.eat_token(token);
         self.out.token(token)?;
         Ok(())
     }
@@ -155,30 +151,26 @@ impl SourceFormatter {
     /// Copy a token from source
     pub fn token_from_source(&self, span: Span) -> FormatResult {
         self.horizontal_whitespace()?;
-        self.source_reader.expect_pos(span.lo());
-        let token = self.source_reader.get_span(span);
-        self.token_unchecked(token)?;
+        let token = self.source_reader.eat_span(span);
+        self.out.token(token)?;
         Ok(())
     }
 
     fn copy(&self, len: u32) -> FormatResult {
-        let segment = &self.source_reader.remaining()[..len.try_into().unwrap()];
-        self.out.write_possibly_multiline(segment)?;
-        self.source_reader.advance(len);
+        let segment = self.source_reader.eat_len(len);
+        self.out.write_str(segment)?;
         Ok(())
+    }
+
+    fn copy_unchecked(&self, len: u32) {
+        let segment = self.source_reader.eat_len(len);
+        self.out.write_str_unchecked(segment);
     }
 
     pub fn copy_span(&self, span: Span) -> FormatResult {
         self.horizontal_whitespace()?;
         self.source_reader.expect_pos(span.lo());
         self.copy(span.hi().to_u32() - span.lo().to_u32())?;
-        Ok(())
-    }
-
-    /** Write a token assuming it is next in source */
-    fn token_unchecked(&self, token: &str) -> FormatResult {
-        self.out.token(token)?;
-        self.source_reader.advance(token.len().try_into().unwrap());
         Ok(())
     }
 

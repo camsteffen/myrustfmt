@@ -110,15 +110,14 @@ impl WhitespaceContext<'_> {
         let mut last_is_line_comment = false;
 
         while let Some((token_str, is_comment, is_line_comment)) = tokens.next() {
-            let is_last = tokens.peek().is_none();
             let is_newline;
             if is_comment {
                 self.comment_token(token_str, is_line_comment)?;
                 is_newline = false;
                 seen_comments = true;
             } else {
-                is_newline =
-                    self.whitespace_token(token_str, seen_comments, !is_last)?;
+                let has_comments_after = tokens.peek().is_some();
+                is_newline = self.whitespace_token(token_str, seen_comments, has_comments_after)?;
             }
             last_is_line_comment = is_line_comment;
             if self.mode.vertical_mode() == Some(VerticalWhitespaceMode::SingleNewline)
@@ -158,17 +157,30 @@ impl WhitespaceContext<'_> {
                 return Err(VerticalError::MultiLineComment.into());
             }
         }
-        if is_line_comment && let Some((i, _)) = str
-            .char_indices()
-            .rev()
-            .take_while(|(_, c)| c.is_whitespace())
-            .last()
-        {
-            self.copy_comment(i as u32)?;
-            // skip trailing whitespace
-            self.advance_source((str.len() - i) as u32);
+        if is_line_comment {
+            let trimmed_len = str.trim_end().len();
+            self.sf.copy_unchecked(trimmed_len as u32);
+            if trimmed_len < str.len() {
+                self.advance_source((str.len() - trimmed_len) as u32);
+            }
         } else {
-            self.copy_comment(str.len() as u32)?;
+            let mut remaining = str;
+            loop {
+                let newline_idx = remaining.find('\n');
+                let line = newline_idx.map_or(remaining, |i| &remaining[..i]);
+                let trimmed = line.trim_end();
+                self.sf.copy_unchecked(trimmed.len() as u32);
+                if trimmed.len() < line.len() {
+                    // skip trailing whitespace
+                    self.advance_source((line.len() - trimmed.len()) as u32)
+                }
+                let Some(newline_idx) = newline_idx else {
+                    break;
+                };
+                // copy the newline
+                self.sf.copy_unchecked(1);
+                remaining = &remaining[newline_idx + 1..];
+            }
         }
         Ok(())
     }
@@ -180,8 +192,9 @@ impl WhitespaceContext<'_> {
         has_comments_after: bool,
     ) -> FormatResult<bool> {
         let len = str.len() as u32;
-        let mut is_newline = false;
-        match whitespace_token_strategy(self.mode, has_comments_before, has_comments_after) {
+        let strategy =
+            whitespace_token_strategy(self.mode, has_comments_before, has_comments_after);
+        let is_newline = match strategy {
             WhitespaceTokenStrategy::Horizontal {
                 error_on_newline,
                 space,
@@ -193,33 +206,36 @@ impl WhitespaceContext<'_> {
                     }
                     return Err(VerticalError::Newline.into());
                 }
-                if !space {
+                if space {
+                    self.emit_space(len)?;
+                } else {
                     self.advance_source(len);
-                    return Ok(is_newline);
                 }
-                self.emit_space(len)?;
+                false
             }
             WhitespaceTokenStrategy::Vertical { allow_blank_line } => {
                 let double = allow_blank_line && str.matches('\n').nth(1).is_some();
                 self.emit_newline(len, double, has_comments_after)?;
-                is_newline = true;
+                true
             }
             WhitespaceTokenStrategy::Flexible {
                 allow_blank_line,
                 space_if_horizontal,
             } => {
-                let mut newlines = str.matches('\n');
-                if newlines.next().is_some() {
-                    let double = allow_blank_line && newlines.next().is_some();
-                    self.emit_newline(len, double, has_comments_after)?;
-                    is_newline = true;
+                let newlines = str
+                    .matches('\n')
+                    .take(1 + usize::from(allow_blank_line))
+                    .count();
+                if newlines > 0 {
+                    self.emit_newline(len, newlines > 1, has_comments_after)?;
                 } else if space_if_horizontal {
                     self.emit_space(len)?;
                 } else {
                     self.advance_source(len);
                 }
+                newlines > 0
             }
-        }
+        };
         Ok(is_newline)
     }
 }
@@ -228,13 +244,6 @@ impl WhitespaceContext<'_> {
 impl WhitespaceContext<'_> {
     fn advance_source(&self, input_len: u32) {
         self.sf.source_reader.advance(input_len)
-    }
-
-    fn copy_comment(&self, len: u32) -> FormatResult {
-        // width limits don't apply to comments
-        self.sf
-            .constraints()
-            .with_replace_width_limit(None, || self.sf.copy(len))
     }
 
     fn emit_newline(&mut self, input_len: u32, double: bool, indent: bool) -> FormatResult {

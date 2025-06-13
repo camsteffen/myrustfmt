@@ -86,7 +86,7 @@ impl ConstraintWriter {
         self.check_width_constraints()
     }
 
-    pub fn write_possibly_multiline(&self, source: &str) -> FormatResult {
+    pub fn write_str(&self, source: &str) -> FormatResult {
         for c in source.chars() {
             if c == '\n' {
                 self.newline()?;
@@ -96,6 +96,10 @@ impl ConstraintWriter {
             }
         }
         Ok(())
+    }
+
+    pub fn write_str_unchecked(&self, str: &str) {
+        self.buffer.with_taken(|b| b.push_str(str));
     }
 
     pub fn newline(&self) -> Result<(), NewlineNotAllowedError> {

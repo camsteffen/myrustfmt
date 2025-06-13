@@ -39,6 +39,7 @@ impl SourceReader {
 
     pub fn advance(&self, len: u32) {
         self.pos.set(self.pos.get() + BytePos::from_u32(len));
+        assert!(self.pos.get().to_usize() <= self.source().len(), "source position advanced passed EOF");
     }
 
     pub fn expect_pos(&self, pos: BytePos) {
@@ -47,14 +48,27 @@ impl SourceReader {
         }
     }
 
-    pub fn eat(&self, token: &'static str) {
-        if !self.try_eat(token) {
+    pub fn eat_len(&self, len: u32) -> &str {
+        let start = self.pos.get().to_usize();
+        self.advance(len);
+        let end = self.pos.get().to_usize();
+        &self.source()[start..end]
+    }
+
+    pub fn eat_span(&self, span: Span) -> &str {
+        self.expect_pos(span.lo());
+        let len = span.hi().to_u32() - span.lo().to_u32();
+        self.eat_len(len)
+    }
+
+    pub fn eat_token(&self, token: &'static str) {
+        if !self.try_eat_token(token) {
             self.parse_error(ParseError::ExpectedToken(token));
         }
     }
 
     #[must_use]
-    pub fn try_eat(&self, token: &str) -> bool {
+    pub fn try_eat_token(&self, token: &str) -> bool {
         if !self.remaining().starts_with(token) {
             return false;
         }
@@ -63,25 +77,20 @@ impl SourceReader {
     }
 
     pub fn eat_next_token(&self) -> &str {
-        let token = self.next_token();
-        self.advance(token.len);
-        &self.remaining()[..token.len.try_into().unwrap()]
+        let token = self.next_lexer_token();
+        self.eat_len(token.len)
     }
 
     pub fn goto(&self, pos: BytePos) {
         self.pos.set(pos);
     }
 
-    fn next_token(&self) -> rustc_lexer::Token {
+    fn next_lexer_token(&self) -> rustc_lexer::Token {
         rustc_lexer::tokenize(self.remaining()).next().unwrap()
     }
 
     pub fn remaining(&self) -> &str {
         &self.source()[self.pos.get().to_usize()..]
-    }
-
-    pub fn get_span(&self, span: Span) -> &str {
-        &self.source()[span.lo().to_usize()..span.hi().to_usize()]
     }
 
     #[track_caller]
