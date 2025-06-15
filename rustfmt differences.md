@@ -16,6 +16,10 @@
 * A single call argument cannot be combined with control flow expressions
 * Only argument lists can overflow. Not arrays or tuples.
 
+Enum
+ * An enum struct variant may be written horizontally purely based on its width.
+   Rustfmt has hard to understand rules that consider surrounding variants and comments.
+
 Postfix chains (or "dot chains")
  * Horizontal chains are preferred over vertical chains when they are shorter even when a vertical chain
    would allow the last item to fit on one line.
@@ -49,6 +53,7 @@ Chains
 * Multi-line chains with no indent as a list item (e.g. array element) are wrapped with a block
 * Separate line chains are preferred over overflow if the number of lines is the same
   * Rationale: it's better for higher level structures to use line breaks than more deeply nested structures
+* Horizontal line chains are preferred if shorter than a veritcal chain, even if there is an overflowing closure
 
 Comments
  * Removes trailing spaces from all comments, including doc comments and line comments with preceding code

@@ -8,8 +8,6 @@ Some(
 
 std macros
 
-force vertical enum variant fields
-
 binary expression width limit?
 
 block statements must be vertical
