@@ -21,7 +21,7 @@ Enum
    Rustfmt has hard to understand rules that consider surrounding variants and comments.
 
 Postfix chains (or "dot chains")
- * Horizontal chains are preferred over vertical chains when they are shorter even when a vertical chain
+ * Horizontal chains are preferred over vertical chains when they are shorter, even when a vertical chain
    would allow the last item to fit on one line.
  * The chain width is not enforced for items that start within the first 15 chars of the chain
 

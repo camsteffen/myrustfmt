@@ -6,6 +6,14 @@ Some(
     aaaaaaaaaaaaaaaaa(bbbbbbbbb, ccccccc),
 )
 
+Why isn't fn_call_width applied here?
+let errors = Rc::new(
+    BufferedErrorEmitter::new(ErrorEmitter::new(path.clone(), config.capture_error_output)),
+);
+
+Why does rustfmt wrap this &&?
+if let Some(width_limit) = self.width_limit.get() && width_limit.line == line {
+
 std macros
 
 binary expression width limit?
