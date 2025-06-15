@@ -201,9 +201,9 @@ impl ErrorEmitter {
         let (line, col) = (line + 1, col + 1);
         match &self.path {
             None => self.write(format_args!(" at {line}:{col}\n")),
-            Some(path) => self.write(
-                format_args!(" at {path}:{line}:{col}\n", path = path.display()),
-            ),
+            Some(path) => {
+                self.write(format_args!(" at {path}:{line}:{col}\n", path = path.display()))
+            }
         }
     }
 

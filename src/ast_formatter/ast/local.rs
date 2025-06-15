@@ -15,9 +15,7 @@ impl AstFormatter {
         self.out.token_space("let")?;
         self.pat_tail(
             &local.pat,
-            Some(
-                &self.tail_fn(|af| af.local_after_pat(local, first_line, start_col)),
-            ),
+            Some(&self.tail_fn(|af| af.local_after_pat(local, first_line, start_col))),
         )?;
         Ok(())
     }

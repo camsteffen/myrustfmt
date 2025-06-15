@@ -131,10 +131,7 @@ impl WhitespaceContext<'_> {
         }
         match self.mode {
             WhitespaceMode::Horizontal { space }
-            | WhitespaceMode::Flexible {
-                space_if_horizontal: space,
-                ..
-            } => {
+            | WhitespaceMode::Flexible { space_if_horizontal: space, .. } => {
                 if space && !(self.has_emitted_newline || self.has_emitted_space) {
                     sf.out.token(" ")?;
                 }

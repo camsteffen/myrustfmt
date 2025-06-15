@@ -66,7 +66,9 @@ impl AstFormatter {
                         };
                         af.out.space_token("=>")?;
                         af.deindented(|| {
-                            if plain_block(body).is_some_and(|block| af.is_block_empty(block)) {
+                            if plain_block(body)
+                                .is_some_and(|block| af.is_block_empty(block))
+                            {
                                 af.out.space_allow_newlines()?;
                                 af.expr(body)?;
                             } else {

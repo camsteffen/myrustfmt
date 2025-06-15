@@ -140,6 +140,7 @@ impl AstFormatter {
                     Ok(())
                 },
                 ListOptions::new()
+                    // todo test
                     .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
             )?,
             ast::MetaItemKind::NameValue(lit) => {

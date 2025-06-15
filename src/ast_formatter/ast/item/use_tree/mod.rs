@@ -67,9 +67,7 @@ impl AstFormatter {
                             .item_requires_own_line(|(use_tree, _): &(&ast::UseTree, _)| {
                                 matches!(use_tree.kind, ast::UseTreeKind::Nested { .. })
                             })
-                            .wrap_to_fit(ListWrapToFit::Yes {
-                                max_element_width: None,
-                            })
+                            .wrap_to_fit(ListWrapToFit::Yes { max_element_width: None })
                             .tail(tail),
                     )?;
                 }

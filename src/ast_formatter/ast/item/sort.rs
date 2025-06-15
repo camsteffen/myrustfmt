@@ -71,14 +71,10 @@ impl AstFormatter {
             };
             if is_external_mod(item) {
                 let group = self.split_off_contiguous_maybe_item(&mut remaining, is_external_mod);
-                Some(
-                    NodeOrSortableItemGroup::SortableItemGroup(SortableItemGroupKind::Mod, group),
-                )
+                Some(NodeOrSortableItemGroup::SortableItemGroup(SortableItemGroupKind::Mod, group))
             } else if is_use(item) {
                 let group = self.split_off_contiguous_maybe_item(&mut remaining, is_use);
-                Some(
-                    NodeOrSortableItemGroup::SortableItemGroup(SortableItemGroupKind::Use, group),
-                )
+                Some(NodeOrSortableItemGroup::SortableItemGroup(SortableItemGroupKind::Use, group))
             } else {
                 let first = remaining.split_off_first().unwrap();
                 Some(NodeOrSortableItemGroup::Node(first))

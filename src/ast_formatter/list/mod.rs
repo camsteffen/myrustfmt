@@ -177,7 +177,12 @@ where
         });
         let end_tail = af.tail_fn(close);
         let mut is_overflow = false;
-        af.with_width_limit_opt(opt.single_line_max_contents_width, || {
+        let width_limit = if len + usize::from(rest.is_some_and(|r| r.base.is_some())) > 1 {
+            opt.single_line_max_contents_width
+        } else {
+            None
+        };
+        af.with_width_limit_opt(width_limit, || {
             if len == 0 {
                 if let Some(rest) = rest {
                     list_rest(af, rest, Some(&end_tail))?;
