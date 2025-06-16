@@ -44,6 +44,8 @@ pub enum VStruct {
     Closure,
     /// Control flow expressions (if/for/loop/while)
     ControlFlow,
+    // todo use this more?
+    Index,
     /// All kinds of lists (e.g. arrays, tuples, call arguments) when they span multiple lines.
     List,
     /// `match` expressions

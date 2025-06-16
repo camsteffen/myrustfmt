@@ -198,7 +198,6 @@ impl AstFormatter {
         tail: Tail,
     ) -> FormatResult {
         let mut list_opt = ListOptions::<P<ast::Expr>>::new()
-            .item_prefers_overflow(|expr| matches!(expr.kind, ast::ExprKind::Closure(_)))
             .omit_open_brace()
             .shape(list_shape)
             .tail(tail);
@@ -211,7 +210,8 @@ impl AstFormatter {
             args,
             |af, expr, tail, lcx| {
                 if lcx.strategy == ListStrategy::Horizontal && lcx.index == args.len() - 1 {
-                    let mut vstructs = VStruct::ControlFlow | VStruct::NonBlockIndent;
+                    let mut vstructs =
+                        VStruct::ControlFlow | VStruct::Index | VStruct::NonBlockIndent;
                     if args.len() > 1 {
                         // todo maybe just look for closure explicitly?
                         // todo or can we collapse some of these variants?

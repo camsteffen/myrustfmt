@@ -362,9 +362,11 @@ impl AstFormatter {
                             })
                         })
                         .next(|| {
-                            self.enclosed_after_opening("]", || self.expr(index))?;
-                            self.tail(tail)?;
-                            Ok(())
+                            self.has_vstruct(VStruct::Index, || {
+                                self.enclosed_after_opening("]", || self.expr(index))?;
+                                self.tail(tail)?;
+                                Ok(())
+                            })
                         })
                         .result()?;
                 }

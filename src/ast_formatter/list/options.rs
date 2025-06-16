@@ -25,7 +25,6 @@ pub struct ListOptions<'ast, 'tail, Item> {
     pub(super) is_struct: bool,
     /// Called with the last item in the list. Returns true if that item always prefers overflow
     /// to being wrapped to the next line.
-    pub(super) item_prefers_overflow: Option<Box<dyn Fn(&Item) -> bool>>,
     pub(super) item_requires_own_line: Option<Box<dyn Fn(&Item) -> bool>>,
     pub(super) omit_open_brace: bool,
     pub(super) rest: Option<ListRest<'ast>>,
@@ -40,7 +39,6 @@ impl<'ast, 'tail, Item> ListOptions<'ast, 'tail, Item> {
             contents_max_width: None,
             force_trailing_comma: false,
             is_struct: false,
-            item_prefers_overflow: None,
             item_requires_own_line: None,
             omit_open_brace: false,
             rest: None,
@@ -67,16 +65,6 @@ impl<'ast, 'tail, Item> ListOptions<'ast, 'tail, Item> {
     pub fn is_struct(self) -> Self {
         Self {
             is_struct: true,
-            ..self
-        }
-    }
-
-    pub fn item_prefers_overflow(
-        self,
-        item_prefers_overflow: impl Fn(&Item) -> bool + 'static,
-    ) -> Self {
-        Self {
-            item_prefers_overflow: Some(Box::new(item_prefers_overflow)),
             ..self
         }
     }

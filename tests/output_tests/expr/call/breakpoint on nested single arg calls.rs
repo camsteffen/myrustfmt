@@ -8,7 +8,7 @@ fn test() {
 // :after:
 
 fn test() {
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-        bbbbbbbbbbbbbbbbbbbbbbbb(ccccccccccccccccccccccc),
-    );
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(bbbbbbbbbbbbbbbbbbbbbbbb(
+        ccccccccccccccccccccccc,
+    ));
 }

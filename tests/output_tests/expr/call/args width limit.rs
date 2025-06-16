@@ -10,8 +10,8 @@ fn test() {
     fun(fun(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaa));
     // multiple args exceeds max width by 1
     fun(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaaaaaaaa);
-    // single arg, nested multiple args exceeds max width by 1
-    fun(fun(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaaa));
+    // nested multiple args exceeds max width by 1
+    fun(fun(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaaaaaaaa));
 }
 
 // :after:
@@ -28,9 +28,9 @@ fn test() {
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
         aaaaaaaaaaaaaaaaaaaaaaaaaaaa,
     );
-    // single arg, nested multiple args exceeds max width by 1
+    // nested multiple args exceeds max width by 1
     fun(fun(
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-        aaaaaaaaaaaaaaaaaaaaaaa,
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaa,
     ));
 }

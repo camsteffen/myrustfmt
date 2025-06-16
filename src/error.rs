@@ -34,9 +34,6 @@ impl FormatError {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FormatErrorKind {
-    /// Occurs when we attempt to overflow the last item in a horizontal list while single line mode
-    /// is enabled.
-    ListOverflow { cause: VerticalError },
     /// Used to explicitly fail the current strategy for implementation-specific reasons
     Logical,
     UnsupportedSyntax,
@@ -84,13 +81,13 @@ fn write_constraint_error(
 ) -> std::fmt::Result {
     write!(f, "{}, ", error_formatting_at(source, pos, path))?;
     match e.kind {
-        FormatErrorKind::Vertical(vertical)
-        | FormatErrorKind::ListOverflow { cause: vertical }
-        | FormatErrorKind::VStruct { cause: vertical } => match vertical {
-            VerticalError::LineComment => write!(f, "line comment not allowed")?,
-            VerticalError::MultiLineComment => write!(f, "multi-line comment not allowed")?,
-            VerticalError::Newline => write!(f, "newline not allowed")?,
-        },
+        FormatErrorKind::Vertical(vertical) | FormatErrorKind::VStruct { cause: vertical } => {
+            match vertical {
+                VerticalError::LineComment => write!(f, "line comment not allowed")?,
+                VerticalError::MultiLineComment => write!(f, "multi-line comment not allowed")?,
+                VerticalError::Newline => write!(f, "newline not allowed")?,
+            }
+        }
         kind @ FormatErrorKind::Logical => write!(f, "unhandled {kind:?}")?,
         FormatErrorKind::WidthLimitExceeded => write!(f, "width limit exceeded")?,
         FormatErrorKind::UnsupportedSyntax => write!(f, "unsupported syntax")?,

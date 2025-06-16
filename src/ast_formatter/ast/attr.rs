@@ -62,8 +62,7 @@ impl AstFormatter {
         let (line, col) = self.out.line_col();
         match err.kind {
             // todo test all these outputs
-            FormatErrorKind::ListOverflow { cause: vertical }
-            | FormatErrorKind::Vertical(vertical)
+            FormatErrorKind::Vertical(vertical)
             // todo propagate VStruct?
             | FormatErrorKind::VStruct { cause: vertical } => match vertical {
                 VerticalError::LineComment => self.errors.line_comment_not_allowed(line, col),

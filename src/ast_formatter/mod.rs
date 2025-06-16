@@ -26,9 +26,9 @@ pub fn format_module(
     path: Option<PathBuf>,
     config: &Config,
 ) -> FormatModuleResult {
-    let errors = Rc::new(
-        BufferedErrorEmitter::new(ErrorEmitter::new(path.clone(), config.capture_error_output)),
-    );
+    let errors = Rc::new(BufferedErrorEmitter::new(
+        ErrorEmitter::new(path.clone(), config.capture_error_output),
+    ));
     // todo need Arc?
     let out = SourceFormatter::new(
         path,
