@@ -141,7 +141,7 @@ impl AstFormatter {
                 },
                 ListOptions::new()
                     // todo test
-                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
+                    .contents_max_width(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
             )?,
             ast::MetaItemKind::NameValue(lit) => {
                 self.out.space_token_space("=")?;

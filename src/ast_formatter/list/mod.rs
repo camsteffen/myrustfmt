@@ -177,8 +177,11 @@ where
         });
         let end_tail = af.tail_fn(close);
         let mut is_overflow = false;
-        let width_limit = if len + usize::from(rest.is_some_and(|r| r.base.is_some())) > 1 {
-            opt.single_line_max_contents_width
+        // structs are subject to width limit even with only one item
+        let width_limit = if opt.is_struct
+            || len + usize::from(rest.is_some_and(|r| r.base.is_some())) > 1
+        {
+            opt.contents_max_width
         } else {
             None
         };

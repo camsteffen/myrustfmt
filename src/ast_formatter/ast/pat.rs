@@ -123,7 +123,8 @@ impl AstFormatter {
             fields,
             Self::pat_field,
             ListOptions::new()
-                .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
+                .contents_max_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
+                .is_struct()
                 .rest(ListRest::from_pat_fields_rest(rest))
                 .tail(tail),
         )?;

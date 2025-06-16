@@ -379,15 +379,14 @@ impl AstFormatter {
                     fields,
                     Self::field_def,
                     ListOptions::new()
+                        .contents_max_width(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width)
+                        .is_struct()
                         .shape(
                             if is_enum {
                                 ListShape::Flexible
                             } else {
                                 ListShape::Vertical
                             },
-                        )
-                        .single_line_max_contents_width(
-                            RUSTFMT_CONFIG_DEFAULTS.struct_variant_width,
                         ),
                 )?;
             }

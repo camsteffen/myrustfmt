@@ -20,49 +20,53 @@ pub enum ListWrapToFit {
 }
 
 pub struct ListOptions<'ast, 'tail, Item> {
-    pub(super) rest: Option<ListRest<'ast>>,
-    pub(super) shape: ListShape,
-    pub(super) tail: Tail<'tail, 'ast>,
+    pub(super) contents_max_width: Option<HSize>,
     pub(super) force_trailing_comma: bool,
+    pub(super) is_struct: bool,
     /// Called with the last item in the list. Returns true if that item always prefers overflow
     /// to being wrapped to the next line.
     pub(super) item_prefers_overflow: Option<Box<dyn Fn(&Item) -> bool>>,
     pub(super) item_requires_own_line: Option<Box<dyn Fn(&Item) -> bool>>,
     pub(super) omit_open_brace: bool,
-    pub(super) single_line_max_contents_width: Option<HSize>,
+    pub(super) rest: Option<ListRest<'ast>>,
+    pub(super) shape: ListShape,
+    pub(super) tail: Tail<'tail, 'ast>,
     pub(super) wrap_to_fit: ListWrapToFit,
 }
 
 impl<'ast, 'tail, Item> ListOptions<'ast, 'tail, Item> {
     pub fn new() -> Self {
         ListOptions {
-            rest: None,
-            shape: ListShape::default(),
-            tail: None,
+            contents_max_width: None,
             force_trailing_comma: false,
+            is_struct: false,
             item_prefers_overflow: None,
             item_requires_own_line: None,
             omit_open_brace: false,
-            single_line_max_contents_width: None,
+            rest: None,
+            shape: ListShape::default(),
+            tail: None,
             wrap_to_fit: ListWrapToFit::default(),
         }
     }
 
-    pub fn rest(self, rest: Option<ListRest<'ast>>) -> Self {
-        ListOptions { rest, ..self }
-    }
-
-    pub fn shape(self, shape: ListShape) -> Self {
-        ListOptions { shape, ..self }
-    }
-
-    pub fn tail(self, tail: Tail<'tail, 'ast>) -> ListOptions<'ast, 'tail, Item> {
-        Self { tail, ..self }
+    pub fn contents_max_width(self, width: HSize) -> Self {
+        ListOptions {
+            contents_max_width: Some(width),
+            ..self
+        }
     }
 
     pub fn force_trailing_comma(self, force_trailing_comma: bool) -> Self {
         Self {
             force_trailing_comma,
+            ..self
+        }
+    }
+
+    pub fn is_struct(self) -> Self {
+        Self {
+            is_struct: true,
             ..self
         }
     }
@@ -94,11 +98,16 @@ impl<'ast, 'tail, Item> ListOptions<'ast, 'tail, Item> {
         }
     }
 
-    pub fn single_line_max_contents_width(self, width: HSize) -> Self {
-        ListOptions {
-            single_line_max_contents_width: Some(width),
-            ..self
-        }
+    pub fn rest(self, rest: Option<ListRest<'ast>>) -> Self {
+        ListOptions { rest, ..self }
+    }
+
+    pub fn shape(self, shape: ListShape) -> Self {
+        ListOptions { shape, ..self }
+    }
+
+    pub fn tail(self, tail: Tail<'tail, 'ast>) -> ListOptions<'ast, 'tail, Item> {
+        Self { tail, ..self }
     }
 
     pub fn wrap_to_fit(self, wrap_to_fit: ListWrapToFit) -> Self {

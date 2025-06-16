@@ -153,13 +153,13 @@ impl AstFormatter {
             items,
             |af, expr, tail, _lcx| af.expr_tail(expr, tail),
             ListOptions::new()
-                .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.array_width)
+                .contents_max_width(RUSTFMT_CONFIG_DEFAULTS.array_width)
+                .tail(tail)
                 .wrap_to_fit(ListWrapToFit::Yes {
                     max_element_width: Some(
                         RUSTFMT_CONFIG_DEFAULTS.short_array_element_width_threshold,
                     ),
-                })
-                .tail(tail),
+                }),
         )
     }
 
@@ -204,8 +204,7 @@ impl AstFormatter {
             .tail(tail);
         let is_only_closure = args.len() == 1 && matches!(args[0].kind, ast::ExprKind::Closure(_));
         if !is_only_closure {
-            list_opt = list_opt
-                .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
+            list_opt = list_opt.contents_max_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
         }
         self.list(
             Braces::Parens,
@@ -531,7 +530,8 @@ impl AstFormatter {
                 Self::struct_field,
                 ListOptions::new()
                     // todo not wide enough?
-                    .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
+                    .contents_max_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
+                    .is_struct()
                     .rest(ListRest::from_struct_rest(&struct_.rest))
                     .shape(
                         if self.out.line() > first_line {
@@ -571,8 +571,8 @@ impl AstFormatter {
             items,
             |af, expr, tail, _lcx| af.expr_tail(expr, tail),
             ListOptions::new()
+                .contents_max_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
                 .force_trailing_comma(items.len() == 1)
-                .single_line_max_contents_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
                 .tail(tail),
         )
     }
