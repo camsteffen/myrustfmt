@@ -105,7 +105,11 @@ where
         Ok(())
     }
 
-    fn list_horizontal(&self, overflow: bool, flexible: bool) -> Result<(), ListHorizontalError> {
+    fn list_horizontal(
+        &self,
+        can_overflow: bool,
+        has_vertical_fallback: bool,
+    ) -> Result<(), ListHorizontalError> {
         let Self {
             af,
             opt,
@@ -168,17 +172,17 @@ where
                 af.out.space()?;
             }
 
-            let mut last_item_result = if !overflow {
+            let last_item_result = if !can_overflow {
                 af.with_single_line(|| {
                     self.list_horizontal_item(list.len() - 1, Some(&last_item_tail))
                 })
-            } else if !flexible {
+            } else if !has_vertical_fallback {
                 self.list_horizontal_item(list.len() - 1, Some(&last_item_tail))
             } else {
                 self.list_horizontal_overflowable(&height, Some(&last_item_tail))
             };
-            if overflow
-                && let Err(err) = &mut last_item_result
+            if can_overflow
+                && let Err(err) = &last_item_result
                 && let FormatErrorKind::Vertical(_) = err.kind
             {
                 // We formatted the first line and stopped because we are in single-line mode.
