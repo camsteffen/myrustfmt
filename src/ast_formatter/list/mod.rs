@@ -37,11 +37,11 @@ impl AstFormatter {
 }
 
 struct ListContext<'af, 'ast, 'tail, Item, FormatItem> {
-    pub af: &'af AstFormatter,
-    pub opt: ListOptions<'ast, 'tail, Item>,
-    pub braces: Braces,
-    pub list: &'ast [Item],
-    pub format_item: FormatItem,
+    af: &'af AstFormatter,
+    opt: ListOptions<'ast, 'tail, Item>,
+    braces: Braces,
+    list: &'ast [Item],
+    format_item: FormatItem,
 }
 
 impl<'af, 'ast, 'tail, Item, FormatItem> ListContext<'af, 'ast, 'tail, Item, FormatItem>
@@ -280,12 +280,11 @@ where
                 },
             )
         };
-        let format_item = format_index;
         let format_item = |index| match max_element_width {
             Some(max_width) => {
-                af.with_single_line(|| af.with_width_limit(max_width, || format_item(index)))
+                af.with_single_line(|| af.with_width_limit(max_width, || format_index(index)))
             }
-            None => format_item(index),
+            None => format_index(index),
         };
         af.enclosed_after_opening(braces.end(), || {
             let (first, rest) = (0, 1..len);
