@@ -16,9 +16,19 @@ impl AstFormatter {
         tail: Tail,
     ) -> FormatResult {
         let (first, chain) = collect_binary_expr_chain(left, right, op);
+        let force_multi_line = if let ast::ExprKind::Let(..) = first.kind {
+            true
+        } else if let [(_, right)] = &chain[..] {
+            matches!(right.kind, ast::ExprKind::Let(..)) && !is_prefixed_ident(first)
+        } else {
+            chain.iter().any(|(_, e)| matches!(e.kind, ast::ExprKind::Let(..)))
+        };
         let first_line = self.out.line();
         self.expr(first)?;
         self.has_vstruct(VStruct::NonBlockIndent, || {
+            if force_multi_line {
+                return self.indented(|| self.binary_vertical(&chain, tail));
+            }
             let mut chain = chain.as_slice();
             let indent_margin = self.out.total_indent.get() + INDENT_WIDTH;
             let indent_guard = loop {
@@ -58,16 +68,21 @@ impl AstFormatter {
                 })
                 .next(|| {
                     let _indent_guard = indent_guard.unwrap_or_else(|| self.begin_indent());
-                    for (op, expr) in chain {
-                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                        self.out.token_space(op.as_str())?;
-                        self.expr(expr)?;
-                    }
-                    self.tail(tail)?;
+                    self.binary_vertical(chain, tail)?;
                     Ok(())
                 })
                 .result()
         })
+    }
+
+    fn binary_vertical(&self, chain: &[(ast::BinOpKind, &ast::Expr)], tail: Tail) -> FormatResult {
+        for (op, expr) in chain {
+            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+            self.out.token_space(op.as_str())?;
+            self.expr(expr)?;
+        }
+        self.tail(tail)?;
+        Ok(())
     }
 }
 
@@ -103,4 +118,16 @@ fn collect_binary_expr_chain<'a>(
         }
     }
     (first.unwrap(), chain)
+}
+
+fn is_prefixed_ident(expr: &ast::Expr) -> bool {
+    match &expr.kind {
+        ast::ExprKind::Path(None, path) => {
+            matches!(&path.segments[..], [segment] if segment.args.is_none())
+        }
+        ast::ExprKind::AddrOf(.., inner) | ast::ExprKind::Unary(_, inner) => {
+            is_prefixed_ident(inner)
+        }
+        _ => false,
+    }
 }

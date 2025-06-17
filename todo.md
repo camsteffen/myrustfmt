@@ -1,12 +1,3 @@
-this case feels weird, does not match rustfmt
-maybe exclude call width for one argument? only if the method name is short, or short distance from margin?
-Some(
-    aaaaaaaaaaaaaaaaa(bbbbbbbbb, ccccccc),
-)
-
-Why does rustfmt wrap this &&?
-if let Some(width_limit) = self.width_limit.get() && width_limit.line == line {
-
 std macros
 
 binary expression width limit?
