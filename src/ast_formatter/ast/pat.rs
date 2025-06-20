@@ -67,7 +67,10 @@ impl AstFormatter {
                 Braces::Square,
                 elements,
                 Self::pat_list_item,
-                ListOptions {tail: take_tail(), ..}
+                ListOptions {
+                    tail: take_tail(),
+                    ..
+                },
             )?,
             ast::PatKind::Struct(ref qself, ref path, ref fields, rest) => {
                 self.struct_pat(qself, path, fields, rest, take_tail())?
@@ -76,7 +79,10 @@ impl AstFormatter {
                 Braces::Parens,
                 fields,
                 Self::pat_list_item,
-                ListOptions {tail: take_tail(), ..}
+                ListOptions {
+                    tail: take_tail(),
+                    ..
+                },
             )?,
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 // todo tail?
@@ -85,7 +91,10 @@ impl AstFormatter {
                     Braces::Parens,
                     fields,
                     Self::pat_list_item,
-                    ListOptions {tail: take_tail(), ..}
+                    ListOptions {
+                        tail: take_tail(),
+                        ..
+                    },
                 )?;
             }
             ast::PatKind::Wild => self.out.token("_")?,
@@ -128,7 +137,7 @@ impl AstFormatter {
                 rest: ListRest::from_pat_fields_rest(rest),
                 tail,
                 ..
-            }
+            },
         )?;
         Ok(())
     }

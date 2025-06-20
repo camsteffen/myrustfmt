@@ -6,8 +6,6 @@ mod rest;
 pub use self::braces::Braces;
 pub use self::list_item_context::{ListItemContext, ListStrategy};
 pub use self::rest::ListRest;
-use std::cell::Cell;
-use std::num::NonZero;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::options::{ListOptions, ListStrategies};
 use crate::ast_formatter::tail::Tail;
@@ -16,6 +14,8 @@ use crate::constraints::VStruct;
 use crate::error::{FormatError, FormatErrorKind, FormatResult};
 use crate::num::{HSize, VSize};
 use crate::whitespace::VerticalWhitespaceMode;
+use std::cell::Cell;
+use std::num::NonZero;
 
 impl AstFormatter {
     pub fn list<'ast, Item>(
@@ -59,12 +59,16 @@ where
                 return Ok(());
             }
             match self.opt.strategies {
-                ListStrategies::Horizontal(horizontal) => self.list_horizontal(horizontal.is_overflow(), false)
-                    .map_err(|e| e.error)?,
+                ListStrategies::Horizontal(horizontal) => {
+                    self.list_horizontal(horizontal.is_overflow(), false)
+                        .map_err(|e| e.error)?
+                }
                 ListStrategies::Vertical(_) => {
                     self.list_vertical()?;
-                },
-                ListStrategies::Flexible(horizontal, _) => self.list_flexible(horizontal.is_overflow())?,
+                }
+                ListStrategies::Flexible(horizontal, _) => {
+                    self.list_flexible(horizontal.is_overflow())?
+                }
             }
             Ok(())
         })
@@ -242,7 +246,12 @@ where
         if self.list.len() <= 1 && self.opt.rest.is_none() {
             return None;
         }
-        let max_element_width = self.opt.strategies.get_vertical()?.wrap_to_fit?.max_element_width;
+        let max_element_width = self
+            .opt
+            .strategies
+            .get_vertical()?
+            .wrap_to_fit?
+            .max_element_width;
         assert!(
             self.opt.rest.is_none(),
             "rest cannot be used with wrap-to-fit",

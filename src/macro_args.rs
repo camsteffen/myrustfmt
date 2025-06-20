@@ -1,5 +1,5 @@
-use crate::std_macro::{std_macro, StdMacro};
 use crate::parse::parse_no_errors;
+use crate::std_macro::{StdMacro, std_macro};
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 use rustc_ast::token;
@@ -48,7 +48,10 @@ impl MacroArgsCollector {
 pub enum MacroArgs {
     /// Same as a function call. Optional trailing comma. Also used for macros with no args.
     ExprList(ThinVec<P<ast::Expr>>),
-    Format { args: ThinVec<P<ast::Expr>>, format_string_pos: u8 },
+    Format {
+        args: ThinVec<P<ast::Expr>>,
+        format_string_pos: u8,
+    },
     MetaItemInner(ThinVec<ast::MetaItemInner>),
 }
 
@@ -60,22 +63,26 @@ pub fn try_parse_macro_args(psess: &ParseSess, mac_call: &ast::MacCall) -> Optio
     // todo silence errors except in debug mode
     let parser = Parser::new(psess, tokens, MACRO_ARGUMENTS)
         .recovery(Recovery::Forbidden);
-    let macro_args = parse_no_errors(parser, |parser| {
-        match std_macro {
-            StdMacro::Cfg => {
-                parse_comma_sep_list(parser, |p| p.parse_meta_item_inner())
-                    .map(MacroArgs::MetaItemInner)
-            },
-            StdMacro::ExprList => {
-                parse_comma_sep_list(parser, |p| p.parse_expr())
-                    .map(MacroArgs::ExprList)
-            },
-            StdMacro::Format { format_string_pos } => {
-                parse_comma_sep_list(parser, |p| p.parse_expr())
-                    .map(|args| MacroArgs::Format{args, format_string_pos})
-            }
+    let macro_args = parse_no_errors(parser, |parser| match std_macro {
+        StdMacro::Cfg => {
+            parse_comma_sep_list(parser, |p| p.parse_meta_item_inner())
+                .map(MacroArgs::MetaItemInner)
         }
-    }).ok()?;
+        StdMacro::ExprList => {
+            parse_comma_sep_list(parser, |p| p.parse_expr())
+                .map(MacroArgs::ExprList)
+        }
+        StdMacro::Format { format_string_pos } => {
+            parse_comma_sep_list(parser, |p| p.parse_expr())
+                .map(|args| {
+                    MacroArgs::Format {
+                        args,
+                        format_string_pos,
+                    }
+                })
+        }
+    })
+    .ok()?;
     Some(macro_args)
 }
 

@@ -1,8 +1,8 @@
-use std::num::NonZero;
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::tail::Tail;
 use crate::num::HSize;
 use crate::util::default::default;
+use std::num::NonZero;
 
 pub enum ListStrategies {
     Horizontal(HorizontalListStrategy),
@@ -14,19 +14,25 @@ impl ListStrategies {
     pub fn horizontal() -> ListStrategies {
         ListStrategies::Horizontal(HorizontalListStrategy::SingleLine)
     }
-    
+
     pub fn horizontal_overflow() -> ListStrategies {
         ListStrategies::Horizontal(HorizontalListStrategy::Overflow)
     }
 
     pub fn flexible() -> ListStrategies {
-        ListStrategies::Flexible(HorizontalListStrategy::SingleLine, VerticalListStrategy {..})
+        ListStrategies::Flexible(
+            HorizontalListStrategy::SingleLine,
+            VerticalListStrategy { .. },
+        )
     }
-    
+
     pub fn flexible_overflow() -> ListStrategies {
-        ListStrategies::Flexible(HorizontalListStrategy::Overflow, VerticalListStrategy {..})
+        ListStrategies::Flexible(
+            HorizontalListStrategy::Overflow,
+            VerticalListStrategy { .. },
+        )
     }
-    
+
     pub fn vertical() -> ListStrategies {
         ListStrategies::Vertical(default())
     }
@@ -36,7 +42,9 @@ impl ListStrategies {
     pub fn get_vertical(&self) -> Option<&VerticalListStrategy> {
         match &self {
             ListStrategies::Horizontal(_) => None,
-            ListStrategies::Vertical(vertical) | ListStrategies::Flexible(_, vertical) => Some(vertical),
+            ListStrategies::Vertical(vertical) | ListStrategies::Flexible(_, vertical) => {
+                Some(vertical)
+            }
         }
     }
 }
@@ -61,11 +69,14 @@ pub struct VerticalListStrategy {
 }
 
 impl VerticalListStrategy {
-    pub fn wrap_to_fit(
-        max_element_width: Option<HSize>,
-    ) -> VerticalListStrategy {
+    pub fn wrap_to_fit(max_element_width: Option<HSize>) -> VerticalListStrategy {
         VerticalListStrategy {
-            wrap_to_fit: Some(WrapToFit { max_element_width: max_element_width.map(|v| NonZero::new(v).expect("wrap-to-fit max width must not be zero"))}),
+            wrap_to_fit: Some(WrapToFit {
+                max_element_width: max_element_width.map(|v| {
+                    NonZero::new(v)
+                        .expect("wrap-to-fit max width must not be zero")
+                }),
+            }),
             ..
         }
     }
@@ -75,12 +86,12 @@ impl VerticalListStrategy {
 pub enum FormatArgs {
     #[default]
     Off,
-    On { format_string_pos: u8 }
+    On { format_string_pos: u8 },
 }
 
 #[derive(Clone, Copy)]
 pub struct WrapToFit {
-    pub max_element_width: Option<NonZero<HSize>>
+    pub max_element_width: Option<NonZero<HSize>>,
 }
 
 pub struct ListOptions<'ast, 'tail, Item> {

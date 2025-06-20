@@ -106,7 +106,7 @@ impl AstFormatter {
                     Braces::Angle,
                     &args.args,
                     Self::angle_bracketed_arg,
-                    ListOptions{tail,..}
+                    ListOptions { tail, .. },
                 )?;
             }
             // (A, B) -> C

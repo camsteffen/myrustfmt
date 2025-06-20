@@ -151,7 +151,8 @@ impl AstFormatter {
             &parenthesized_args.inputs,
             |af, ty, tail, _lcx| af.ty_tail(ty, tail),
             ListOptions {
-                tail:list_tail,..
+                tail: list_tail,
+                ..
             },
         )?;
         if let ast::FnRetTy::Ty(_) = parenthesized_args.output {
@@ -209,7 +210,7 @@ impl AstFormatter {
             }
             Ok(wrapped)
         };
-        let args = |vertical:bool| {
+        let args = |vertical: bool| {
             self.has_vstruct(VStruct::NonBlockIndent, || {
                 self.list(
                     braces,
@@ -221,8 +222,8 @@ impl AstFormatter {
                         } else {
                             ListStrategies::horizontal()
                         },
-                            ..
-                    }
+                        ..
+                    },
                 )
             })
         };

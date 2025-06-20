@@ -70,11 +70,11 @@ impl AstFormatter {
                 Braces::Parens,
                 elements,
                 |af, ty, tail, _lcx| af.ty_tail(ty, tail),
-                ListOptions{
-                    force_trailing_comma:elements.len() == 1,
+                ListOptions {
+                    force_trailing_comma: elements.len() == 1,
                     tail: take_tail(),
                     ..
-                }
+                },
             )?,
             ast::TyKind::Typeof(anon_const) => self.expr(&anon_const.value)?,
             ast::TyKind::Pat(..) | ast::TyKind::PinnedRef(..) | ast::TyKind::UnsafeBinder(..) => {
@@ -130,7 +130,7 @@ impl AstFormatter {
                     Braces::Angle,
                     capture_args,
                     |af, arg, tail, _lcx| af.precise_capturing_arg(arg, tail),
-                    ListOptions{..}
+                    ListOptions { .. },
                 )?;
                 Ok(())
             }

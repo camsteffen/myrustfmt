@@ -3,7 +3,9 @@ mod r#match;
 mod postfix;
 
 use crate::ast_formatter::list::ListRest;
-use crate::ast_formatter::list::options::{HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy, };
+use crate::ast_formatter::list::options::{
+    HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy,
+};
 use crate::ast_formatter::list::{Braces, ListItemContext, ListStrategy};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
@@ -156,7 +158,9 @@ impl AstFormatter {
                 contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.array_width),
                 strategies: ListStrategies::Flexible(
                     HorizontalListStrategy::SingleLine,
-                    VerticalListStrategy::wrap_to_fit(Some(RUSTFMT_CONFIG_DEFAULTS.short_array_element_width_threshold)),
+                    VerticalListStrategy::wrap_to_fit(Some(
+                        RUSTFMT_CONFIG_DEFAULTS.short_array_element_width_threshold,
+                    )),
                 ),
                 tail,
                 ..
@@ -527,8 +531,7 @@ impl AstFormatter {
                     contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
                     is_struct: true,
                     rest: ListRest::from_struct_rest(&struct_.rest),
-                    strategies:
-                    if self.out.line() > first_line {
+                    strategies: if self.out.line() > first_line {
                         ListStrategies::vertical()
                     } else {
                         ListStrategies::flexible()
@@ -560,7 +563,7 @@ impl AstFormatter {
         })
     }
 
-    pub fn tuple(&self, items: &[P<ast::Expr>], tail: Tail) -> FormatResult {
+    fn tuple(&self, items: &[P<ast::Expr>], tail: Tail) -> FormatResult {
         self.list(
             Braces::Parens,
             items,

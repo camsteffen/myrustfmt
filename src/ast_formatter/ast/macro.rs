@@ -1,12 +1,14 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
-use crate::ast_formatter::list::options::{FormatArgs, ListOptions, ListStrategies,  VerticalListStrategy};
+use crate::ast_formatter::list::options::{
+    FormatArgs, ListOptions, ListStrategies, VerticalListStrategy,
+};
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::macro_args::{MacroArgs, mac_call_id};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
-use rustc_ast::ast;
 use crate::util::default::default;
+use rustc_ast::ast;
 
 impl AstFormatter {
     pub fn macro_call(&self, mac_call: &ast::MacCall) -> FormatResult {
@@ -29,21 +31,25 @@ impl AstFormatter {
             MacroArgs::ExprList(ref args) => {
                 self.macro_args_list(args, |af, expr, tail| af.expr_tail(expr, tail))?
             }
-            MacroArgs::Format { ref args, format_string_pos } => {
-                self.list(
-                    Braces::Parens,
-                    &args,
-                    |af, item, tail, _lcx| af.expr_tail(item, tail),
-                    ListOptions {
-                        contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
-                        strategies: ListStrategies::Flexible(default(), VerticalListStrategy{
+            MacroArgs::Format {
+                ref args,
+                format_string_pos,
+            } => self.list(
+                Braces::Parens,
+                &args,
+                |af, item, tail, _lcx| af.expr_tail(item, tail),
+                ListOptions {
+                    contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
+                    strategies: ListStrategies::Flexible(
+                        default(),
+                        VerticalListStrategy {
                             format_args: FormatArgs::On { format_string_pos },
                             ..
-                        }),
-                        ..
-                    },
-                )?
-            }
+                        },
+                    ),
+                    ..
+                },
+            )?,
             MacroArgs::MetaItemInner(ref args) => self.macro_args_list(args, |af, item, tail| {
                 af.meta_item_inner(item)?;
                 af.tail(tail)?;

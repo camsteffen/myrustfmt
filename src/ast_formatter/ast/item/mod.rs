@@ -154,7 +154,10 @@ impl AstFormatter {
             Braces::Curly,
             variants,
             Self::variant,
-            ListOptions {strategies: ListStrategies::vertical(),..}
+            ListOptions {
+                strategies: ListStrategies::vertical(),
+                ..
+            },
         )?;
         Ok(())
     }
@@ -385,13 +388,13 @@ impl AstFormatter {
                             ListStrategies::flexible()
                         } else {
                             ListStrategies::vertical()
-                        }
-                        ,..
-                    }
+                        },
+                        ..
+                    },
                 )?;
             }
             ast::VariantData::Tuple(fields, _) => {
-                self.list(Braces::Parens, fields, Self::field_def, ListOptions {..})?
+                self.list(Braces::Parens, fields, Self::field_def, ListOptions { .. })?
             }
             ast::VariantData::Unit(_) => {}
         }
@@ -406,6 +409,10 @@ impl AstFormatter {
                 self.out.token_space(":")?;
             }
             self.ty_tail(&field.ty, tail)?;
+            if field.default.is_some() {
+                // todo
+                return Err(FormatErrorKind::UnsupportedSyntax.into());
+            }
             Ok(())
         })
     }

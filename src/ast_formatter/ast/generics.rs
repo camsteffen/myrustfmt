@@ -18,7 +18,7 @@ impl AstFormatter {
             Braces::Angle,
             params,
             Self::generic_param,
-            ListOptions {..}
+            ListOptions { .. },
         )?;
         Ok(())
     }

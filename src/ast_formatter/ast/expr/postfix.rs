@@ -1,4 +1,4 @@
-use crate::ast_formatter::list::options::{ListStrategies};
+use crate::ast_formatter::list::options::ListStrategies;
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};

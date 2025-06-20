@@ -5,6 +5,7 @@ use crate::submodules::Submodule;
 use rustc_errors::ColorConfig;
 use rustc_errors::DiagCtxt;
 use rustc_errors::ErrorGuaranteed;
+use rustc_errors::PResult;
 use rustc_errors::emitter::HumanEmitter;
 use rustc_errors::emitter::stderr_destination;
 use rustc_parse::parser::ExpTokenPair;
@@ -13,7 +14,6 @@ use rustc_session::parse::ParseSess;
 use rustc_span::source_map::{FilePathMapping, SourceMap};
 use rustc_span::symbol::Ident;
 use rustc_span::{FileName, SourceFile};
-use rustc_errors::PResult;
 use std::sync::Arc;
 
 pub struct ParseModuleResult {
@@ -40,11 +40,10 @@ pub fn parse_module(
 
         let parser = module_parser(&psess, crate_source);
         let (attrs, items, spans) = parse_no_errors(parser, |parser| {
-            parser
-                .parse_mod(ExpTokenPair {
-                    tok: &rustc_ast::token::Eof,
-                    token_type: rustc_parse::parser::token_type::TokenType::Eof,
-                })
+            parser.parse_mod(ExpTokenPair {
+                tok: &rustc_ast::token::Eof,
+                token_type: rustc_parse::parser::token_type::TokenType::Eof,
+            })
         })?;
 
         let macro_args;
@@ -73,7 +72,10 @@ pub fn parse_module(
     })
 }
 
-pub fn parse_no_errors<T>(mut parser: Parser, f: impl for<'p> FnOnce(&mut Parser<'p>) -> PResult<'p, T>) -> Result<T, ErrorGuaranteed> {
+pub fn parse_no_errors<T>(
+    mut parser: Parser,
+    f: impl for<'p> FnOnce(&mut Parser<'p>) -> PResult<'p, T>,
+) -> Result<T, ErrorGuaranteed> {
     match f(&mut parser) {
         Ok(value) => {
             if let Some(err) = parser.psess.dcx().has_errors() {
