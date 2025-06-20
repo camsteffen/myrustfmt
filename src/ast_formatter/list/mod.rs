@@ -7,9 +7,9 @@ pub use self::braces::Braces;
 pub use self::list_item_context::{ListItemContext, ListStrategy};
 pub use self::rest::ListRest;
 use std::cell::Cell;
-
+use std::num::NonZero;
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::options::{ListOptions, ListShape, ListWrapToFit};
+use crate::ast_formatter::list::options::{ListOptions, ListStrategies};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
 use crate::constraints::VStruct;
@@ -58,19 +58,14 @@ where
                 self.af.tail(self.opt.tail)?;
                 return Ok(());
             }
-            match self.opt.shape {
-                ListShape::Flexible => self.list_flexible(false)?,
-                ListShape::FlexibleWithOverflow => self.list_flexible(true)?,
-                ListShape::Horizontal => {
-                    self.list_horizontal(false, false).map_err(|e| e.error)?;
-                }
-                ListShape::HorizontalWithOverflow => {
-                    self.list_horizontal(true, false).map_err(|e| e.error)?;
-                }
-                ListShape::Vertical => {
+            match self.opt.strategies {
+                ListStrategies::Horizontal(horizontal) => self.list_horizontal(horizontal.is_overflow(), false)
+                    .map_err(|e| e.error)?,
+                ListStrategies::Vertical(_) => {
                     self.list_vertical()?;
-                }
-            };
+                },
+                ListStrategies::Flexible(horizontal, _) => self.list_flexible(horizontal.is_overflow())?,
+            }
             Ok(())
         })
     }
@@ -95,7 +90,10 @@ where
 
         if let Err(e) = self.af.out.with_recover_width(|| self.list_horizontal(overflow, true)) {
             if e.is_overflow {
-                assert!(self.af.constraints().single_line.get(), "list overflow error should only occur in single line mode");
+                assert!(
+                    self.af.constraints().single_line.get(),
+                    "list overflow error should only occur in single line mode",
+                );
                 // Horizontal formatting would have succeeded if single line mode were not enabled.
                 return Err(e.error);
             }
@@ -244,16 +242,12 @@ where
         if self.list.len() <= 1 && self.opt.rest.is_none() {
             return None;
         }
-        match self.opt.wrap_to_fit {
-            ListWrapToFit::Yes { max_element_width } => {
-                assert!(
-                    self.opt.rest.is_none(),
-                    "rest cannot be used with wrap-to-fit"
-                );
-                Some(move || self.list_wrap_to_fit(max_element_width))
-            }
-            ListWrapToFit::No => None,
-        }
+        let max_element_width = self.opt.strategies.get_vertical()?.wrap_to_fit?.max_element_width;
+        assert!(
+            self.opt.rest.is_none(),
+            "rest cannot be used with wrap-to-fit",
+        );
+        Some(move || self.list_wrap_to_fit(max_element_width))
     }
 
     /*
@@ -263,7 +257,7 @@ where
     ]
     */
     // todo how does this behave with comments between items - forcing newlines?
-    fn list_wrap_to_fit(&self, max_element_width: Option<HSize>) -> FormatResult<VSize> {
+    fn list_wrap_to_fit(&self, max_element_width: Option<NonZero<HSize>>) -> FormatResult<VSize> {
         let Self {
             af,
             opt,
@@ -286,7 +280,7 @@ where
         };
         let format_item = |index| match max_element_width {
             Some(max_width) => {
-                af.with_single_line(|| af.with_width_limit(max_width, || format_index(index)))
+                af.with_single_line(|| af.with_width_limit(max_width.get(), || format_index(index)))
             }
             None => format_index(index),
         };

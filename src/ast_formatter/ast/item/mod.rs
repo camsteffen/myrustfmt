@@ -2,7 +2,7 @@ mod sort;
 pub mod use_tree;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::options::{ListOptions, ListShape};
+use crate::ast_formatter::list::options::{ListOptions, ListStrategies};
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatErrorKind, FormatResult};
@@ -67,7 +67,7 @@ impl AstFormatter {
             }
             ast::ItemKind::Impl(ref impl_) => self.impl_(impl_)?,
             ast::ItemKind::MacCall(ref mac_call) => {
-                self.mac_call(mac_call)?;
+                self.macro_call(mac_call)?;
                 if !matches!(mac_call.args.delim, rustc_ast::token::Delimiter::Brace) {
                     self.out.token(";")?;
                 }
@@ -154,7 +154,7 @@ impl AstFormatter {
             Braces::Curly,
             variants,
             Self::variant,
-            ListOptions::new().shape(ListShape::Vertical),
+            ListOptions {strategies: ListStrategies::vertical(),..}
         )?;
         Ok(())
     }
@@ -263,7 +263,7 @@ impl AstFormatter {
                 ast::AssocItemKind::Fn(fn_) => self.fn_(fn_)?,
                 ast::AssocItemKind::Type(ty_alias) => self.ty_alias(ty_alias)?,
                 ast::AssocItemKind::MacCall(mac_call) => {
-                    self.mac_call(mac_call)?;
+                    self.macro_call(mac_call)?;
                     self.out.token(";")?;
                 }
                 ast::AssocItemKind::Delegation(_) => {
@@ -282,7 +282,7 @@ impl AstFormatter {
             match kind {
                 ast::ForeignItemKind::Fn(fn_) => self.fn_(fn_)?,
                 ast::ForeignItemKind::MacCall(mac_call) => {
-                    self.mac_call(mac_call)?;
+                    self.macro_call(mac_call)?;
                     self.out.token(";")?;
                 }
                 ast::ForeignItemKind::Static(static_item) => self.static_item(static_item)?,
@@ -378,20 +378,20 @@ impl AstFormatter {
                     Braces::Curly,
                     fields,
                     Self::field_def,
-                    ListOptions::new()
-                        .contents_max_width(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width)
-                        .is_struct()
-                        .shape(
-                            if is_enum {
-                                ListShape::Flexible
-                            } else {
-                                ListShape::Vertical
-                            },
-                        ),
+                    ListOptions {
+                        contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width),
+                        is_struct: true,
+                        strategies: if is_enum {
+                            ListStrategies::flexible()
+                        } else {
+                            ListStrategies::vertical()
+                        }
+                        ,..
+                    }
                 )?;
             }
             ast::VariantData::Tuple(fields, _) => {
-                self.list(Braces::Parens, fields, Self::field_def, ListOptions::new())?
+                self.list(Braces::Parens, fields, Self::field_def, ListOptions {..})?
             }
             ast::VariantData::Unit(_) => {}
         }

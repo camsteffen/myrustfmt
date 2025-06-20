@@ -6,6 +6,7 @@ mod r#fn;
 mod generics;
 pub mod item;
 mod local;
+mod r#macro;
 mod pat;
 mod path;
 mod ty;

@@ -82,7 +82,7 @@ impl AstFormatter {
         assert!(
             self.errors.error_count() > error_count_before,
             "an error should be emitted before copy fallback\nstack trace:\n{}",
-            err.backtrace
+            err.backtrace,
         );
         self.out.restore_checkpoint(&checkpoint);
         self.with_replace_width_limit(None, || self.out.copy_span(span))?;
@@ -122,6 +122,7 @@ impl AstFormatter {
         Ok(())
     }
 
+    // todo tail?
     pub fn meta_item(&self, meta: &ast::MetaItem) -> FormatResult {
         self.safety(meta.unsafety)?;
         self.path(&meta.path, false)?;
@@ -131,21 +132,28 @@ impl AstFormatter {
                 Braces::Parens,
                 items,
                 |af, item, tail, _lcx| {
-                    match item {
-                        ast::MetaItemInner::MetaItem(item) => af.meta_item(item)?,
-                        ast::MetaItemInner::Lit(lit) => af.meta_item_lit(lit)?,
-                    }
+                    self.meta_item_inner(item)?;
                     af.tail(tail)?;
                     Ok(())
                 },
-                ListOptions::new()
+                ListOptions {
                     // todo test
-                    .contents_max_width(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
+                    contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
+                    ..
+                },
             )?,
             ast::MetaItemKind::NameValue(lit) => {
                 self.out.space_token_space("=")?;
                 self.meta_item_lit(lit)?;
             }
+        }
+        Ok(())
+    }
+
+    pub fn meta_item_inner(&self, item: &ast::MetaItemInner) -> FormatResult {
+        match item {
+            ast::MetaItemInner::MetaItem(item) => self.meta_item(item)?,
+            ast::MetaItemInner::Lit(lit) => self.meta_item_lit(lit)?,
         }
         Ok(())
     }

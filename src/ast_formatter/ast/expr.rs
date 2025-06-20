@@ -3,7 +3,7 @@ mod r#match;
 mod postfix;
 
 use crate::ast_formatter::list::ListRest;
-use crate::ast_formatter::list::options::{ListOptions, ListShape, ListWrapToFit};
+use crate::ast_formatter::list::options::{HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy, };
 use crate::ast_formatter::list::{Braces, ListItemContext, ListStrategy};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
@@ -74,7 +74,7 @@ impl AstFormatter {
             ast::ExprKind::Let(ref pat, ref init, ..) => self.let_(pat, init, take_tail())?,
             ast::ExprKind::Lit(_) => self.out.copy_span(expr.span)?,
             ast::ExprKind::Loop(ref block, label, _) => self.loop_(label, block)?,
-            ast::ExprKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,
+            ast::ExprKind::MacCall(ref mac_call) => self.macro_call(mac_call)?,
             ast::ExprKind::Match(ref scrutinee, ref arms, ast::MatchKind::Prefix) => {
                 self.match_(scrutinee, arms)?
             }
@@ -152,14 +152,15 @@ impl AstFormatter {
             Braces::Square,
             items,
             |af, expr, tail, _lcx| af.expr_tail(expr, tail),
-            ListOptions::new()
-                .contents_max_width(RUSTFMT_CONFIG_DEFAULTS.array_width)
-                .tail(tail)
-                .wrap_to_fit(ListWrapToFit::Yes {
-                    max_element_width: Some(
-                        RUSTFMT_CONFIG_DEFAULTS.short_array_element_width_threshold,
-                    ),
-                }),
+            ListOptions {
+                contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.array_width),
+                strategies: ListStrategies::Flexible(
+                    HorizontalListStrategy::SingleLine,
+                    VerticalListStrategy::wrap_to_fit(Some(RUSTFMT_CONFIG_DEFAULTS.short_array_element_width_threshold)),
+                ),
+                tail,
+                ..
+            },
         )
     }
 
@@ -186,7 +187,7 @@ impl AstFormatter {
         let first_line = self.out.line();
         self.expr_tail(func, Some(&self.tail_token("(")))?;
         self.has_vstruct_if(self.out.line() > first_line, VStruct::NonBlockIndent, || {
-            self.call_args(args, ListShape::FlexibleWithOverflow, tail)
+            self.call_args(args, ListStrategies::flexible_overflow(), tail)
         })?;
         Ok(())
     }
@@ -194,16 +195,18 @@ impl AstFormatter {
     pub fn call_args(
         &self,
         args: &[P<ast::Expr>],
-        list_shape: ListShape,
+        list_strategies: ListStrategies,
         tail: Tail,
     ) -> FormatResult {
-        let mut list_opt = ListOptions::<P<ast::Expr>>::new()
-            .omit_open_brace()
-            .shape(list_shape)
-            .tail(tail);
+        let mut list_opt = ListOptions {
+            omit_open_brace: true,
+            strategies: list_strategies,
+            tail,
+            ..
+        };
         let is_only_closure = args.len() == 1 && matches!(args[0].kind, ast::ExprKind::Closure(_));
         if !is_only_closure {
-            list_opt = list_opt.contents_max_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
+            list_opt.contents_max_width = Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
         }
         self.list(
             Braces::Parens,
@@ -510,15 +513,6 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn mac_call(&self, mac_call: &ast::MacCall) -> FormatResult {
-        self.path(&mac_call.path, true)?;
-        self.out.token("!")?;
-        if matches!(mac_call.args.delim, rustc_ast::token::Delimiter::Brace) {
-            self.out.space()?;
-        }
-        self.out.copy_span(mac_call.args.dspan.entire())
-    }
-
     fn struct_expr(&self, struct_: &ast::StructExpr, tail: Tail) -> FormatResult {
         let first_line = self.out.line();
         self.qpath(&struct_.qself, &struct_.path, true, None)?;
@@ -528,19 +522,20 @@ impl AstFormatter {
                 Braces::Curly,
                 &struct_.fields,
                 Self::struct_field,
-                ListOptions::new()
+                ListOptions {
                     // todo not wide enough?
-                    .contents_max_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
-                    .is_struct()
-                    .rest(ListRest::from_struct_rest(&struct_.rest))
-                    .shape(
-                        if self.out.line() > first_line {
-                            ListShape::Vertical
-                        } else {
-                            ListShape::Flexible
-                        },
-                    )
-                    .tail(tail),
+                    contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
+                    is_struct: true,
+                    rest: ListRest::from_struct_rest(&struct_.rest),
+                    strategies:
+                    if self.out.line() > first_line {
+                        ListStrategies::vertical()
+                    } else {
+                        ListStrategies::flexible()
+                    },
+                    tail,
+                    ..
+                },
             )?;
             Ok(())
         })?;
@@ -565,15 +560,17 @@ impl AstFormatter {
         })
     }
 
-    fn tuple(&self, items: &[P<ast::Expr>], tail: Tail) -> FormatResult {
+    pub fn tuple(&self, items: &[P<ast::Expr>], tail: Tail) -> FormatResult {
         self.list(
             Braces::Parens,
             items,
             |af, expr, tail, _lcx| af.expr_tail(expr, tail),
-            ListOptions::new()
-                .contents_max_width(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)
-                .force_trailing_comma(items.len() == 1)
-                .tail(tail),
+            ListOptions {
+                contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
+                force_trailing_comma: items.len() == 1,
+                tail,
+                ..
+            },
         )
     }
 

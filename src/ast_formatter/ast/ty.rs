@@ -31,7 +31,7 @@ impl AstFormatter {
                 self.generic_bounds(bounds, take_tail())?;
             }
             ast::TyKind::Infer => self.out.token("_")?,
-            ast::TyKind::MacCall(mac_call) => self.mac_call(mac_call)?,
+            ast::TyKind::MacCall(mac_call) => self.macro_call(mac_call)?,
             ast::TyKind::Never => self.out.token("!")?,
             ast::TyKind::Paren(ty) => {
                 self.out.token("(")?;
@@ -70,9 +70,11 @@ impl AstFormatter {
                 Braces::Parens,
                 elements,
                 |af, ty, tail, _lcx| af.ty_tail(ty, tail),
-                ListOptions::new()
-                    .force_trailing_comma(elements.len() == 1)
-                    .tail(take_tail()),
+                ListOptions{
+                    force_trailing_comma:elements.len() == 1,
+                    tail: take_tail(),
+                    ..
+                }
             )?,
             ast::TyKind::Typeof(anon_const) => self.expr(&anon_const.value)?,
             ast::TyKind::Pat(..) | ast::TyKind::PinnedRef(..) | ast::TyKind::UnsafeBinder(..) => {
@@ -128,7 +130,7 @@ impl AstFormatter {
                     Braces::Angle,
                     capture_args,
                     |af, arg, tail, _lcx| af.precise_capturing_arg(arg, tail),
-                    ListOptions::new(),
+                    ListOptions{..}
                 )?;
                 Ok(())
             }

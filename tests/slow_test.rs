@@ -21,7 +21,9 @@ mod modA {
     }
 }"#;
     assert_eq!(
-        format_str(source, Config::default().max_width(800)).unwrap().formatted,
+        format_str(source, Config::default().max_width(800))
+            .unwrap()
+            .formatted,
         r#"
 mod modA {
     mod modB {
@@ -75,6 +77,6 @@ mod modA {
     }
 }
 "#
-        .trim_start()
+        .trim_start(),
     );
 }

@@ -108,7 +108,7 @@ impl AstFormatter {
             ast::StmtKind::Empty => self.out.token(";"),
             ast::StmtKind::MacCall(mac_call_stmt) => {
                 self.with_attrs(&mac_call_stmt.attrs, stmt.span, || {
-                    self.mac_call(&mac_call_stmt.mac)?;
+                    self.macro_call(&mac_call_stmt.mac)?;
                     match mac_call_stmt.style {
                         ast::MacStmtStyle::Semicolon => self.out.token(";")?,
                         ast::MacStmtStyle::Braces | ast::MacStmtStyle::NoBraces => {}

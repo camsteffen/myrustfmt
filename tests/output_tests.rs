@@ -115,12 +115,18 @@ fn parse_test_body(
             }
         }
         TestKindRaw::Breakpoint => {
-            assert!(max_width.is_none(), "cannot use max-width with this test kind");
+            assert!(
+                max_width.is_none(),
+                "cannot use max-width with this test kind",
+            );
             let (before, after) = parse_before_after(body)?;
             TestKind::Breakpoint { before, after }
         }
         TestKindRaw::BreakpointError => {
-            assert!(max_width.is_none(), "cannot use max-width with this test kind");
+            assert!(
+                max_width.is_none(),
+                "cannot use max-width with this test kind",
+            );
             expect_no_after(body)?;
             TestKind::BreakpointError {
                 formatted: body.to_owned(),

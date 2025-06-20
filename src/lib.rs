@@ -1,5 +1,7 @@
+#![feature(default_field_values)]
 #![feature(if_let_guard)]
 #![feature(let_chains)]
+#![feature(result_option_map_or_default)]
 #![feature(rustc_private)]
 #![feature(unqualified_local_imports)]
 // Uncomment to let clippy babble (with some overrides made below)
@@ -21,6 +23,7 @@
 // these crates are loaded from the sysroot, so they need extern crate.
 extern crate core;
 extern crate rustc_ast;
+extern crate rustc_data_structures;
 extern crate rustc_driver;
 extern crate rustc_errors;
 extern crate rustc_expand;
@@ -38,10 +41,13 @@ mod constraint_writer;
 mod constraints;
 mod error;
 mod error_emitter;
+mod macro_args;
+mod module_extras;
 mod num;
 mod parse;
 mod rustfmt_config_defaults;
 mod source_formatter;
+mod std_macro;
 mod submodules;
 mod util;
 mod whitespace;
@@ -93,9 +99,10 @@ impl FormatModuleResult {
             formatted,
         } = self;
         assert_eq!(
-            error_count, 0,
+            error_count,
+            0,
             "Some errors occurred. Formatted:\n{}",
-            formatted
+            formatted,
         );
         formatted
     }
@@ -234,7 +241,12 @@ fn format_module_file(
             prev_panic_hook(info);
         })
     });
-    let result = format_module(&module, source_file, Some(path.to_path_buf()), config);
+    let result = format_module(
+        Rc::new(module),
+        source_file,
+        Some(path.to_path_buf()),
+        config,
+    );
     let _ = std::panic::take_hook();
     match on_format_module.on_format_module(path, result, &source) {
         ControlFlow::Continue(()) => Ok(submodules),
@@ -249,6 +261,6 @@ pub fn format_str(source: &str, config: Config) -> Result<FormatModuleResult, Er
             source_file,
             submodules: _,
         } = parse_module(CrateSource::Source(source), None)?;
-        Ok(format_module(&module, source_file, None, &config))
+        Ok(format_module(Rc::new(module), source_file, None, &config))
     })
 }

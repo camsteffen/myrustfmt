@@ -3,7 +3,7 @@ use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatErrorKind, FormatResult};
 
-use crate::ast_formatter::list::options::{ListOptions, ListShape};
+use crate::ast_formatter::list::options::{ListOptions, ListStrategies};
 use crate::constraints::VStruct;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::BindingMode;
@@ -150,7 +150,9 @@ impl AstFormatter {
             Braces::Parens,
             &parenthesized_args.inputs,
             |af, ty, tail, _lcx| af.ty_tail(ty, tail),
-            ListOptions::new().tail(list_tail),
+            ListOptions {
+                tail:list_tail,..
+            },
         )?;
         if let ast::FnRetTy::Ty(_) = parenthesized_args.output {
             self.out.space()?;
@@ -207,13 +209,20 @@ impl AstFormatter {
             }
             Ok(wrapped)
         };
-        let args = |arg_list_shape| {
+        let args = |vertical:bool| {
             self.has_vstruct(VStruct::NonBlockIndent, || {
                 self.list(
                     braces,
                     &fn_decl.inputs,
                     Self::param,
-                    ListOptions::new().shape(arg_list_shape),
+                    ListOptions {
+                        strategies: if vertical {
+                            ListStrategies::vertical()
+                        } else {
+                            ListStrategies::horizontal()
+                        },
+                            ..
+                    }
                 )
             })
         };
@@ -221,7 +230,7 @@ impl AstFormatter {
         // if there are no args, then we might wrap the return type to recover width
         if fn_decl.inputs.is_empty() {
             let first_line = self.out.line();
-            args(ListShape::Horizontal)?;
+            args(false)?;
             if !has_ret_ty {
                 self.tail(tail)?;
                 return Ok(false);
@@ -240,12 +249,12 @@ impl AstFormatter {
         self.backtrack()
             .next(|| {
                 self.out.with_recover_width(|| {
-                    args(ListShape::Horizontal)?;
+                    args(false)?;
                     return_ty_tail(true, false)
                 })
             })
             .next(|| {
-                args(ListShape::Vertical)?;
+                args(true)?;
                 return_ty_tail(false, false)
             })
             .result()

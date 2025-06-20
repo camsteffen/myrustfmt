@@ -1,6 +1,7 @@
 use crate::CrateSource;
 use crate::ast_module::AstModule;
-use crate::submodules::{Submodule, get_submodules};
+use crate::module_extras::get_module_extras;
+use crate::submodules::Submodule;
 use rustc_errors::ColorConfig;
 use rustc_errors::DiagCtxt;
 use rustc_errors::ErrorGuaranteed;
@@ -12,6 +13,7 @@ use rustc_session::parse::ParseSess;
 use rustc_span::source_map::{FilePathMapping, SourceMap};
 use rustc_span::symbol::Ident;
 use rustc_span::{FileName, SourceFile};
+use rustc_errors::PResult;
 use std::sync::Arc;
 
 pub struct ParseModuleResult {
@@ -36,26 +38,23 @@ pub fn parse_module(
         let dcx = build_diag_ctxt(Arc::clone(&source_map));
         let psess = ParseSess::with_dcx(dcx, Arc::clone(&source_map));
 
-        let mut parser = build_parser(&psess, crate_source);
-        let (attrs, items, spans) = parser
-            .parse_mod(ExpTokenPair {
-                tok: &rustc_ast::token::Eof,
-                token_type: rustc_parse::parser::token_type::TokenType::Eof,
-            })
-            .map_err(|err| err.emit())?;
-        if let Some(error) = psess.dcx().has_errors() {
-            return Err(error);
-        }
+        let parser = module_parser(&psess, crate_source);
+        let (attrs, items, spans) = parse_no_errors(parser, |parser| {
+            parser
+                .parse_mod(ExpTokenPair {
+                    tok: &rustc_ast::token::Eof,
+                    token_type: rustc_parse::parser::token_type::TokenType::Eof,
+                })
+        })?;
+
+        let macro_args;
+        (submodules, macro_args) = get_module_extras(&psess, &items, crate_source.path(), relative);
 
         module = AstModule {
             attrs,
             items,
+            macro_args,
             spans,
-        };
-
-        submodules = match crate_source {
-            CrateSource::File(path) => get_submodules(&psess, &module, path, relative),
-            CrateSource::Source(_) => Vec::new(),
         };
 
         source_file = match source_map.files().as_slice() {
@@ -74,6 +73,23 @@ pub fn parse_module(
     })
 }
 
+pub fn parse_no_errors<T>(mut parser: Parser, f: impl for<'p> FnOnce(&mut Parser<'p>) -> PResult<'p, T>) -> Result<T, ErrorGuaranteed> {
+    match f(&mut parser) {
+        Ok(value) => {
+            if let Some(err) = parser.psess.dcx().has_errors() {
+                parser.psess.dcx().reset_err_count();
+                Err(err)
+            } else {
+                Ok(value)
+            }
+        }
+        Err(diag) => {
+            parser.psess.dcx().reset_err_count();
+            Err(diag.emit())
+        }
+    }
+}
+
 fn build_diag_ctxt(source_map: Arc<SourceMap>) -> DiagCtxt {
     let fallback_bundle = rustc_errors::fallback_fluent_bundle(
         rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
@@ -86,7 +102,7 @@ fn build_diag_ctxt(source_map: Arc<SourceMap>) -> DiagCtxt {
     DiagCtxt::new(emitter)
 }
 
-fn build_parser<'a>(psess: &'a ParseSess, source: CrateSource) -> Parser<'a> {
+fn module_parser<'a>(psess: &'a ParseSess, source: CrateSource) -> Parser<'a> {
     let parser = match source {
         // todo provide span when the file is found from a mod
         CrateSource::File(path) => rustc_parse::new_parser_from_file(psess, path, None),

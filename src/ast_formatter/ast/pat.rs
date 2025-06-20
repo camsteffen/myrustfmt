@@ -38,7 +38,7 @@ impl AstFormatter {
                     self.pat(pat)?;
                 }
             }
-            ast::PatKind::MacCall(ref mac_call) => self.mac_call(mac_call)?,
+            ast::PatKind::MacCall(ref mac_call) => self.macro_call(mac_call)?,
             ast::PatKind::Or(ref pats) => {
                 self.simple_infix_chain("|", pats, |pat| self.pat(pat), false, take_tail())?
             }
@@ -67,7 +67,7 @@ impl AstFormatter {
                 Braces::Square,
                 elements,
                 Self::pat_list_item,
-                ListOptions::new().tail(take_tail()),
+                ListOptions {tail: take_tail(), ..}
             )?,
             ast::PatKind::Struct(ref qself, ref path, ref fields, rest) => {
                 self.struct_pat(qself, path, fields, rest, take_tail())?
@@ -76,7 +76,7 @@ impl AstFormatter {
                 Braces::Parens,
                 fields,
                 Self::pat_list_item,
-                ListOptions::new().tail(take_tail()),
+                ListOptions {tail: take_tail(), ..}
             )?,
             ast::PatKind::TupleStruct(ref qself, ref path, ref fields) => {
                 // todo tail?
@@ -85,7 +85,7 @@ impl AstFormatter {
                     Braces::Parens,
                     fields,
                     Self::pat_list_item,
-                    ListOptions::new().tail(take_tail()),
+                    ListOptions {tail: take_tail(), ..}
                 )?;
             }
             ast::PatKind::Wild => self.out.token("_")?,
@@ -122,11 +122,13 @@ impl AstFormatter {
             Braces::Curly,
             fields,
             Self::pat_field,
-            ListOptions::new()
-                .contents_max_width(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width)
-                .is_struct()
-                .rest(ListRest::from_pat_fields_rest(rest))
-                .tail(tail),
+            ListOptions {
+                contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
+                is_struct: true,
+                rest: ListRest::from_pat_fields_rest(rest),
+                tail,
+                ..
+            }
         )?;
         Ok(())
     }

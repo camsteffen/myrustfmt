@@ -39,7 +39,10 @@ impl SourceReader {
 
     pub fn advance(&self, len: u32) {
         self.pos.set(self.pos.get() + BytePos::from_u32(len));
-        assert!(self.pos.get().to_usize() <= self.source().len(), "source position advanced passed EOF");
+        assert!(
+            self.pos.get().to_usize() <= self.source().len(),
+            "source position advanced passed EOF",
+        );
     }
 
     pub fn eat_len(&self, len: u32) -> &str {

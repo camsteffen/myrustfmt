@@ -1,4 +1,4 @@
-use crate::ast_formatter::list::options::ListShape;
+use crate::ast_formatter::list::options::{ListStrategies};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
@@ -113,7 +113,7 @@ impl AstFormatter {
             if method_call.args.is_empty() {
                 self.method_call_args_postfix_tail(
                     method_call,
-                    ListShape::HorizontalWithOverflow,
+                    ListStrategies::horizontal_overflow(),
                     postfix_item,
                     tail,
                 )?;
@@ -125,7 +125,7 @@ impl AstFormatter {
                 // First just try to format the method call horizontally.
                 let horizontal_args_result = self.method_call_args_postfix_tail(
                     method_call,
-                    ListShape::HorizontalWithOverflow,
+                    ListStrategies::horizontal_overflow(),
                     postfix_item,
                     tail,
                 );
@@ -160,7 +160,7 @@ impl AstFormatter {
             Ok(self.simulate_wrap_indent(width_before_args, || {
                 self.method_call_args_postfix_tail(
                     method_call,
-                    ListShape::FlexibleWithOverflow,
+                    ListStrategies::flexible_overflow(),
                     postfix_item,
                     tail,
                 )?;
@@ -197,7 +197,7 @@ impl AstFormatter {
                     self.out.restore_checkpoint(&checkpoint);
                     self.method_call_args_postfix_tail(
                         method_call,
-                        ListShape::Vertical,
+                        ListStrategies::vertical(),
                         postfix_item,
                         tail,
                     )?;
@@ -231,7 +231,7 @@ impl AstFormatter {
                 self.out.restore_checkpoint(&checkpoint);
                 self.method_call_args_postfix_tail(
                     method_call,
-                    ListShape::Vertical,
+                    ListStrategies::vertical(),
                     postfix_item,
                     tail,
                 )?;
@@ -287,7 +287,7 @@ impl AstFormatter {
                 postfix_tail(self)?;
             }
             ast::ExprKind::MethodCall(ref method_call) => {
-                self.method_call(method_call, ListShape::FlexibleWithOverflow, item, tail)?;
+                self.method_call(method_call, ListStrategies::flexible_overflow(), item, tail)?;
             }
             // root expression
             _ => {
@@ -300,13 +300,13 @@ impl AstFormatter {
     fn method_call(
         &self,
         method_call: &ast::MethodCall,
-        list_shape: ListShape,
+        list_strategies: ListStrategies,
         postfix_item: &PostfixItem,
         tail: Tail,
     ) -> FormatResult<VSize> {
         self.method_call_dot_path(method_call)?;
         let args_height =
-            self.method_call_args_postfix_tail(method_call, list_shape, postfix_item, tail)?;
+            self.method_call_args_postfix_tail(method_call, list_strategies, postfix_item, tail)?;
         Ok(args_height)
     }
 
@@ -319,7 +319,7 @@ impl AstFormatter {
     fn method_call_args_postfix_tail(
         &self,
         method_call: &ast::MethodCall,
-        list_shape: ListShape,
+        list_strategies: ListStrategies,
         postfix_item: &PostfixItem,
         tail: Tail,
     ) -> FormatResult<VSize> {
@@ -327,7 +327,7 @@ impl AstFormatter {
         let height = Cell::new(0);
         self.call_args(
             &method_call.args,
-            list_shape,
+            list_strategies,
             Some(&self.tail_fn(|af| {
                 height.set(af.out.line() - first_line + 1);
                 af.postfix_tail(&postfix_item.postfix_tail, tail)

@@ -1,107 +1,97 @@
+use std::num::NonZero;
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::tail::Tail;
 use crate::num::HSize;
+use crate::util::default::default;
 
-#[derive(Clone, Copy, Default, PartialEq)]
-pub enum ListShape {
-    #[default]
-    Flexible,
-    FlexibleWithOverflow,
-    Horizontal,
-    HorizontalWithOverflow,
-    Vertical,
+pub enum ListStrategies {
+    Horizontal(HorizontalListStrategy),
+    Vertical(VerticalListStrategy),
+    Flexible(HorizontalListStrategy, VerticalListStrategy),
+}
+
+impl ListStrategies {
+    pub fn horizontal() -> ListStrategies {
+        ListStrategies::Horizontal(HorizontalListStrategy::SingleLine)
+    }
+    
+    pub fn horizontal_overflow() -> ListStrategies {
+        ListStrategies::Horizontal(HorizontalListStrategy::Overflow)
+    }
+
+    pub fn flexible() -> ListStrategies {
+        ListStrategies::Flexible(HorizontalListStrategy::SingleLine, VerticalListStrategy {..})
+    }
+    
+    pub fn flexible_overflow() -> ListStrategies {
+        ListStrategies::Flexible(HorizontalListStrategy::Overflow, VerticalListStrategy {..})
+    }
+    
+    pub fn vertical() -> ListStrategies {
+        ListStrategies::Vertical(default())
+    }
+}
+
+impl ListStrategies {
+    pub fn get_vertical(&self) -> Option<&VerticalListStrategy> {
+        match &self {
+            ListStrategies::Horizontal(_) => None,
+            ListStrategies::Vertical(vertical) | ListStrategies::Flexible(_, vertical) => Some(vertical),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Default)]
-pub enum ListWrapToFit {
+pub enum HorizontalListStrategy {
     #[default]
-    No,
-    Yes { max_element_width: Option<HSize> },
+    SingleLine,
+    Overflow,
+}
+
+impl HorizontalListStrategy {
+    pub fn is_overflow(self) -> bool {
+        matches!(self, Self::Overflow)
+    }
+}
+
+#[derive(Default)]
+pub struct VerticalListStrategy {
+    pub format_args: FormatArgs = FormatArgs::Off,
+    pub wrap_to_fit: Option<WrapToFit> = None,
+}
+
+impl VerticalListStrategy {
+    pub fn wrap_to_fit(
+        max_element_width: Option<HSize>,
+    ) -> VerticalListStrategy {
+        VerticalListStrategy {
+            wrap_to_fit: Some(WrapToFit { max_element_width: max_element_width.map(|v| NonZero::new(v).expect("wrap-to-fit max width must not be zero"))}),
+            ..
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default)]
+pub enum FormatArgs {
+    #[default]
+    Off,
+    On { format_string_pos: u8 }
+}
+
+#[derive(Clone, Copy)]
+pub struct WrapToFit {
+    pub max_element_width: Option<NonZero<HSize>>
 }
 
 pub struct ListOptions<'ast, 'tail, Item> {
-    pub(super) contents_max_width: Option<HSize>,
-    pub(super) force_trailing_comma: bool,
-    pub(super) is_struct: bool,
+    pub contents_max_width: Option<HSize> = None,
+    pub force_trailing_comma: bool = false,
+    pub is_struct: bool = false,
     /// Called with the last item in the list. Returns true if that item always prefers overflow
     /// to being wrapped to the next line.
-    pub(super) item_requires_own_line: Option<Box<dyn Fn(&Item) -> bool>>,
-    pub(super) omit_open_brace: bool,
-    pub(super) rest: Option<ListRest<'ast>>,
-    pub(super) shape: ListShape,
-    pub(super) tail: Tail<'tail, 'ast>,
-    pub(super) wrap_to_fit: ListWrapToFit,
-}
-
-impl<'ast, 'tail, Item> ListOptions<'ast, 'tail, Item> {
-    pub fn new() -> Self {
-        ListOptions {
-            contents_max_width: None,
-            force_trailing_comma: false,
-            is_struct: false,
-            item_requires_own_line: None,
-            omit_open_brace: false,
-            rest: None,
-            shape: ListShape::default(),
-            tail: None,
-            wrap_to_fit: ListWrapToFit::default(),
-        }
-    }
-
-    pub fn contents_max_width(self, width: HSize) -> Self {
-        ListOptions {
-            contents_max_width: Some(width),
-            ..self
-        }
-    }
-
-    pub fn force_trailing_comma(self, force_trailing_comma: bool) -> Self {
-        Self {
-            force_trailing_comma,
-            ..self
-        }
-    }
-
-    pub fn is_struct(self) -> Self {
-        Self {
-            is_struct: true,
-            ..self
-        }
-    }
-
-    pub fn item_requires_own_line(
-        self,
-        item_requires_own_line: impl Fn(&Item) -> bool + 'static,
-    ) -> Self {
-        Self {
-            item_requires_own_line: Some(Box::new(item_requires_own_line)),
-            ..self
-        }
-    }
-
-    pub fn omit_open_brace(self) -> Self {
-        ListOptions {
-            omit_open_brace: true,
-            ..self
-        }
-    }
-
-    pub fn rest(self, rest: Option<ListRest<'ast>>) -> Self {
-        ListOptions { rest, ..self }
-    }
-
-    pub fn shape(self, shape: ListShape) -> Self {
-        ListOptions { shape, ..self }
-    }
-
-    pub fn tail(self, tail: Tail<'tail, 'ast>) -> ListOptions<'ast, 'tail, Item> {
-        Self { tail, ..self }
-    }
-
-    pub fn wrap_to_fit(self, wrap_to_fit: ListWrapToFit) -> Self {
-        Self {
-            wrap_to_fit,
-            ..self
-        }
-    }
+    pub item_requires_own_line: Option<Box<dyn Fn(&Item) -> bool>> = None,
+    pub omit_open_brace: bool = false,
+    pub rest: Option<ListRest<'ast>> = None,
+    pub strategies: ListStrategies = ListStrategies::Flexible(HorizontalListStrategy::SingleLine, VerticalListStrategy{..}),
+    pub tail: Tail<'tail, 'ast> = None,
 }

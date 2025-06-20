@@ -21,7 +21,7 @@ pub mod util;
 pub const INDENT_WIDTH: HSize = 4;
 
 pub fn format_module(
-    module: &AstModule,
+    module: Rc<AstModule>,
     source_file: SourceFile,
     path: Option<PathBuf>,
     config: &Config,
@@ -36,18 +36,23 @@ pub fn format_module(
         Rc::clone(&errors),
         config.max_width,
     );
-    let formatter = AstFormatter { errors, out };
-    formatter.module(module)
+    AstFormatter {
+        module,
+        errors,
+        out,
+    }
+    .module()
 }
 
 struct AstFormatter {
+    module: Rc<AstModule>,
     errors: Rc<BufferedErrorEmitter>,
     out: SourceFormatter,
 }
 
 impl AstFormatter {
-    fn module(self, module: &AstModule) -> FormatModuleResult {
-        match self.do_module(module) {
+    fn module(self) -> FormatModuleResult {
+        match self.do_module() {
             Err(e) => {
                 // todo don't panic?
                 // todo make it possible to panic inside ErrorEmitter instead?
@@ -64,7 +69,11 @@ impl AstFormatter {
                 );
             }
             Ok(()) => {
-                let Self { errors, out } = self;
+                let Self {
+                    errors,
+                    out,
+                    module: _,
+                } = self;
                 let formatted = out.finish();
                 let (error_count, error_output) = Rc::into_inner(errors).unwrap().finish();
                 FormatModuleResult {
@@ -76,11 +85,17 @@ impl AstFormatter {
         }
     }
 
-    fn do_module(&self, module: &AstModule) -> FormatResult {
+    fn do_module(&self) -> FormatResult {
+        let AstModule {
+            attrs,
+            spans,
+            items,
+            ..
+        } = &*self.module;
         self.out.comments(VerticalWhitespaceMode::Top)?;
         // todo skip the whole file if there's a skip attribute?
-        self.with_attrs(&module.attrs, module.spans.inner_span, || {
-            self.list_with_item_sorting(&module.items, |item| self.item(item))
+        self.with_attrs(&attrs, spans.inner_span, || {
+            self.list_with_item_sorting(&items, |item| self.item(item))
         })?;
         self.out.newline(VerticalWhitespaceMode::Bottom)?;
         Ok(())
