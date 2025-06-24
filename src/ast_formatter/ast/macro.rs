@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
 use crate::ast_formatter::list::options::{
-    HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy, WrapToFit,
+    FlexibleListStrategy, ListOptions, ListStrategies, VerticalListStrategy, WrapToFit,
 };
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
@@ -60,9 +60,8 @@ impl AstFormatter {
             |af, item, tail, _lcx| format(af, item, tail),
             ListOptions {
                 contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
-                strategies: ListStrategies::Flexible(
-                    HorizontalListStrategy::SingleLine,
-                    VerticalListStrategy {
+                strategies: ListStrategies::Flexible(FlexibleListStrategy {
+                    vertical: VerticalListStrategy {
                         wrap_to_fit: format_string_pos.map(|format_string_pos| {
                             WrapToFit {
                                 format_string_pos: Some(format_string_pos),
@@ -75,8 +74,10 @@ impl AstFormatter {
                                 ),
                             }
                         }),
+                        ..
                     },
-                ),
+                    ..
+                }),
                 ..
             },
         )

@@ -4,7 +4,7 @@ mod postfix;
 
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::options::{
-    HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy,
+    FlexibleListStrategy, ListOptions, ListStrategies, VerticalListStrategy,
 };
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
@@ -156,12 +156,12 @@ impl AstFormatter {
             |af, expr, tail, _lcx| af.expr_tail(expr, tail),
             ListOptions {
                 contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.array_width),
-                strategies: ListStrategies::Flexible(
-                    HorizontalListStrategy::SingleLine,
-                    VerticalListStrategy::wrap_to_fit(Some(
+                strategies: ListStrategies::Flexible(FlexibleListStrategy {
+                    vertical: VerticalListStrategy::wrap_to_fit(Some(
                         RUSTFMT_CONFIG_DEFAULTS.short_array_element_width_threshold,
                     )),
-                ),
+                    ..
+                }),
                 tail,
                 ..
             },
@@ -199,7 +199,7 @@ impl AstFormatter {
     pub fn call_args(
         &self,
         args: &[P<ast::Expr>],
-        list_strategies: ListStrategies,
+        list_strategies: ListStrategies<P<ast::Expr>>,
         tail: Tail,
     ) -> FormatResult {
         let mut list_opt = ListOptions {

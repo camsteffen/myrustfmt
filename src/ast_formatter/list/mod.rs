@@ -7,7 +7,10 @@ pub use self::braces::Braces;
 pub use self::list_item_context::ListItemContext;
 pub use self::rest::ListRest;
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::options::{ListOptions, ListStrategies, WrapToFit};
+use crate::ast_formatter::list::options::{
+    FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy,
+    WrapToFit,
+};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
 use crate::constraints::VStruct;
@@ -60,31 +63,32 @@ where
             }
             match self.opt.strategies {
                 ListStrategies::Horizontal(horizontal) => {
-                    self.list_horizontal(horizontal.is_overflow(), false)
+                    self.list_horizontal(horizontal, false)
                         .map_err(|e| e.error)?
                 }
                 ListStrategies::Vertical(_) => {
                     self.list_vertical(None)?;
                 }
-                ListStrategies::Flexible(horizontal, _) => {
-                    self.list_flexible(horizontal.is_overflow())?
-                }
+                ListStrategies::Flexible(ref flexible) => self.list_flexible(flexible)?,
             }
             Ok(())
         })
     }
 
-    fn list_flexible(&self, overflow: bool) -> FormatResult {
+    fn list_flexible(&self, strategy: &FlexibleListStrategy<Item>) -> FormatResult {
         let checkpoint = self.af.out.checkpoint();
 
-        if self.opt.item_requires_own_line.as_ref().is_some_and(|f| {
-            self.list.iter().any(f)
-        }) {
+        if strategy
+            .vertical
+            .item_requires_own_line
+            .as_ref()
+            .is_some_and(|f| self.list.iter().any(f))
+        {
             return self.list_vertical(Some(&checkpoint));
         }
 
         let horizontal_result =
-            self.af.out.with_recover_width(|| self.list_horizontal(overflow, true));
+            self.af.out.with_recover_width(|| self.list_horizontal(strategy.horizontal, true));
         if let Err(e) = horizontal_result {
             if e.is_overflow {
                 assert!(
@@ -103,7 +107,7 @@ where
 
     fn list_horizontal(
         &self,
-        can_overflow: bool,
+        strategy: HorizontalListStrategy,
         has_vertical_fallback: bool,
     ) -> Result<(), ListHorizontalError> {
         let Self {
@@ -113,6 +117,10 @@ where
             list,
             ..
         } = self;
+        let can_overflow = match strategy {
+            HorizontalListStrategy::SingleLine => false,
+            HorizontalListStrategy::Overflow => true,
+        };
         let rest = opt.rest;
         let len = list.len();
         let first_line = self.af.out.line();
@@ -228,12 +236,13 @@ where
         if self.list.len() <= 1 {
             return None;
         }
-        let wrap_to_fit = self.opt.strategies.get_vertical()?.wrap_to_fit?;
+        let vertical = self.opt.strategies.get_vertical()?;
+        let wrap_to_fit = vertical.wrap_to_fit?;
         assert!(
             self.opt.rest.is_none(),
             "rest cannot be used with wrap-to-fit",
         );
-        Some(move || self.list_wrap_to_fit(wrap_to_fit))
+        Some(move || self.list_wrap_to_fit(wrap_to_fit, vertical))
     }
 
     /*
@@ -243,7 +252,11 @@ where
     ]
     */
     // todo how does this behave with comments between items - forcing newlines?
-    fn list_wrap_to_fit(&self, wrap_to_fit: WrapToFit) -> FormatResult {
+    fn list_wrap_to_fit(
+        &self,
+        wrap_to_fit: WrapToFit,
+        vertical: &VerticalListStrategy<Item>,
+    ) -> FormatResult {
         let WrapToFit {
             format_string_pos,
             max_element_width,
@@ -278,7 +291,7 @@ where
                 };
                 let is_own_line = prev_must_have_own_line
                     || format_string_pos.is_some_and(|i| index == i as usize)
-                    || opt.item_requires_own_line.as_ref().is_some_and(|f| {
+                    || vertical.item_requires_own_line.as_ref().is_some_and(|f| {
                         f(&list[index])
                     });
                 if is_own_line {

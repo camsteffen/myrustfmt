@@ -8,6 +8,7 @@ use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::{HSize, VSize};
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
+use rustc_ast::ptr::P;
 use std::cell::Cell;
 
 // In rustfmt, this is called chain_width, and is 60 by default
@@ -287,7 +288,7 @@ impl AstFormatter {
                 postfix_tail(self)?;
             }
             ast::ExprKind::MethodCall(ref method_call) => {
-                self.method_call(method_call, ListStrategies::flexible_overflow(), item, tail)?;
+                self.method_call(method_call, item, tail)?;
             }
             // root expression
             _ => {
@@ -300,13 +301,16 @@ impl AstFormatter {
     fn method_call(
         &self,
         method_call: &ast::MethodCall,
-        list_strategies: ListStrategies,
         postfix_item: &PostfixItem,
         tail: Tail,
     ) -> FormatResult<VSize> {
         self.method_call_dot_path(method_call)?;
-        let args_height =
-            self.method_call_args_postfix_tail(method_call, list_strategies, postfix_item, tail)?;
+        let args_height = self.method_call_args_postfix_tail(
+            method_call,
+            ListStrategies::flexible_overflow(),
+            postfix_item,
+            tail,
+        )?;
         Ok(args_height)
     }
 
@@ -319,7 +323,7 @@ impl AstFormatter {
     fn method_call_args_postfix_tail(
         &self,
         method_call: &ast::MethodCall,
-        list_strategies: ListStrategies,
+        list_strategies: ListStrategies<P<ast::Expr>>,
         postfix_item: &PostfixItem,
         tail: Tail,
     ) -> FormatResult<VSize> {
