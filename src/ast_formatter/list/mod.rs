@@ -4,18 +4,18 @@ pub mod options;
 mod rest;
 
 pub use self::braces::Braces;
-pub use self::list_item_context::{ListItemContext, ListStrategy};
+pub use self::list_item_context::ListItemContext;
 pub use self::rest::ListRest;
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::options::{ListOptions, ListStrategies};
+use crate::ast_formatter::list::options::{ListOptions, ListStrategies, WrapToFit};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
 use crate::constraints::VStruct;
 use crate::error::{FormatError, FormatErrorKind, FormatResult};
-use crate::num::{HSize, VSize};
+use crate::num::VSize;
+use crate::source_formatter::checkpoint::Checkpoint;
 use crate::whitespace::VerticalWhitespaceMode;
 use std::cell::Cell;
-use std::num::NonZero;
 
 impl AstFormatter {
     pub fn list<'ast, Item>(
@@ -64,7 +64,7 @@ where
                         .map_err(|e| e.error)?
                 }
                 ListStrategies::Vertical(_) => {
-                    self.list_vertical()?;
+                    self.list_vertical(None)?;
                 }
                 ListStrategies::Flexible(horizontal, _) => {
                     self.list_flexible(horizontal.is_overflow())?
@@ -77,22 +77,15 @@ where
     fn list_flexible(&self, overflow: bool) -> FormatResult {
         let checkpoint = self.af.out.checkpoint();
 
-        let wrap_to_fit_or_vertical = |restore: bool| {
-            self.af
-                .backtrack()
-                .next_opt(self.list_wrap_to_fit_fn_opt())
-                .next(|| self.list_vertical())
-                .result_with_checkpoint(&checkpoint, restore)?;
-            Ok(())
-        };
-
         if self.opt.item_requires_own_line.as_ref().is_some_and(|f| {
             self.list.iter().any(f)
         }) {
-            return wrap_to_fit_or_vertical(false);
+            return self.list_vertical(Some(&checkpoint));
         }
 
-        if let Err(e) = self.af.out.with_recover_width(|| self.list_horizontal(overflow, true)) {
+        let horizontal_result =
+            self.af.out.with_recover_width(|| self.list_horizontal(overflow, true));
+        if let Err(e) = horizontal_result {
             if e.is_overflow {
                 assert!(
                     self.af.constraints().single_line.get(),
@@ -101,7 +94,8 @@ where
                 // Horizontal formatting would have succeeded if single line mode were not enabled.
                 return Err(e.error);
             }
-            return wrap_to_fit_or_vertical(true);
+            self.af.out.restore_checkpoint(&checkpoint);
+            return self.list_vertical(Some(&checkpoint));
         }
 
         Ok(())
@@ -122,6 +116,7 @@ where
         let rest = opt.rest;
         let len = list.len();
         let first_line = self.af.out.line();
+        let item = |index, tail| self.list_item(index, false, tail);
         let pad = |af: &AstFormatter| -> FormatResult {
             if braces.pad() {
                 af.out.space()?;
@@ -169,17 +164,15 @@ where
             }
 
             for index in 0..(len - 1) {
-                af.with_single_line(|| self.list_horizontal_item(index, None))?;
+                af.with_single_line(|| item(index, None))?;
                 af.out.token_maybe_missing(",")?;
                 af.out.space()?;
             }
 
             let last_item_result = if !can_overflow {
-                af.with_single_line(|| {
-                    self.list_horizontal_item(list.len() - 1, Some(&last_item_tail))
-                })
+                af.with_single_line(|| item(list.len() - 1, Some(&last_item_tail)))
             } else if !has_vertical_fallback {
-                self.list_horizontal_item(list.len() - 1, Some(&last_item_tail))
+                item(list.len() - 1, Some(&last_item_tail))
             } else {
                 self.list_horizontal_overflowable(&height, Some(&last_item_tail))
             };
@@ -202,34 +195,23 @@ where
         Ok(())
     }
 
-    fn list_horizontal_item(&self, index: usize, tail: Tail) -> FormatResult {
-        (self.format_item)(
-            self.af,
-            &self.list[index],
-            tail,
-            ListItemContext {
-                index,
-                strategy: ListStrategy::Horizontal,
-            },
-        )
-    }
-
     fn list_horizontal_overflowable(&self, height: &Cell<VSize>, tail: Tail) -> FormatResult {
         let Self { af, list, .. } = self;
         let index = list.len() - 1;
+        let item = || self.list_item(index, false, tail);
         let checkpoint = af.out.checkpoint();
-        let wrap_result = af.simulate_wrap_indent(0, || self.list_horizontal_item(index, tail));
+        let wrap_result = af.simulate_wrap_indent(0, item);
         match wrap_result {
             SimulateWrapResult::Ok => {}
             SimulateWrapResult::NoWrap
             // vertical would increase indentation in the overflow
             | SimulateWrapResult::WrapForLongerFirstLine => {
                 af.out.restore_checkpoint(&checkpoint);
-                self.list_horizontal_item(index, tail)?;
+                item()?;
             }
             SimulateWrapResult::WrapForSingleLine => {
                 af.out.restore_checkpoint(&checkpoint);
-                self.list_horizontal_item(index, tail)?;
+                item()?;
                 let vertical_height = 2 + list.len() as VSize;
                 if vertical_height < height.get() {
                     return Err(FormatErrorKind::Logical.into());
@@ -242,21 +224,16 @@ where
         Ok(())
     }
 
-    fn list_wrap_to_fit_fn_opt(&self) -> Option<impl Fn() -> FormatResult<VSize>> {
-        if self.list.len() <= 1 && self.opt.rest.is_none() {
+    fn list_wrap_to_fit_fn_opt(&self) -> Option<impl Fn() -> FormatResult> {
+        if self.list.len() <= 1 {
             return None;
         }
-        let max_element_width = self
-            .opt
-            .strategies
-            .get_vertical()?
-            .wrap_to_fit?
-            .max_element_width;
+        let wrap_to_fit = self.opt.strategies.get_vertical()?.wrap_to_fit?;
         assert!(
             self.opt.rest.is_none(),
             "rest cannot be used with wrap-to-fit",
         );
-        Some(move || self.list_wrap_to_fit(max_element_width))
+        Some(move || self.list_wrap_to_fit(wrap_to_fit))
     }
 
     /*
@@ -266,7 +243,11 @@ where
     ]
     */
     // todo how does this behave with comments between items - forcing newlines?
-    fn list_wrap_to_fit(&self, max_element_width: Option<NonZero<HSize>>) -> FormatResult<VSize> {
+    fn list_wrap_to_fit(&self, wrap_to_fit: WrapToFit) -> FormatResult {
+        let WrapToFit {
+            format_string_pos,
+            max_element_width,
+        } = wrap_to_fit;
         let Self {
             af,
             opt,
@@ -274,37 +255,29 @@ where
             list,
             ..
         } = self;
-        let len = list.len();
-        let first_line = af.out.line();
-        let format_index = |index| {
-            (self.format_item)(
-                self.af,
-                &self.list[index],
-                None,
-                ListItemContext {
-                    index,
-                    strategy: ListStrategy::WrapToFit,
-                },
-            )
-        };
-        let format_item = |index| match max_element_width {
-            Some(max_width) => {
-                af.with_single_line(|| af.with_width_limit(max_width.get(), || format_index(index)))
+        let item = |index| {
+            let item = || self.list_item(index, true, None);
+            if let Some(max_width) = max_element_width
+                && !format_string_pos.is_some_and(|i| index == i as usize)
+            {
+                af.with_single_line(|| af.with_width_limit(max_width.get(), item))
+            } else {
+                item()
             }
-            None => format_index(index),
         };
         af.enclosed_after_opening(braces.end(), || {
-            let (first, rest) = (0, 1..len);
-            format_item(first)?;
+            let (first, rest) = (0, 1..list.len());
+            item(first)?;
             af.out.token_maybe_missing(",")?;
             let mut prev_must_have_own_line = false;
             for index in rest {
                 let item_comma = || -> FormatResult {
-                    format_item(index)?;
+                    item(index)?;
                     af.out.token_maybe_missing(",")?;
                     Ok(())
                 };
                 let is_own_line = prev_must_have_own_line
+                    || format_string_pos.is_some_and(|i| index == i as usize)
                     || opt.item_requires_own_line.as_ref().is_some_and(|f| {
                         f(&list[index])
                     });
@@ -328,12 +301,19 @@ where
             }
             Ok(())
         })?;
-        let height = af.out.line() - first_line + 1;
         af.tail(opt.tail)?;
-        Ok(height)
+        Ok(())
     }
 
-    fn list_vertical(&self) -> FormatResult<VSize> {
+    fn list_vertical(&self, checkpoint: Option<&Checkpoint>) -> FormatResult {
+        self.af
+            .backtrack()
+            .next_opt(self.list_wrap_to_fit_fn_opt())
+            .next(|| self.list_vertical_simple())
+            .result_opt_checkpoint(checkpoint)
+    }
+
+    fn list_vertical_simple(&self) -> FormatResult {
         let Self {
             af,
             opt,
@@ -342,16 +322,11 @@ where
             ..
         } = self;
         let len = list.len();
-        let first_line = af.out.line();
         let item_comma = |index| {
-            (self.format_item)(
-                af,
-                &list[index],
+            self.list_item(
+                index,
+                true,
                 Some(&af.tail_fn(|af| af.out.token_maybe_missing(","))),
-                ListItemContext {
-                    index,
-                    strategy: ListStrategy::Vertical,
-                },
             )
         };
         af.enclosed_after_opening(braces.end(), || {
@@ -374,9 +349,17 @@ where
             }
             Ok(())
         })?;
-        let height = af.out.line() - first_line + 1;
         af.tail(opt.tail)?;
-        Ok(height)
+        Ok(())
+    }
+
+    fn list_item(&self, index: usize, is_vertical: bool, tail: Tail) -> FormatResult {
+        (self.format_item)(
+            self.af,
+            &self.list[index],
+            tail,
+            ListItemContext { index, is_vertical },
+        )
     }
 }
 

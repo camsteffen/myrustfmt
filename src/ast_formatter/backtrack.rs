@@ -44,15 +44,12 @@ impl<'s, T> Backtrack<'_, 's, T> {
         self.result_inner(None)
     }
 
-    pub fn result_with_checkpoint(
-        self,
-        checkpoint: &Checkpoint,
-        initial_restore: bool,
-    ) -> FormatResult<T> {
-        if initial_restore {
-            self.af.out.restore_checkpoint(checkpoint);
-        }
+    pub fn result_with_checkpoint(self, checkpoint: &Checkpoint) -> FormatResult<T> {
         self.result_inner(Some(checkpoint))
+    }
+
+    pub fn result_opt_checkpoint(self, checkpoint: Option<&Checkpoint>) -> FormatResult<T> {
+        self.result_inner(checkpoint)
     }
 
     fn result_inner(self, checkpoint: Option<&Checkpoint>) -> FormatResult<T> {

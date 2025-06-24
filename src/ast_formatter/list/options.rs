@@ -40,7 +40,7 @@ impl ListStrategies {
 
 impl ListStrategies {
     pub fn get_vertical(&self) -> Option<&VerticalListStrategy> {
-        match &self {
+        match self {
             ListStrategies::Horizontal(_) => None,
             ListStrategies::Vertical(vertical) | ListStrategies::Flexible(_, vertical) => {
                 Some(vertical)
@@ -64,7 +64,6 @@ impl HorizontalListStrategy {
 
 #[derive(Default)]
 pub struct VerticalListStrategy {
-    pub format_args: FormatArgs = FormatArgs::Off,
     pub wrap_to_fit: Option<WrapToFit> = None,
 }
 
@@ -72,6 +71,7 @@ impl VerticalListStrategy {
     pub fn wrap_to_fit(max_element_width: Option<HSize>) -> VerticalListStrategy {
         VerticalListStrategy {
             wrap_to_fit: Some(WrapToFit {
+                format_string_pos: None,
                 max_element_width: max_element_width.map(|v| {
                     NonZero::new(v)
                         .expect("wrap-to-fit max width must not be zero")
@@ -82,15 +82,9 @@ impl VerticalListStrategy {
     }
 }
 
-#[derive(Clone, Copy, Default)]
-pub enum FormatArgs {
-    #[default]
-    Off,
-    On { format_string_pos: u8 },
-}
-
 #[derive(Clone, Copy)]
 pub struct WrapToFit {
+    pub format_string_pos: Option<u8>,
     pub max_element_width: Option<NonZero<HSize>>,
 }
 
@@ -100,6 +94,7 @@ pub struct ListOptions<'ast, 'tail, Item> {
     pub is_struct: bool = false,
     /// Called with the last item in the list. Returns true if that item always prefers overflow
     /// to being wrapped to the next line.
+    // todo move to flexible strategy object
     pub item_requires_own_line: Option<Box<dyn Fn(&Item) -> bool>> = None,
     pub omit_open_brace: bool = false,
     pub rest: Option<ListRest<'ast>> = None,

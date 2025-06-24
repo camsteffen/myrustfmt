@@ -21,6 +21,7 @@ impl AstFormatter {
             }
         };
 
+        self.out.restore_checkpoint(&checkpoint_after_eq);
         self.backtrack()
             .next_if(!force_wrap, || {
                 self.space_could_wrap_indent(|| {
@@ -36,7 +37,7 @@ impl AstFormatter {
                     Ok(())
                 })
             })
-            .result_with_checkpoint(&checkpoint_after_eq, true)?;
+            .result_with_checkpoint(&checkpoint_after_eq)?;
         Ok(())
     }
 }

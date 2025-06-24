@@ -6,7 +6,7 @@ use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::options::{
     HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy,
 };
-use crate::ast_formatter::list::{Braces, ListItemContext, ListStrategy};
+use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
@@ -216,7 +216,7 @@ impl AstFormatter {
             Braces::Parens,
             args,
             |af, expr, tail, lcx| {
-                if lcx.strategy == ListStrategy::Horizontal && lcx.index == args.len() - 1 {
+                if !lcx.is_vertical && lcx.index == args.len() - 1 {
                     let mut vstructs =
                         VStruct::ControlFlow | VStruct::Index | VStruct::NonBlockIndent;
                     if args.len() > 1 {

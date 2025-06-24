@@ -11,18 +11,14 @@ pub fn std_macro(mac_call: &ast::MacCall) -> Option<StdMacro> {
         return None;
     };
     let std_macro = match segment.ident.as_str() {
-        "assert"
-        | "assert_eq"
-        | "assert_ne"
-        | "column"
-        | "compile_error"
-        | "concat"
-        | "dbg"
-        | "debug_assert"
-        | "debug_assert_eq"
-        | "debug_assert_ne"
-        | "env" => StdMacro::ExprList,
-        "eprint" => StdMacro::Format {
+        "column" | "compile_error" | "concat" | "dbg" | "env" => StdMacro::ExprList,
+        "assert" | "debug_assert" => StdMacro::Format {
+            format_string_pos: 1,
+        },
+        "assert_eq" | "assert_ne" | "debug_assert_eq" | "debug_assert_ne" => StdMacro::Format {
+            format_string_pos: 2,
+        },
+        "eprint" | "eprintln" | "print" | "println" => StdMacro::Format {
             format_string_pos: 0,
         },
         "cfg" => StdMacro::Cfg,

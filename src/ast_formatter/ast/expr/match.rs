@@ -120,6 +120,7 @@ impl AstFormatter {
             | SimulateWrapResult::WrapForLongerFirstLine
             | SimulateWrapResult::WrapForLessExcessWidth => true,
         };
+        self.out.restore_checkpoint(&checkpoint);
         self.backtrack()
             .next_if(!force_block, || {
                 self.disallow_vstructs(VStruct::ControlFlow | VStruct::NonBlockIndent, || {
@@ -127,7 +128,7 @@ impl AstFormatter {
                 })
             })
             .next(|| self.add_block(|| self.expr_stmt(body)))
-            .result_with_checkpoint(&checkpoint, true)?;
+            .result_with_checkpoint(&checkpoint)?;
         Ok(())
     }
 }

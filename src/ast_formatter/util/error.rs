@@ -31,7 +31,8 @@ impl<T> FormatResultExt for FormatResult<T> {
             af.out.with_taken_buffer(|buf| {
                 eprintln!(
                     "[{location}] Error: {:?}\nBuffer:\n{buf}\nBacktrace:\n{}",
-                    e.kind, &e.backtrace
+                    e.kind,
+                    &e.backtrace,
                 );
             });
         }
