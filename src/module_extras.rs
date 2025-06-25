@@ -1,6 +1,6 @@
 use crate::Submodule;
-use crate::macro_args::MacroArgsCollector;
 use crate::macro_args::MacroArgsMap;
+use crate::macro_args::MacroArgsParser;
 use crate::submodules::SubmoduleCollector;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
@@ -31,7 +31,10 @@ pub fn get_module_extras(
     });
     let mut visitor = ModuleExtrasVisitor {
         psess,
-        macro_args: MacroArgsCollector::default(),
+        macro_args: MacroArgsParser {
+            psess,
+            macro_args: Default::default(),
+        },
         submodules,
     };
     for item in items {
@@ -45,28 +48,23 @@ pub fn get_module_extras(
 
 struct ModuleExtrasVisitor<'psess> {
     psess: &'psess ParseSess,
-    macro_args: MacroArgsCollector,
+    macro_args: MacroArgsParser<'psess>,
     submodules: Option<SubmoduleCollector>,
 }
 
 impl Visitor<'_> for ModuleExtrasVisitor<'_> {
-    fn visit_expr(&mut self, expr: &ast::Expr) {
-        self.macro_args.expr(self.psess, expr);
-        visit::walk_expr(self, expr);
-    }
-
     fn visit_item(&mut self, item: &ast::Item) {
-        let submodules_close = self.submodules.as_mut().map(|s| {
-            s.visit_item(self.psess, item)
-        });
-        visit::walk_item(self, item);
-        if let Some(close) = submodules_close {
+        if let Some(submodules) = &mut self.submodules {
+            let close = submodules.visit_item(self.psess, item);
+            visit::walk_item(self, item);
             close(self.submodules.as_mut().unwrap());
+        } else {
+            visit::walk_item(self, item);
         }
     }
 
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        self.macro_args.stmt(self.psess, stmt);
-        visit::walk_stmt(self, stmt);
+    fn visit_mac_call(&mut self, mac_call: &ast::MacCall) {
+        self.macro_args.visit_mac_call(mac_call);
+        visit::walk_mac(self, mac_call);
     }
 }

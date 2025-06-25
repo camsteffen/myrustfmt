@@ -136,7 +136,7 @@ fn write_parse_error(
                     "ahead"
                 } else {
                     "behind"
-                }
+                },
             )?;
             next_token(f)?;
         }

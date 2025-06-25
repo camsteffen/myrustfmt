@@ -12,7 +12,7 @@ pub fn std_macro(mac_call: &ast::MacCall) -> Option<StdMacro> {
     };
     let std_macro = match segment.ident.as_str() {
         "column" | "compile_error" | "concat" | "dbg" | "env" => StdMacro::ExprList,
-        "assert" | "debug_assert" => StdMacro::Format {
+        "assert" | "debug_assert" | "write" => StdMacro::Format {
             format_string_pos: 1,
         },
         "assert_eq" | "assert_ne" | "debug_assert_eq" | "debug_assert_ne" => StdMacro::Format {
