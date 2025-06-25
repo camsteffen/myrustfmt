@@ -117,10 +117,6 @@ where
             list,
             ..
         } = self;
-        let can_overflow = match strategy {
-            HorizontalListStrategy::SingleLine => false,
-            HorizontalListStrategy::Overflow => true,
-        };
         let rest = opt.rest;
         let len = list.len();
         let first_line = self.af.out.line();
@@ -159,7 +155,7 @@ where
         let width_limit = if opt.is_struct
             || len + usize::from(rest.is_some_and(|r| r.base.is_some())) > 1
         {
-            opt.contents_max_width
+            strategy.contents_max_width
         } else {
             None
         };
@@ -177,14 +173,14 @@ where
                 af.out.space()?;
             }
 
-            let last_item_result = if !can_overflow {
+            let last_item_result = if !strategy.overflow {
                 af.with_single_line(|| item(list.len() - 1, Some(&last_item_tail)))
             } else if !has_vertical_fallback {
                 item(list.len() - 1, Some(&last_item_tail))
             } else {
                 self.list_horizontal_overflowable(&height, Some(&last_item_tail))
             };
-            if can_overflow
+            if strategy.overflow
                 && let Err(err) = &last_item_result
                 && let FormatErrorKind::Vertical(_) = err.kind
             {

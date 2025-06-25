@@ -3,7 +3,9 @@ use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::ListRest;
-use crate::ast_formatter::list::options::ListOptions;
+use crate::ast_formatter::list::options::{
+    FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies,
+};
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatErrorKind, FormatResult};
@@ -132,9 +134,15 @@ impl AstFormatter {
             fields,
             Self::pat_field,
             ListOptions {
-                contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
                 is_struct: true,
                 rest: ListRest::from_pat_fields_rest(rest),
+                strategies: ListStrategies::Flexible(FlexibleListStrategy {
+                    horizontal: HorizontalListStrategy {
+                        contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
+                        ..
+                    },
+                    ..
+                }),
                 tail,
                 ..
             },

@@ -11,20 +11,16 @@ pub enum ListStrategies<Item> {
 
 impl<Item> ListStrategies<Item> {
     pub fn horizontal() -> Self {
-        ListStrategies::Horizontal(HorizontalListStrategy::SingleLine)
+        ListStrategies::Horizontal(HorizontalListStrategy { .. })
     }
 
     pub fn horizontal_overflow() -> Self {
-        ListStrategies::Horizontal(HorizontalListStrategy::Overflow)
-    }
-
-    pub fn flexible() -> Self {
-        ListStrategies::Flexible(FlexibleListStrategy { .. })
+        ListStrategies::Horizontal(HorizontalListStrategy { overflow: true, .. })
     }
 
     pub fn flexible_overflow() -> Self {
         ListStrategies::Flexible(FlexibleListStrategy {
-            horizontal: HorizontalListStrategy::Overflow,
+            horizontal: HorizontalListStrategy { overflow: true, .. },
             ..
         })
     }
@@ -33,7 +29,15 @@ impl<Item> ListStrategies<Item> {
         ListStrategies::Vertical(VerticalListStrategy { .. })
     }
 
-    pub(super) fn get_vertical(&self) -> Option<&VerticalListStrategy<Item>> {
+    pub fn get_horizontal_mut(&mut self) -> Option<&mut HorizontalListStrategy> {
+        match self {
+            ListStrategies::Horizontal(horizontal)
+            | ListStrategies::Flexible(FlexibleListStrategy { horizontal, .. }) => Some(horizontal),
+            ListStrategies::Vertical(_) => None,
+        }
+    }
+
+    pub fn get_vertical(&self) -> Option<&VerticalListStrategy<Item>> {
         match self {
             ListStrategies::Horizontal(_) => None,
             ListStrategies::Vertical(vertical)
@@ -43,10 +47,9 @@ impl<Item> ListStrategies<Item> {
 }
 
 #[derive(Clone, Copy, Default)]
-pub enum HorizontalListStrategy {
-    #[default]
-    SingleLine,
-    Overflow,
+pub struct HorizontalListStrategy {
+    pub contents_max_width: Option<HSize> = None,
+    pub overflow: bool = false,
 }
 
 pub struct VerticalListStrategy<Item> {
@@ -70,7 +73,7 @@ impl<Item> VerticalListStrategy<Item> {
 }
 
 pub struct FlexibleListStrategy<Item> {
-    pub horizontal: HorizontalListStrategy = HorizontalListStrategy::SingleLine,
+    pub horizontal: HorizontalListStrategy = HorizontalListStrategy{..},
     pub vertical: VerticalListStrategy<Item> = VerticalListStrategy {..},
 }
 
@@ -81,11 +84,8 @@ pub struct WrapToFit {
 }
 
 pub struct ListOptions<'ast, 'tail, Item> {
-    pub contents_max_width: Option<HSize> = None,
     pub force_trailing_comma: bool = false,
     pub is_struct: bool = false,
-    /// Called with the last item in the list. Returns true if that item always prefers overflow
-    /// to being wrapped to the next line.
     pub omit_open_brace: bool = false,
     pub rest: Option<ListRest<'ast>> = None,
     pub strategies: ListStrategies<Item> = ListStrategies::Flexible(FlexibleListStrategy{..}),

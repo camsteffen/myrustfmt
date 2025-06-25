@@ -2,7 +2,9 @@ mod sort;
 pub mod use_tree;
 
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::options::{ListOptions, ListStrategies};
+use crate::ast_formatter::list::options::{
+    FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies,
+};
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatErrorKind, FormatResult};
@@ -385,10 +387,17 @@ impl AstFormatter {
                     fields,
                     Self::field_def,
                     ListOptions {
-                        contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.struct_variant_width),
                         is_struct: true,
                         strategies: if is_enum {
-                            ListStrategies::flexible()
+                            ListStrategies::Flexible(FlexibleListStrategy {
+                                horizontal: HorizontalListStrategy {
+                                    contents_max_width: Some(
+                                        RUSTFMT_CONFIG_DEFAULTS.struct_variant_width,
+                                    ),
+                                    ..
+                                },
+                                ..
+                            })
                         } else {
                             ListStrategies::vertical()
                         },

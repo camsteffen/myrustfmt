@@ -4,7 +4,7 @@ mod postfix;
 
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::options::{
-    FlexibleListStrategy, ListOptions, ListStrategies, VerticalListStrategy,
+    FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy,
 };
 use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
@@ -155,8 +155,11 @@ impl AstFormatter {
             items,
             |af, expr, tail, _lcx| af.expr_tail(expr, tail),
             ListOptions {
-                contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.array_width),
                 strategies: ListStrategies::Flexible(FlexibleListStrategy {
+                    horizontal: HorizontalListStrategy {
+                        contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.array_width),
+                        ..
+                    },
                     vertical: VerticalListStrategy::wrap_to_fit(Some(
                         RUSTFMT_CONFIG_DEFAULTS.short_array_element_width_threshold,
                     )),
@@ -199,18 +202,11 @@ impl AstFormatter {
     pub fn call_args(
         &self,
         args: &[P<ast::Expr>],
-        list_strategies: ListStrategies<P<ast::Expr>>,
+        mut list_strategies: ListStrategies<P<ast::Expr>>,
         tail: Tail,
     ) -> FormatResult {
-        let mut list_opt = ListOptions {
-            omit_open_brace: true,
-            strategies: list_strategies,
-            tail,
-            ..
-        };
-        let is_only_closure = args.len() == 1 && matches!(args[0].kind, ast::ExprKind::Closure(_));
-        if !is_only_closure {
-            list_opt.contents_max_width = Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
+        if let Some(horizontal) = list_strategies.get_horizontal_mut() {
+            horizontal.contents_max_width = Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
         }
         self.list(
             Braces::Parens,
@@ -231,7 +227,12 @@ impl AstFormatter {
                 }
                 Ok(())
             },
-            list_opt,
+            ListOptions {
+                omit_open_brace: true,
+                strategies: list_strategies,
+                tail,
+                ..
+            },
         )?;
         Ok(())
     }
@@ -527,14 +528,19 @@ impl AstFormatter {
                 &struct_.fields,
                 Self::struct_field,
                 ListOptions {
-                    // todo not wide enough?
-                    contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
                     is_struct: true,
                     rest: ListRest::from_struct_rest(&struct_.rest),
                     strategies: if self.out.line() > first_line {
                         ListStrategies::vertical()
                     } else {
-                        ListStrategies::flexible()
+                        ListStrategies::Flexible(FlexibleListStrategy {
+                            horizontal: HorizontalListStrategy {
+                                // todo not wide enough?
+                                contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
+                                ..
+                            },
+                            ..
+                        })
                     },
                     tail,
                     ..
@@ -569,8 +575,14 @@ impl AstFormatter {
             items,
             |af, expr, tail, _lcx| af.expr_tail(expr, tail),
             ListOptions {
-                contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
                 force_trailing_comma: items.len() == 1,
+                strategies: ListStrategies::Flexible(FlexibleListStrategy {
+                    horizontal: HorizontalListStrategy {
+                        contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
+                        ..
+                    },
+                    ..
+                }),
                 tail,
                 ..
             },

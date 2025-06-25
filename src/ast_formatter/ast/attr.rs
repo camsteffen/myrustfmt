@@ -1,6 +1,8 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::list::Braces;
-use crate::ast_formatter::list::options::ListOptions;
+use crate::ast_formatter::list::options::{
+    FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies,
+};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_utils::is_rustfmt_skip;
 use crate::constraints::VStruct;
@@ -137,8 +139,14 @@ impl AstFormatter {
                     Ok(())
                 },
                 ListOptions {
-                    // todo test
-                    contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
+                    strategies: ListStrategies::Flexible(FlexibleListStrategy {
+                        horizontal: HorizontalListStrategy {
+                            // todo test
+                            contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
+                            ..
+                        },
+                        ..
+                    }),
                     ..
                 },
             )?,
