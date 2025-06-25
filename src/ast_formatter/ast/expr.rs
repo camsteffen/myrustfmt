@@ -76,7 +76,7 @@ impl AstFormatter {
             ast::ExprKind::Let(ref pat, ref init, ..) => self.let_(pat, init, take_tail())?,
             ast::ExprKind::Lit(_) => self.out.copy_span(expr.span)?,
             ast::ExprKind::Loop(ref block, label, _) => self.loop_(label, block)?,
-            ast::ExprKind::MacCall(ref mac_call) => self.macro_call(mac_call)?,
+            ast::ExprKind::MacCall(ref mac_call) => self.macro_call(mac_call, take_tail())?,
             ast::ExprKind::Match(ref scrutinee, ref arms, ast::MatchKind::Prefix) => {
                 self.match_(scrutinee, arms)?
             }

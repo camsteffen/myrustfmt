@@ -16,6 +16,11 @@
 * A single call argument cannot be combined with control flow expressions
 * Only argument lists can overflow. Not arrays or tuples.
 
+Macros
+ * All std macros are parsed according to their supported syntax.
+ * Trailing commas are added.
+ * `matches!` is supported
+
 Enum
  * An enum struct variant may be written horizontally purely based on its width.
    Rustfmt has hard to understand rules that consider surrounding variants and comments.

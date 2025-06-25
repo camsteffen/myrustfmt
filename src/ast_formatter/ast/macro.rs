@@ -7,42 +7,76 @@ use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::macro_args::{MacroArgs, mac_call_id};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
+use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 use std::num::NonZero;
 
 impl AstFormatter {
-    pub fn macro_call(&self, mac_call: &ast::MacCall) -> FormatResult {
+    pub fn macro_call(&self, mac_call: &ast::MacCall, tail: Tail) -> FormatResult {
         self.path(&mac_call.path, true)?;
         self.out.token("!")?;
         let args = self.module.macro_args.get(&mac_call_id(mac_call));
         if let Some(args) = args {
-            self.macro_args(args)?;
+            self.macro_args(args, tail)?;
         } else {
             if matches!(mac_call.args.delim, rustc_ast::token::Delimiter::Brace) {
                 self.out.space()?;
             }
             self.out.copy_span(mac_call.args.dspan.entire())?;
+            self.tail(tail)?;
         }
         Ok(())
     }
 
-    fn macro_args(&self, args: &MacroArgs) -> FormatResult {
+    fn macro_args(&self, args: &MacroArgs, tail: Tail) -> FormatResult {
         match *args {
+            MacroArgs::Cfg(ref args) => self.macro_args_list(args, None, tail, |af, item, tail| {
+                af.meta_item_inner(item)?;
+                af.tail(tail)?;
+                Ok(())
+            })?,
             MacroArgs::ExprList(ref args) => {
-                self.macro_args_list(args, None, |af, expr, tail| af.expr_tail(expr, tail))?
+                self.macro_args_list(args, None, tail, |af, expr, tail| af.expr_tail(expr, tail))?
             }
             MacroArgs::Format {
                 ref args,
                 format_string_pos,
-            } => self.macro_args_list(args, Some(format_string_pos), |af, item, tail| {
+            } => self.macro_args_list(args, Some(format_string_pos), tail, |af, item, tail| {
                 af.expr_tail(item, tail)
             })?,
-            MacroArgs::MetaItemInner(ref args) => {
-                self.macro_args_list(args, None, |af, item, tail| {
-                    af.meta_item_inner(item)?;
-                    af.tail(tail)?;
-                    Ok(())
-                })?
+            MacroArgs::Matches(ref expr, ref pat) => {
+                self.backtrack()
+                    .next(|| {
+                        self.out.with_recover_width(|| {
+                            self.with_single_line(|| {
+                                self.out.token("(")?;
+                                self.expr(expr)?;
+                                self.out.token_space(",")?;
+                                self.pat(pat)?;
+                                self.out.token_skip_if_present(",")?;
+                                self.out.token(")")?;
+                                self.tail(tail)?;
+                                Ok(())
+                            })
+                        })
+                    })
+                    .next(|| {
+                        self.out.token("(")?;
+                        self.indented(|| {
+                            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                            self.expr(expr)?;
+                            self.out.token(",")?;
+                            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                            self.pat(pat)?;
+                            self.out.token_maybe_missing(",")?;
+                            Ok(())
+                        })?;
+                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                        self.out.token(")")?;
+                        self.tail(tail)?;
+                        Ok(())
+                    })
+                    .result()?;
             }
         }
         Ok(())
@@ -52,6 +86,7 @@ impl AstFormatter {
         &self,
         args: &[T],
         format_string_pos: Option<u8>,
+        tail: Tail,
         format: impl Fn(&Self, &T, Tail) -> FormatResult,
     ) -> FormatResult {
         self.list(
@@ -78,6 +113,7 @@ impl AstFormatter {
                     },
                     ..
                 }),
+                tail,
                 ..
             },
         )

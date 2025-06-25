@@ -38,7 +38,7 @@ impl AstFormatter {
                     self.pat(pat)?;
                 }
             }
-            ast::PatKind::MacCall(ref mac_call) => self.macro_call(mac_call)?,
+            ast::PatKind::MacCall(ref mac_call) => self.macro_call(mac_call, take_tail())?,
             ast::PatKind::Or(ref pats) => {
                 self.simple_infix_chain("|", pats, |pat| self.pat(pat), false, take_tail())?
             }

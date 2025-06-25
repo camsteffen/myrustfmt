@@ -9,7 +9,10 @@ use rustc_data_structures::fx::FxHashMap;
 use rustc_errors::PResult;
 use rustc_parse::MACRO_ARGUMENTS;
 use rustc_parse::exp;
+use rustc_parse::parser::CommaRecoveryMode;
 use rustc_parse::parser::Parser;
+use rustc_parse::parser::RecoverColon;
+use rustc_parse::parser::RecoverComma;
 use rustc_parse::parser::Recovery;
 use rustc_session::parse::ParseSess;
 use rustc_span::BytePos;
@@ -31,10 +34,14 @@ impl Visitor<'_> for MacroArgsParser<'_> {
         if let Some(mac_args) = try_parse_macro_args(self.psess, mac_call) {
             // recursively walk parsed macro args for nested macro calls
             match &mac_args {
+                MacroArgs::Cfg(_) => {}
                 MacroArgs::ExprList(args) | MacroArgs::Format { args, .. } => {
                     walk_list!(self, visit_expr, args);
                 }
-                MacroArgs::MetaItemInner(_) => {}
+                MacroArgs::Matches(expr, pat) => {
+                    self.visit_expr(expr);
+                    self.visit_pat(pat);
+                }
             }
             self.macro_args.insert(mac_call_id(mac_call), mac_args);
         }
@@ -42,13 +49,14 @@ impl Visitor<'_> for MacroArgsParser<'_> {
 }
 
 pub enum MacroArgs {
+    Cfg(ThinVec<ast::MetaItemInner>),
     /// Same as a function call. Optional trailing comma. Also used for macros with no args.
     ExprList(ThinVec<P<ast::Expr>>),
     Format {
         args: ThinVec<P<ast::Expr>>,
         format_string_pos: u8,
     },
-    MetaItemInner(ThinVec<ast::MetaItemInner>),
+    Matches(P<ast::Expr>, P<ast::Pat>),
 }
 
 // todo emit an error if we fail to parse a known macro? at least in debug mode
@@ -62,7 +70,7 @@ pub fn try_parse_macro_args(psess: &ParseSess, mac_call: &ast::MacCall) -> Optio
     let macro_args = parse_no_errors(parser, |parser| match std_macro {
         StdMacro::Cfg => {
             parse_comma_sep_list(parser, Parser::parse_meta_item_inner)
-                .map(MacroArgs::MetaItemInner)
+                .map(MacroArgs::Cfg)
         }
         StdMacro::ExprList => {
             parse_comma_sep_list(parser, Parser::parse_expr)
@@ -77,6 +85,7 @@ pub fn try_parse_macro_args(psess: &ParseSess, mac_call: &ast::MacCall) -> Optio
                     }
                 })
         }
+        StdMacro::Matches => parse_matches(parser),
     })
     .ok()?;
     Some(macro_args)
@@ -99,4 +108,18 @@ fn parse_comma_sep_list<'p, T>(
         }
     }
     Ok(list)
+}
+
+fn parse_matches<'p>(parser: &mut Parser<'p>) -> PResult<'p, MacroArgs> {
+    let expr = parser.parse_expr()?;
+    parser.expect(exp!(Comma))?;
+    let pat = parser.parse_pat_allow_top_guard(
+        None,
+        RecoverComma::No,
+        RecoverColon::No,
+        CommaRecoveryMode::EitherTupleOrPipe,
+    )?;
+    let _ = parser.eat(exp!(Comma));
+    parser.expect(exp!(Eof))?;
+    Ok(MacroArgs::Matches(expr, pat))
 }

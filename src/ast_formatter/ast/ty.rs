@@ -31,7 +31,7 @@ impl AstFormatter {
                 self.generic_bounds(bounds, take_tail())?;
             }
             ast::TyKind::Infer => self.out.token("_")?,
-            ast::TyKind::MacCall(mac_call) => self.macro_call(mac_call)?,
+            ast::TyKind::MacCall(mac_call) => self.macro_call(mac_call, take_tail())?,
             ast::TyKind::Never => self.out.token("!")?,
             ast::TyKind::Paren(ty) => {
                 self.out.token("(")?;

@@ -70,9 +70,10 @@ impl AstFormatter {
                             strategies: ListStrategies::Flexible(FlexibleListStrategy {
                                 vertical: VerticalListStrategy {
                                     item_requires_own_line: Some(Box::new(
-                                        |(use_tree, _): &(&ast::UseTree, _)| {
-                                            matches!(use_tree.kind, ast::UseTreeKind::Nested { .. })
-                                        },
+                                        |(use_tree, _): &(&ast::UseTree, _)| matches!(
+                                            use_tree.kind,
+                                            ast::UseTreeKind::Nested { .. },
+                                        ),
                                     )),
                                     wrap_to_fit: Some(WrapToFit { .. }),
                                 },

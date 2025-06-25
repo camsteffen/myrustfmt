@@ -73,9 +73,6 @@ fn read_config_values(file_name: &Path) -> Vec<(String, String)> {
 fn is_unsupported_config(name: &str) -> bool {
     matches!(
         name,
-        "fn_args_layout"
-            | "imports_granularity"
-            | "struct_field_align_threshold"
-            | "trailing_comma"
+        "fn_args_layout" | "imports_granularity" | "struct_field_align_threshold" | "trailing_comma",
     )
 }

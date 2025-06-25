@@ -67,10 +67,15 @@ impl AstFormatter {
             }
             ast::ItemKind::Impl(ref impl_) => self.impl_(impl_)?,
             ast::ItemKind::MacCall(ref mac_call) => {
-                self.macro_call(mac_call)?;
-                if !matches!(mac_call.args.delim, rustc_ast::token::Delimiter::Brace) {
-                    self.out.token(";")?;
-                }
+                self.macro_call(
+                    mac_call,
+                    Some(&self.tail_fn(|af| {
+                        if !matches!(mac_call.args.delim, rustc_ast::token::Delimiter::Brace) {
+                            af.out.token(";")?;
+                        }
+                        Ok(())
+                    })),
+                )?;
             }
             // todo
             ast::ItemKind::MacroDef(..) => return Err(FormatErrorKind::UnsupportedSyntax.into()),
@@ -266,8 +271,7 @@ impl AstFormatter {
                 ast::AssocItemKind::Fn(fn_) => self.fn_(fn_)?,
                 ast::AssocItemKind::Type(ty_alias) => self.ty_alias(ty_alias)?,
                 ast::AssocItemKind::MacCall(mac_call) => {
-                    self.macro_call(mac_call)?;
-                    self.out.token(";")?;
+                    self.macro_call(mac_call, Some(&self.tail_token(";")))?;
                 }
                 ast::AssocItemKind::Delegation(_) => {
                     return Err(FormatErrorKind::UnsupportedSyntax.into());
@@ -285,8 +289,7 @@ impl AstFormatter {
             match kind {
                 ast::ForeignItemKind::Fn(fn_) => self.fn_(fn_)?,
                 ast::ForeignItemKind::MacCall(mac_call) => {
-                    self.macro_call(mac_call)?;
-                    self.out.token(";")?;
+                    self.macro_call(mac_call, Some(&self.tail_token(";")))?;
                 }
                 ast::ForeignItemKind::Static(static_item) => self.static_item(static_item)?,
                 ast::ForeignItemKind::TyAlias(ty_alias) => self.ty_alias(ty_alias)?,
