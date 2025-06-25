@@ -47,7 +47,7 @@ mod num;
 mod parse;
 mod rustfmt_config_defaults;
 mod source_formatter;
-mod std_macro;
+mod span;
 mod submodules;
 mod util;
 mod whitespace;

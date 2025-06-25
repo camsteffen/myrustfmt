@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::Braces;
+use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::options::{
     FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies,
 };
@@ -8,9 +8,9 @@ use crate::ast_utils::is_rustfmt_skip;
 use crate::constraints::VStruct;
 use crate::error::{FormatErrorKind, FormatResult, VerticalError};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
+use crate::span::Span;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
-use rustc_span::Span;
 
 impl AstFormatter {
     pub fn with_attrs(
@@ -99,7 +99,7 @@ impl AstFormatter {
             ast::AttrKind::Normal(_) => match attr.meta() {
                 None => {
                     // todo do better, format key-value pairs
-                    self.out.copy_span(attr.span)?;
+                    self.out.copy_span(attr.span.into())?;
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 }
                 Some(meta) => {
@@ -131,7 +131,7 @@ impl AstFormatter {
         match &meta.kind {
             ast::MetaItemKind::Word => {}
             ast::MetaItemKind::List(items) => self.list(
-                Braces::Parens,
+                Brackets::Parens,
                 items,
                 |af, item, tail, _lcx| {
                     self.meta_item_inner(item)?;
@@ -167,6 +167,6 @@ impl AstFormatter {
     }
 
     fn meta_item_lit(&self, lit: &ast::MetaItemLit) -> FormatResult {
-        self.out.copy_span(lit.span)
+        self.out.copy_span(lit.span.into())
     }
 }

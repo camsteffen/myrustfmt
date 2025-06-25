@@ -38,12 +38,6 @@ fn test() {
     writeln!(a, b, );
 }
 
-fn empty_macros() {
-    line!(
-    // comment
-    )
-}
-
 thread_local! (
     pub static FOO:
     Cell<u32> = const { Cell::new(1) };
@@ -82,19 +76,13 @@ fn test() {
     panic!(a, b);
     print!(a, b);
     println!(a, b);
-    stringify!(a~ ;b,);
+    stringify!( a~ ;b, );
     todo!(a, b);
     unimplemented!(a, b);
     unreachable!(a, b);
     vec![a, b];
     write!(a, b);
     writeln!(a, b);
-}
-
-fn empty_macros() {
-    line!(
-    // comment
-    )
 }
 
 thread_local! {

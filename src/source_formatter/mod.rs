@@ -10,8 +10,9 @@ use crate::error::FormatResult;
 use crate::error_emitter::{BufferedErrorEmitter, Error};
 use crate::num::{HSize, VSize};
 use crate::source_formatter::checkpoint::Checkpoint;
+use crate::span::Span;
 use crate::util::chars::is_closer_char;
-use rustc_span::{BytePos, SourceFile, Span};
+use rustc_span::{BytePos, SourceFile};
 use std::cell::Cell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -107,6 +108,13 @@ impl SourceFormatter {
         self.out.token(token)
     }
 
+    /// Replaces the next token
+    pub fn token_replace(&self, token: &'static str) -> FormatResult {
+        self.horizontal_whitespace()?;
+        self.source_reader.eat_next_token();
+        self.out.token(token)
+    }
+
     pub fn token_space(&self, token: &'static str) -> FormatResult {
         self.token(token)?;
         self.space()?;
@@ -158,7 +166,12 @@ impl SourceFormatter {
     }
 
     pub fn copy_span(&self, span: Span) -> FormatResult {
-        self.horizontal_whitespace()?;
+        // If there is any whitespace next, if it is part of the span, we want to copy it with the
+        // rest of the span. If it is not part of the span, we should consume it as normal
+        // whitespace.
+        if self.source_reader.pos.get() < span.lo {
+            self.horizontal_whitespace()?;
+        }
         let segment = self.source_reader.eat_span(span);
         self.out.write_str(segment)?;
         Ok(())

@@ -5,27 +5,6 @@ use crate::util::cell_ext::CellExt;
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
-    pub fn enclosed_empty_after_opening(&self, closing_brace: &'static str) -> FormatResult {
-        let first_line = self.out.line();
-        self.indented(|| self.out.comments(VerticalWhitespaceMode::Break))?;
-        let multi_line = self.out.line() != first_line;
-        if multi_line {
-            self.out.indent();
-        }
-        self.out.token(closing_brace)?;
-        Ok(())
-    }
-
-    pub fn enclosed_after_opening(
-        &self,
-        close_brace: &'static str,
-        contents: impl FnOnce() -> FormatResult,
-    ) -> FormatResult {
-        self.enclosed_contents(contents)?;
-        self.out.token(close_brace)?;
-        Ok(())
-    }
-
     /// Writes contents between braces with indentation
     pub fn enclosed_contents(&self, scope: impl FnOnce() -> FormatResult) -> FormatResult {
         self.has_vstruct(VStruct::Block, || {
@@ -41,5 +20,19 @@ impl AstFormatter {
             self.out.indent();
             Ok(())
         })
+    }
+
+    /// Normally nothing, but allows for comments inside like:
+    /// (
+    ///     // comment
+    /// )
+    pub fn enclosed_empty_contents(&self) -> FormatResult {
+        let first_line = self.out.line();
+        self.indented(|| self.out.comments(VerticalWhitespaceMode::Break))?;
+        let multi_line = self.out.line() != first_line;
+        if multi_line {
+            self.out.indent();
+        }
+        Ok(())
     }
 }

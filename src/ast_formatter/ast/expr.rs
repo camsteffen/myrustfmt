@@ -2,11 +2,12 @@ mod binary_expr;
 mod r#match;
 mod postfix;
 
+use crate::ast_formatter::brackets::Brackets;
+use crate::ast_formatter::list::ListItemContext;
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::options::{
     FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy,
 };
-use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
@@ -25,7 +26,7 @@ impl AstFormatter {
     }
 
     pub fn expr_tail(&self, expr: &ast::Expr, tail: Tail) -> FormatResult {
-        self.with_attrs_tail(&expr.attrs, expr.span, tail, || {
+        self.with_attrs_tail(&expr.attrs, expr.span.into(), tail, || {
             self.expr_after_attrs(expr, tail)
         })
     }
@@ -74,7 +75,7 @@ impl AstFormatter {
                 self.if_(condition, block, else_.as_deref(), take_tail())?
             }
             ast::ExprKind::Let(ref pat, ref init, ..) => self.let_(pat, init, take_tail())?,
-            ast::ExprKind::Lit(_) => self.out.copy_span(expr.span)?,
+            ast::ExprKind::Lit(_) => self.out.copy_span(expr.span.into())?,
             ast::ExprKind::Loop(ref block, label, _) => self.loop_(label, block)?,
             ast::ExprKind::MacCall(ref mac_call) => self.macro_call(mac_call, take_tail())?,
             ast::ExprKind::Match(ref scrutinee, ref arms, ast::MatchKind::Prefix) => {
@@ -151,7 +152,7 @@ impl AstFormatter {
 
     fn array(&self, items: &[P<ast::Expr>], tail: Tail) -> FormatResult {
         self.list(
-            Braces::Square,
+            Brackets::Square,
             items,
             |af, expr, tail, _lcx| af.expr_tail(expr, tail),
             ListOptions {
@@ -209,7 +210,7 @@ impl AstFormatter {
             horizontal.contents_max_width = Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
         }
         self.list(
-            Braces::Parens,
+            Brackets::Parens,
             args,
             |af, expr, tail, lcx| {
                 if !lcx.is_vertical && lcx.index == args.len() - 1 {
@@ -228,7 +229,7 @@ impl AstFormatter {
                 Ok(())
             },
             ListOptions {
-                omit_open_brace: true,
+                omit_open_bracket: true,
                 strategies: list_strategies,
                 tail,
                 ..
@@ -455,7 +456,8 @@ impl AstFormatter {
                 })
             })
             .next(|| {
-                self.enclosed_after_opening(")", || self.expr(inner))?;
+                self.enclosed_contents(|| self.expr(inner))?;
+                self.out.token(")")?;
                 self.tail(tail)?;
                 Ok(())
             })
@@ -524,7 +526,7 @@ impl AstFormatter {
         self.has_vstruct_if(self.out.line() > first_line, VStruct::NonBlockIndent, || {
             self.out.space()?;
             self.list(
-                Braces::Curly,
+                Brackets::Curly,
                 &struct_.fields,
                 Self::struct_field,
                 ListOptions {
@@ -557,7 +559,7 @@ impl AstFormatter {
         tail: Tail,
         _lcx: ListItemContext,
     ) -> FormatResult {
-        self.with_attrs_tail(&field.attrs, field.span, tail, || {
+        self.with_attrs_tail(&field.attrs, field.span.into(), tail, || {
             self.ident(field.ident)?;
             if field.is_shorthand {
                 self.tail(tail)?;
@@ -571,7 +573,7 @@ impl AstFormatter {
 
     fn tuple(&self, items: &[P<ast::Expr>], tail: Tail) -> FormatResult {
         self.list(
-            Braces::Parens,
+            Brackets::Parens,
             items,
             |af, expr, tail, _lcx| af.expr_tail(expr, tail),
             ListOptions {

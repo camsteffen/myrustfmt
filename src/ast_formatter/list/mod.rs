@@ -1,12 +1,11 @@
-mod braces;
 mod list_item_context;
 pub mod options;
 mod rest;
 
-pub use self::braces::Braces;
 pub use self::list_item_context::ListItemContext;
 pub use self::rest::ListRest;
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::options::{
     FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy,
     WrapToFit,
@@ -23,7 +22,7 @@ use std::cell::Cell;
 impl AstFormatter {
     pub fn list<'ast, Item>(
         &self,
-        braces: Braces,
+        brackets: Brackets,
         list: &'ast [Item],
         format_item: impl Fn(&AstFormatter, &Item, Tail, ListItemContext) -> FormatResult,
         options: ListOptions<'ast, '_, Item>,
@@ -32,7 +31,7 @@ impl AstFormatter {
             af: self,
             opt: options,
             format_item,
-            braces,
+            brackets,
             list,
         }
         .format()
@@ -42,7 +41,7 @@ impl AstFormatter {
 struct ListContext<'af, 'ast, 'tail, Item, FormatItem> {
     af: &'af AstFormatter,
     opt: ListOptions<'ast, 'tail, Item>,
-    braces: Braces,
+    brackets: Brackets,
     list: &'ast [Item],
     format_item: FormatItem,
 }
@@ -53,11 +52,13 @@ where
 {
     fn format(&self) -> FormatResult {
         self.af.has_vstruct(VStruct::List, || {
-            if !self.opt.omit_open_brace {
-                self.af.out.token(self.braces.start())?;
+            if !self.opt.omit_open_bracket {
+                // token_replace is for macro calls where we correct the bracket type
+                self.af.out.token_replace(self.brackets.start())?;
             }
             if self.list.is_empty() && self.opt.rest.is_none() {
-                self.af.enclosed_empty_after_opening(self.braces.end())?;
+                self.af.enclosed_empty_contents()?;
+                self.af.out.token_replace(self.brackets.end())?;
                 self.af.tail(self.opt.tail)?;
                 return Ok(());
             }
@@ -113,7 +114,7 @@ where
         let Self {
             af,
             opt,
-            braces,
+            brackets,
             list,
             ..
         } = self;
@@ -122,7 +123,7 @@ where
         let first_line = self.af.out.line();
         let item = |index, tail| self.list_item(index, false, tail);
         let pad = |af: &AstFormatter| -> FormatResult {
-            if braces.pad() {
+            if brackets.pad() {
                 af.out.space()?;
             }
             Ok(())
@@ -130,7 +131,7 @@ where
         let height = Cell::new(0);
         let close = |af: &AstFormatter| {
             pad(af)?;
-            af.out.token(braces.end())?;
+            af.out.token_replace(brackets.end())?;
             // measure height before writing the tail
             height.set(af.out.line() - first_line + 1);
             af.tail(opt.tail)?;
@@ -260,7 +261,7 @@ where
         let Self {
             af,
             opt,
-            braces,
+            brackets,
             list,
             ..
         } = self;
@@ -274,7 +275,7 @@ where
                 item()
             }
         };
-        af.enclosed_after_opening(braces.end(), || {
+        af.enclosed_contents(|| {
             let (first, rest) = (0, 1..list.len());
             item(first)?;
             af.out.token_maybe_missing(",")?;
@@ -310,6 +311,7 @@ where
             }
             Ok(())
         })?;
+        af.out.token_replace(brackets.end())?;
         af.tail(opt.tail)?;
         Ok(())
     }
@@ -326,7 +328,7 @@ where
         let Self {
             af,
             opt,
-            braces,
+            brackets,
             list,
             ..
         } = self;
@@ -338,7 +340,7 @@ where
                 Some(&af.tail_fn(|af| af.out.token_maybe_missing(","))),
             )
         };
-        af.enclosed_after_opening(braces.end(), || {
+        af.enclosed_contents(|| {
             match opt.rest {
                 None => {
                     for index in 0..len - 1 {
@@ -358,6 +360,7 @@ where
             }
             Ok(())
         })?;
+        af.out.token_replace(brackets.end())?;
         af.tail(opt.tail)?;
         Ok(())
     }

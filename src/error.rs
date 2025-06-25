@@ -103,8 +103,9 @@ fn write_constraint_error(
 
 #[track_caller]
 pub fn panic_parse_error(error: ParseError, path: Option<&Path>, source: &str, pos: BytePos) -> ! {
-    panic!("{}",
-           display_from_fn(move |f| write_parse_error(f, error, path, source, pos))
+    panic!(
+        "{}",
+        display_from_fn(move |f| write_parse_error(f, error, path, source, pos)),
     )
 }
 

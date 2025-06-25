@@ -1,5 +1,5 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::Braces;
+use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatErrorKind, FormatResult};
@@ -67,7 +67,7 @@ impl AstFormatter {
                 self.generic_bounds(bounds, take_tail())?;
             }
             ast::TyKind::Tup(elements) => self.list(
-                Braces::Parens,
+                Brackets::Parens,
                 elements,
                 |af, ty, tail, _lcx| af.ty_tail(ty, tail),
                 ListOptions {
@@ -127,7 +127,7 @@ impl AstFormatter {
             ast::GenericBound::Use(capture_args, _) => {
                 self.out.token("use")?;
                 self.list(
-                    Braces::Angle,
+                    Brackets::Angle,
                     capture_args,
                     |af, arg, tail, _lcx| af.precise_capturing_arg(arg, tail),
                     ListOptions { .. },

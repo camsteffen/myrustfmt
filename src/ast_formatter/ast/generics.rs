@@ -1,6 +1,7 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::brackets::Brackets;
+use crate::ast_formatter::list::ListItemContext;
 use crate::ast_formatter::list::options::ListOptions;
-use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::whitespace::VerticalWhitespaceMode;
@@ -15,7 +16,7 @@ impl AstFormatter {
             return Ok(());
         }
         self.list(
-            Braces::Angle,
+            Brackets::Angle,
             params,
             Self::generic_param,
             ListOptions { .. },

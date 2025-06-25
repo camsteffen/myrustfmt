@@ -2,7 +2,7 @@ pub mod order;
 
 use self::order::use_tree_order;
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::Braces;
+use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::options::{
     FlexibleListStrategy, ListOptions, ListStrategies, VerticalListStrategy, WrapToFit,
 };
@@ -46,7 +46,7 @@ impl AstFormatter {
                     }));
                     sorted.sort_by(|(a, _), (b, _)| use_tree_order(a, b));
                     self.list(
-                        Braces::CurlyNoPad,
+                        Brackets::CurlyNoPad,
                         &sorted,
                         |af, &(ref use_tree, start), tail, lcx| {
                             af.out.source_reader.goto(start);
@@ -65,7 +65,7 @@ impl AstFormatter {
                             Ok(())
                         },
                         ListOptions {
-                            omit_open_brace: true,
+                            omit_open_bracket: true,
                             tail,
                             strategies: ListStrategies::Flexible(FlexibleListStrategy {
                                 vertical: VerticalListStrategy {

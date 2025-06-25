@@ -1,6 +1,7 @@
 use crate::error::{ParseError, panic_parse_error};
+use crate::span::Span;
 use crate::util::line_col::line_col;
-use rustc_span::{BytePos, Pos, SourceFile, Span};
+use rustc_span::{BytePos, Pos, SourceFile};
 use std::cell::Cell;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -53,10 +54,10 @@ impl SourceReader {
     }
 
     pub fn eat_span(&self, span: Span) -> &str {
-        if span.lo() != self.pos.get() {
-            self.parse_error(ParseError::ExpectedPosition(span.lo()));
+        if span.lo != self.pos.get() {
+            self.parse_error(ParseError::ExpectedPosition(span.lo));
         }
-        let len = span.hi().to_u32() - span.lo().to_u32();
+        let len = span.hi.to_u32() - span.lo.to_u32();
         self.eat_len(len)
     }
 

@@ -14,7 +14,9 @@ use crate::whitespace::VerticalWhitespaceMode;
 
 mod ast;
 pub mod backtrack;
+pub mod brackets;
 mod list;
+pub mod std_macro;
 pub mod tail;
 pub mod util;
 
@@ -65,7 +67,7 @@ impl AstFormatter {
                         self.out.source_reader.source(),
                         self.out.source_reader.pos(),
                         self.out.source_reader.path.as_deref(),
-                    )
+                    ),
                 );
             }
             Ok(()) => {
@@ -94,7 +96,7 @@ impl AstFormatter {
         } = &*self.module;
         self.out.comments(VerticalWhitespaceMode::Top)?;
         // todo skip the whole file if there's a skip attribute?
-        self.with_attrs(&attrs, spans.inner_span, || {
+        self.with_attrs(&attrs, spans.inner_span.into(), || {
             self.list_with_item_sorting(&items, |item| self.item(item))
         })?;
         self.out.newline(VerticalWhitespaceMode::Bottom)?;
@@ -111,7 +113,7 @@ impl AstFormatter {
                 self.out.source_reader.source(),
                 self.out.source_reader.pos(),
                 self.out.source_reader.path.as_deref(),
-            )
+            ),
         );
     }
 }

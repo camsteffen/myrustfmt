@@ -1,5 +1,6 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::{Braces, ListItemContext};
+use crate::ast_formatter::brackets::Brackets;
+use crate::ast_formatter::list::ListItemContext;
 use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatErrorKind, FormatResult};
 
@@ -23,7 +24,7 @@ impl AstFormatter {
         let is_block_after_decl = generics.where_clause.is_empty() && body.is_some();
         let wrapped_return_type = self.fn_decl(
             &sig.decl,
-            Braces::Parens,
+            Brackets::Parens,
             Some(&self.tail_fn(|af| {
                 if is_block_after_decl {
                     af.out.space_allow_newlines()?;
@@ -76,7 +77,7 @@ impl AstFormatter {
             };
             let wrapped_return_type = self.fn_decl(
                 &closure.fn_decl,
-                Braces::Pipe,
+                Brackets::Pipe,
                 Some(&self.tail_fn(|af| {
                     af.out.space_allow_newlines()?;
                     body(af)?;
@@ -133,7 +134,7 @@ impl AstFormatter {
         // self.extern_(&bare_fn_ty.ext)?;
         // self.generic_params(&bare_fn_ty.generic_params)?;
         self.out.token("fn")?;
-        self.fn_decl(&bare_fn_ty.decl, Braces::Parens, None)?;
+        self.fn_decl(&bare_fn_ty.decl, Brackets::Parens, None)?;
         Ok(())
     }
 
@@ -147,7 +148,7 @@ impl AstFormatter {
             ast::FnRetTy::Ty(_) => (None, tail),
         };
         self.list(
-            Braces::Parens,
+            Brackets::Parens,
             &parenthesized_args.inputs,
             |af, ty, tail, _lcx| af.ty_tail(ty, tail),
             ListOptions {
@@ -186,7 +187,7 @@ impl AstFormatter {
     fn fn_decl(
         &self,
         fn_decl: &ast::FnDecl,
-        braces: Braces,
+        brackets: Brackets,
         tail: Tail,
     ) -> FormatResult</*wrapped_return_type*/bool> {
         let has_ret_ty = matches!(fn_decl.output, ast::FnRetTy::Ty(_));
@@ -213,7 +214,7 @@ impl AstFormatter {
         let args = |vertical: bool| {
             self.has_vstruct(VStruct::NonBlockIndent, || {
                 self.list(
-                    braces,
+                    brackets,
                     &fn_decl.inputs,
                     Self::param,
                     ListOptions {
@@ -262,7 +263,7 @@ impl AstFormatter {
     }
 
     fn param(&self, param: &ast::Param, tail: Tail, _lcx: ListItemContext) -> FormatResult {
-        self.with_attrs_tail(&param.attrs, param.span, tail, || {
+        self.with_attrs_tail(&param.attrs, param.span.into(), tail, || {
             self.param_after_attrs(param, tail)
         })
     }

@@ -1,11 +1,11 @@
-macro_rules! define_braces {
+macro_rules! define_brackets {
     ($($name:ident($start:literal, $end:literal, $pad:literal),)*) => {
-        #[derive(Clone, Copy)]
-        pub enum Braces {
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        pub enum Brackets {
             $($name,)*
         }
 
-        impl Braces {
+        impl Brackets {
             pub fn start(self) -> &'static str {
                 match self {
                     $(Self::$name => $start,)*
@@ -27,7 +27,7 @@ macro_rules! define_braces {
     };
 }
 
-define_braces! {
+define_brackets! {
     Angle("<", ">", false),
     Curly("{", "}", true),
     CurlyNoPad("{", "}", false),

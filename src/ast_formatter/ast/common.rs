@@ -5,7 +5,7 @@ use rustc_span::symbol::Ident;
 
 impl AstFormatter {
     pub fn ident(&self, ident: Ident) -> FormatResult {
-        self.out.token_from_source(ident.span)
+        self.out.token_from_source(ident.span.into())
     }
 
     pub fn mutability(&self, mutability: ast::Mutability) -> FormatResult {
@@ -17,7 +17,7 @@ impl AstFormatter {
 
     pub fn strlit(&self, strlit: ast::StrLit) -> FormatResult {
         // todo check for newlines
-        self.out.token_from_source(strlit.span)
+        self.out.token_from_source(strlit.span.into())
     }
 
     pub fn safety(&self, safety: ast::Safety) -> FormatResult {

@@ -1,50 +1,81 @@
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::list::Braces;
+use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::options::{
     FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy,
     WrapToFit,
 };
+use crate::ast_formatter::std_macro::std_macro;
 use crate::ast_formatter::tail::Tail;
 use crate::error::FormatResult;
 use crate::macro_args::{MacroArgs, mac_call_id};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
+use crate::span::Span;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
+use rustc_ast::token::Delimiter;
 use std::num::NonZero;
 
 impl AstFormatter {
     pub fn macro_call(&self, mac_call: &ast::MacCall, tail: Tail) -> FormatResult {
         self.path(&mac_call.path, true)?;
         self.out.token("!")?;
-        let args = self.module.macro_args.get(&mac_call_id(mac_call));
-        if let Some(args) = args {
-            self.macro_args(args, tail)?;
+        let mac_args = self.module.macro_args.get(&mac_call_id(mac_call));
+        let brackets = if let Some(std_macro) = std_macro(mac_call) {
+            std_macro.brackets()
         } else {
-            if matches!(mac_call.args.delim, rustc_ast::token::Delimiter::Brace) {
-                self.out.space()?;
+            match mac_call.args.delim {
+                Delimiter::Brace => Brackets::Curly,
+                Delimiter::Bracket => Brackets::Square,
+                Delimiter::Parenthesis => Brackets::Parens,
+                Delimiter::Invisible(_) => panic!("unexpected Invisible delimiter"),
             }
-            self.out.copy_span(mac_call.args.dspan.entire())?;
+        };
+        if brackets == Brackets::Curly {
+            self.out.space()?;
+        }
+        self.out.token_replace(brackets.start())?;
+        if mac_call.args.tokens.is_empty() {
+            self.enclosed_empty_contents()?;
+            self.out.token_replace(brackets.end())?;
+            self.tail(tail)?;
+        } else if let Some(args) = mac_args {
+            self.macro_args(brackets, args, tail)?;
+        } else {
+            let dspan = mac_call.args.dspan;
+            let span = Span {
+                lo: dspan.open.hi(),
+                hi: dspan.close.hi(),
+            };
+            self.out.copy_span(span)?;
             self.tail(tail)?;
         }
         Ok(())
     }
 
-    fn macro_args(&self, args: &MacroArgs, tail: Tail) -> FormatResult {
+    fn macro_args(&self, brackets: Brackets, args: &MacroArgs, tail: Tail) -> FormatResult {
         match *args {
-            MacroArgs::Cfg(ref args) => self.macro_args_list(args, None, tail, |af, item, tail| {
-                af.meta_item_inner(item)?;
-                af.tail(tail)?;
-                Ok(())
-            })?,
+            MacroArgs::Cfg(ref args) => {
+                self.macro_args_list(brackets, args, None, tail, |af, item, tail| {
+                    af.meta_item_inner(item)?;
+                    af.tail(tail)?;
+                    Ok(())
+                })?
+            }
             MacroArgs::FnLike(ref args) => {
-                self.macro_args_list(args, None, tail, |af, expr, tail| af.expr_tail(expr, tail))?
+                self.macro_args_list(brackets, args, None, tail, |af, expr, tail| {
+                    af.expr_tail(expr, tail)
+                })?
             }
             MacroArgs::Format {
                 ref args,
                 format_string_pos,
-            } => self.macro_args_list(args, Some(format_string_pos), tail, |af, item, tail| {
-                af.expr_tail(item, tail)
-            })?,
+            } => self.macro_args_list(
+                brackets,
+                args,
+                Some(format_string_pos),
+                tail,
+                |af, item, tail| af.expr_tail(item, tail),
+            )?,
             MacroArgs::Matches(ref expr, ref pat, ref guard) => {
                 self.matches_args(expr, pat, guard.as_deref(), tail)?
             }
@@ -54,16 +85,18 @@ impl AstFormatter {
 
     fn macro_args_list<T>(
         &self,
+        brackets: Brackets,
         args: &[T],
         format_string_pos: Option<u8>,
         tail: Tail,
         format: impl Fn(&Self, &T, Tail) -> FormatResult,
     ) -> FormatResult {
         self.list(
-            Braces::Parens,
+            brackets,
             &args,
             |af, item, tail, _lcx| format(af, item, tail),
             ListOptions {
+                omit_open_bracket: true,
                 strategies: ListStrategies::Flexible(FlexibleListStrategy {
                     horizontal: HorizontalListStrategy {
                         contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
@@ -99,7 +132,6 @@ impl AstFormatter {
         guard: Option<&ast::Expr>,
         tail: Tail,
     ) -> FormatResult {
-        self.out.token("(")?;
         self.backtrack()
             .next(|| {
                 self.with_single_line(|| {
@@ -114,7 +146,7 @@ impl AstFormatter {
                         Ok(())
                     })?;
                     self.out.token_skip_if_present(",")?;
-                    self.out.token(")")?;
+                    self.out.token_replace(")")?;
                     self.tail(tail)?;
                     Ok(())
                 })
@@ -158,7 +190,7 @@ impl AstFormatter {
                     Ok(())
                 })?;
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                self.out.token(")")?;
+                self.out.token_replace(")")?;
                 self.tail(tail)?;
                 Ok(())
             })

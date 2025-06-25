@@ -68,7 +68,7 @@ rustfmt Bugs:
 * chain_width is reduced by 1 when the chain ends with `?`
 * match arm width is reduced by 1 when ending with `?`
 * when function parameters are formatted on multiple lines, max_width is reduced by 4 when placing `{`
-* When an import has curly braces, max_width is reduced by 2
+* When an import has curly brackets, max_width is reduced by 2
 * When placing a `{` after `let...else`, max_width is reduced by 1
 * When placing a `{` after `if .. =>` where the if-guard has its own line, max_width is reduced by 2
 

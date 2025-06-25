@@ -86,7 +86,7 @@ pub struct WrapToFit {
 pub struct ListOptions<'ast, 'tail, Item> {
     pub force_trailing_comma: bool = false,
     pub is_struct: bool = false,
-    pub omit_open_brace: bool = false,
+    pub omit_open_bracket: bool = false,
     pub rest: Option<ListRest<'ast>> = None,
     pub strategies: ListStrategies<Item> = ListStrategies::Flexible(FlexibleListStrategy{..}),
     pub tail: Tail<'tail, 'ast> = None,

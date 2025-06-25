@@ -1,5 +1,5 @@
+use crate::ast_formatter::std_macro::{StdMacro, std_macro};
 use crate::parse::parse_no_errors;
-use crate::std_macro::{StdMacro, std_macro};
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 use rustc_ast::token;
@@ -74,7 +74,7 @@ pub fn try_parse_macro_args(psess: &ParseSess, mac_call: &ast::MacCall) -> Optio
             parse_comma_sep_list(parser, Parser::parse_meta_item_inner)
                 .map(MacroArgs::Cfg)
         }
-        StdMacro::FnLike => {
+        StdMacro::FnLike | StdMacro::Vec => {
             parse_comma_sep_list(parser, Parser::parse_expr)
                 .map(MacroArgs::FnLike)
         }

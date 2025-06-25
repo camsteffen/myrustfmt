@@ -367,7 +367,8 @@ impl AstFormatter {
                         })
                         .next(|| {
                             self.has_vstruct(VStruct::Index, || {
-                                self.enclosed_after_opening("]", || self.expr(index))?;
+                                self.enclosed_contents(|| self.expr(index))?;
+                                self.out.token("]")?;
                                 self.tail(tail)?;
                                 Ok(())
                             })

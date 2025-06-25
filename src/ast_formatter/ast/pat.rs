@@ -1,12 +1,13 @@
+use crate::ast_formatter::brackets::Brackets;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::list::ListItemContext;
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::options::{
     FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies,
 };
-use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -66,7 +67,7 @@ impl AstFormatter {
             }
             ast::PatKind::Rest => self.out.token("..")?,
             ast::PatKind::Slice(ref elements) => self.list(
-                Braces::Square,
+                Brackets::Square,
                 elements,
                 Self::pat_list_item,
                 ListOptions {
@@ -78,7 +79,7 @@ impl AstFormatter {
                 self.struct_pat(qself, path, fields, rest, take_tail())?
             }
             ast::PatKind::Tuple(ref fields) => self.list(
-                Braces::Parens,
+                Brackets::Parens,
                 fields,
                 Self::pat_list_item,
                 ListOptions {
@@ -90,7 +91,7 @@ impl AstFormatter {
                 // todo tail?
                 self.qpath(qself, path, false, None)?;
                 self.list(
-                    Braces::Parens,
+                    Brackets::Parens,
                     fields,
                     Self::pat_list_item,
                     ListOptions {
@@ -130,7 +131,7 @@ impl AstFormatter {
         self.qpath(qself, path, false, None)?;
         self.out.space()?;
         self.list(
-            Braces::Curly,
+            Brackets::Curly,
             fields,
             Self::pat_field,
             ListOptions {
@@ -156,7 +157,7 @@ impl AstFormatter {
         tail: Tail,
         _lcx: ListItemContext,
     ) -> FormatResult {
-        self.with_attrs_tail(&pat_field.attrs, pat_field.span, tail, || {
+        self.with_attrs_tail(&pat_field.attrs, pat_field.span.into(), tail, || {
             if !pat_field.is_shorthand {
                 self.ident(pat_field.ident)?;
                 self.out.token_space(":")?;

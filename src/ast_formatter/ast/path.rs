@@ -1,6 +1,7 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::brackets::Brackets;
+use crate::ast_formatter::list::ListItemContext;
 use crate::ast_formatter::list::options::ListOptions;
-use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatErrorKind, FormatResult};
 use rustc_ast::ast;
@@ -103,7 +104,7 @@ impl AstFormatter {
                     self.out.token("::")?;
                 }
                 self.list(
-                    Braces::Angle,
+                    Brackets::Angle,
                     &args.args,
                     Self::angle_bracketed_arg,
                     ListOptions { tail, .. },

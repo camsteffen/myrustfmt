@@ -9,8 +9,8 @@ use rustc_ast::ast;
 use rustc_span::Pos;
 
 impl AstFormatter {
-    pub fn block_expr(&self, omit_open_brace: bool, block: &ast::Block) -> FormatResult {
-        self.block_with_item_sorting(omit_open_brace, &block.stmts, |stmt| self.stmt(stmt))
+    pub fn block_expr(&self, omit_open_bracket: bool, block: &ast::Block) -> FormatResult {
+        self.block_with_item_sorting(omit_open_bracket, &block.stmts, |stmt| self.stmt(stmt))
     }
 
     pub fn block_expr_allow_horizontal(
@@ -93,9 +93,10 @@ impl AstFormatter {
             self.out.token("{")?;
         }
         match contents {
-            None => self.enclosed_empty_after_opening("}")?,
-            Some(contents) => self.enclosed_after_opening("}", contents)?,
+            None => self.enclosed_empty_contents()?,
+            Some(contents) => self.enclosed_contents(contents)?,
         }
+        self.out.token("}")?;
         Ok(())
     }
 
@@ -107,7 +108,7 @@ impl AstFormatter {
             ast::StmtKind::Semi(expr) => self.expr_tail(expr, Some(&self.tail_token(";"))),
             ast::StmtKind::Empty => self.out.token(";"),
             ast::StmtKind::MacCall(mac_call_stmt) => {
-                self.with_attrs(&mac_call_stmt.attrs, stmt.span, || {
+                self.with_attrs(&mac_call_stmt.attrs, stmt.span.into(), || {
                     self.macro_call(
                         &mac_call_stmt.mac,
                         Some(&self.tail_fn(|af| match mac_call_stmt.style {

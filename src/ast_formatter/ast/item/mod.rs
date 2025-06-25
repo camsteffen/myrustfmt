@@ -2,10 +2,11 @@ mod sort;
 pub mod use_tree;
 
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::brackets::Brackets;
+use crate::ast_formatter::list::ListItemContext;
 use crate::ast_formatter::list::options::{
     FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies,
 };
-use crate::ast_formatter::list::{Braces, ListItemContext};
 use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -44,7 +45,7 @@ impl AstFormatter {
         item: &ast::Item<K>,
         kind: impl FnOnce(&K) -> FormatResult,
     ) -> FormatResult {
-        self.with_attrs(&item.attrs, item.span, || {
+        self.with_attrs(&item.attrs, item.span.into(), || {
             self.vis(&item.vis)?;
             kind(&item.kind)?;
             Ok(())
@@ -158,7 +159,7 @@ impl AstFormatter {
         self.token_ident_generic_params("enum", ident, generics)?;
         self.out.space()?;
         self.list(
-            Braces::Curly,
+            Brackets::Curly,
             variants,
             Self::variant,
             ListOptions {
@@ -198,7 +199,7 @@ impl AstFormatter {
     }
 
     fn variant(&self, variant: &ast::Variant, tail: Tail, _lcx: ListItemContext) -> FormatResult {
-        self.with_attrs(&variant.attrs, variant.span, || {
+        self.with_attrs(&variant.attrs, variant.span.into(), || {
             self.vis(&variant.vis)?;
             self.ident(variant.ident)?;
             self.variant_data(&variant.data, true, true)?;
@@ -383,7 +384,7 @@ impl AstFormatter {
                     self.out.space()?;
                 }
                 self.list(
-                    Braces::Curly,
+                    Brackets::Curly,
                     fields,
                     Self::field_def,
                     ListOptions {
@@ -405,16 +406,19 @@ impl AstFormatter {
                     },
                 )?;
             }
-            ast::VariantData::Tuple(fields, _) => {
-                self.list(Braces::Parens, fields, Self::field_def, ListOptions { .. })?
-            }
+            ast::VariantData::Tuple(fields, _) => self.list(
+                Brackets::Parens,
+                fields,
+                Self::field_def,
+                ListOptions { .. },
+            )?,
             ast::VariantData::Unit(_) => {}
         }
         Ok(())
     }
 
     fn field_def(&self, field: &ast::FieldDef, tail: Tail, _lcx: ListItemContext) -> FormatResult {
-        self.with_attrs_tail(&field.attrs, field.span, tail, || {
+        self.with_attrs_tail(&field.attrs, field.span.into(), tail, || {
             self.vis(&field.vis)?;
             if let Some(ident) = field.ident {
                 self.ident(ident)?;
