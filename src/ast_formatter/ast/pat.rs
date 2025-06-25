@@ -1,8 +1,6 @@
-use crate::ast_formatter::brackets::Brackets;
-use rustc_ast::ast;
-use rustc_ast::ptr::P;
-
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::ast::r#macro::MacCallSemi;
+use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::ListItemContext;
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::list::options::{
@@ -11,6 +9,8 @@ use crate::ast_formatter::list::options::{
 use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
+use rustc_ast::ast;
+use rustc_ast::ptr::P;
 
 impl AstFormatter {
     pub fn pat(&self, pat: &ast::Pat) -> FormatResult {
@@ -41,7 +41,9 @@ impl AstFormatter {
                     self.pat(pat)?;
                 }
             }
-            ast::PatKind::MacCall(ref mac_call) => self.macro_call(mac_call, take_tail())?,
+            ast::PatKind::MacCall(ref mac_call) => {
+                self.macro_call(mac_call, MacCallSemi::No, take_tail())?
+            }
             ast::PatKind::Or(ref pats) => {
                 self.simple_infix_chain("|", pats, |pat| self.pat(pat), false, take_tail())?
             }

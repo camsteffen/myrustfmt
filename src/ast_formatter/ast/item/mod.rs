@@ -2,6 +2,7 @@ mod sort;
 pub mod use_tree;
 
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::ast::r#macro::MacCallSemi;
 use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::ListItemContext;
 use crate::ast_formatter::list::options::{
@@ -70,15 +71,7 @@ impl AstFormatter {
             }
             ast::ItemKind::Impl(ref impl_) => self.impl_(impl_)?,
             ast::ItemKind::MacCall(ref mac_call) => {
-                self.macro_call(
-                    mac_call,
-                    Some(&self.tail_fn(|af| {
-                        if !matches!(mac_call.args.delim, rustc_ast::token::Delimiter::Brace) {
-                            af.out.token(";")?;
-                        }
-                        Ok(())
-                    })),
-                )?;
+                self.macro_call(mac_call, MacCallSemi::Item, None)?;
             }
             // todo
             ast::ItemKind::MacroDef(..) => return Err(FormatErrorKind::UnsupportedSyntax.into()),
@@ -274,7 +267,7 @@ impl AstFormatter {
                 ast::AssocItemKind::Fn(fn_) => self.fn_(fn_)?,
                 ast::AssocItemKind::Type(ty_alias) => self.ty_alias(ty_alias)?,
                 ast::AssocItemKind::MacCall(mac_call) => {
-                    self.macro_call(mac_call, Some(&self.tail_token(";")))?;
+                    self.macro_call(mac_call, MacCallSemi::Item, None)?
                 }
                 ast::AssocItemKind::Delegation(_) => {
                     return Err(FormatErrorKind::UnsupportedSyntax.into());
@@ -292,7 +285,7 @@ impl AstFormatter {
             match kind {
                 ast::ForeignItemKind::Fn(fn_) => self.fn_(fn_)?,
                 ast::ForeignItemKind::MacCall(mac_call) => {
-                    self.macro_call(mac_call, Some(&self.tail_token(";")))?;
+                    self.macro_call(mac_call, MacCallSemi::Item, None)?
                 }
                 ast::ForeignItemKind::Static(static_item) => self.static_item(static_item)?,
                 ast::ForeignItemKind::TyAlias(ty_alias) => self.ty_alias(ty_alias)?,

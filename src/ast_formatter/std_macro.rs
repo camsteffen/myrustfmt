@@ -7,6 +7,7 @@ pub enum StdMacro {
     FnLike,
     Format { format_string_pos: u8 },
     Matches,
+    ThreadLocal,
     Vec,
 }
 
@@ -16,6 +17,7 @@ impl StdMacro {
             StdMacro::Cfg | StdMacro::FnLike | StdMacro::Format { .. } | StdMacro::Matches => {
                 Brackets::Parens
             }
+            StdMacro::ThreadLocal => Brackets::Curly,
             StdMacro::Vec => Brackets::Square,
         }
     }
@@ -59,6 +61,7 @@ pub fn std_macro(mac_call: &ast::MacCall) -> Option<StdMacro> {
             format_string_pos: 2,
         },
         "matches" => StdMacro::Matches,
+        "thread_local" => StdMacro::ThreadLocal,
         "vec" => StdMacro::Vec,
         _ => return None,
     };

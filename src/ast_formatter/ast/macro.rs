@@ -15,8 +15,20 @@ use rustc_ast::ast;
 use rustc_ast::token::Delimiter;
 use std::num::NonZero;
 
+#[derive(Clone, Copy)]
+pub enum MacCallSemi {
+    Yes,
+    No,
+    Item,
+}
+
 impl AstFormatter {
-    pub fn macro_call(&self, mac_call: &ast::MacCall, tail: Tail) -> FormatResult {
+    pub fn macro_call(
+        &self,
+        mac_call: &ast::MacCall,
+        semi: MacCallSemi,
+        tail: Tail,
+    ) -> FormatResult {
         self.path(&mac_call.path, true)?;
         self.out.token("!")?;
         let mac_args = self.module.macro_args.get(&mac_call_id(mac_call));
@@ -33,21 +45,27 @@ impl AstFormatter {
         if brackets == Brackets::Curly {
             self.out.space()?;
         }
+        let tail = |af: &Self| {
+            af.macro_call_semi(semi, brackets)?;
+            af.tail(tail)?;
+            Ok(())
+        };
         self.out.token_replace(brackets.start())?;
         if mac_call.args.tokens.is_empty() {
             self.enclosed_empty_contents()?;
             self.out.token_replace(brackets.end())?;
-            self.tail(tail)?;
+            tail(self)?;
         } else if let Some(args) = mac_args {
-            self.macro_args(brackets, args, tail)?;
+            self.macro_args(brackets, args, Some(&self.tail_fn(tail)))?;
         } else {
             let dspan = mac_call.args.dspan;
+            // skip open bracket but include closing bracket
             let span = Span {
                 lo: dspan.open.hi(),
                 hi: dspan.close.hi(),
             };
             self.out.copy_span(span)?;
-            self.tail(tail)?;
+            tail(self)?;
         }
         Ok(())
     }
@@ -78,6 +96,14 @@ impl AstFormatter {
             )?,
             MacroArgs::Matches(ref expr, ref pat, ref guard) => {
                 self.matches_args(expr, pat, guard.as_deref(), tail)?
+            }
+            MacroArgs::ThreadLocal(ref stmts) => {
+                self.enclosed_contents(|| {
+                    self.list_with_item_sorting(stmts, |stmt| self.stmt(stmt))
+                })?;
+                self.out.token_replace(brackets.end())?;
+                self.out.token_skip_if_present(";")?;
+                self.tail(tail)?;
             }
         }
         Ok(())
@@ -195,5 +221,16 @@ impl AstFormatter {
                 Ok(())
             })
             .result()
+    }
+
+    fn macro_call_semi(&self, semi: MacCallSemi, brackets: Brackets) -> FormatResult {
+        match (semi, brackets) {
+            (MacCallSemi::Item, Brackets::Curly) => {
+                self.out.token_skip_if_present(";")?;
+            }
+            (MacCallSemi::Yes, _) | (MacCallSemi::Item, _) => self.out.token_maybe_missing(";")?,
+            (MacCallSemi::No, _) => {}
+        }
+        Ok(())
     }
 }

@@ -1,5 +1,6 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::ast::item::MaybeItem;
+use crate::ast_formatter::ast::r#macro::MacCallSemi;
 use crate::ast_formatter::tail::Tail;
 use crate::ast_utils::{is_jump_expr, plain_block};
 use crate::error::FormatResult;
@@ -111,10 +112,13 @@ impl AstFormatter {
                 self.with_attrs(&mac_call_stmt.attrs, stmt.span.into(), || {
                     self.macro_call(
                         &mac_call_stmt.mac,
-                        Some(&self.tail_fn(|af| match mac_call_stmt.style {
-                            ast::MacStmtStyle::Semicolon => af.out.token(";"),
-                            ast::MacStmtStyle::Braces | ast::MacStmtStyle::NoBraces => Ok(()),
-                        })),
+                        match mac_call_stmt.style {
+                            ast::MacStmtStyle::Semicolon => MacCallSemi::Yes,
+                            ast::MacStmtStyle::Braces | ast::MacStmtStyle::NoBraces => {
+                                MacCallSemi::No
+                            }
+                        },
+                        None,
                     )?;
                     Ok(())
                 })

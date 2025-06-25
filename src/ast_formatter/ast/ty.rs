@@ -1,4 +1,5 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::ast::r#macro::MacCallSemi;
 use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::tail::Tail;
@@ -31,7 +32,9 @@ impl AstFormatter {
                 self.generic_bounds(bounds, take_tail())?;
             }
             ast::TyKind::Infer => self.out.token("_")?,
-            ast::TyKind::MacCall(mac_call) => self.macro_call(mac_call, take_tail())?,
+            ast::TyKind::MacCall(mac_call) => {
+                self.macro_call(mac_call, MacCallSemi::No, take_tail())?
+            }
             ast::TyKind::Never => self.out.token("!")?,
             ast::TyKind::Paren(ty) => {
                 self.out.token("(")?;

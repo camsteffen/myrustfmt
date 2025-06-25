@@ -9,6 +9,7 @@ use rustc_data_structures::fx::FxHashMap;
 use rustc_errors::PResult;
 use rustc_parse::MACRO_ARGUMENTS;
 use rustc_parse::exp;
+use rustc_parse::parser::AttemptLocalParseRecovery;
 use rustc_parse::parser::CommaRecoveryMode;
 use rustc_parse::parser::Parser;
 use rustc_parse::parser::RecoverColon;
@@ -45,6 +46,9 @@ impl Visitor<'_> for MacroArgsParser<'_> {
                         self.visit_expr(guard);
                     }
                 }
+                MacroArgs::ThreadLocal(stmts) => {
+                    walk_list!(self, visit_stmt, stmts);
+                }
             }
             self.macro_args.insert(mac_call_id(mac_call), mac_args);
         }
@@ -60,6 +64,7 @@ pub enum MacroArgs {
         format_string_pos: u8,
     },
     Matches(P<ast::Expr>, P<ast::Pat>, Option<P<ast::Expr>>),
+    ThreadLocal(ThinVec<ast::Stmt>),
 }
 
 // todo emit an error if we fail to parse a known macro? at least in debug mode
@@ -88,6 +93,7 @@ pub fn try_parse_macro_args(psess: &ParseSess, mac_call: &ast::MacCall) -> Optio
                 })
         }
         StdMacro::Matches => parse_matches(parser),
+        StdMacro::ThreadLocal => parse_thread_local(parser),
     })
     .ok()?;
     Some(macro_args)
@@ -129,4 +135,14 @@ fn parse_matches<'p>(parser: &mut Parser<'p>) -> PResult<'p, MacroArgs> {
     let _ = parser.eat(exp!(Comma));
     parser.expect(exp!(Eof))?;
     Ok(MacroArgs::Matches(expr, pat, guard))
+}
+
+fn parse_thread_local<'p>(parser: &mut Parser<'p>) -> PResult<'p, MacroArgs> {
+    let mut stmts = ThinVec::new();
+    while !parser.eat(exp!(Eof)) {
+        if let Some(stmt) = parser.parse_full_stmt(AttemptLocalParseRecovery::No)? {
+            stmts.push(stmt);
+        }
+    }
+    Ok(MacroArgs::ThreadLocal(stmts))
 }

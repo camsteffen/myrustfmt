@@ -2,6 +2,7 @@ mod binary_expr;
 mod r#match;
 mod postfix;
 
+use crate::ast_formatter::ast::r#macro::MacCallSemi;
 use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::ListItemContext;
 use crate::ast_formatter::list::ListRest;
@@ -77,7 +78,9 @@ impl AstFormatter {
             ast::ExprKind::Let(ref pat, ref init, ..) => self.let_(pat, init, take_tail())?,
             ast::ExprKind::Lit(_) => self.out.copy_span(expr.span.into())?,
             ast::ExprKind::Loop(ref block, label, _) => self.loop_(label, block)?,
-            ast::ExprKind::MacCall(ref mac_call) => self.macro_call(mac_call, take_tail())?,
+            ast::ExprKind::MacCall(ref mac_call) => {
+                self.macro_call(mac_call, MacCallSemi::No, take_tail())?
+            }
             ast::ExprKind::Match(ref scrutinee, ref arms, ast::MatchKind::Prefix) => {
                 self.match_(scrutinee, arms)?
             }
