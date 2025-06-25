@@ -35,12 +35,15 @@ impl Visitor<'_> for MacroArgsParser<'_> {
             // recursively walk parsed macro args for nested macro calls
             match &mac_args {
                 MacroArgs::Cfg(_) => {}
-                MacroArgs::ExprList(args) | MacroArgs::Format { args, .. } => {
+                MacroArgs::FnLike(args) | MacroArgs::Format { args, .. } => {
                     walk_list!(self, visit_expr, args);
                 }
-                MacroArgs::Matches(expr, pat) => {
+                MacroArgs::Matches(expr, pat, guard) => {
                     self.visit_expr(expr);
                     self.visit_pat(pat);
+                    if let Some(guard) = guard {
+                        self.visit_expr(guard);
+                    }
                 }
             }
             self.macro_args.insert(mac_call_id(mac_call), mac_args);
@@ -51,30 +54,29 @@ impl Visitor<'_> for MacroArgsParser<'_> {
 pub enum MacroArgs {
     Cfg(ThinVec<ast::MetaItemInner>),
     /// Same as a function call. Optional trailing comma. Also used for macros with no args.
-    ExprList(ThinVec<P<ast::Expr>>),
+    FnLike(ThinVec<P<ast::Expr>>),
     Format {
         args: ThinVec<P<ast::Expr>>,
         format_string_pos: u8,
     },
-    Matches(P<ast::Expr>, P<ast::Pat>),
+    Matches(P<ast::Expr>, P<ast::Pat>, Option<P<ast::Expr>>),
 }
 
 // todo emit an error if we fail to parse a known macro? at least in debug mode
 pub fn try_parse_macro_args(psess: &ParseSess, mac_call: &ast::MacCall) -> Option<MacroArgs> {
     let std_macro = std_macro(mac_call)?;
-    let tokens = mac_call.args.tokens.clone();
     // todo is MACRO_ARGUMENTS necessary?
     // todo silence errors except in debug mode
-    let parser = Parser::new(psess, tokens, MACRO_ARGUMENTS)
+    let parser = Parser::new(psess, mac_call.args.tokens.clone(), MACRO_ARGUMENTS)
         .recovery(Recovery::Forbidden);
     let macro_args = parse_no_errors(parser, |parser| match std_macro {
         StdMacro::Cfg => {
             parse_comma_sep_list(parser, Parser::parse_meta_item_inner)
                 .map(MacroArgs::Cfg)
         }
-        StdMacro::ExprList => {
+        StdMacro::FnLike => {
             parse_comma_sep_list(parser, Parser::parse_expr)
-                .map(MacroArgs::ExprList)
+                .map(MacroArgs::FnLike)
         }
         StdMacro::Format { format_string_pos } => {
             parse_comma_sep_list(parser, Parser::parse_expr)
@@ -113,13 +115,18 @@ fn parse_comma_sep_list<'p, T>(
 fn parse_matches<'p>(parser: &mut Parser<'p>) -> PResult<'p, MacroArgs> {
     let expr = parser.parse_expr()?;
     parser.expect(exp!(Comma))?;
-    let pat = parser.parse_pat_allow_top_guard(
+    let pat = parser.parse_pat_no_top_guard(
         None,
         RecoverComma::No,
         RecoverColon::No,
         CommaRecoveryMode::EitherTupleOrPipe,
     )?;
+    let guard = if parser.eat_keyword(exp!(If)) {
+        Some(parser.parse_expr()?)
+    } else {
+        None
+    };
     let _ = parser.eat(exp!(Comma));
     parser.expect(exp!(Eof))?;
-    Ok(MacroArgs::Matches(expr, pat))
+    Ok(MacroArgs::Matches(expr, pat, guard))
 }

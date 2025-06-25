@@ -2,7 +2,7 @@ use rustc_ast::ast;
 
 pub enum StdMacro {
     Cfg,
-    ExprList,
+    FnLike,
     Format { format_string_pos: u8 },
     Matches,
 }
@@ -24,7 +24,7 @@ pub fn std_macro(mac_call: &ast::MacCall) -> Option<StdMacro> {
         | "include_bytes"
         | "include_str"
         | "is_x86_feature_detected"
-        | "line" => StdMacro::ExprList,
+        | "line" => StdMacro::FnLike,
         "eprint" | "eprintln" | "format_args" | "print" | "println" => StdMacro::Format {
             format_string_pos: 0,
         },

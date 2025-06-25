@@ -35,7 +35,7 @@ impl AstFormatter {
                 af.tail(tail)?;
                 Ok(())
             })?,
-            MacroArgs::ExprList(ref args) => {
+            MacroArgs::FnLike(ref args) => {
                 self.macro_args_list(args, None, tail, |af, expr, tail| af.expr_tail(expr, tail))?
             }
             MacroArgs::Format {
@@ -44,39 +44,8 @@ impl AstFormatter {
             } => self.macro_args_list(args, Some(format_string_pos), tail, |af, item, tail| {
                 af.expr_tail(item, tail)
             })?,
-            MacroArgs::Matches(ref expr, ref pat) => {
-                self.backtrack()
-                    .next(|| {
-                        self.out.with_recover_width(|| {
-                            self.with_single_line(|| {
-                                self.out.token("(")?;
-                                self.expr(expr)?;
-                                self.out.token_space(",")?;
-                                self.pat(pat)?;
-                                self.out.token_skip_if_present(",")?;
-                                self.out.token(")")?;
-                                self.tail(tail)?;
-                                Ok(())
-                            })
-                        })
-                    })
-                    .next(|| {
-                        self.out.token("(")?;
-                        self.indented(|| {
-                            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                            self.expr(expr)?;
-                            self.out.token(",")?;
-                            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                            self.pat(pat)?;
-                            self.out.token_maybe_missing(",")?;
-                            Ok(())
-                        })?;
-                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                        self.out.token(")")?;
-                        self.tail(tail)?;
-                        Ok(())
-                    })
-                    .result()?;
+            MacroArgs::Matches(ref expr, ref pat, ref guard) => {
+                self.matches_args(expr, pat, guard.as_deref(), tail)?
             }
         }
         Ok(())
@@ -117,5 +86,78 @@ impl AstFormatter {
                 ..
             },
         )
+    }
+
+    fn matches_args(
+        &self,
+        expr: &ast::Expr,
+        pat: &ast::Pat,
+        guard: Option<&ast::Expr>,
+        tail: Tail,
+    ) -> FormatResult {
+        self.out.token("(")?;
+        self.backtrack()
+            .next(|| {
+                self.with_single_line(|| {
+                    self.with_width_limit(RUSTFMT_CONFIG_DEFAULTS.fn_call_width, || {
+                        self.expr(expr)?;
+                        self.out.token_space(",")?;
+                        self.pat(pat)?;
+                        if let Some(guard) = guard {
+                            self.out.space_token_space("if")?;
+                            self.expr(guard)?;
+                        }
+                        Ok(())
+                    })?;
+                    self.out.token_skip_if_present(",")?;
+                    self.out.token(")")?;
+                    self.tail(tail)?;
+                    Ok(())
+                })
+            })
+            .next(|| {
+                self.indented(|| {
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                    self.expr(expr)?;
+                    self.out.token(",")?;
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                    let (pat_first_line, pat_start) = self.out.line_col();
+                    self.pat(pat)?;
+                    let pat_width = (self.out.line() == pat_first_line)
+                        .then(|| self.out.col() - pat_start);
+                    // todo width limit on pat + guard single line?
+                    if let Some(guard) = guard {
+                        // todo introduce constant
+                        let allow_same_line = pat_width.is_some_and(|w| w <= 40);
+                        self.backtrack()
+                            .next_if(allow_same_line, || {
+                                self.could_wrap_indent(|| {
+                                    self.out.space_token_space("if")?;
+                                    self.expr(guard)?;
+                                    self.out.token_maybe_missing(",")?;
+                                    Ok(())
+                                })
+                            })
+                            .next(|| {
+                                self.indented(|| {
+                                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                                    self.out.token_space("if")?;
+                                    self.expr(guard)?;
+                                    self.out.token_maybe_missing(",")?;
+                                    Ok(())
+                                })
+                            })
+                            .result()?;
+                    } else {
+                        self.out.token_maybe_missing(",")?;
+                    }
+                    Ok(())
+                })?;
+                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                self.out.token(")")?;
+                self.tail(tail)?;
+                Ok(())
+            })
+            .result()
     }
 }
