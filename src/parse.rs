@@ -93,12 +93,9 @@ pub fn parse_no_errors<T>(
 }
 
 fn build_diag_ctxt(source_map: Arc<SourceMap>) -> DiagCtxt {
-    let fallback_bundle = rustc_errors::fallback_fluent_bundle(
-        rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
-        false,
-    );
+    let translator = rustc_driver::default_translator();
     let emitter = Box::new(
-        HumanEmitter::new(stderr_destination(ColorConfig::Auto), fallback_bundle)
+        HumanEmitter::new(stderr_destination(ColorConfig::Auto), translator)
             .sm(Some(source_map)),
     );
     DiagCtxt::new(emitter)
