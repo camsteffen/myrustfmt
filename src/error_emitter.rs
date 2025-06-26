@@ -1,8 +1,6 @@
 use crate::num::{HSize, VSize};
 use crate::util::cell_ext::{CellExt, CellNumberExt};
-use std::cell::{Cell, RefCell};
-use std::io;
-use std::io::Write;
+use std::cell::Cell;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -151,15 +149,12 @@ impl BufferedErrorEmitter {
 pub struct ErrorEmitter {
     error_count: Cell<u32>,
     path: Option<PathBuf>,
-    writer: RefCell<Box<dyn Write>>,
 }
 
 macro_rules! emit {
     ($emitter:expr, $($t:tt)*) => {
         $emitter.error_count.increment();
-        if let Err(err) = writeln!($emitter.writer.borrow_mut(), $($t)*) {
-            panic!("Failed to write error: {err}");
-        }
+        eprintln!($($t)*);
     };
 }
 
@@ -168,7 +163,6 @@ impl ErrorEmitter {
         ErrorEmitter {
             error_count: Cell::new(0),
             path,
-            writer: RefCell::new(Box::new(io::stderr())),
         }
     }
 

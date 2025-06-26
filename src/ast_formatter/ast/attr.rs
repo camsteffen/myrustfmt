@@ -81,8 +81,7 @@ impl AstFormatter {
         }
         assert!(
             self.errors.error_count() > error_count_before,
-            "an error should be emitted before copy fallback\nstack trace:\n{}",
-            err.backtrace,
+            "an error should be emitted before copy fallback",
         );
         self.out.restore_checkpoint(&checkpoint);
         self.with_replace_width_limit(None, || self.out.copy_span(span))?;
