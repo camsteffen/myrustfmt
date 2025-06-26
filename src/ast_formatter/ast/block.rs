@@ -119,8 +119,7 @@ impl AstFormatter {
                             }
                         },
                         None,
-                    )?;
-                    Ok(())
+                    )
                 })
             }
         }

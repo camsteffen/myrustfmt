@@ -1,8 +1,8 @@
 use crate::num::{HSize, VSize};
 use crate::util::cell_ext::{CellExt, CellNumberExt};
-use std::cell::Cell;
-use std::fmt::Display;
-use std::fmt::Write;
+use std::cell::{Cell, RefCell};
+use std::io;
+use std::io::Write;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -34,7 +34,7 @@ impl BufferedErrorEmitter {
         }
     }
 
-    pub fn finish(self) -> (u32, Option<String>) {
+    pub fn finish(self) -> u32 {
         let Self {
             checkpoint_count,
             buffer,
@@ -42,15 +42,7 @@ impl BufferedErrorEmitter {
         } = self;
         assert_eq!(checkpoint_count.get(), 0);
         assert!(buffer.into_inner().is_empty());
-        (
-            emitter.error_count.get(),
-            emitter.captured.map(Cell::into_inner),
-        )
-    }
-
-    pub fn error_count(&self) -> u32 {
-        let buffer_len = self.buffer.with_taken(|b| b.len());
-        self.emitter.error_count() + u32::try_from(buffer_len).unwrap()
+        emitter.error_count.get()
     }
 
     pub fn checkpoint(&self) -> Checkpoint {
@@ -152,65 +144,57 @@ impl BufferedErrorEmitter {
 }
 
 pub struct ErrorEmitter {
-    captured: Option<Cell<String>>,
     error_count: Cell<u32>,
     path: Option<PathBuf>,
+    writer: RefCell<Box<dyn Write>>,
+}
+
+macro_rules! emit {
+    ($emitter:expr, $($t:tt)*) => {
+        if let Err(err) = writeln!($emitter.writer.borrow_mut(), $($t)*) {
+            panic!("Failed to write error: {err}");
+        }
+    };
 }
 
 impl ErrorEmitter {
-    pub fn new(path: Option<PathBuf>, capture: bool) -> ErrorEmitter {
+    pub fn new(path: Option<PathBuf>) -> ErrorEmitter {
         ErrorEmitter {
-            captured: capture.then(|| Cell::new(String::new())),
             error_count: Cell::new(0),
             path,
+            writer: RefCell::new(Box::new(io::stderr())),
         }
-    }
-
-    fn error_count(&self) -> u32 {
-        self.error_count.get()
     }
 
     pub fn line_comment_not_allowed(&self, line: VSize, col: HSize) {
         self.error_count.increment();
-        self.write("Line comment not allowed");
-        self.at(line, col);
+        emit!(self, "Line comment not allowed{}", self.at(line, col));
     }
 
     pub fn multi_line_comment_not_allowed(&self, line: VSize, col: HSize) {
         self.error_count.increment();
-        self.write("Multi-line comment not allowed");
-        self.at(line, col);
+        emit!(self, "Multi-line comment not allowed{}", self.at(line, col));
     }
 
     pub fn unsupported_syntax(&self, line: VSize, col: HSize) {
         self.error_count.increment();
-        self.write("Unsupported syntax");
-        self.at(line, col);
+        emit!(self, "Unsupported syntax{}", self.at(line, col));
     }
 
     fn width_exceeded(&self, line: VSize) {
         self.error_count.increment();
-        self.write("Max width exceeded at ");
-        match &self.path {
-            None => self.write(format_args!("line {line}\n")),
-            Some(path) => self.write(format_args!("{}:{line}\n", path.display())),
-        }
+        let at = match &self.path {
+            None => format!("line {line}"),
+            Some(path) => format!("{}:{line}", path.display()),
+        };
+        emit!(self, "Max width exceeded at {at}");
     }
 
-    fn at(&self, line: VSize, col: HSize) {
+    fn at(&self, line: VSize, col: HSize) -> String {
         let (line, col) = (line + 1, col + 1);
         match &self.path {
-            None => self.write(format_args!(" at {line}:{col}\n")),
-            Some(path) => {
-                self.write(format_args!(" at {path}:{line}:{col}\n", path = path.display()))
-            }
-        }
-    }
-
-    fn write(&self, output: impl Display) {
-        eprint!("{output}");
-        if let Some(captured) = &self.captured {
-            captured.with_taken(|s| write!(s, "{output}").unwrap());
+            None => format!(" at {line}:{col}"),
+            Some(path) => format!(" at {path}:{line}:{col}", path = path.display()),
         }
     }
 }

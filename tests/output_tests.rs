@@ -1,10 +1,10 @@
 #![feature(rustc_private)]
 #![feature(str_split_inclusive_remainder)]
 
-use myrustfmt::config::Config;
-use myrustfmt::format_str;
 use std::error::Error;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::{fs, io};
 use tracing_subscriber::EnvFilter;
 
@@ -298,15 +298,35 @@ fn format_max_width_expected(
     expected_stderr: Option<&str>,
     expected_stderr_path: Option<&Path>,
 ) -> TestResult {
-    let mut config = Config::default().capture_error_output(true);
+    let mut args = Vec::<String>::new();
     if let Some(max_width) = max_width {
-        config = config.max_width(max_width)
+        args.push("--max-width".to_string());
+        args.push(max_width.to_string());
     }
-    let result = format_str(source, config).unwrap();
+    args.push("-".to_string());
+    let mut child = Command::new(env!("CARGO_BIN_EXE_myrustfmt"))
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let stdin = child.stdin.as_mut().unwrap();
+    stdin.write_all(source.as_bytes()).unwrap();
+    let output = child.wait_with_output().unwrap();
+    let result = String::from_utf8(output.stdout).unwrap();
     let expected = format!("{expected}\n");
-    expect_formatted_equals(&result.formatted, &expected, name)?;
-    let error_output = result.error_output.unwrap();
+    expect_formatted_equals(&result, &expected, name)?;
+    let error_output = String::from_utf8(output.stderr).unwrap();
+    let errors_expected = expected_stderr.is_some();
     handle_format_errors(&error_output, expected_stderr, expected_stderr_path)?;
+    if output.status.success() {
+        if errors_expected {
+            return Err("expected errors but status code was success".into());
+        }
+    } else if !errors_expected {
+        return Err("No errors expected but status code was success".into());
+    }
     Ok(())
 }
 

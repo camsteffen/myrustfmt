@@ -72,7 +72,6 @@ use std::sync::Arc;
 #[derive(Debug)]
 pub struct FormatModuleResult {
     pub error_count: u32,
-    pub error_output: Option<String>,
     pub formatted: String,
 }
 
@@ -80,7 +79,6 @@ impl FormatModuleResult {
     pub fn into_result(self) -> Result<String, Box<dyn Error>> {
         let Self {
             error_count,
-            error_output: _,
             formatted,
         } = self;
         if error_count > 0 {
@@ -95,7 +93,6 @@ impl FormatModuleResult {
     pub fn expect_no_errors(self) -> String {
         let Self {
             error_count,
-            error_output: _,
             formatted,
         } = self;
         assert_eq!(
@@ -138,7 +135,6 @@ impl OnFormatModule {
     ) -> ControlFlow<()> {
         let FormatModuleResult {
             error_count,
-            error_output: _,
             formatted,
         } = result;
         if error_count > 0 {

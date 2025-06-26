@@ -34,7 +34,6 @@ pub fn parse_module(
         // Create a fresh SourceMap, ParseSess, etc. for every file to avoid unnecessarily
         // accumulating files in memory.
         let source_map = Arc::new(SourceMap::new(FilePathMapping::empty()));
-
         let dcx = build_diag_ctxt(Arc::clone(&source_map));
         let psess = ParseSess::with_dcx(dcx, Arc::clone(&source_map));
 

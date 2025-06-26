@@ -30,6 +30,5 @@ macro_rules! config {
 }
 
 config! {
-    capture_error_output: bool = false,
     max_width: HSize = 100,
 }
