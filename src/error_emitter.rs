@@ -45,6 +45,11 @@ impl BufferedErrorEmitter {
         emitter.error_count.get()
     }
 
+    pub fn error_count(&self) -> u32 {
+        let buffer_len = self.buffer.with_taken(|b| b.len());
+        self.emitter.error_count() + u32::try_from(buffer_len).unwrap()
+    }
+
     pub fn checkpoint(&self) -> Checkpoint {
         let buffer_len = self.buffer.with_taken(|b| b.len());
         let index = self.checkpoint_count.get();
@@ -151,6 +156,7 @@ pub struct ErrorEmitter {
 
 macro_rules! emit {
     ($emitter:expr, $($t:tt)*) => {
+        $emitter.error_count.increment();
         if let Err(err) = writeln!($emitter.writer.borrow_mut(), $($t)*) {
             panic!("Failed to write error: {err}");
         }
@@ -166,28 +172,24 @@ impl ErrorEmitter {
         }
     }
 
+    fn error_count(&self) -> u32 {
+        self.error_count.get()
+    }
+
     pub fn line_comment_not_allowed(&self, line: VSize, col: HSize) {
-        self.error_count.increment();
         emit!(self, "Line comment not allowed{}", self.at(line, col));
     }
 
     pub fn multi_line_comment_not_allowed(&self, line: VSize, col: HSize) {
-        self.error_count.increment();
         emit!(self, "Multi-line comment not allowed{}", self.at(line, col));
     }
 
     pub fn unsupported_syntax(&self, line: VSize, col: HSize) {
-        self.error_count.increment();
         emit!(self, "Unsupported syntax{}", self.at(line, col));
     }
 
     fn width_exceeded(&self, line: VSize) {
-        self.error_count.increment();
-        let at = match &self.path {
-            None => format!("line {line}"),
-            Some(path) => format!("{}:{line}", path.display()),
-        };
-        emit!(self, "Max width exceeded at {at}");
+        emit!(self, "Max width exceeded{}", self.at_line(line));
     }
 
     fn at(&self, line: VSize, col: HSize) -> String {
@@ -195,6 +197,14 @@ impl ErrorEmitter {
         match &self.path {
             None => format!(" at {line}:{col}"),
             Some(path) => format!(" at {path}:{line}:{col}", path = path.display()),
+        }
+    }
+
+    fn at_line(&self, line: VSize) -> String {
+        let line = line + 1;
+        match &self.path {
+            None => format!(" at line {line}"),
+            Some(path) => format!(" at {}:{line}", path.display()),
         }
     }
 }

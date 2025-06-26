@@ -58,7 +58,6 @@ impl AstFormatter {
         tail: Tail,
     ) -> FormatResult {
         let checkpoint = self.out.checkpoint_without_buffer_errors();
-        #[cfg(debug_assertions)]
         let error_count_before = self.errors.error_count();
         let Err(err) = format() else { return Ok(()) };
         let (line, col) = self.out.line_col();
@@ -80,7 +79,6 @@ impl AstFormatter {
             // these are not expected
             FormatErrorKind::Logical | FormatErrorKind::WidthLimitExceeded => return Err(err),
         }
-        #[cfg(debug_assertions)]
         assert!(
             self.errors.error_count() > error_count_before,
             "an error should be emitted before copy fallback\nstack trace:\n{}",
