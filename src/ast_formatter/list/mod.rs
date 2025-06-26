@@ -64,8 +64,7 @@ where
             }
             match self.opt.strategies {
                 ListStrategies::Horizontal(horizontal) => {
-                    self.list_horizontal(horizontal, false)
-                        .map_err(|e| e.error)?
+                    self.list_horizontal(horizontal, false).map_err(|e| e.error)?
                 }
                 ListStrategies::Vertical(_) => {
                     self.list_vertical(None)?;
@@ -88,8 +87,9 @@ where
             return self.list_vertical(Some(&checkpoint));
         }
 
-        let horizontal_result =
-            self.af.out.with_recover_width(|| self.list_horizontal(strategy.horizontal, true));
+        let horizontal_result = self.af.out.with_recover_width(|| {
+            self.list_horizontal(strategy.horizontal, true)
+        });
         if let Err(e) = horizontal_result {
             if e.is_overflow {
                 assert!(

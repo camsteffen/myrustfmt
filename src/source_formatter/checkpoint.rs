@@ -47,8 +47,7 @@ impl SourceFormatter {
             ref writer_checkpoint,
         } = *checkpoint;
         if let Some(error_emitter_checkpoint) = error_emitter_checkpoint {
-            self.error_emitter
-                .restore_checkpoint(error_emitter_checkpoint);
+            self.error_emitter.restore_checkpoint(error_emitter_checkpoint);
         }
         self.out.restore_checkpoint(writer_checkpoint);
         self.source_reader.pos.set(source_pos);
@@ -57,8 +56,7 @@ impl SourceFormatter {
     pub fn capture_lookahead<'c, 'ca>(&self, from: &'c Checkpoint<'ca>) -> Lookahead<'c, 'ca> {
         let error_buffer = match &from.error_emitter_checkpoint {
             Some(error_emitter_checkpoint) => {
-                self.error_emitter
-                    .take_from_checkpoint(error_emitter_checkpoint)
+                self.error_emitter.take_from_checkpoint(error_emitter_checkpoint)
             }
             None => Vec::new(),
         };

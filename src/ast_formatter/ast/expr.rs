@@ -344,9 +344,8 @@ impl AstFormatter {
 
                 Some(move || {
                     self.with_single_line(|| {
-                        self.with_width_limit_from_start(
-                            start_col,
-                            RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
+                        self.with_width_limit_end(
+                            start_col + RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
                             || {
                                 self.optional_block_horizontal_after_open_brace(block_expr)?;
                                 self.out.space_token_space("else")?;

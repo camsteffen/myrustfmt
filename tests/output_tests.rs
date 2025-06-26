@@ -92,8 +92,7 @@ fn parse_test_header(string: &str) -> TestResult<(TestKindRaw, Option<u16>, &str
     match lines_peekable.next() {
         Some("\n") => {}
         next => return Err(
-            format!("expected a blank line after header comments, found {next:?}")
-                .into(),
+            format!("expected a blank line after header comments, found {next:?}").into(),
         ),
     }
     let body = lines.remainder().unwrap_or("");
@@ -379,10 +378,7 @@ fn expect_formatted_equals(formatted: &str, expected: &str, name: &str) -> TestR
         return Ok(());
     }
     print_diff(expected, formatted);
-    Err(
-        format!("\"{name}\" formatted does not match expected")
-            .into(),
-    )
+    Err(format!("\"{name}\" formatted does not match expected").into())
 }
 
 fn print_diff(left: &str, right: &str) {

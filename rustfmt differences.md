@@ -1,5 +1,4 @@
 * A chain of binary operators of equal precedence are treated as a single chain.
-* A method call with one argument that is a function call is not exempt from fn_call_width.
 * When `impl` generics are formatted on multiple lines, the rest of the header is not indented.
 * Struct patterns are formatted consistently with struct expressions. Rustfmt gives struct patterns
   a unique format when there is a `..`, the struct can not fit in one line,
@@ -25,11 +24,6 @@ Enum
  * An enum struct variant may be written horizontally purely based on its width.
    Rustfmt has hard to understand rules that consider surrounding variants and comments.
 
-Postfix chains (or "dot chains")
- * Horizontal chains are preferred over vertical chains when they are shorter, even when a vertical chain
-   would allow the last item to fit on one line.
- * The chain width is not enforced for items that start within the first 15 chars of the chain
-
 `match`
  * A match arm may not start with `loop`
  * Does not add a semicolon after `return`, `break` etc. This is only done for statements and not expressions.
@@ -51,14 +45,14 @@ Closures
 * Closure arguments on multiple lines are formatted like other lists, not with visual style.
 
 Chains
-* A dot chain of only two elements (e.g. expr.field) may be wrapped and is not exempt from chain_width.
 * Dot chains may include index operators
 * Multi-line chains as a match arm body are always wrapped with a block. Rustfmt makes an exception when the chain
   ends in a multi-line method call (this is probably a bug).
 * Multi-line chains with no indent as a list item (e.g. array element) are wrapped with a block
 * Separate line chains are preferred over overflow if the number of lines is the same
   * Rationale: it's better for higher level structures to use line breaks than more deeply nested structures
-* Horizontal line chains are preferred if shorter than a veritcal chain, even if there is an overflowing closure
+* Horizontal chains are preferred over vertical chains when they are shorter, even when a vertical chain
+  would allow the last item to fit on one line.
 
 Comments
  * Removes trailing spaces from all comments, including doc comments and line comments with preceding code

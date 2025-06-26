@@ -13,11 +13,6 @@ use std::cell::Cell;
 
 // In rustfmt, this is called chain_width, and is 60 by default
 const POSTFIX_CHAIN_MAX_WIDTH: HSize = 60;
-/// Don't apply chain max width unless the chain item's distance from the start
-/// of the chain is at least this much.
-// todo maybe do the same thing at the *end* of the chain
-// todo how to pick this magic number? Is 10 better?
-const POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH: HSize = 15;
 
 struct PostfixItem<'a> {
     /// The first item in the chain has the root expression, which is not a postfix expression.
@@ -53,10 +48,11 @@ impl AstFormatter {
             // no indent
             self.postfix_chain_vertical(chain, tail)
         } else {
+            let width_limit_end = (chain.len() > 1).then(|| start_col + POSTFIX_CHAIN_MAX_WIDTH);
             self.backtrack()
                 .next(|| {
                     self.out.with_recover_width(|| {
-                        self.postfix_chain_horizontal(chain, start_col, tail)
+                        self.postfix_chain_horizontal(chain, width_limit_end, tail)
                     })
                 })
                 .next(|| {
@@ -71,25 +67,32 @@ impl AstFormatter {
     fn postfix_chain_horizontal(
         &self,
         chain: &[PostfixItem],
-        start_col: HSize,
+        width_limit_end: Option<HSize>,
         tail: Tail,
     ) -> FormatResult {
         let wrappable_items = chain.len();
         let (last, before_last) = chain.split_last().unwrap();
+        let items = |items: &[PostfixItem]| {
+            self.with_single_line(|| {
+                items.iter().try_for_each(|item| {
+                    self.with_width_limit_end_opt(width_limit_end, || self.postfix_item(item))
+                })
+            })
+        };
         match &last.root_or_dot_item.kind {
             ast::ExprKind::MethodCall(method_call) => {
-                self.with_single_line(|| self.postfix_items(before_last, start_col))?;
+                items(before_last)?;
                 self.postfix_chain_horizontal_last_method_call(
                     method_call,
                     last,
-                    start_col,
+                    width_limit_end,
                     wrappable_items,
                     tail,
                 )?;
             }
             // other postfix expression kinds are not overflowable
             _ => {
-                self.with_single_line(|| self.postfix_items(chain, start_col))?;
+                items(chain)?;
                 self.tail(tail)?;
             }
         }
@@ -100,14 +103,11 @@ impl AstFormatter {
         &self,
         method_call: &ast::MethodCall,
         postfix_item: &PostfixItem,
-        start_col: HSize,
+        width_limit_end: Option<HSize>,
         wrappable_items: usize,
         tail: Tail,
     ) -> FormatResult {
         let method_col_start = self.out.col();
-        let width_limit_end = self
-            .has_chain_width_limit(start_col)
-            .then(|| start_col + POSTFIX_CHAIN_MAX_WIDTH);
         let result = self.with_width_limit_end_opt(width_limit_end, || {
             // todo single line?
             self.method_call_dot_path(method_call)?;
@@ -255,21 +255,6 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn has_chain_width_limit(&self, start_col: HSize) -> bool {
-        (self.out.col() - start_col) >= POSTFIX_CHAIN_MIN_ITEM_OFFSET_FOR_MAX_WIDTH
-    }
-
-    fn with_chain_width_limit<T>(
-        &self,
-        start_col: HSize,
-        format: impl Fn() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        let limit = self
-            .has_chain_width_limit(start_col)
-            .then_some(POSTFIX_CHAIN_MAX_WIDTH);
-        self.with_width_limit_from_start_opt(start_col, limit, format)
-    }
-
     fn postfix_item(&self, item: &PostfixItem) -> FormatResult {
         self.postfix_item_tail(item, None)
     }
@@ -338,12 +323,6 @@ impl AstFormatter {
             })),
         )?;
         Ok(height.get())
-    }
-
-    fn postfix_items(&self, items: &[PostfixItem], start_col: HSize) -> FormatResult {
-        items
-            .iter()
-            .try_for_each(|item| self.with_chain_width_limit(start_col, || self.postfix_item(item)))
     }
 
     fn postfix_tail(&self, postfix_tail: &[&ast::Expr], tail: Tail) -> FormatResult {

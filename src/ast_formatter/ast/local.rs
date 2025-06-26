@@ -66,9 +66,8 @@ impl AstFormatter {
             {
                 Some(move || {
                     self.with_single_line(|| {
-                        self.with_width_limit_from_start(
-                            start_col,
-                            RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
+                        self.with_width_limit_end(
+                            start_col + RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
                             || {
                                 self.optional_block_horizontal_after_open_brace(expr_only_else)?;
                                 self.out.token(";")?;

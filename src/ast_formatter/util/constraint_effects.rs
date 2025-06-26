@@ -88,8 +88,7 @@ impl AstFormatter {
         if self.out.col() > end_col {
             return Err(FormatErrorKind::WidthLimitExceeded.into());
         }
-        let end_col = NonZero::new(end_col)
-            .expect("width limit end should not be zero");
+        let end_col = NonZero::new(end_col).expect("width limit end should not be zero");
         let limit = WidthLimit { end_col, line };
         self.constraints().with_width_limit(limit, scope)
     }
@@ -103,27 +102,5 @@ impl AstFormatter {
             return scope();
         };
         self.with_width_limit_end(end_col, scope)
-    }
-
-    pub fn with_width_limit_from_start<T>(
-        &self,
-        start_col: HSize,
-        width_limit: HSize,
-        scope: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        let end_col = start_col + width_limit;
-        self.with_width_limit_end(end_col, scope)
-    }
-
-    pub fn with_width_limit_from_start_opt<T>(
-        &self,
-        start_col: HSize,
-        width_limit: Option<HSize>,
-        scope: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        let Some(width_limit) = width_limit else {
-            return scope();
-        };
-        self.with_width_limit_from_start(start_col, width_limit, scope)
     }
 }

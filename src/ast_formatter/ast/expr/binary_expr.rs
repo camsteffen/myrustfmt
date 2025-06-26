@@ -21,7 +21,9 @@ impl AstFormatter {
         } else if let [(_, right)] = &chain[..] {
             matches!(right.kind, ast::ExprKind::Let(..)) && !is_prefixed_ident(first)
         } else {
-            chain.iter().any(|(_, e)| matches!(e.kind, ast::ExprKind::Let(..)))
+            chain
+                .iter()
+                .any(|(_, e)| matches!(e.kind, ast::ExprKind::Let(..)))
         };
         let first_line = self.out.line();
         self.expr(first)?;

@@ -94,7 +94,9 @@ impl SubmoduleCollector {
     fn mod_error(&self, psess: &ParseSess, error: ModError) -> ! {
         match error {
             ModError::FileNotFound(ident, _default_path, _secondary_path) => {
-                psess.dcx().span_err(ident.span, "file not found for module");
+                psess
+                    .dcx()
+                    .span_err(ident.span, "file not found for module");
                 todo!();
             }
             ModError::MultipleCandidates(ident, default_path, secondary_path) => {

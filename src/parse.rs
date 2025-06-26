@@ -61,8 +61,8 @@ pub fn parse_module(
         };
     }
 
-    let source_file = Arc::into_inner(source_file)
-        .expect("should have a unique reference to the SourceFile");
+    let source_file =
+        Arc::into_inner(source_file).expect("should have a unique reference to the SourceFile");
 
     Ok(ParseModuleResult {
         module,
@@ -94,8 +94,7 @@ pub fn parse_no_errors<T>(
 fn build_diag_ctxt(source_map: Arc<SourceMap>) -> DiagCtxt {
     let translator = rustc_driver::default_translator();
     let emitter = Box::new(
-        HumanEmitter::new(stderr_destination(ColorConfig::Auto), translator)
-            .sm(Some(source_map)),
+        HumanEmitter::new(stderr_destination(ColorConfig::Auto), translator).sm(Some(source_map)),
     );
     DiagCtxt::new(emitter)
 }

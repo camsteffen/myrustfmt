@@ -82,10 +82,7 @@ impl FormatModuleResult {
             formatted,
         } = self;
         if error_count > 0 {
-            return Err(
-                format!("Some errors occurred. Formatted:\n{}", formatted)
-                    .into(),
-            );
+            return Err(format!("Some errors occurred. Formatted:\n{}", formatted).into());
         }
         Ok(formatted)
     }
@@ -219,8 +216,8 @@ fn format_module_file(
     config: &Config,
     on_format_module: &mut OnFormatModule,
 ) -> Result<Vec<Submodule>, ()> {
-    let result = parse_module(CrateSource::File(path), relative)
-        .map_err(|ErrorGuaranteed { .. }| ())?;
+    let result =
+        parse_module(CrateSource::File(path), relative).map_err(|ErrorGuaranteed { .. }| ())?;
     let ParseModuleResult {
         module,
         source_file,

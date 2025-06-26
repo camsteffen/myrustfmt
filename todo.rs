@@ -1,5 +1,18 @@
 // test-kind: no-change
 
+// don't wrap the if here
+fn test() {
+    items.iter().try_for_each(|item| {
+        let start = self.out.col();
+        let actual_width_limit_end =
+            if seen_wide_item {
+                width_limit_end
+            } else {
+                None
+            };
+    });
+}
+
 fn test() {
     match x {
         (x if y, y) => x,

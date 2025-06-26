@@ -45,8 +45,7 @@ pub fn version_sort(a: &str, b: &str) -> Ordering {
         cmp_iter_by(chunks(a), chunks(b), |chunk_a, chunk_b| {
             match (chunk_a, chunk_b) {
                 (Chunk::Number(a), Chunk::Number(b)) => {
-                    cmp_by_key(a, b, |c| c.bytes().take_while(|&b| b == b'0').count())
-                        .reverse()
+                    cmp_by_key(a, b, |c| c.bytes().take_while(|&b| b == b'0').count()).reverse()
                 }
                 _ => Ordering::Equal,
             }

@@ -80,8 +80,7 @@ impl AstFormatter {
     ) -> FormatResult {
         self.do_block(
             omit_open_brace,
-            (!list.is_empty())
-                .then_some(|| self.list_with_item_sorting(list, format)),
+            (!list.is_empty()).then_some(|| self.list_with_item_sorting(list, format)),
         )
     }
 
@@ -153,9 +152,7 @@ impl AstFormatter {
         tail: Tail,
         format: impl FnOnce(&ast::Expr, Tail) -> FormatResult,
     ) -> FormatResult {
-        match plain_block(expr)
-            .and_then(|b| self.try_into_optional_block(b))
-        {
+        match plain_block(expr).and_then(|b| self.try_into_optional_block(b)) {
             None => format(expr, tail),
             Some(opt_block) => {
                 self.out.token_skip("{")?;

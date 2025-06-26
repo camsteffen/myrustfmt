@@ -76,21 +76,18 @@ pub fn try_parse_macro_args(psess: &ParseSess, mac_call: &ast::MacCall) -> Optio
         .recovery(Recovery::Forbidden);
     let macro_args = parse_no_errors(parser, |parser| match std_macro {
         StdMacro::Cfg => {
-            parse_comma_sep_list(parser, Parser::parse_meta_item_inner)
-                .map(MacroArgs::Cfg)
+            parse_comma_sep_list(parser, Parser::parse_meta_item_inner).map(MacroArgs::Cfg)
         }
         StdMacro::FnLike | StdMacro::Vec => {
-            parse_comma_sep_list(parser, Parser::parse_expr)
-                .map(MacroArgs::FnLike)
+            parse_comma_sep_list(parser, Parser::parse_expr).map(MacroArgs::FnLike)
         }
         StdMacro::Format { format_string_pos } => {
-            parse_comma_sep_list(parser, Parser::parse_expr)
-                .map(|args| {
-                    MacroArgs::Format {
-                        args,
-                        format_string_pos,
-                    }
-                })
+            parse_comma_sep_list(parser, Parser::parse_expr).map(|args| {
+                MacroArgs::Format {
+                    args,
+                    format_string_pos,
+                }
+            })
         }
         StdMacro::Matches => parse_matches(parser),
         StdMacro::ThreadLocal => parse_thread_local(parser),

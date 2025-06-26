@@ -185,8 +185,8 @@ impl AstFormatter {
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     let (pat_first_line, pat_start) = self.out.line_col();
                     self.pat(pat)?;
-                    let pat_width = (self.out.line() == pat_first_line)
-                        .then(|| self.out.col() - pat_start);
+                    let pat_width =
+                        (self.out.line() == pat_first_line).then(|| self.out.col() - pat_start);
                     // todo width limit on pat + guard single line?
                     if let Some(guard) = guard {
                         // todo introduce constant

@@ -62,10 +62,8 @@ impl<Item> VerticalListStrategy<Item> {
         VerticalListStrategy {
             wrap_to_fit: Some(WrapToFit {
                 format_string_pos: None,
-                max_element_width: max_element_width.map(|v| {
-                    NonZero::new(v)
-                        .expect("wrap-to-fit max width must not be zero")
-                }),
+                max_element_width: max_element_width
+                    .map(|v| NonZero::new(v).expect("wrap-to-fit max width must not be zero")),
             }),
             ..
         }
