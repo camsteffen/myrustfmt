@@ -2,5 +2,5 @@
 
 set -e
 
-cargo build --bin myrustfmt
-RUSTFMT=./target/debug/myrustfmt RUST_BACKTRACE=1 exec cargo fmt "$@"
+cargo build --release --bin myrustfmt
+RUSTFMT=./target/release/myrustfmt RUST_BACKTRACE=1 exec cargo fmt "$@"
