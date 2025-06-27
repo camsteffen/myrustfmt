@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn test_submodules_non_relative() {
-        rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
+        rustc_span::create_session_globals_then(Edition::Edition2024, &[], None, || {
             let module = parse_module(
                 CrateSource::File(Path::new("tests/submodules_tests/non_relative/main.rs")),
                 None,
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_submodules_relative() {
-        rustc_span::create_session_globals_then(Edition::Edition2024, None, || {
+        rustc_span::create_session_globals_then(Edition::Edition2024, &[], None, || {
             let module = parse_module(
                 CrateSource::File(Path::new("tests/submodules_tests/relative/main.rs")),
                 Some(Ident::with_dummy_span(Symbol::intern("main"))),
