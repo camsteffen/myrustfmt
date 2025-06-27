@@ -2,28 +2,26 @@
 
 fn test() {
     // exactly max width
-    aaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb();
+    aaaaaaaaaaa.bbbbbbbbbb.ccccccccccccccccccccccccccccccccccc();
     // one over max width
-    aaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb();
+    aaaaaaaaaaa.bbbbbbbbbb.cccccccccccccccccccccccccccccccccccc();
 
-    // one under distance to enforce max width
-    aaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb();
-    // at distance to enforce max width
-    aaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb();
+    // over max width only one wrappable item
+    aaaaaaaaaaaaaaaaaaaaaa.ccccccccccccccccccccccccccccccccccccccc();
+    a.b.cccccccccccccccccc.ddddddddddddddddddddddddddddddddddddddd();
 }
 
 // :after:
 
 fn test() {
     // exactly max width
-    aaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb();
+    aaaaaaaaaaa.bbbbbbbbbb.ccccccccccccccccccccccccccccccccccc();
     // one over max width
-    aaaaaaaaaaaaaaaaaaaaaa
-        .bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb();
+    aaaaaaaaaaa
+        .bbbbbbbbbb
+        .cccccccccccccccccccccccccccccccccccc();
 
-    // one under distance to enforce max width
-    aaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb();
-    // at distance to enforce max width
-    aaaaaaaaaaaaaaa
-        .bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb();
+    // over max width only one wrappable item
+    aaaaaaaaaaaaaaaaaaaaaa.ccccccccccccccccccccccccccccccccccccccc();
+    a.b.cccccccccccccccccc.ddddddddddddddddddddddddddddddddddddddd();
 }

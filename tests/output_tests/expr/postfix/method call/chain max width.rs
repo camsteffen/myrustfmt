@@ -1,14 +1,15 @@
 // test-kind: before-after
 
 fn test() {
-    aaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbb(cccccccc, ccccccc)?;
-    aaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbb(cccccccc, cccccccc)?;
+    aaaaaaaaaaaaaaa.bbbbbbbbb.cccccccccccccc(aaaaaaaa, aaaaaaa)?;
+    aaaaaaaaaaaaaaa.bbbbbbbbb.cccccccccccccc(aaaaaaaa, aaaaaaaa)?;
 }
 
 // :after:
 
 fn test() {
-    aaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbb(cccccccc, ccccccc)?;
+    aaaaaaaaaaaaaaa.bbbbbbbbb.cccccccccccccc(aaaaaaaa, aaaaaaa)?;
     aaaaaaaaaaaaaaa
-        .bbbbbbbbbbbbbbbbbbbbbbbb(cccccccc, cccccccc)?;
+        .bbbbbbbbb
+        .cccccccccccccc(aaaaaaaa, aaaaaaaa)?;
 }

@@ -11,8 +11,9 @@ fn test() {
     // vertical chain
     match x {
         x => {
-            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-                .aaaaaaaaaaaaaa({
+            aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                .bbbbbbbbbbbbbbbbb
+                .cccccccccccccc({
                     let x;
                 })
         }
