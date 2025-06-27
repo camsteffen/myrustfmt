@@ -135,9 +135,10 @@ impl Constraints {
     }
 
     pub fn with_width_limit<T>(&self, width_limit: WidthLimit, scope: impl FnOnce() -> T) -> T {
-        if self.width_limit.get().is_some_and(|wl| {
-            wl.end_col <= width_limit.end_col
-        }) {
+        if let Some(wl) = self.width_limit.get()
+            && wl.line == width_limit.line
+            && wl.end_col <= width_limit.end_col
+        {
             return scope();
         }
         self.with_replace_width_limit(Some(width_limit), scope)

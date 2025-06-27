@@ -610,9 +610,10 @@ impl AstFormatter {
             self.out.token_space(keyword)?;
             self.expr(expr)?;
             self.backtrack()
-                .next_if(self.out.line() == first_line || self.out.last_line_is_closers(), || {
-                    self.with_single_line(|| self.out.space_token("{"))
-                })
+                .next_if(
+                    self.out.line() == first_line || self.out.last_line_is_closers(),
+                    || self.with_single_line(|| self.out.space_token("{")),
+                )
                 .next(|| {
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     self.out.token("{")?;

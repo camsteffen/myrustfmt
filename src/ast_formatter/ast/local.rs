@@ -28,22 +28,29 @@ impl AstFormatter {
         first_line: VSize,
         start_col: HSize,
     ) -> FormatResult {
-        let ast::Local { kind, ty, .. } = local;
-        let init_else = |af: &AstFormatter| {
-            let Some((init, else_)) = kind.init_else_opt() else {
-                return af.out.token(";");
-            };
-            af.assign_expr(init, else_.is_none().then(|| af.tail_token(";")).as_ref())?;
-            let Some(else_) = else_ else { return Ok(()) };
-            let is_single_line_init = af.out.line() == first_line;
-            af.local_else(else_, is_single_line_init, start_col)?;
-            Ok(())
-        };
-        if let Some(ty) = ty {
+        let after_ty = |af: &Self| af.local_after_ty(local, first_line, start_col);
+        if let Some(ty) = &local.ty {
             self.out.token_space(":")?;
-            return self.ty_tail(ty, Some(&self.tail_fn(init_else)));
+            self.ty_tail(ty, Some(&self.tail_fn(after_ty)))?;
+        } else {
+            after_ty(self)?;
         }
-        init_else(self)?;
+        Ok(())
+    }
+
+    fn local_after_ty(
+        &self,
+        local: &ast::Local,
+        first_line: VSize,
+        start_col: HSize,
+    ) -> FormatResult {
+        let Some((init, else_)) = local.kind.init_else_opt() else {
+            return self.out.token(";");
+        };
+        self.assign_expr(init, else_.is_none().then(|| self.tail_token(";")).as_ref())?;
+        let Some(else_) = else_ else { return Ok(()) };
+        let is_single_line_init = self.out.line() == first_line;
+        self.local_else(else_, is_single_line_init, start_col)?;
         Ok(())
     }
 
