@@ -1,4 +1,5 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::backtrack::BacktrackCtxt;
 use crate::error::FormatResult;
 use crate::num::{HSize, VSize};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -71,7 +72,7 @@ impl AstFormatter {
             let else_block_horizontal = if is_single_line_init
                 && let Some(expr_only_else) = self.try_into_optional_block(else_)
             {
-                Some(move || {
+                Some(move |_: &BacktrackCtxt| {
                     self.with_single_line(|| {
                         self.with_width_limit_end(
                             start_col + RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
@@ -88,7 +89,7 @@ impl AstFormatter {
             };
             self.backtrack()
                 .next_opt(else_block_horizontal)
-                .next(else_block_vertical)
+                .next(|_| else_block_vertical())
                 .result()?;
             Ok(())
         };
@@ -100,10 +101,11 @@ impl AstFormatter {
             Ok(())
         };
         self.backtrack()
-            .next_if(is_single_line_init || self.out.last_line_is_closers(), || {
-                self.out.with_recover_width(same_line_else)
-            })
-            .next(next_line_else)
+            .next_if(
+                is_single_line_init || self.out.last_line_is_closers(),
+                |_| self.out.with_recover_width(same_line_else),
+            )
+            .next(|_| next_line_else())
             .result()?;
         Ok(())
     }

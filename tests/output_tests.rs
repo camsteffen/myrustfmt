@@ -320,7 +320,10 @@ fn format_max_width_expected(
         println!("Stderr:\n{error_output}");
     })?;
     let errors_expected = expected_stderr.is_some();
-    handle_format_errors(&error_output, expected_stderr, expected_stderr_path)?;
+    handle_format_errors(&error_output, expected_stderr, expected_stderr_path).inspect_err(|_| {
+        // todo dedupe
+        println!("Stderr:\n{error_output}");
+    })?;
     if output.status.success() {
         if errors_expected {
             return Err("expected errors but status code was success".into());

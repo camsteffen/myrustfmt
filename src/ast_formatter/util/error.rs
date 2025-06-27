@@ -32,7 +32,7 @@ impl<T> FormatResultExt for FormatResult<T> {
                 #[cfg(debug_assertions)]
                 let backtrace = format!("\nBacktrace:\n{}", &e.backtrace);
                 #[cfg(not(debug_assertions))]
-                let backtrace = "";
+                let backtrace = "\nBacktrace omitted";
                 eprintln!(
                     "[{location}] Error: {:?}\nBuffer:\n{buf}{backtrace}", e.kind,
                 );

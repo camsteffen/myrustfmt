@@ -1,9 +1,7 @@
 pub mod checkpoint;
 
 use crate::constraints::Constraints;
-use crate::error::{
-    FormatError, FormatErrorKind, FormatResult, NewlineNotAllowedError, WidthLimitExceededError,
-};
+use crate::error::{FormatErrorKind, FormatResult, VerticalError, WidthLimitExceededError};
 use crate::error_emitter::BufferedErrorEmitter;
 use crate::num::{HSize, VSize};
 use crate::util::cell_ext::{CellExt, CellNumberExt};
@@ -103,9 +101,11 @@ impl ConstraintWriter {
         self.buffer.with_taken(|b| b.push_str(str));
     }
 
-    pub fn newline(&self) -> Result<(), NewlineNotAllowedError> {
+    pub fn newline(&self) -> FormatResult {
         if self.constraints.single_line.get() {
-            return Err(NewlineNotAllowedError);
+            return Err(
+                self.constraints.err(FormatErrorKind::Vertical(VerticalError::Newline)),
+            );
         }
         self.buffer.with_taken(|b| b.push('\n'));
         self.last_line_start.set(self.len());
@@ -124,7 +124,7 @@ impl ConstraintWriter {
         // If there is a fallback formatting strategy, then raise an error to trigger the
         // fallback. Otherwise, emit an error and keep going.
         if self.is_enforcing_width() {
-            Err(FormatError::new(FormatErrorKind::WidthLimitExceeded))
+            Err(self.constraints.err(FormatErrorKind::WidthLimitExceeded))
         } else {
             let line = self.line.get();
             if self.last_width_exceeded_line.get() != Some(line) {

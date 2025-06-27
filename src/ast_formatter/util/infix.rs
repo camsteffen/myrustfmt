@@ -32,7 +32,7 @@ impl AstFormatter {
     ) -> FormatResult {
         let (first, rest) = items.split_first().unwrap();
         self.backtrack()
-            .next(|| {
+            .next(|_| {
                 self.with_single_line(|| {
                     format_item(first)?;
                     for item in rest {
@@ -43,7 +43,7 @@ impl AstFormatter {
                     Ok(())
                 })
             })
-            .next(|| {
+            .next(|_| {
                 format_item(first)?;
                 self.indented_optional(should_indent, || {
                     for item in rest {

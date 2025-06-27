@@ -159,7 +159,7 @@ impl AstFormatter {
         tail: Tail,
     ) -> FormatResult {
         self.backtrack()
-            .next(|| {
+            .next(|_| {
                 self.with_single_line(|| {
                     self.with_width_limit(RUSTFMT_CONFIG_DEFAULTS.fn_call_width, || {
                         self.expr(expr)?;
@@ -177,7 +177,7 @@ impl AstFormatter {
                     Ok(())
                 })
             })
-            .next(|| {
+            .next(|_| {
                 self.indented(|| {
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     self.expr(expr)?;
@@ -192,7 +192,7 @@ impl AstFormatter {
                         // todo introduce constant
                         let allow_same_line = pat_width.is_some_and(|w| w <= 40);
                         self.backtrack()
-                            .next_if(allow_same_line, || {
+                            .next_if(allow_same_line, |_| {
                                 self.could_wrap_indent(|| {
                                     self.out.space_token_space("if")?;
                                     self.expr(guard)?;
@@ -200,7 +200,7 @@ impl AstFormatter {
                                     Ok(())
                                 })
                             })
-                            .next(|| {
+                            .next(|_| {
                                 self.indented(|| {
                                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                                     self.out.token_space("if")?;

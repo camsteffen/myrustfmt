@@ -27,6 +27,7 @@ pub struct TailS<'a> {
     disallowed_vstructs: VStructSet,
     single_line: bool,
     width_limit: Option<WidthLimit>,
+    constraint_version: u32,
 }
 
 // Tail creation
@@ -37,6 +38,7 @@ impl AstFormatter {
             disallowed_vstructs: self.constraints().disallowed_vstructs.get(),
             single_line: self.constraints().single_line.get(),
             width_limit: self.constraints().width_limit.get(),
+            constraint_version: self.constraints().version.get(),
         }
     }
 
@@ -48,14 +50,18 @@ impl AstFormatter {
 impl AstFormatter {
     pub fn tail(&self, tail: Tail) -> FormatResult {
         let Some(tail) = tail else { return Ok(()) };
-        self.constraints()
-            .disallowed_vstructs
-            .with_replaced(tail.disallowed_vstructs, || {
-                self.constraints()
-                    .single_line
-                    .with_replaced(tail.single_line, || {
-                        self.with_replace_width_limit(tail.width_limit, || (tail.func)(self))
-                    })
-            })
+        let _guard = self.constraints().version.replace_guard(
+            tail.constraint_version,
+        );
+        let _guard = self.constraints().disallowed_vstructs.replace_guard(
+            tail.disallowed_vstructs,
+        );
+        let _guard = self.constraints().single_line.replace_guard(
+            tail.single_line,
+        );
+        let _guard = self.constraints().width_limit.replace_guard(
+            tail.width_limit,
+        );
+        (tail.func)(self)
     }
 }

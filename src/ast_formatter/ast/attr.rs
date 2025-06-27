@@ -65,7 +65,10 @@ impl AstFormatter {
             // todo test all these outputs
             FormatErrorKind::Vertical(vertical)
             // todo propagate VStruct?
-            | FormatErrorKind::VStruct { cause: vertical } => match vertical {
+            | FormatErrorKind::VStruct {
+                cause: vertical,
+                ..
+            } => match vertical {
                 VerticalError::LineComment => self.errors.line_comment_not_allowed(line, col),
                 VerticalError::MultiLineComment => {
                     self.errors.multi_line_comment_not_allowed(line, col)

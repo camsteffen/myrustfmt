@@ -58,7 +58,7 @@ impl AstFormatter {
             }
             self.backtrack()
                 // format all on one line, only if the first item fits in one line
-                .next_if(self.out.line() == first_line, || {
+                .next_if(self.out.line() == first_line, |_| {
                     self.with_single_line(|| {
                         for (op, expr) in chain {
                             self.out.space_token_space(op.as_str())?;
@@ -68,7 +68,7 @@ impl AstFormatter {
                         Ok(())
                     })
                 })
-                .next(|| {
+                .next(|_| {
                     let _indent_guard = indent_guard.unwrap_or_else(|| self.begin_indent());
                     self.binary_vertical(chain, tail)?;
                     Ok(())

@@ -1,6 +1,19 @@
 use crate::ast_formatter::AstFormatter;
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::source_formatter::checkpoint::Checkpoint;
+use std::cell::Cell;
+
+// todo can we use this more?
+#[derive(Debug, Default)]
+pub struct BacktrackCtxt {
+    pub can_recover: Cell<bool>,
+}
+
+impl BacktrackCtxt {
+    pub fn mark_can_recover(&self) {
+        self.can_recover.set(true);
+    }
+}
 
 impl AstFormatter {
     pub fn backtrack<'a, T>(&self) -> Backtrack<'_, 'a, T> {
@@ -13,11 +26,11 @@ impl AstFormatter {
 
 pub struct Backtrack<'a, 's, T> {
     af: &'a AstFormatter,
-    strategies: Vec<Box<dyn FnOnce() -> FormatResult<T> + 's>>,
+    strategies: Vec<Box<dyn FnOnce(&BacktrackCtxt) -> FormatResult<T> + 's>>,
 }
 
 impl<'s, T> Backtrack<'_, 's, T> {
-    pub fn next(mut self, strategy: impl FnOnce() -> FormatResult<T> + 's) -> Self {
+    pub fn next(mut self, strategy: impl FnOnce(&BacktrackCtxt) -> FormatResult<T> + 's) -> Self {
         self.strategies.push(Box::new(strategy));
         self
     }
@@ -25,7 +38,7 @@ impl<'s, T> Backtrack<'_, 's, T> {
     pub fn next_if(
         mut self,
         condition: bool,
-        strategy: impl FnOnce() -> FormatResult<T> + 's,
+        strategy: impl FnOnce(&BacktrackCtxt) -> FormatResult<T> + 's,
     ) -> Self {
         if condition {
             self.strategies.push(Box::new(strategy));
@@ -33,7 +46,10 @@ impl<'s, T> Backtrack<'_, 's, T> {
         self
     }
 
-    pub fn next_opt(mut self, strategy: Option<impl FnOnce() -> FormatResult<T> + 's>) -> Self {
+    pub fn next_opt(
+        mut self,
+        strategy: Option<impl FnOnce(&BacktrackCtxt) -> FormatResult<T> + 's>,
+    ) -> Self {
         if let Some(strategy) = strategy {
             self.strategies.push(Box::new(strategy));
         }
@@ -53,11 +69,12 @@ impl<'s, T> Backtrack<'_, 's, T> {
     }
 
     fn result_inner(self, checkpoint: Option<&Checkpoint>) -> FormatResult<T> {
+        let bctx = BacktrackCtxt::default();
         let mut iter = self.strategies.into_iter();
         let first = iter.next().expect("must provide at least one strategy");
         if iter.len() == 0 {
             // avoid creating a checkpoint if there is only one strategy
-            return first();
+            return first(&bctx);
         }
         let new_checkpoint;
         let checkpoint = match checkpoint {
@@ -67,13 +84,16 @@ impl<'s, T> Backtrack<'_, 's, T> {
                 &new_checkpoint
             }
         };
-        let mut result = first();
+        let mut result = first(&bctx);
         for strategy in iter {
             let is_done = match &result {
                 Ok(_) => true,
+                Err(_) if bctx.can_recover.get() => false,
                 Err(e) => match e.kind {
                     FormatErrorKind::UnsupportedSyntax => true,
+                    // todo can we abort in more cases?
                     FormatErrorKind::Vertical(_) => self.af.constraints().single_line.get(),
+                    FormatErrorKind::VStruct { .. } => true,
                     _ => false,
                 },
             };
@@ -81,7 +101,7 @@ impl<'s, T> Backtrack<'_, 's, T> {
                 break;
             }
             self.af.out.restore_checkpoint(&checkpoint);
-            result = strategy();
+            result = strategy(&bctx);
         }
         result
     }

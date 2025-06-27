@@ -105,7 +105,7 @@ impl AstFormatter {
                 self.generic_bounds(&pred.bounds, None)?;
             }
             ast::WherePredicateKind::EqPredicate(_) => {
-                return Err(FormatErrorKind::UnsupportedSyntax.into());
+                return Err(self.err(FormatErrorKind::UnsupportedSyntax));
             }
         }
         Ok(())

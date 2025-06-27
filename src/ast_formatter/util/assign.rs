@@ -13,7 +13,7 @@ impl AstFormatter {
         let force_wrap = if self.out.with_recover_width(|| self.out.space()).is_err() {
             true
         } else {
-            match self.simulate_wrap_indent(0, || self.expr_tail(expr, tail)) {
+            match self.simulate_wrap_indent(0, || self.expr_tail(expr, tail))? {
                 SimulateWrapResult::Ok => return Ok(()),
                 SimulateWrapResult::NoWrap | SimulateWrapResult::WrapForLongerFirstLine => false,
                 SimulateWrapResult::WrapForSingleLine
@@ -23,14 +23,14 @@ impl AstFormatter {
 
         self.out.restore_checkpoint(&checkpoint_after_eq);
         self.backtrack()
-            .next_if(!force_wrap, || {
+            .next_if(!force_wrap, |_| {
                 self.space_could_wrap_indent(|| {
                     self.expr(expr)?;
                     self.tail(tail)?;
                     Ok(())
                 })
             })
-            .next(|| {
+            .next(|_| {
                 self.indented(|| {
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     self.expr_tail(expr, tail)?;

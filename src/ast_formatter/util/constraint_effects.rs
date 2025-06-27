@@ -1,6 +1,7 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::backtrack::BacktrackCtxt;
 use crate::constraints::{Constraints, VStruct, VStructSet, WidthLimit};
-use crate::error::{FormatErrorKind, FormatResult};
+use crate::error::{FormatError, FormatErrorKind, FormatResult};
 use crate::num::HSize;
 use crate::util::cell_ext::CellExt;
 use std::num::NonZero;
@@ -16,11 +17,12 @@ macro_rules! delegate_to_constraints {
 }
 
 delegate_to_constraints! {
+    pub fn err(&self, kind: FormatErrorKind) -> FormatError;
     pub fn with_replace_width_limit<T>(&self, width_limit: Option<WidthLimit>, scope: impl FnOnce() -> T) -> T;
 
     // vertical structures
     pub fn allow_vstructs(&self, values: impl Into<VStructSet>, scope: impl FnOnce() -> FormatResult) -> FormatResult;
-    pub fn disallow_vstructs(&self, values: impl Into<VStructSet>, scope: impl FnOnce() -> FormatResult) -> FormatResult;
+    pub fn disallow_vstructs(&self, bctx: &BacktrackCtxt, values: impl Into<VStructSet>, scope: impl FnOnce() -> FormatResult) -> FormatResult;
     pub fn has_vstruct<T>(&self, vstruct: VStruct, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
 }
 
@@ -86,7 +88,7 @@ impl AstFormatter {
     ) -> FormatResult<T> {
         let line = self.out.line();
         if self.out.col() > end_col {
-            return Err(FormatErrorKind::WidthLimitExceeded.into());
+            return Err(self.err(FormatErrorKind::WidthLimitExceeded));
         }
         let end_col = NonZero::new(end_col).expect("width limit end should not be zero");
         let limit = WidthLimit { end_col, line };

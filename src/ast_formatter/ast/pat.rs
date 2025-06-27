@@ -106,7 +106,7 @@ impl AstFormatter {
             ast::PatKind::Box(_)
             | ast::PatKind::Deref(_)
             | ast::PatKind::Guard(..)
-            | ast::PatKind::Never => return Err(FormatErrorKind::UnsupportedSyntax.into()),
+            | ast::PatKind::Never => return Err(self.err(FormatErrorKind::UnsupportedSyntax)),
             ast::PatKind::Err(_) | ast::PatKind::Missing => panic!("unexpected PatKind"),
         }
 

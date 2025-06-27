@@ -117,14 +117,14 @@ fn module_parser<'a>(psess: &'a ParseSess, source: CrateSource) -> Parser<'a> {
 mod tests {
     use crate::CrateSource;
     use crate::parse::parse_module;
+    use crate::util::rustc::init_rustc_globals;
     use rustc_span::Symbol;
-    use rustc_span::edition::Edition;
     use rustc_span::symbol::Ident;
     use std::path::Path;
 
     #[test]
     fn test_submodules_non_relative() {
-        rustc_span::create_session_globals_then(Edition::Edition2024, &[], None, || {
+        init_rustc_globals(|| {
             let module = parse_module(
                 CrateSource::File(Path::new("tests/submodules_tests/non_relative/main.rs")),
                 None,
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_submodules_relative() {
-        rustc_span::create_session_globals_then(Edition::Edition2024, &[], None, || {
+        init_rustc_globals(|| {
             let module = parse_module(
                 CrateSource::File(Path::new("tests/submodules_tests/relative/main.rs")),
                 Some(Ident::with_dummy_span(Symbol::intern("main"))),

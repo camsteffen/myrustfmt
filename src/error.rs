@@ -1,3 +1,4 @@
+use crate::constraints::VStruct;
 use crate::rustc_span::Pos;
 use crate::util::display::display_from_fn;
 use crate::util::line_col::line_col;
@@ -13,22 +14,18 @@ pub struct FormatError {
     pub kind: FormatErrorKind,
     #[cfg(debug_assertions)]
     pub backtrace: Box<Backtrace>,
+    pub context_version: u32,
 }
 
 impl FormatError {
-    pub fn new(kind: FormatErrorKind) -> FormatError {
-        FormatError {
-            kind,
-            #[cfg(debug_assertions)]
-            backtrace: Box::new(Backtrace::capture()),
-        }
-    }
-
-    fn backtrace(&self) -> Option<&Backtrace> {
+    fn backtrace(&self) -> &Backtrace {
         #[cfg(debug_assertions)]
-        { Some(&self.backtrace) }
+        { &self.backtrace }
         #[cfg(not(debug_assertions))]
-        { None }
+        {
+            static DISABLED: Backtrace = Backtrace::disabled();
+            &DISABLED
+        }
     }
 }
 
@@ -36,10 +33,14 @@ impl FormatError {
 pub enum FormatErrorKind {
     /// Used to explicitly fail the current strategy for implementation-specific reasons
     Logical,
+    // todo propagate this error when using checkpoints
     UnsupportedSyntax,
     Vertical(VerticalError),
-    // todo do we actually need cause here or on other variants? debug only?
-    VStruct { cause: VerticalError },
+    // todo do we actually need cause here? debug only?
+    VStruct {
+        vstruct: VStruct,
+        cause: VerticalError,
+    },
     WidthLimitExceeded,
 }
 
@@ -50,9 +51,6 @@ pub enum VerticalError {
     MultiLineComment,
     Newline,
 }
-
-#[derive(Clone, Copy, Debug)]
-pub struct NewlineNotAllowedError;
 
 #[derive(Clone, Copy, Debug)]
 pub struct WidthLimitExceededError;
@@ -79,25 +77,16 @@ fn write_constraint_error(
     pos: BytePos,
     path: Option<&Path>,
 ) -> std::fmt::Result {
-    write!(f, "{}, ", error_formatting_at(source, pos, path))?;
-    match e.kind {
-        FormatErrorKind::Vertical(vertical) | FormatErrorKind::VStruct { cause: vertical } => {
-            match vertical {
-                VerticalError::LineComment => write!(f, "line comment not allowed")?,
-                VerticalError::MultiLineComment => write!(f, "multi-line comment not allowed")?,
-                VerticalError::Newline => write!(f, "newline not allowed")?,
-            }
-        }
-        kind @ FormatErrorKind::Logical => write!(f, "unhandled {kind:?}")?,
-        FormatErrorKind::WidthLimitExceeded => write!(f, "width limit exceeded")?,
-        FormatErrorKind::UnsupportedSyntax => write!(f, "unsupported syntax")?,
-    }
+    write!(
+        f,
+        "{}: {:?}",
+        error_formatting_at(source, pos, path),
+        e.kind,
+    )?;
     if cfg!(debug_assertions) && path.is_none() {
         write!(f, "\nSource:\n{source}")?;
     }
-    if let Some(backtrace) = e.backtrace() {
-        write!(f, "\nformat error backtrace:\n{backtrace}")?;
-    }
+    write!(f, "\nformat error backtrace:\n{}", e.backtrace())?;
     Ok(())
 }
 
@@ -162,38 +151,8 @@ impl FormatError {
     }
 }
 
-impl From<FormatErrorKind> for FormatError {
-    fn from(kind: FormatErrorKind) -> Self {
-        FormatError::new(kind)
-    }
-}
-
-impl From<NewlineNotAllowedError> for FormatErrorKind {
-    fn from(_: NewlineNotAllowedError) -> Self {
-        FormatErrorKind::Vertical(VerticalError::Newline)
-    }
-}
-
-impl From<NewlineNotAllowedError> for FormatError {
-    fn from(error: NewlineNotAllowedError) -> Self {
-        FormatErrorKind::from(error).into()
-    }
-}
-
 impl From<WidthLimitExceededError> for FormatErrorKind {
     fn from(_: WidthLimitExceededError) -> Self {
         FormatErrorKind::WidthLimitExceeded
-    }
-}
-
-impl From<WidthLimitExceededError> for FormatError {
-    fn from(e: WidthLimitExceededError) -> Self {
-        FormatErrorKind::from(e).into()
-    }
-}
-
-impl From<VerticalError> for FormatError {
-    fn from(err: VerticalError) -> Self {
-        FormatErrorKind::Vertical(err).into()
     }
 }

@@ -51,13 +51,15 @@ impl AstFormatter {
             let first_line = self.out.line();
             match closure.binder {
                 ast::ClosureBinder::For { .. } => {
-                    return Err(FormatErrorKind::UnsupportedSyntax.into());
+                    return Err(self.err(FormatErrorKind::UnsupportedSyntax));
                 }
                 ast::ClosureBinder::NotPresent => {}
             }
             match closure.capture_clause {
                 ast::CaptureBy::Ref => {}
-                ast::CaptureBy::Use { .. } => return Err(FormatErrorKind::UnsupportedSyntax.into()),
+                ast::CaptureBy::Use { .. } => {
+                    return Err(self.err(FormatErrorKind::UnsupportedSyntax));
+                }
                 ast::CaptureBy::Value { .. } => self.out.token_space("move")?,
             }
             self.constness(closure.constness)?;
@@ -110,16 +112,18 @@ impl AstFormatter {
         }
         self.skip_single_expr_blocks_tail(body, tail, |body, tail| {
             self.backtrack()
-                .next(|| {
+                .next(|bctx| {
                     self.could_wrap_indent(|| {
                         let disallowed_vstructs = VStruct::Closure
                             | VStruct::ControlFlow
                             | VStruct::List
                             | VStruct::NonBlockIndent;
-                        self.disallow_vstructs(disallowed_vstructs, || self.expr_tail(body, tail))
+                        self.disallow_vstructs(bctx, disallowed_vstructs, || {
+                            self.expr_tail(body, tail)
+                        })
                     })
                 })
-                .next(|| {
+                .next(|_| {
                     self.add_block(|| self.expr_stmt(body))?;
                     self.tail(tail)?;
                     Ok(())
@@ -242,20 +246,20 @@ impl AstFormatter {
             }
             return self
                 .backtrack()
-                .next(|| self.out.with_recover_width(|| return_ty_tail(true, false)))
-                .next(|| return_ty_tail(false, true))
+                .next(|_| self.out.with_recover_width(|| return_ty_tail(true, false)))
+                .next(|_| return_ty_tail(false, true))
                 .result();
         }
 
         // there are one or more args
         self.backtrack()
-            .next(|| {
+            .next(|_| {
                 self.out.with_recover_width(|| {
                     args(false)?;
                     return_ty_tail(true, false)
                 })
             })
-            .next(|| {
+            .next(|_| {
                 args(true)?;
                 return_ty_tail(false, false)
             })

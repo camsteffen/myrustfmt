@@ -50,12 +50,12 @@ impl AstFormatter {
         } else {
             let width_limit_end = (chain.len() > 1).then(|| start_col + POSTFIX_CHAIN_MAX_WIDTH);
             self.backtrack()
-                .next(|| {
+                .next(|_| {
                     self.out.with_recover_width(|| {
                         self.postfix_chain_horizontal(chain, width_limit_end, tail)
                     })
                 })
-                .next(|| {
+                .next(|_| {
                     self.has_vstruct(VStruct::NonBlockIndent, || {
                         self.indented(|| self.postfix_chain_vertical(chain, tail))
                     })
@@ -158,7 +158,7 @@ impl AstFormatter {
         // We may or may not have been able to format the method call horizontally. Either way,
         // next we'll simulate wrapping the method call as if in a vertical chain.
         let wrap_result = self.with_width_limit_end_opt(width_limit_end, || {
-            Ok(self.simulate_wrap_indent(width_before_args, || {
+            self.simulate_wrap_indent(width_before_args, || {
                 self.method_call_args_postfix_tail(
                     method_call,
                     ListStrategies::flexible_overflow(),
@@ -166,7 +166,7 @@ impl AstFormatter {
                     tail,
                 )?;
                 Ok(())
-            }))
+            })
         })?;
 
         // This is a very complex decision tree! One unifying theme is that vertical chains are
@@ -185,14 +185,14 @@ impl AstFormatter {
                 if let Some((horizontal_args_height, horizontal_args_lookahead)) = horizontal_args {
                     if vertical_chain_height <= horizontal_args_height {
                         // A vertical chain is at least as short as a horizontal chain with overflow
-                        return Err(FormatErrorKind::Logical.into());
+                        return Err(self.err(FormatErrorKind::Logical));
                     }
                     // Use a horizontal chain with horizontal method call arguments with overflow
                     self.out.restore_lookahead(horizontal_args_lookahead);
                 } else {
                     let vertical_args_height = (2 + method_call.args.len()) as VSize;
                     if vertical_chain_height <= vertical_args_height {
-                        return Err(FormatErrorKind::Logical.into());
+                        return Err(self.err(FormatErrorKind::Logical.into()));
                     }
                     // Use a horizontal chain with vertical method call arguments.
                     self.out.restore_checkpoint(&checkpoint);
@@ -223,7 +223,7 @@ impl AstFormatter {
             SimulateWrapResult::WrapForLongerFirstLine
                 if wrappable_items <= method_call.args.len() + 1 =>
             {
-                return Err(FormatErrorKind::Logical.into());
+                return Err(self.err(FormatErrorKind::Logical.into()));
             }
 
             // We couldn't do horizontal method call arguments, but we can still try vertical, and
@@ -240,7 +240,7 @@ impl AstFormatter {
 
             // Use a vertical chain if it has less excess width.
             SimulateWrapResult::WrapForLessExcessWidth => {
-                return Err(FormatErrorKind::Logical.into());
+                return Err(self.err(FormatErrorKind::Logical.into()));
             }
         }
         Ok(())
@@ -336,7 +336,7 @@ impl AstFormatter {
                 ast::ExprKind::Index(_, ref index, _) => {
                     self.out.token("[")?;
                     self.backtrack()
-                        .next(|| {
+                        .next(|_| {
                             self.with_single_line(|| {
                                 self.expr(index)?;
                                 self.out.token("]")?;
@@ -344,7 +344,7 @@ impl AstFormatter {
                                 Ok(())
                             })
                         })
-                        .next(|| {
+                        .next(|_| {
                             self.has_vstruct(VStruct::Index, || {
                                 self.enclosed_contents(|| self.expr(index))?;
                                 self.out.token("]")?;

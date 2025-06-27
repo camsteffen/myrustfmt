@@ -3,6 +3,7 @@ mod r#match;
 mod postfix;
 
 use crate::ast_formatter::ast::r#macro::MacCallSemi;
+use crate::ast_formatter::backtrack::BacktrackCtxt;
 use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::ListItemContext;
 use crate::ast_formatter::list::ListRest;
@@ -117,7 +118,7 @@ impl AstFormatter {
             | ast::ExprKind::UnsafeBinderCast(..)
             | ast::ExprKind::Use(..)
             | ast::ExprKind::Yeet(_)
-            | ast::ExprKind::Yield(_) => return Err(FormatErrorKind::UnsupportedSyntax.into()),
+            | ast::ExprKind::Yield(_) => return Err(self.err(FormatErrorKind::UnsupportedSyntax)),
             ast::ExprKind::Dummy
             | ast::ExprKind::Err(_)
             | ast::ExprKind::IncludedBytes(_)
@@ -225,7 +226,7 @@ impl AstFormatter {
                         // really it's anything that isn't a closure
                         vstructs |= VStruct::Block | VStruct::List | VStruct::Match;
                     }
-                    af.disallow_vstructs(vstructs, || af.expr_tail(expr, tail))?;
+                    af.disallow_vstructs(lcx.bctx, vstructs, || af.expr_tail(expr, tail))?;
                 } else {
                     af.expr_tail(expr, tail)?;
                 }
@@ -244,7 +245,7 @@ impl AstFormatter {
     fn cast(&self, target: &ast::Expr, ty: &ast::Ty, tail: Tail) -> FormatResult {
         self.expr(target)?;
         self.backtrack()
-            .next(|| {
+            .next(|_| {
                 self.space_could_wrap_indent(|| {
                     self.out.token_space("as")?;
                     self.ty(ty)?;
@@ -252,7 +253,7 @@ impl AstFormatter {
                     Ok(())
                 })
             })
-            .next(|| {
+            .next(|_| {
                 self.has_vstruct(VStruct::NonBlockIndent, || {
                     self.indented(|| {
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
@@ -290,7 +291,7 @@ impl AstFormatter {
             // todo comments
             let wrapped_iter = self
                 .backtrack()
-                .next(|| {
+                .next(|_| {
                     self.could_wrap_indent(|| {
                         self.out.space_token_space("in")?;
                         self.expr_tail(
@@ -304,7 +305,7 @@ impl AstFormatter {
                         Ok(false)
                     })
                 })
-                .next(|| {
+                .next(|_| {
                     self.indented(|| {
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         self.out.token_space("in")?;
@@ -342,7 +343,7 @@ impl AstFormatter {
                 let block_expr = self.try_into_optional_block(block)?;
                 let else_expr = self.try_into_optional_block(else_block)?;
 
-                Some(move || {
+                Some(move |_: &BacktrackCtxt| {
                     self.with_single_line(|| {
                         self.with_width_limit_end(
                             start_col + RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
@@ -383,7 +384,7 @@ impl AstFormatter {
 
             self.backtrack()
                 .next_opt(single_line)
-                .next(multi_line)
+                .next(|_| multi_line())
                 .result()
         })
     }
@@ -421,8 +422,8 @@ impl AstFormatter {
     fn paren(&self, inner: &ast::Expr, tail: Tail) -> FormatResult {
         self.out.token("(")?;
         self.backtrack()
-            .next(|| {
-                self.disallow_vstructs(VStruct::NonBlockIndent, || {
+            .next(|bctx| {
+                self.disallow_vstructs(bctx, VStruct::NonBlockIndent, || {
                     let expr_start = self.out.col();
                     self.expr_tail(
                         inner,
@@ -457,7 +458,7 @@ impl AstFormatter {
                     )
                 })
             })
-            .next(|| {
+            .next(|_| {
                 self.enclosed_contents(|| self.expr(inner))?;
                 self.out.token(")")?;
                 self.tail(tail)?;
@@ -612,9 +613,9 @@ impl AstFormatter {
             self.backtrack()
                 .next_if(
                     self.out.line() == first_line || self.out.last_line_is_closers(),
-                    || self.with_single_line(|| self.out.space_token("{")),
+                    |_| self.with_single_line(|| self.out.space_token("{")),
                 )
-                .next(|| {
+                .next(|_| {
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     self.out.token("{")?;
                     Ok(())

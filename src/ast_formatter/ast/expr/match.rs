@@ -81,10 +81,10 @@ impl AstFormatter {
             })
         };
         self.backtrack()
-            .next_if(self.out.line() == first_line, || {
+            .next_if(self.out.line() == first_line, |_| {
                 self.could_wrap_indent(single_line_guard)
             })
-            .next(next_line_guard)
+            .next(|_| next_line_guard())
             .result()?;
         Ok(())
     }
@@ -101,7 +101,7 @@ impl AstFormatter {
 
     fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
         let checkpoint = self.out.checkpoint();
-        let force_block = match self.simulate_wrap_indent(0, || self.expr(body)) {
+        let force_block = match self.simulate_wrap_indent(0, || self.expr(body))? {
             SimulateWrapResult::Ok => {
                 if self
                     .out
@@ -120,12 +120,12 @@ impl AstFormatter {
         };
         self.out.restore_checkpoint(&checkpoint);
         self.backtrack()
-            .next_if(!force_block, || {
-                self.disallow_vstructs(VStruct::ControlFlow | VStruct::NonBlockIndent, || {
+            .next_if(!force_block, |bctx| {
+                self.disallow_vstructs(bctx, VStruct::ControlFlow | VStruct::NonBlockIndent, || {
                     self.expr_tail(body, Some(&self.tail_fn(|af| af.out.token_insert(","))))
                 })
             })
-            .next(|| self.add_block(|| self.expr_stmt(body)))
+            .next(|_| self.add_block(|| self.expr_stmt(body)))
             .result_with_checkpoint(&checkpoint)?;
         Ok(())
     }

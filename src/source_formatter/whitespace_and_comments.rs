@@ -1,4 +1,4 @@
-use crate::error::{FormatResult, VerticalError};
+use crate::error::{FormatErrorKind, FormatResult, VerticalError};
 use crate::source_formatter::SourceFormatter;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_lexer::{FrontmatterAllowed, TokenKind};
@@ -151,9 +151,13 @@ impl WhitespaceContext<'_> {
     fn comment_token(&self, str: &str, is_line_comment: bool) -> FormatResult {
         if matches!(self.mode, WhitespaceMode::Horizontal { .. }) {
             if is_line_comment {
-                return Err(VerticalError::LineComment.into());
+                return Err(self.sf.constraints().err(FormatErrorKind::Vertical(
+                    VerticalError::LineComment,
+                )));
             } else if str.contains('\n') {
-                return Err(VerticalError::MultiLineComment.into());
+                return Err(self.sf.constraints().err(FormatErrorKind::Vertical(
+                    VerticalError::MultiLineComment,
+                )));
             }
         }
         if is_line_comment {
@@ -203,7 +207,9 @@ impl WhitespaceContext<'_> {
                         // todo add a test - probably necessary for accurate error output
                         self.advance_source(newline_pos as u32);
                     }
-                    return Err(VerticalError::Newline.into());
+                    return Err(self.sf.constraints().err(FormatErrorKind::Vertical(
+                        VerticalError::Newline,
+                    )));
                 }
                 if space {
                     self.emit_space(len)?;

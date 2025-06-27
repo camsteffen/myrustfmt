@@ -33,14 +33,14 @@ impl AstFormatter {
             }
             Some(expr_only_block) => {
                 self.backtrack()
-                    .next(|| {
+                    .next(|_| {
                         self.with_single_line(|| {
                             self.optional_block_horizontal_after_open_brace(expr_only_block)?;
                             self.tail(tail)?;
                             Ok(())
                         })
                     })
-                    .next(|| {
+                    .next(|_| {
                         self.block_expr(true, block)?;
                         self.tail(tail)?;
                         Ok(())

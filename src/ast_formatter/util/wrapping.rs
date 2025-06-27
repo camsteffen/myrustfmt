@@ -6,7 +6,7 @@ use crate::whitespace::VerticalWhitespaceMode;
 impl AstFormatter {
     /// If the current position is farther right compared to the position if wrap-indented, then
     /// width is recoverable for the given scope.
-    pub fn could_wrap_indent<T>(&self, scope: impl Fn() -> FormatResult<T>) -> FormatResult<T> {
+    pub fn could_wrap_indent<T>(&self, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
         if self.out.col() <= self.out.total_indent.get() + INDENT_WIDTH {
             scope()
         } else {

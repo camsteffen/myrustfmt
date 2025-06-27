@@ -1,7 +1,10 @@
-use crate::error::{FormatErrorKind, FormatResult};
+use crate::ast_formatter::backtrack::BacktrackCtxt;
+use crate::error::{FormatError, FormatErrorKind, FormatResult};
 use crate::num::{HSize, VSize};
-use crate::util::cell_ext::CellExt;
+use crate::util::cell_ext::{CellExt, CellNumberExt};
 use enumset::{EnumSet, EnumSetType};
+#[cfg(debug_assertions)]
+use std::backtrace::Backtrace;
 use std::cell::Cell;
 use std::num::NonZero;
 
@@ -22,7 +25,9 @@ pub struct Constraints {
     pub recover_width: Cell<Option<VSize>>,
     // todo using SingleLine to measure the width of the first line should ignore trailing line comments
     pub single_line: Cell<bool>,
+    // todo add function to get width limit only if current line
     pub width_limit: Cell<Option<WidthLimit>>,
+    pub version: Cell<u32>,
 }
 
 /// Width limit imposed on a specific node or range as part of formatting logic.
@@ -72,6 +77,16 @@ impl Constraints {
             recover_width: Cell::new(None),
             single_line: Cell::new(false),
             width_limit: Cell::new(None),
+            version: Cell::new(0),
+        }
+    }
+
+    pub fn err(&self, kind: FormatErrorKind) -> FormatError {
+        FormatError {
+            kind,
+            #[cfg(debug_assertions)]
+            backtrace: Box::new(Backtrace::capture()),
+            context_version: self.version.get(),
         }
     }
 
@@ -99,12 +114,21 @@ impl Constraints {
 
     pub fn disallow_vstructs(
         &self,
+        bctx: &BacktrackCtxt,
         values: impl Into<VStructSet>,
         scope: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
-        let mut next = self.disallowed_vstructs.get();
-        next.insert_all(values.into());
-        self.disallowed_vstructs.with_replaced(next, scope)
+        let prev = self.disallowed_vstructs.get();
+        let values = values.into();
+        self.disallowed_vstructs
+            .with_replaced(prev | values, scope)
+            .inspect_err(|e| {
+                if let FormatErrorKind::VStruct { vstruct, .. } = e.kind
+                    && values.contains(vstruct)
+                {
+                    bctx.mark_can_recover();
+                }
+            })
     }
 
     /// Declares that the output in the given scope has the given VStruct.
@@ -121,17 +145,21 @@ impl Constraints {
         vstruct: VStruct,
         scope: impl FnOnce() -> FormatResult<T>,
     ) -> FormatResult<T> {
+        // todo can't short circuit if single line mode b/c of `|| for x in y`
         if !self.disallowed_vstructs.get().contains(vstruct) {
             return scope();
         }
-        self.single_line
-            .with_replaced(true, scope)
-            .map_err(|mut err| {
-                if let FormatErrorKind::Vertical(cause) = err.kind {
-                    err.kind = FormatErrorKind::VStruct { cause };
-                }
-                err
-            })
+        let _guard = self.version.increment_guard();
+        let version = self.version.get();
+        let _guard = self.single_line.replace_guard(true);
+        scope().map_err(|mut err| {
+            if let FormatErrorKind::Vertical(cause) = err.kind
+                && err.context_version >= version
+            {
+                err.kind = FormatErrorKind::VStruct { cause, vstruct };
+            }
+            err
+        })
     }
 
     pub fn with_width_limit<T>(&self, width_limit: WidthLimit, scope: impl FnOnce() -> T) -> T {

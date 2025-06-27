@@ -15,3 +15,6 @@ TDD every tail usage
 
 have an explicit rustfmt replacement mode that works with cargo fmt;
 otherwise don't support the extra parameters
+
+
+use more guards instead of closures

@@ -5,6 +5,7 @@ mod rest;
 pub use self::list_item_context::ListItemContext;
 pub use self::rest::ListRest;
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::backtrack::BacktrackCtxt;
 use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::options::{
     FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy,
@@ -13,9 +14,10 @@ use crate::ast_formatter::list::options::{
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
 use crate::constraints::VStruct;
-use crate::error::{FormatError, FormatErrorKind, FormatResult};
+use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::VSize;
 use crate::source_formatter::checkpoint::Checkpoint;
+use crate::util::cell_ext::CellNumberExt;
 use crate::whitespace::VerticalWhitespaceMode;
 use std::cell::Cell;
 
@@ -64,7 +66,7 @@ where
             }
             match self.opt.strategies {
                 ListStrategies::Horizontal(horizontal) => {
-                    self.list_horizontal(horizontal, false).map_err(|e| e.error)?
+                    self.list_horizontal(horizontal, &BacktrackCtxt::default(), false)?
                 }
                 ListStrategies::Vertical(_) => {
                     self.list_vertical(None)?;
@@ -87,20 +89,22 @@ where
             return self.list_vertical(Some(&checkpoint));
         }
 
+        let bctx = BacktrackCtxt::default();
         let horizontal_result = self.af.out.with_recover_width(|| {
-            self.list_horizontal(strategy.horizontal, true)
+            self.list_horizontal(strategy.horizontal, &bctx, true)
         });
         if let Err(e) = horizontal_result {
-            if e.is_overflow {
-                assert!(
-                    self.af.constraints().single_line.get(),
-                    "list overflow error should only occur in single line mode",
+            let can_recover = bctx.can_recover.get()
+                || matches!(
+                    e.kind,
+                    FormatErrorKind::Logical | FormatErrorKind::WidthLimitExceeded,
                 );
-                // Horizontal formatting would have succeeded if single line mode were not enabled.
-                return Err(e.error);
+            if can_recover {
+                self.af.out.restore_checkpoint(&checkpoint);
+                self.list_vertical(Some(&checkpoint))?;
+                return Ok(());
             }
-            self.af.out.restore_checkpoint(&checkpoint);
-            return self.list_vertical(Some(&checkpoint));
+            return Err(e);
         }
 
         Ok(())
@@ -109,8 +113,9 @@ where
     fn list_horizontal(
         &self,
         strategy: HorizontalListStrategy,
+        bctx: &BacktrackCtxt,
         has_vertical_fallback: bool,
-    ) -> Result<(), ListHorizontalError> {
+    ) -> FormatResult {
         let Self {
             af,
             opt,
@@ -121,7 +126,9 @@ where
         let rest = opt.rest;
         let len = list.len();
         let first_line = self.af.out.line();
-        let item = |index, tail| self.list_item(index, false, tail);
+        let _guard = self.af.constraints().version.increment_guard();
+        let version = self.af.constraints().version.get();
+        let item = |index, tail| self.list_item(index, false, bctx, tail);
         let pad = |af: &AstFormatter| -> FormatResult {
             if brackets.pad() {
                 af.out.space()?;
@@ -151,7 +158,7 @@ where
             }
             Ok(())
         });
-        let mut is_overflow = false;
+        let mut is_overflow_err = false;
         // structs are subject to width limit even with only one item
         let width_limit = if opt.is_struct
             || len + usize::from(rest.is_some_and(|r| r.base.is_some())) > 1
@@ -174,38 +181,46 @@ where
                 af.out.space()?;
             }
 
-            let last_item_result = if !strategy.overflow {
-                af.with_single_line(|| item(list.len() - 1, Some(&last_item_tail)))
-            } else if !has_vertical_fallback {
-                item(list.len() - 1, Some(&last_item_tail))
+            if strategy.overflow {
+                let result = if has_vertical_fallback {
+                    self.list_horizontal_overflowable(&height, bctx, Some(&last_item_tail))
+                } else {
+                    item(list.len() - 1, Some(&last_item_tail))
+                };
+                result.inspect_err(|_| {
+                    is_overflow_err = true;
+                })?;
             } else {
-                self.list_horizontal_overflowable(&height, Some(&last_item_tail))
+                af.with_single_line(|| item(list.len() - 1, Some(&last_item_tail)))?;
             };
-            if strategy.overflow
-                && let Err(err) = &last_item_result
-                && let FormatErrorKind::Vertical(_) = err.kind
-            {
-                // We formatted the first line and stopped because we are in single-line mode.
-                // Otherwise, we could have continued without error.
-                is_overflow = true;
-            }
-            last_item_result?;
             if let Some(rest) = rest {
                 af.out.space()?;
                 list_rest(af, rest, Some(&end_tail))?;
             }
             Ok(())
         })
-        .map_err(|error| ListHorizontalError { error, is_overflow })?;
+        .inspect_err(|e| {
+            if let FormatErrorKind::Vertical(_) = e.kind
+                && e.context_version >= version
+                && !is_overflow_err
+            {
+                bctx.mark_can_recover();
+            }
+        })?;
         Ok(())
     }
 
-    fn list_horizontal_overflowable(&self, height: &Cell<VSize>, tail: Tail) -> FormatResult {
+    fn list_horizontal_overflowable(
+        &self,
+        height: &Cell<VSize>,
+        bctx: &BacktrackCtxt,
+        tail: Tail,
+    ) -> FormatResult {
         let Self { af, list, .. } = self;
         let index = list.len() - 1;
-        let item = || self.list_item(index, false, tail);
+        let item = || self.list_item(index, false, bctx, tail);
         let checkpoint = af.out.checkpoint();
-        let wrap_result = af.simulate_wrap_indent(0, item);
+        let wrap_result = af.simulate_wrap_indent(0, item)?;
         match wrap_result {
             SimulateWrapResult::Ok => {}
             SimulateWrapResult::NoWrap
@@ -219,17 +234,19 @@ where
                 item()?;
                 let vertical_height = 2 + list.len() as VSize;
                 if vertical_height < height.get() {
-                    return Err(FormatErrorKind::Logical.into());
+                    return Err(self.af.err(FormatErrorKind::Logical));
                 }
             }
             SimulateWrapResult::WrapForLessExcessWidth => {
-                return Err(FormatErrorKind::Logical.into());
+                return Err(self.af.err(FormatErrorKind::Logical));
             }
         }
         Ok(())
     }
 
-    fn list_wrap_to_fit_fn_opt(&self) -> Option<impl Fn() -> FormatResult> {
+    fn list_wrap_to_fit_fn_opt<'a>(
+        &'a self,
+    ) -> Option<impl Fn(&BacktrackCtxt) -> FormatResult + 'a> {
         if self.list.len() <= 1 {
             return None;
         }
@@ -239,7 +256,7 @@ where
             self.opt.rest.is_none(),
             "rest cannot be used with wrap-to-fit",
         );
-        Some(move || self.list_wrap_to_fit(wrap_to_fit, vertical))
+        Some(move |_: &BacktrackCtxt| self.list_wrap_to_fit(wrap_to_fit, vertical))
     }
 
     /*
@@ -266,7 +283,7 @@ where
             ..
         } = self;
         let item = |index| {
-            let item = || self.list_item(index, true, None);
+            let item = || self.list_item(index, true, &BacktrackCtxt::default(), None);
             if let Some(max_width) = max_element_width
                 && !format_string_pos.is_some_and(|i| index == i as usize)
             {
@@ -295,14 +312,14 @@ where
                     prev_must_have_own_line = !prev_must_have_own_line;
                 }
                 af.backtrack()
-                    .next_if(!is_own_line, || {
+                    .next_if(!is_own_line, |_| {
                         af.out.with_recover_width(|| {
                             af.out.space()?;
                             item_comma()?;
                             Ok(())
                         })
                     })
-                    .next(|| {
+                    .next(|_| {
                         af.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         item_comma()?;
                         Ok(())
@@ -320,7 +337,7 @@ where
         self.af
             .backtrack()
             .next_opt(self.list_wrap_to_fit_fn_opt())
-            .next(|| self.list_vertical_simple())
+            .next(|_| self.list_vertical_simple())
             .result_opt_checkpoint(checkpoint)
     }
 
@@ -337,6 +354,7 @@ where
             self.list_item(
                 index,
                 true,
+                &BacktrackCtxt::default(),
                 Some(&af.tail_fn(|af| af.out.token_maybe_missing(","))),
             )
         };
@@ -365,12 +383,22 @@ where
         Ok(())
     }
 
-    fn list_item(&self, index: usize, is_vertical: bool, tail: Tail) -> FormatResult {
+    fn list_item(
+        &self,
+        index: usize,
+        is_vertical: bool,
+        bctx: &BacktrackCtxt,
+        tail: Tail,
+    ) -> FormatResult {
         (self.format_item)(
             self.af,
             &self.list[index],
             tail,
-            ListItemContext { index, is_vertical },
+            ListItemContext {
+                bctx,
+                index,
+                is_vertical,
+            },
         )
     }
 }
@@ -383,20 +411,4 @@ fn list_rest(af: &AstFormatter, rest: ListRest, tail: Tail) -> FormatResult {
         af.tail(tail)?;
     }
     Ok(())
-}
-
-#[derive(Debug)]
-struct ListHorizontalError {
-    error: FormatError,
-    /// True if the _current_ list is an overflow error
-    is_overflow: bool,
-}
-
-impl From<FormatError> for ListHorizontalError {
-    fn from(error: FormatError) -> Self {
-        ListHorizontalError {
-            error,
-            is_overflow: false,
-        }
-    }
 }

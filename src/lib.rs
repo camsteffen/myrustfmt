@@ -56,8 +56,8 @@ use crate::ast_formatter::format_module;
 use crate::config::Config;
 use crate::parse::{ParseModuleResult, parse_module};
 use crate::submodules::Submodule;
+use crate::util::rustc::init_rustc_globals;
 use rustc_span::ErrorGuaranteed;
-use rustc_span::edition::Edition;
 use rustc_span::symbol::Ident;
 use std::collections::VecDeque;
 use std::error::Error;
@@ -184,8 +184,7 @@ pub fn format_module_file_roots(
     is_check: bool,
     is_verbose: bool,
 ) -> Result<(), ()> {
-    // todo use extra_symbols?
-    rustc_span::create_session_globals_then(Edition::Edition2024, &[], None, || {
+    init_rustc_globals(|| {
         let config = Rc::new(config);
         let mut queue = VecDeque::<(PathBuf, Option<Ident>)>::from_iter(
             paths.into_iter().map(|path| (path.into(), None)),
@@ -248,7 +247,7 @@ fn format_module_file(
 }
 
 pub fn format_str(source: &str, config: Config) -> Result<FormatModuleResult, ErrorGuaranteed> {
-    rustc_span::create_session_globals_then(Edition::Edition2024, &[], None, || {
+    init_rustc_globals(|| {
         let ParseModuleResult {
             module,
             source_file,

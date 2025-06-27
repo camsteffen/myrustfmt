@@ -38,9 +38,12 @@ impl AstFormatter {
         &self,
         offset: HSize,
         scope: impl FnOnce() -> FormatResult,
-    ) -> SimulateWrapResult {
-        let with_single_line_and_no_width_limit =
-            || self.with_single_line(|| self.constraints().width_limit.with_replaced(None, scope));
+    ) -> FormatResult<SimulateWrapResult> {
+        let with_single_line_and_no_width_limit = || {
+            let _guard = self.constraints().single_line.replace_guard(true);
+            let _guard = self.constraints().width_limit.replace_guard(None);
+            scope()
+        };
         let (result, used_extra_width) = self.out.with_recover_width(|| {
             let col = self.out.col();
             let wrap_indent_col = self.out.total_indent.get() + INDENT_WIDTH + offset;
@@ -64,7 +67,7 @@ impl AstFormatter {
         let exceeded_width_limit = self.constraints().width_limit.get().is_some_and(|wl| {
             wl.line == self.out.line() && self.out.col() > wl.end_col.get()
         });
-        match result {
+        let simulate_result = match result {
             Ok(()) => {
                 if used_extra_width || exceeded_width_limit {
                     SimulateWrapResult::WrapForSingleLine
@@ -72,16 +75,18 @@ impl AstFormatter {
                     SimulateWrapResult::Ok
                 }
             }
-            Err(err) => {
-                if err.kind == FormatErrorKind::WidthLimitExceeded {
-                    SimulateWrapResult::WrapForLessExcessWidth
-                } else if used_extra_width || exceeded_width_limit {
-                    // todo vertical error only
-                    SimulateWrapResult::WrapForLongerFirstLine
-                } else {
-                    SimulateWrapResult::NoWrap
+            Err(err) => match err.kind {
+                FormatErrorKind::WidthLimitExceeded => SimulateWrapResult::WrapForLessExcessWidth,
+                FormatErrorKind::Vertical(_) => {
+                    if used_extra_width || exceeded_width_limit {
+                        SimulateWrapResult::WrapForLongerFirstLine
+                    } else {
+                        SimulateWrapResult::NoWrap
+                    }
                 }
-            }
-        }
+                _ => return Err(err),
+            },
+        };
+        Ok(simulate_result)
     }
 }

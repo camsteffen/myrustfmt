@@ -74,7 +74,7 @@ impl AstFormatter {
                 self.macro_call(mac_call, MacCallSemi::Item, None)?;
             }
             // todo
-            ast::ItemKind::MacroDef(..) => return Err(FormatErrorKind::UnsupportedSyntax.into()),
+            ast::ItemKind::MacroDef(..) => return Err(self.err(FormatErrorKind::UnsupportedSyntax)),
             ast::ItemKind::Mod(safety, ident, ref mod_kind) => {
                 self.mod_item(safety, ident, mod_kind)?
             }
@@ -102,7 +102,7 @@ impl AstFormatter {
             | ast::ItemKind::DelegationMac(_)
             | ast::ItemKind::GlobalAsm(_)
             | ast::ItemKind::TraitAlias(..) => {
-                return Err(FormatErrorKind::UnsupportedSyntax.into());
+                return Err(self.err(FormatErrorKind::UnsupportedSyntax));
             }
         }
         Ok(())
@@ -214,14 +214,14 @@ impl AstFormatter {
         };
         let indented = if self.out.line() == first_line {
             self.backtrack()
-                .next(|| {
+                .next(|_| {
                     self.with_single_line(|| {
                         self.out.space()?;
                         first_part()?;
                         Ok(false)
                     })
                 })
-                .next(|| {
+                .next(|_| {
                     self.indented(|| {
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         first_part()?;
@@ -236,14 +236,14 @@ impl AstFormatter {
         };
         if impl_.of_trait.is_some() {
             self.backtrack()
-                .next(|| {
+                .next(|_| {
                     self.space_could_wrap_indent(|| {
                         self.out.token_space("for")?;
                         self.ty(&impl_.self_ty)?;
                         Ok(())
                     })
                 })
-                .next(|| {
+                .next(|_| {
                     self.indented_optional(!indented, || {
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         self.out.token_space("for")?;
@@ -270,10 +270,10 @@ impl AstFormatter {
                     self.macro_call(mac_call, MacCallSemi::Item, None)?
                 }
                 ast::AssocItemKind::Delegation(_) => {
-                    return Err(FormatErrorKind::UnsupportedSyntax.into());
+                    return Err(self.err(FormatErrorKind::UnsupportedSyntax));
                 }
                 ast::AssocItemKind::DelegationMac(_) => {
-                    return Err(FormatErrorKind::UnsupportedSyntax.into());
+                    return Err(self.err(FormatErrorKind::UnsupportedSyntax));
                 }
             }
             Ok(())
@@ -420,7 +420,7 @@ impl AstFormatter {
             self.ty_tail(&field.ty, tail)?;
             if field.default.is_some() {
                 // todo
-                return Err(FormatErrorKind::UnsupportedSyntax.into());
+                return Err(self.err(FormatErrorKind::UnsupportedSyntax));
             }
             Ok(())
         })
