@@ -4,6 +4,8 @@ use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
 use crate::whitespace::VerticalWhitespaceMode;
 
+pub const ENCLOSED_DISALLOWED_VSTRUCTS: VStructSet = VStructSet::empty();
+
 impl AstFormatter {
     /// Writes contents between braces with indentation
     pub fn enclosed_contents(&self, scope: impl FnOnce() -> FormatResult) -> FormatResult {
@@ -13,7 +15,7 @@ impl AstFormatter {
                 self.out.indent();
                 self.constraints()
                     .disallowed_vstructs
-                    .with_replaced(VStructSet::new(), scope)?;
+                    .with_replaced(ENCLOSED_DISALLOWED_VSTRUCTS, scope)?;
                 self.out.newline(VerticalWhitespaceMode::Bottom)?;
                 Ok(())
             })?;

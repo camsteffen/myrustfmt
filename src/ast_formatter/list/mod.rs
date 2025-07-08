@@ -12,6 +12,7 @@ use crate::ast_formatter::list::options::{
     WrapToFit,
 };
 use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::util::enclosed::ENCLOSED_DISALLOWED_VSTRUCTS;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
 use crate::constraints::VStruct;
 use crate::error::{FormatErrorKind, FormatResult};
@@ -95,12 +96,13 @@ where
         });
         if let Err(e) = horizontal_result {
             let recovering = recover.get()
-                || matches!(
-                    e.kind,
-                    FormatErrorKind::Logical
-                    | FormatErrorKind::VStruct { .. }
-                    | FormatErrorKind::WidthLimitExceeded,
-                );
+                || match e.kind {
+                    FormatErrorKind::Logical | FormatErrorKind::WidthLimitExceeded => true,
+                    FormatErrorKind::VStruct { vstruct, .. } => {
+                        !ENCLOSED_DISALLOWED_VSTRUCTS.contains(vstruct)
+                    }
+                    _ => false,
+                };
             if recovering {
                 self.af.out.restore_checkpoint(&checkpoint);
                 self.list_vertical(Some(&checkpoint))?;

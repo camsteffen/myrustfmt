@@ -2,7 +2,7 @@ mod assign;
 pub(super) mod ast;
 mod constraint_effects;
 pub(super) mod debug;
-mod enclosed;
+pub(super) mod enclosed;
 pub(super) mod error;
 mod indent;
 mod infix;
