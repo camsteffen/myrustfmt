@@ -73,12 +73,10 @@ impl SubmoduleCollector {
         let DirOwnership::Owned { relative } = mod_path.dir_ownership else {
             unreachable!();
         };
-        Ok(
-            Submodule {
-                path: mod_path.file_path,
-                relative,
-            },
-        )
+        Ok(Submodule {
+            path: mod_path.file_path,
+            relative,
+        })
     }
 
     fn inline_mod_dir(&self, ident: Ident) -> PathBuf {

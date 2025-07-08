@@ -97,7 +97,9 @@ where
             let recovering = recover.get()
                 || matches!(
                     e.kind,
-                    FormatErrorKind::Logical | FormatErrorKind::WidthLimitExceeded,
+                    FormatErrorKind::Logical
+                    | FormatErrorKind::VStruct { .. }
+                    | FormatErrorKind::WidthLimitExceeded,
                 );
             if recovering {
                 self.af.out.restore_checkpoint(&checkpoint);
