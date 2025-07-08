@@ -1,4 +1,4 @@
-use crate::ast_formatter::backtrack::BacktrackCtxt;
+use crate::Recover;
 use crate::error::{FormatError, FormatErrorKind, FormatResult};
 use crate::num::{HSize, VSize};
 use crate::util::cell_ext::{CellExt, CellNumberExt};
@@ -114,8 +114,8 @@ impl Constraints {
 
     pub fn disallow_vstructs(
         &self,
-        bctx: &BacktrackCtxt,
         values: impl Into<VStructSet>,
+        recover: &Recover,
         scope: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
         let prev = self.disallowed_vstructs.get();
@@ -126,7 +126,7 @@ impl Constraints {
                 if let FormatErrorKind::VStruct { vstruct, .. } = e.kind
                     && values.contains(vstruct)
                 {
-                    bctx.mark_can_recover();
+                    recover.set(true);
                 }
             })
     }

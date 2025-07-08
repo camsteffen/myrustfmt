@@ -1,5 +1,5 @@
+use crate::Recover;
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::backtrack::BacktrackCtxt;
 use crate::constraints::{Constraints, VStruct, VStructSet, WidthLimit};
 use crate::error::{FormatError, FormatErrorKind, FormatResult};
 use crate::num::HSize;
@@ -22,7 +22,7 @@ delegate_to_constraints! {
 
     // vertical structures
     pub fn allow_vstructs(&self, values: impl Into<VStructSet>, scope: impl FnOnce() -> FormatResult) -> FormatResult;
-    pub fn disallow_vstructs(&self, bctx: &BacktrackCtxt, values: impl Into<VStructSet>, scope: impl FnOnce() -> FormatResult) -> FormatResult;
+    pub fn disallow_vstructs(&self, values: impl Into<VStructSet>, recover: &Recover, scope: impl FnOnce() -> FormatResult) -> FormatResult;
     pub fn has_vstruct<T>(&self, vstruct: VStruct, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
 }
 

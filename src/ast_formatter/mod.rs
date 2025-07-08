@@ -96,7 +96,9 @@ impl AstFormatter {
         self.with_attrs(attrs, spans.inner_span.into(), || {
             self.list_with_item_sorting(items, |item| self.item(item))
         })?;
-        self.out.newline(VerticalWhitespaceMode::Bottom)?;
+        if !items.is_empty() {
+            self.out.newline(VerticalWhitespaceMode::Bottom)?;
+        }
         Ok(())
     }
 

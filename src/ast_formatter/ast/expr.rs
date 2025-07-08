@@ -2,8 +2,8 @@ mod binary_expr;
 mod r#match;
 mod postfix;
 
+use crate::Recover;
 use crate::ast_formatter::ast::r#macro::MacCallSemi;
-use crate::ast_formatter::backtrack::BacktrackCtxt;
 use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::ListItemContext;
 use crate::ast_formatter::list::ListRest;
@@ -217,7 +217,9 @@ impl AstFormatter {
             Brackets::Parens,
             args,
             |af, expr, tail, lcx| {
-                if !lcx.is_vertical && lcx.index == args.len() - 1 {
+                if let Some(recover) = lcx.horizontal
+                    && lcx.index == args.len() - 1
+                {
                     let mut vstructs =
                         VStruct::ControlFlow | VStruct::Index | VStruct::NonBlockIndent;
                     if args.len() > 1 {
@@ -226,7 +228,7 @@ impl AstFormatter {
                         // really it's anything that isn't a closure
                         vstructs |= VStruct::Block | VStruct::List | VStruct::Match;
                     }
-                    af.disallow_vstructs(lcx.bctx, vstructs, || af.expr_tail(expr, tail))?;
+                    af.disallow_vstructs(vstructs, recover, || af.expr_tail(expr, tail))?;
                 } else {
                     af.expr_tail(expr, tail)?;
                 }
@@ -343,7 +345,7 @@ impl AstFormatter {
                 let block_expr = self.try_into_optional_block(block)?;
                 let else_expr = self.try_into_optional_block(else_block)?;
 
-                Some(move |_: &BacktrackCtxt| {
+                Some(move |_: &Recover| {
                     self.with_single_line(|| {
                         self.with_width_limit_end(
                             start_col + RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
@@ -422,8 +424,8 @@ impl AstFormatter {
     fn paren(&self, inner: &ast::Expr, tail: Tail) -> FormatResult {
         self.out.token("(")?;
         self.backtrack()
-            .next(|bctx| {
-                self.disallow_vstructs(bctx, VStruct::NonBlockIndent, || {
+            .next(|recover| {
+                self.disallow_vstructs(VStruct::NonBlockIndent, recover, || {
                     let expr_start = self.out.col();
                     self.expr_tail(
                         inner,

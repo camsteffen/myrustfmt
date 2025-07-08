@@ -1,7 +1,6 @@
-use crate::ast_formatter::backtrack::BacktrackCtxt;
+use crate::Recover;
 
 pub struct ListItemContext<'a> {
-    pub bctx: &'a BacktrackCtxt,
+    pub horizontal: Option<&'a Recover>,
     pub index: usize,
-    pub is_vertical: bool,
 }

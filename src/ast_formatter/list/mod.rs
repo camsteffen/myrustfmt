@@ -4,8 +4,8 @@ mod rest;
 
 pub use self::list_item_context::ListItemContext;
 pub use self::rest::ListRest;
+use crate::Recover;
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::backtrack::BacktrackCtxt;
 use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::options::{
     FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy,
@@ -66,7 +66,7 @@ where
             }
             match self.opt.strategies {
                 ListStrategies::Horizontal(horizontal) => {
-                    self.list_horizontal(horizontal, &BacktrackCtxt::default(), false)?
+                    self.list_horizontal(horizontal, &Recover::default(), false)?
                 }
                 ListStrategies::Vertical(_) => {
                     self.list_vertical(None)?;
@@ -89,17 +89,17 @@ where
             return self.list_vertical(Some(&checkpoint));
         }
 
-        let bctx = BacktrackCtxt::default();
+        let recover = Recover::default();
         let horizontal_result = self.af.out.with_recover_width(|| {
-            self.list_horizontal(strategy.horizontal, &bctx, true)
+            self.list_horizontal(strategy.horizontal, &recover, true)
         });
         if let Err(e) = horizontal_result {
-            let can_recover = bctx.can_recover.get()
+            let recovering = recover.get()
                 || matches!(
                     e.kind,
                     FormatErrorKind::Logical | FormatErrorKind::WidthLimitExceeded,
                 );
-            if can_recover {
+            if recovering {
                 self.af.out.restore_checkpoint(&checkpoint);
                 self.list_vertical(Some(&checkpoint))?;
                 return Ok(());
@@ -113,7 +113,7 @@ where
     fn list_horizontal(
         &self,
         strategy: HorizontalListStrategy,
-        bctx: &BacktrackCtxt,
+        recover: &Recover,
         has_vertical_fallback: bool,
     ) -> FormatResult {
         let Self {
@@ -128,7 +128,7 @@ where
         let first_line = self.af.out.line();
         let _guard = self.af.constraints().version.increment_guard();
         let version = self.af.constraints().version.get();
-        let item = |index, tail| self.list_item(index, false, bctx, tail);
+        let item = |index, tail| self.list_item(index, Some(recover), tail);
         let pad = |af: &AstFormatter| -> FormatResult {
             if brackets.pad() {
                 af.out.space()?;
@@ -183,7 +183,7 @@ where
 
             if strategy.overflow {
                 let result = if has_vertical_fallback {
-                    self.list_horizontal_overflowable(&height, bctx, Some(&last_item_tail))
+                    self.list_horizontal_overflowable(&height, recover, Some(&last_item_tail))
                 } else {
                     item(list.len() - 1, Some(&last_item_tail))
                 };
@@ -204,7 +204,7 @@ where
                 && e.context_version >= version
                 && !is_overflow_err
             {
-                bctx.mark_can_recover();
+                recover.set(true);
             }
         })?;
         Ok(())
@@ -213,12 +213,12 @@ where
     fn list_horizontal_overflowable(
         &self,
         height: &Cell<VSize>,
-        bctx: &BacktrackCtxt,
+        recover: &Recover,
         tail: Tail,
     ) -> FormatResult {
         let Self { af, list, .. } = self;
         let index = list.len() - 1;
-        let item = || self.list_item(index, false, bctx, tail);
+        let item = || self.list_item(index, Some(recover), tail);
         let checkpoint = af.out.checkpoint();
         let wrap_result = af.simulate_wrap_indent(0, item)?;
         match wrap_result {
@@ -244,9 +244,7 @@ where
         Ok(())
     }
 
-    fn list_wrap_to_fit_fn_opt<'a>(
-        &'a self,
-    ) -> Option<impl Fn(&BacktrackCtxt) -> FormatResult + 'a> {
+    fn list_wrap_to_fit_fn_opt<'a>(&'a self) -> Option<impl Fn(&Recover) -> FormatResult + 'a> {
         if self.list.len() <= 1 {
             return None;
         }
@@ -256,7 +254,7 @@ where
             self.opt.rest.is_none(),
             "rest cannot be used with wrap-to-fit",
         );
-        Some(move |_: &BacktrackCtxt| self.list_wrap_to_fit(wrap_to_fit, vertical))
+        Some(move |_: &Recover| self.list_wrap_to_fit(wrap_to_fit, vertical))
     }
 
     /*
@@ -283,7 +281,7 @@ where
             ..
         } = self;
         let item = |index| {
-            let item = || self.list_item(index, true, &BacktrackCtxt::default(), None);
+            let item = || self.list_item(index, None, None);
             if let Some(max_width) = max_element_width
                 && !format_string_pos.is_some_and(|i| index == i as usize)
             {
@@ -353,8 +351,7 @@ where
         let item_comma = |index| {
             self.list_item(
                 index,
-                true,
-                &BacktrackCtxt::default(),
+                None,
                 Some(&af.tail_fn(|af| af.out.token_maybe_missing(","))),
             )
         };
@@ -383,22 +380,12 @@ where
         Ok(())
     }
 
-    fn list_item(
-        &self,
-        index: usize,
-        is_vertical: bool,
-        bctx: &BacktrackCtxt,
-        tail: Tail,
-    ) -> FormatResult {
+    fn list_item(&self, index: usize, horizontal: Option<&Recover>, tail: Tail) -> FormatResult {
         (self.format_item)(
             self.af,
             &self.list[index],
             tail,
-            ListItemContext {
-                bctx,
-                index,
-                is_vertical,
-            },
+            ListItemContext { horizontal, index },
         )
     }
 }

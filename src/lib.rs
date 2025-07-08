@@ -59,6 +59,7 @@ use crate::submodules::Submodule;
 use crate::util::rustc::init_rustc_globals;
 use rustc_span::ErrorGuaranteed;
 use rustc_span::symbol::Ident;
+use std::cell::Cell;
 use std::collections::VecDeque;
 use std::error::Error;
 use std::fs;
@@ -255,3 +256,6 @@ pub fn format_str(source: &str, config: Config) -> Result<FormatModuleResult, Er
         Ok(format_module(Rc::new(module), source_file, None, &config))
     })
 }
+
+/// A flag to indicate that a returned error should trigger a fallback strategy
+type Recover = Cell<bool>;

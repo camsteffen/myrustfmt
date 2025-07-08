@@ -120,10 +120,12 @@ impl AstFormatter {
         };
         self.out.restore_checkpoint(&checkpoint);
         self.backtrack()
-            .next_if(!force_block, |bctx| {
-                self.disallow_vstructs(bctx, VStruct::ControlFlow | VStruct::NonBlockIndent, || {
-                    self.expr_tail(body, Some(&self.tail_fn(|af| af.out.token_insert(","))))
-                })
+            .next_if(!force_block, |recover| {
+                self.disallow_vstructs(
+                    VStruct::ControlFlow | VStruct::NonBlockIndent,
+                    recover,
+                    || self.expr_tail(body, Some(&self.tail_fn(|af| af.out.token_insert(",")))),
+                )
             })
             .next(|_| self.add_block(|| self.expr_stmt(body)))
             .result_with_checkpoint(&checkpoint)?;

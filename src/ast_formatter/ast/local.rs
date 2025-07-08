@@ -1,5 +1,5 @@
+use crate::Recover;
 use crate::ast_formatter::AstFormatter;
-use crate::ast_formatter::backtrack::BacktrackCtxt;
 use crate::error::FormatResult;
 use crate::num::{HSize, VSize};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
@@ -72,7 +72,7 @@ impl AstFormatter {
             let else_block_horizontal = if is_single_line_init
                 && let Some(expr_only_else) = self.try_into_optional_block(else_)
             {
-                Some(move |_: &BacktrackCtxt| {
+                Some(move |_: &Recover| {
                     self.with_single_line(|| {
                         self.with_width_limit_end(
                             start_col + RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
