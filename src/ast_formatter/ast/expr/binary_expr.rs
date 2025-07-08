@@ -51,9 +51,7 @@ impl AstFormatter {
                 }
             };
             if chain.is_empty() {
-                if let Some(indent_guard) = indent_guard {
-                    indent_guard.close();
-                }
+                drop(indent_guard);
                 return self.tail(tail);
             }
             self.backtrack()

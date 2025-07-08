@@ -20,19 +20,20 @@ impl AstFormatter {
         Ok(())
     }
 
-    // todo should these functions use backtrack?
+    // todo test
     pub fn space_or_wrap_then(&self, then: impl Fn() -> FormatResult) -> FormatResult {
         let checkpoint = self.out.checkpoint();
-        let first_line = self.out.line();
-        self.out.space_allow_newlines()?;
-        let result = self.out.with_recover_width(&then);
-        if self.out.line() == first_line && result.is_err() {
-            self.out.restore_checkpoint(&checkpoint);
-            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-            then()?;
-        } else {
-            result?;
+        if self.out.space_allow_newlines()? {
+            return then();
         }
+        self.backtrack()
+            .next(|_| self.out.with_recover_width(&then))
+            .next(|_| {
+                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                then()?;
+                Ok(())
+            })
+            .result_with_checkpoint(&checkpoint)?;
         Ok(())
     }
 
@@ -48,9 +49,9 @@ impl AstFormatter {
             then()?;
             return Ok(Some(indent_guard));
         }
-        // N.B. observe indent before closing indent guard
+        // N.B. observe indent before dropping indent guard
         let col_if_wrap_indent = self.out.total_indent.get();
-        indent_guard.close();
+        drop(indent_guard);
         if self.out.col() <= col_if_wrap_indent {
             // wrapping does not give more width
             then()?;

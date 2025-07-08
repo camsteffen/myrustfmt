@@ -210,7 +210,7 @@ impl AstFormatter {
             if wrapped {
                 self.fn_ret_ty(&fn_decl.output, None)?;
             } else {
-                indent_guard.close();
+                drop(indent_guard);
                 self.with_single_line_if(single_line, || self.fn_ret_ty(&fn_decl.output, tail))?;
             }
             Ok(wrapped)

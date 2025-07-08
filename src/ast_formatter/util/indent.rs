@@ -7,10 +7,6 @@ pub struct IndentGuard<'a> {
     out: &'a SourceFormatter,
 }
 
-impl IndentGuard<'_> {
-    pub fn close(self) {}
-}
-
 impl Drop for IndentGuard<'_> {
     fn drop(&mut self) {
         if !std::thread::panicking() {
