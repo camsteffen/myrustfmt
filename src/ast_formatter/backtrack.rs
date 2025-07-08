@@ -69,12 +69,11 @@ impl<'s, T> Backtrack<'_, 's, T> {
     }
 
     fn result_inner(self, checkpoint: Option<&Checkpoint>) -> FormatResult<T> {
-        let bctx = BacktrackCtxt::default();
         let mut iter = self.strategies.into_iter();
         let first = iter.next().expect("must provide at least one strategy");
         if iter.len() == 0 {
             // avoid creating a checkpoint if there is only one strategy
-            return first(&bctx);
+            return first(&BacktrackCtxt::default());
         }
         let new_checkpoint;
         let checkpoint = match checkpoint {
@@ -84,21 +83,23 @@ impl<'s, T> Backtrack<'_, 's, T> {
                 &new_checkpoint
             }
         };
+        let mut bctx = BacktrackCtxt::default();
         let mut result = first(&bctx);
         for strategy in iter {
-            let is_done = match &result {
-                Ok(_) => true,
-                Err(_) if bctx.can_recover.get() => false,
+            let recovering = match &result {
+                Ok(_) => false,
+                Err(_) if bctx.can_recover.get() => true,
                 Err(e) => match e.kind {
-                    FormatErrorKind::Logical | FormatErrorKind::WidthLimitExceeded => false,
-                    FormatErrorKind::Vertical(_) => self.af.constraints().single_line.get(),
-                    _ => true,
+                    FormatErrorKind::Logical | FormatErrorKind::WidthLimitExceeded => true,
+                    FormatErrorKind::Vertical(_) => !self.af.constraints().single_line.get(),
+                    _ => false,
                 },
             };
-            if is_done {
+            if !recovering {
                 break;
             }
             self.af.out.restore_checkpoint(checkpoint);
+            bctx = BacktrackCtxt::default();
             result = strategy(&bctx);
         }
         result
