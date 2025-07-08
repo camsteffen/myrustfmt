@@ -4,6 +4,7 @@ use rustc_expand::module::DirOwnership;
 use rustc_expand::module::ModError;
 use rustc_expand::module::default_submod_path;
 use rustc_session::parse::ParseSess;
+use rustc_span::ErrorGuaranteed;
 use rustc_span::sym;
 use rustc_span::symbol::Ident;
 use std::path::PathBuf;
@@ -35,13 +36,14 @@ impl SubmoduleCollector {
                 let prev_relative = self.relative.take();
                 prev = Some((prev_dir, prev_relative));
             } else {
-                let submodule = if let Some(path) = path_from_attr {
+                if let Some(path) = path_from_attr {
                     let relative = None;
-                    Submodule { path, relative }
+                    self.submodules.push(Submodule { path, relative });
                 } else {
-                    self.find_external_module(psess, ident)
-                };
-                self.submodules.push(submodule);
+                    if let Ok(submodule) = self.find_external_module(psess, ident) {
+                        self.submodules.push(submodule);
+                    }
+                }
             }
         }
         |this| {
@@ -60,19 +62,23 @@ impl SubmoduleCollector {
         Some(self.dir.join(path.as_str()))
     }
 
-    fn find_external_module(&mut self, psess: &ParseSess, ident: Ident) -> Submodule {
+    fn find_external_module(
+        &mut self,
+        psess: &ParseSess,
+        ident: Ident,
+    ) -> Result<Submodule, ErrorGuaranteed> {
         // todo check for mod cycle
-        let mod_path = match default_submod_path(psess, ident, self.relative, &self.dir) {
-            Ok(mod_path) => mod_path,
-            Err(e) => self.mod_error(psess, e),
-        };
+        let mod_path = default_submod_path(psess, ident, self.relative, &self.dir)
+            .map_err(|e| self.mod_error(psess, e))?;
         let DirOwnership::Owned { relative } = mod_path.dir_ownership else {
             unreachable!();
         };
-        Submodule {
-            path: mod_path.file_path,
-            relative,
-        }
+        Ok(
+            Submodule {
+                path: mod_path.file_path,
+                relative,
+            },
+        )
     }
 
     fn inline_mod_dir(&self, ident: Ident) -> PathBuf {
@@ -87,13 +93,12 @@ impl SubmoduleCollector {
         dir
     }
 
-    fn mod_error(&self, psess: &ParseSess, error: ModError) -> ! {
+    fn mod_error(&self, psess: &ParseSess, error: ModError) -> ErrorGuaranteed {
         match error {
             ModError::FileNotFound(ident, _default_path, _secondary_path) => {
                 psess
                     .dcx()
-                    .span_err(ident.span, "file not found for module");
-                todo!();
+                    .span_err(ident.span, "file not found for module")
             }
             ModError::MultipleCandidates(ident, default_path, secondary_path) => {
                 let msg = format!(
@@ -101,8 +106,7 @@ impl SubmoduleCollector {
                     default_path.display(),
                     secondary_path.display(),
                 );
-                psess.dcx().span_err(ident.span, msg);
-                todo!();
+                psess.dcx().span_err(ident.span, msg)
             }
             ModError::ParserError(_) | ModError::CircularInclusion(_) | ModError::ModInBlock(_) => {
                 // todo the function never returns these errors, but is there a better way?

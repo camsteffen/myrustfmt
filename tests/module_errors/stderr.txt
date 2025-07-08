@@ -1,0 +1,12 @@
+error: file not found for module
+ --> test.rs:1:5
+  |
+1 | mod foo;
+  |     ^^^
+
+error: file for module `bar` found at both "bar.rs" and "bar/mod.rs"
+ --> test.rs:2:5
+  |
+2 | mod bar;
+  |     ^^^
+

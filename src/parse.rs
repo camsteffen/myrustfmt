@@ -48,6 +48,10 @@ pub fn parse_module(
         let macro_args;
         (submodules, macro_args) = get_module_extras(&psess, &items, crate_source.path(), relative);
 
+        if let Some(e) = psess.dcx().has_errors() {
+            return Err(e);
+        }
+
         module = AstModule {
             attrs,
             items,

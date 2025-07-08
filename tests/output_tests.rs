@@ -1,6 +1,9 @@
 #![feature(rustc_private)]
 #![feature(str_split_inclusive_remainder)]
 
+mod util;
+
+use crate::util::SimpleOutput;
 use std::error::Error;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -312,19 +315,17 @@ fn format_max_width_expected(
         .unwrap();
     let stdin = child.stdin.as_mut().unwrap();
     stdin.write_all(source.as_bytes()).unwrap();
-    let output = child.wait_with_output().unwrap();
-    let result = String::from_utf8(output.stdout).unwrap();
-    let error_output = String::from_utf8(output.stderr).unwrap();
+    let output = SimpleOutput::expect(child.wait_with_output().unwrap());
     let expected = format!("{expected}\n");
-    expect_formatted_equals(&result, &expected, name).inspect_err(|_| {
-        println!("Stderr:\n{error_output}");
+    expect_formatted_equals(&output.stdout, &expected, name).inspect_err(|_| {
+        println!("Stderr:\n{}", &output.stderr);
     })?;
     let errors_expected = expected_stderr.is_some();
-    handle_format_errors(&error_output, expected_stderr, expected_stderr_path).inspect_err(|_| {
+    handle_format_errors(&output.stderr, expected_stderr, expected_stderr_path).inspect_err(|_| {
         // todo dedupe
-        println!("Stderr:\n{error_output}");
+        println!("Stderr:\n{}", &output.stderr);
     })?;
-    if output.status.success() {
+    if output.code == 0 {
         if errors_expected {
             return Err("expected errors but status code was success".into());
         }
