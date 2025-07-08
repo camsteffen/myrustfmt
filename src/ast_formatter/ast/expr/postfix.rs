@@ -111,26 +111,24 @@ impl AstFormatter {
         let result = self.with_width_limit_end_opt(width_limit_end, || {
             // todo single line?
             self.method_call_dot_path(method_call)?;
-            if method_call.args.is_empty() {
+            let args_with_tail = || {
                 self.method_call_args_postfix_tail(
                     method_call,
                     ListStrategies::horizontal_overflow(),
                     postfix_item,
                     tail,
-                )?;
+                )
+            };
+            if method_call.args.is_empty() {
+                args_with_tail()?;
                 Ok(None)
             } else {
                 let checkpoint = self.out.checkpoint();
 
                 // todo do horizontal args on-demand as the result is needed below
                 // First just try to format the method call horizontally.
-                let horizontal_args_result = self.method_call_args_postfix_tail(
-                    method_call,
-                    ListStrategies::horizontal_overflow(),
-                    postfix_item,
-                    tail,
-                );
-                Ok(Some((checkpoint, horizontal_args_result)))
+                let result = args_with_tail();
+                Ok(Some((checkpoint, result)))
             }
         })?;
         let Some((checkpoint, horizontal_args_result)) = result else {
