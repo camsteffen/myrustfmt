@@ -148,7 +148,6 @@ where
             af.tail(opt.tail)?;
             Ok(())
         };
-        pad(af)?;
         // N.B. tails are created outside of width limit
         let end_tail = af.tail_fn(close);
         let last_item_tail = af.tail_fn(|af| {
@@ -171,38 +170,42 @@ where
         } else {
             None
         };
-        af.with_width_limit_opt(width_limit, || {
-            if len == 0 {
+        (|| -> FormatResult {
+            pad(af)?;
+            af.with_width_limit_opt(width_limit, || {
+                if len == 0 {
+                    if let Some(rest) = rest {
+                        list_rest(af, rest, Some(&end_tail))?;
+                    }
+                    return Ok(());
+                }
+
+                for index in 0..(len - 1) {
+                    af.with_single_line(|| item(index, None))?;
+                    af.out.token_maybe_missing(",")?;
+                    af.out.space()?;
+                }
+
+                if strategy.overflow {
+                    let result = if has_vertical_fallback {
+                        self.list_horizontal_overflowable(&height, recover, Some(&last_item_tail))
+                    } else {
+                        item(list.len() - 1, Some(&last_item_tail))
+                    };
+                    result.inspect_err(|_| {
+                        is_overflow_err = true;
+                    })?;
+                } else {
+                    af.with_single_line(|| item(list.len() - 1, Some(&last_item_tail)))?;
+                }
                 if let Some(rest) = rest {
+                    af.out.space()?;
                     list_rest(af, rest, Some(&end_tail))?;
                 }
-                return Ok(());
-            }
-
-            for index in 0..(len - 1) {
-                af.with_single_line(|| item(index, None))?;
-                af.out.token_maybe_missing(",")?;
-                af.out.space()?;
-            }
-
-            if strategy.overflow {
-                let result = if has_vertical_fallback {
-                    self.list_horizontal_overflowable(&height, recover, Some(&last_item_tail))
-                } else {
-                    item(list.len() - 1, Some(&last_item_tail))
-                };
-                result.inspect_err(|_| {
-                    is_overflow_err = true;
-                })?;
-            } else {
-                af.with_single_line(|| item(list.len() - 1, Some(&last_item_tail)))?;
-            }
-            if let Some(rest) = rest {
-                af.out.space()?;
-                list_rest(af, rest, Some(&end_tail))?;
-            }
+                Ok(())
+            })?;
             Ok(())
-        })
+        })()
         .inspect_err(|e| {
             if let FormatErrorKind::Vertical(_) = e.kind
                 && e.context_version >= version

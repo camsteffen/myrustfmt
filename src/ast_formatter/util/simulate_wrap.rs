@@ -3,7 +3,7 @@ use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::HSize;
 use crate::util::cell_ext::CellExt;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SimulateWrapResult {
     /// The result may be used as-is. It fits in one line.
     Ok,

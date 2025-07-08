@@ -15,12 +15,6 @@ pub struct ConstraintWriterSelfCheckpoint {
     last_width_exceeded_line: Option<VSize>,
 }
 
-#[derive(Debug)]
-pub struct ConstraintWriterLookahead {
-    buf_segment: String,
-    checkpoint: ConstraintWriterSelfCheckpoint,
-}
-
 impl ConstraintWriter {
     pub fn checkpoint(&self) -> ConstraintWriterCheckpoint {
         ConstraintWriterCheckpoint {
@@ -63,23 +57,5 @@ impl ConstraintWriter {
         self.last_line_start.set(last_line_start);
         self.last_width_exceeded_line.set(last_width_exceeded_line);
         self.line.set(line);
-    }
-
-    pub fn capture_lookahead(
-        &self,
-        from: &ConstraintWriterCheckpoint,
-    ) -> ConstraintWriterLookahead {
-        let checkpoint = self.self_checkpoint();
-        let buf_segment = self.buffer.with_taken(|b| b.split_off(from.len));
-        self.restore_self_checkpoint(&from.self_checkpoint);
-        ConstraintWriterLookahead {
-            buf_segment,
-            checkpoint,
-        }
-    }
-
-    pub fn restore_lookahead(&self, lookahead: ConstraintWriterLookahead) {
-        self.buffer.with_taken(|b| b.push_str(&lookahead.buf_segment));
-        self.restore_self_checkpoint(&lookahead.checkpoint);
     }
 }

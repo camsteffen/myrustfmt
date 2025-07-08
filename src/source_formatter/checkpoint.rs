@@ -1,6 +1,6 @@
 use crate::constraint_writer::checkpoint::ConstraintWriterCheckpoint;
 use crate::error_emitter::Checkpoint as BufferedErrorEmitterCheckpoint;
-use crate::source_formatter::{Lookahead, SourceFormatter};
+use crate::source_formatter::SourceFormatter;
 use rustc_span::BytePos;
 
 pub struct Checkpoint<'a> {
@@ -50,37 +50,6 @@ impl SourceFormatter {
             self.error_emitter.restore_checkpoint(error_emitter_checkpoint);
         }
         self.out.restore_checkpoint(writer_checkpoint);
-        self.source_reader.pos.set(source_pos);
-    }
-
-    pub fn capture_lookahead<'c, 'ca>(&self, from: &'c Checkpoint<'ca>) -> Lookahead<'c, 'ca> {
-        let error_buffer = match &from.error_emitter_checkpoint {
-            Some(error_emitter_checkpoint) => {
-                self.error_emitter.take_from_checkpoint(error_emitter_checkpoint)
-            }
-            None => Vec::new(),
-        };
-        let writer_lookahead = self.out.capture_lookahead(&from.writer_checkpoint);
-        let source_pos = self.source_reader.pos.get();
-        self.source_reader.pos.set(from.source_pos);
-        Lookahead {
-            checkpoint: from,
-            error_buffer,
-            source_pos,
-            writer_lookahead,
-        }
-    }
-
-    pub fn restore_lookahead(&self, lookahead: Lookahead) {
-        let Lookahead {
-            checkpoint,
-            error_buffer,
-            source_pos,
-            writer_lookahead,
-        } = lookahead;
-        self.restore_checkpoint(checkpoint);
-        self.error_emitter.push_vec(error_buffer);
-        self.out.restore_lookahead(writer_lookahead);
         self.source_reader.pos.set(source_pos);
     }
 }

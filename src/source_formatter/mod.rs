@@ -4,26 +4,17 @@ mod whitespace_and_comments;
 
 use self::source_reader::SourceReader;
 use crate::constraint_writer::ConstraintWriter;
-use crate::constraint_writer::checkpoint::ConstraintWriterLookahead;
 use crate::constraints::Constraints;
 use crate::error::FormatResult;
-use crate::error_emitter::{BufferedErrorEmitter, Error};
+use crate::error_emitter::BufferedErrorEmitter;
 use crate::num::{HSize, VSize};
-use crate::source_formatter::checkpoint::Checkpoint;
 use crate::span::Span;
 use crate::util::chars::is_closer_char;
-use rustc_span::{BytePos, SourceFile};
+use rustc_span::SourceFile;
 use std::cell::Cell;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
-
-pub struct Lookahead<'c, 'ca> {
-    checkpoint: &'c Checkpoint<'ca>,
-    error_buffer: Vec<Error>,
-    source_pos: BytePos,
-    writer_lookahead: ConstraintWriterLookahead,
-}
 
 pub struct SourceFormatter {
     // checkpoint_count: Cell<u32>,

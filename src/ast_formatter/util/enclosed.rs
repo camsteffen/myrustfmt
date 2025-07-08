@@ -4,6 +4,7 @@ use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
 use crate::whitespace::VerticalWhitespaceMode;
 
+// it's just an empty set but this exists for readability
 pub const ENCLOSED_DISALLOWED_VSTRUCTS: VStructSet = VStructSet::empty();
 
 impl AstFormatter {

@@ -70,19 +70,6 @@ impl BufferedErrorEmitter {
         });
     }
 
-    pub fn take_from_checkpoint(&self, checkpoint: &Checkpoint) -> Vec<Error> {
-        self.assert_last_checkpoint(checkpoint);
-        self.buffer.with_taken(|buffer| buffer.split_off(checkpoint.buffer_len))
-    }
-
-    pub fn push_vec(&self, errors: Vec<Error>) {
-        if self.is_buffering() {
-            self.buffer.with_taken(|buffer| buffer.extend(errors));
-        } else {
-            errors.into_iter().for_each(|error| self.emit(error));
-        }
-    }
-
     // actual errors
 
     pub fn line_comment_not_allowed(&self, line: VSize, col: HSize) {
