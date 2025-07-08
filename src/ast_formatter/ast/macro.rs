@@ -119,7 +119,7 @@ impl AstFormatter {
     ) -> FormatResult {
         self.list(
             brackets,
-            &args,
+            args,
             |af, item, tail, _lcx| format(af, item, tail),
             ListOptions {
                 omit_open_bracket: true,

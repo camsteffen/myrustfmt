@@ -82,7 +82,7 @@ impl FormatModuleResult {
             formatted,
         } = self;
         if error_count > 0 {
-            return Err(format!("Some errors occurred. Formatted:\n{}", formatted).into());
+            return Err(format!("Some errors occurred. Formatted:\n{formatted}").into());
         }
         Ok(formatted)
     }
@@ -95,8 +95,7 @@ impl FormatModuleResult {
         assert_eq!(
             error_count,
             0,
-            "Some errors occurred. Formatted:\n{}",
-            formatted,
+            "Some errors occurred. Formatted:\n{formatted}",
         );
         formatted
     }

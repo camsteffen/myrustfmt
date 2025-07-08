@@ -13,7 +13,7 @@ use rustc_lexer::TokenKind;
 use rustc_span::{BytePos, Pos};
 
 impl AstFormatter {
-    pub fn use_tree<'a>(&self, use_tree: &'a ast::UseTree, tail: Tail) -> FormatResult {
+    pub fn use_tree(&self, use_tree: &ast::UseTree, tail: Tail) -> FormatResult {
         self.path(&use_tree.prefix, false)?;
         match use_tree.kind {
             ast::UseTreeKind::Glob => {
@@ -48,7 +48,7 @@ impl AstFormatter {
                     self.list(
                         Brackets::CurlyNoPad,
                         &sorted,
-                        |af, &(ref use_tree, start), tail, lcx| {
+                        |af, &(use_tree, start), tail, lcx| {
                             af.out.source_reader.goto(start);
                             let owned_tail;
                             let tail = if lcx.index == sorted.len() - 1 {

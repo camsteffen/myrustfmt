@@ -185,7 +185,7 @@ impl SourceFormatter {
 
     pub fn last_line_is_closers(&self) -> bool {
         self.with_last_line(|line| {
-            let after_indent = &line[self.total_indent.get().try_into().unwrap()..];
+            let after_indent = &line[self.total_indent.get().into()..];
             after_indent.bytes().all(is_closer_char)
         })
     }

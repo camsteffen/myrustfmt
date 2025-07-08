@@ -202,7 +202,7 @@ impl AstFormatter {
             ast::BoundPolarity::Negative(_) => self.out.token("!")?,
             ast::BoundPolarity::Maybe(_) => self.out.token("?")?,
         }
-        self.trait_ref(&trait_ref)?;
+        self.trait_ref(trait_ref)?;
         Ok(())
     }
 }

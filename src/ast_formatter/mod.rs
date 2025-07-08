@@ -93,8 +93,8 @@ impl AstFormatter {
         } = &*self.module;
         self.out.comments(VerticalWhitespaceMode::Top)?;
         // todo skip the whole file if there's a skip attribute?
-        self.with_attrs(&attrs, spans.inner_span.into(), || {
-            self.list_with_item_sorting(&items, |item| self.item(item))
+        self.with_attrs(attrs, spans.inner_span.into(), || {
+            self.list_with_item_sorting(items, |item| self.item(item))
         })?;
         self.out.newline(VerticalWhitespaceMode::Bottom)?;
         Ok(())

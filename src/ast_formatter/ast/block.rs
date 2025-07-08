@@ -247,7 +247,7 @@ impl AstFormatter {
                 self.expr(expr)?;
                 self.out.token_skip(";")?;
             }
-        };
+        }
         self.out.space_token("}")?;
         Ok(())
     }

@@ -90,17 +90,15 @@ impl<'s, T> Backtrack<'_, 's, T> {
                 Ok(_) => true,
                 Err(_) if bctx.can_recover.get() => false,
                 Err(e) => match e.kind {
-                    FormatErrorKind::UnsupportedSyntax => true,
-                    // todo can we abort in more cases?
+                    FormatErrorKind::Logical | FormatErrorKind::WidthLimitExceeded => false,
                     FormatErrorKind::Vertical(_) => self.af.constraints().single_line.get(),
-                    FormatErrorKind::VStruct { .. } => true,
-                    _ => false,
+                    _ => true,
                 },
             };
             if is_done {
                 break;
             }
-            self.af.out.restore_checkpoint(&checkpoint);
+            self.af.out.restore_checkpoint(checkpoint);
             result = strategy(&bctx);
         }
         result

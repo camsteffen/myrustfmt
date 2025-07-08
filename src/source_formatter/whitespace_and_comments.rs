@@ -99,7 +99,7 @@ struct WhitespaceContext<'a> {
 }
 
 impl WhitespaceContext<'_> {
-    fn whitespace_and_comments<'a>(&mut self) -> FormatResult {
+    fn whitespace_and_comments(&mut self) -> FormatResult {
         let sf = self.sf;
 
         let tokens = tokenize_whitespace_and_comments(sf.source_reader.remaining());

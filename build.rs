@@ -25,7 +25,7 @@ fn main() {
 // (git not installed or if this is not a git repository) just return an empty string.
 fn commit_info() -> String {
     match (channel(), commit_hash(), commit_date()) {
-        (channel, Some(hash), Some(date)) => format!("{} ({} {})", channel, hash, date),
+        (channel, Some(hash), Some(date)) => format!("{channel} ({hash} {date})"),
         _ => String::new(),
     }
 }

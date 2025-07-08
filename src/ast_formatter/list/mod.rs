@@ -192,7 +192,7 @@ where
                 })?;
             } else {
                 af.with_single_line(|| item(list.len() - 1, Some(&last_item_tail)))?;
-            };
+            }
             if let Some(rest) = rest {
                 af.out.space()?;
                 list_rest(af, rest, Some(&end_tail))?;

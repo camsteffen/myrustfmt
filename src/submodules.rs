@@ -21,32 +21,28 @@ pub struct SubmoduleCollector {
 }
 
 impl SubmoduleCollector {
-    #[must_use]
     pub fn visit_item(
         &mut self,
         psess: &ParseSess,
         item: &ast::Item,
     ) -> impl FnOnce(&mut Self) + use<> {
         let mut prev = None;
-        match item.kind {
-            ast::ItemKind::Mod(_, ident, ref mod_kind) => {
-                let path_from_attr = self.path_from_attr(item);
-                if is_mod_inline(mod_kind) {
-                    let dir = path_from_attr.unwrap_or_else(|| self.inline_mod_dir(ident));
-                    let prev_dir = std::mem::replace(&mut self.dir, dir);
-                    let prev_relative = self.relative.take();
-                    prev = Some((prev_dir, prev_relative));
+        if let ast::ItemKind::Mod(_, ident, ref mod_kind) = item.kind {
+            let path_from_attr = self.path_from_attr(item);
+            if is_mod_inline(mod_kind) {
+                let dir = path_from_attr.unwrap_or_else(|| self.inline_mod_dir(ident));
+                let prev_dir = std::mem::replace(&mut self.dir, dir);
+                let prev_relative = self.relative.take();
+                prev = Some((prev_dir, prev_relative));
+            } else {
+                let submodule = if let Some(path) = path_from_attr {
+                    let relative = None;
+                    Submodule { path, relative }
                 } else {
-                    let submodule = if let Some(path) = path_from_attr {
-                        let relative = None;
-                        Submodule { path, relative }
-                    } else {
-                        self.find_external_module(psess, ident)
-                    };
-                    self.submodules.push(submodule);
-                }
+                    self.find_external_module(psess, ident)
+                };
+                self.submodules.push(submodule);
             }
-            _ => {}
         }
         |this| {
             if let Some((dir, relative)) = prev {

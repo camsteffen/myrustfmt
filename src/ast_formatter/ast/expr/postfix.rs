@@ -192,7 +192,7 @@ impl AstFormatter {
                 } else {
                     let vertical_args_height = (2 + method_call.args.len()) as VSize;
                     if vertical_chain_height <= vertical_args_height {
-                        return Err(self.err(FormatErrorKind::Logical.into()));
+                        return Err(self.err(FormatErrorKind::Logical));
                     }
                     // Use a horizontal chain with vertical method call arguments.
                     self.out.restore_checkpoint(&checkpoint);
@@ -223,7 +223,7 @@ impl AstFormatter {
             SimulateWrapResult::WrapForLongerFirstLine
                 if wrappable_items <= method_call.args.len() + 1 =>
             {
-                return Err(self.err(FormatErrorKind::Logical.into()));
+                return Err(self.err(FormatErrorKind::Logical));
             }
 
             // We couldn't do horizontal method call arguments, but we can still try vertical, and
@@ -240,7 +240,7 @@ impl AstFormatter {
 
             // Use a vertical chain if it has less excess width.
             SimulateWrapResult::WrapForLessExcessWidth => {
-                return Err(self.err(FormatErrorKind::Logical.into()));
+                return Err(self.err(FormatErrorKind::Logical));
             }
         }
         Ok(())
