@@ -13,22 +13,8 @@ pub fn is_jump_expr(expr: &ast::Expr) -> bool {
     }
 }
 
-// note: ExprKind::Cast isn't here since it is lower precedence and so it doesn't chain
-macro_rules! postfix_meta {
-    ($mac:path) => {
-        $mac! {
-            // (ExprKind(..), receiver expression, is_dot)
-            (Await(ref receiver, _), receiver, true),
-            (Field(ref receiver, _), receiver, true),
-            (MethodCall(ref method_call), &method_call.receiver, true),
-            // non-dot kinds
-            (Index(ref receiver, _, _), receiver, false),
-            (Try(ref receiver), receiver, false),
-        }
-    };
-}
-macro_rules! postfix_defs {
-    ($(($kind:ident$fields:tt, $receiver:expr, $is_dot:literal),)*) => {
+macro_rules! postfix_utils {
+    ($($kind:ident$fields:tt, $receiver:expr, $is_dot:literal,)*) => {
         macro_rules! postfix_expr_kind {
             () => ($(::rustc_ast::ast::ExprKind::$kind(..))|*);
         }
@@ -40,7 +26,7 @@ macro_rules! postfix_defs {
 
         /// If the given expression is postfix, returns its receiver expression.
         pub fn postfix_expr_receiver(postfix_expr: &ast::Expr) -> &ast::Expr {
-            match postfix_expr.kind {
+            match &postfix_expr.kind {
                 $(::rustc_ast::ast::ExprKind::$kind$fields => $receiver,)|*
                 _ => panic!("expected a postfix expression"),
             }
@@ -55,7 +41,14 @@ macro_rules! postfix_defs {
         }
     };
 }
-postfix_meta!(postfix_defs);
+postfix_utils! {
+    // note: ExprKind::Cast isn't here since it is lower precedence and so it doesn't chain
+    Await(receiver, _),      receiver,              true,
+    Field(receiver, _),      receiver,              true,
+    MethodCall(method_call), &method_call.receiver, true,
+    Index(receiver, _, _),   receiver,              false,
+    Try(receiver),           receiver,              false,
+}
 
 pub fn is_rustfmt_skip(attr: &ast::Attribute) -> bool {
     attr.path_matches(&[sym::rustfmt, sym::skip])
