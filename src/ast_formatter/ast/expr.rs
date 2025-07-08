@@ -197,10 +197,16 @@ impl AstFormatter {
 
     pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
         let first_line = self.out.line();
-        self.expr_tail(func, Some(&self.tail_token("(")))?;
-        self.has_vstruct_if(self.out.line() > first_line, VStruct::NonBlockIndent, || {
-            self.call_args(args, ListStrategies::flexible_overflow(), tail)
-        })?;
+        self.expr_tail(
+            func,
+            Some(&self.tail_fn(|af| {
+                af.out.token("(")?;
+                self.has_vstruct_if(self.out.line() > first_line, VStruct::NonBlockIndent, || {
+                    self.call_args(args, ListStrategies::flexible_overflow(), tail)
+                })?;
+                Ok(())
+            })),
+        )?;
         Ok(())
     }
 
