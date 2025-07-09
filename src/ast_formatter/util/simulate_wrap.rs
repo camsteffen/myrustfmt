@@ -3,20 +3,20 @@ use crate::constraints::{WidthLimit, WidthLimitSimulate};
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::HSize;
 use crate::util::cell_ext::CellExt;
-use std::cell::RefCell;
+use std::cell::Cell;
 use std::rc::Rc;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SimulateWrapResult {
     /// The result may be used as-is. It fits in one line.
     Ok,
-    /// Wrapping does not provide any benefit
+    /// Wrapping does not provide any benefit.
     NoWrap,
     /// Wrapping allows the code to fit in one line.
     WrapForSingleLine,
-    /// Wrapping allows more code to fit in the first line, but it is multiple lines.
+    /// Wrapping allows more code to fit in the first line, but it is still multiple lines.
     WrapForLongerFirstLine,
-    /// Wrapping exceeds the max width, but by a lesser amount.
+    /// Wrapping exceeds the max width by a lesser amount.
     WrapForLessExcessWidth,
 }
 
@@ -29,14 +29,11 @@ impl AstFormatter {
     /// limit that is enabled for the current line. Finally, it uses single line mode to limit the
     /// experiment to the first line.
     ///
+    /// See [`SimulateWrapResult`] for possible outcomes.
+    ///
     /// N.B. This function relies on a subtle invariant that the given formatting scope will emit
     /// the entire first line except for trailing comments before returning a newline-related error
     /// when applicable.
-    ///
-    /// When the extra width is used, this means one of two things: either the extra width allowed
-    /// for a different formatting strategy with more code on the first line, or the extra width was
-    /// strictly required to fit the code at all. This function is useful when these two cases are
-    /// handled in the same way.
     pub fn simulate_wrap_indent(
         &self,
         offset: HSize,
@@ -59,7 +56,7 @@ impl AstFormatter {
             let _guard = self.constraints().single_line.replace_guard(true);
             let _guard = self.constraints().width_limit().map(|width_limit| {
                 let new_width_limit = WidthLimit {
-                    simulate: Some(RefCell::new(WidthLimitSimulate::default())),
+                    simulate: Some(Cell::new(WidthLimitSimulate::default())),
                     ..*width_limit
                 };
                 self.constraints()
@@ -75,7 +72,7 @@ impl AstFormatter {
                 .width_limit()
                 .map_or(false, |width_limit| {
                     width_limit.simulate.as_ref().is_some_and(|s| {
-                        s.borrow().exceeded
+                        s.get().exceeded
                     })
                 });
             used_extra_width = self.out.col() > max_width;

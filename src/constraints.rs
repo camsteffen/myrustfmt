@@ -6,7 +6,7 @@ use crate::util::drop::Guard;
 use enumset::{EnumSet, EnumSetType};
 #[cfg(debug_assertions)]
 use std::backtrace::Backtrace;
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::num::NonZero;
 use std::rc::Rc;
 
@@ -27,6 +27,7 @@ pub struct Constraints {
     // todo using SingleLine to measure the width of the first line should ignore trailing line comments
     pub single_line: Cell<bool>,
     // todo add function to get width limit only if current line
+    // An Rc is needed here so that a Tail may capture a WidthLimit and update its simulate state.
     pub width_limit: Cell<Option<Rc<WidthLimit>>>,
     pub version: Cell<u32>,
 }
@@ -40,7 +41,7 @@ pub struct ConstraintsCheckpoint {
 pub struct WidthLimit {
     pub end_col: NonZero<HSize>,
     pub line: VSize,
-    pub simulate: Option<RefCell<WidthLimitSimulate>>,
+    pub simulate: Option<Cell<WidthLimitSimulate>>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -96,7 +97,7 @@ impl Constraints {
         ConstraintsCheckpoint {
             width_limit_simulate: self
                 .width_limit()
-                .and_then(|wl| wl.simulate.as_ref().map(|s| *s.borrow()))
+                .and_then(|wl| wl.simulate.as_ref().map(Cell::get))
                 .unwrap_or_default(),
         }
     }
@@ -108,7 +109,7 @@ impl Constraints {
         if let Some(width_limit) = self.width_limit()
             && let Some(simulate) = &width_limit.simulate
         {
-            *simulate.borrow_mut() = width_limit_simulate;
+            simulate.set(width_limit_simulate);
         }
     }
 
@@ -131,7 +132,10 @@ impl Constraints {
         {
             if let Some(simulate) = &width_limit.simulate {
                 if col > width_limit.end_col.get() {
-                    simulate.borrow_mut().exceeded = true;
+                    simulate.update(|mut s| {
+                        s.exceeded = true;
+                        s
+                    });
                 }
                 self.max_width.get()
             } else {
