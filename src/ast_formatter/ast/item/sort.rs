@@ -1,8 +1,8 @@
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::ast::item::MaybeItem;
-use crate::ast_formatter::ast::item::use_tree::order::use_tree_order;
 use crate::ast_formatter::util::ast::item_lo_with_attrs;
-use crate::ast_formatter::util::sort::version_sort;
+use crate::ast_utils::use_tree_order::{SortedUseTreeMap, use_tree_order};
+use crate::ast_utils::version_sort::version_sort;
 use crate::error::FormatResult;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -20,7 +20,7 @@ enum SortableItemGroupKind {
 }
 
 impl SortableItemGroupKind {
-    fn compare(self, a: &ast::Item, b: &ast::Item) -> Ordering {
+    fn compare(self, a: &ast::Item, b: &ast::Item, sort_map: &SortedUseTreeMap) -> Ordering {
         match self {
             SortableItemGroupKind::Mod => version_sort(
                 a.kind.ident().unwrap().as_str(),
@@ -33,7 +33,7 @@ impl SortableItemGroupKind {
                         _ => unreachable!(),
                     }
                 }
-                use_tree_order(expect_use_tree(a), expect_use_tree(b))
+                use_tree_order(expect_use_tree(a), expect_use_tree(b), sort_map)
             }
         }
     }
@@ -123,7 +123,13 @@ impl AstFormatter {
         format: impl Fn(&T) -> FormatResult,
     ) -> FormatResult {
         let mut sorted = Vec::from_iter(group);
-        sorted.sort_by(|a, b| kind.compare(a.as_item().unwrap(), b.as_item().unwrap()));
+        sorted.sort_by(|a, b| {
+            kind.compare(
+                a.as_item().unwrap(),
+                b.as_item().unwrap(),
+                &self.module.sorted_use_trees,
+            )
+        });
         for (i, element) in sorted.into_iter().enumerate() {
             if i > 0 {
                 self.out.newline_indent(VerticalWhitespaceMode::SingleNewline)?;

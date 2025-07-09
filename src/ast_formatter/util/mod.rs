@@ -7,5 +7,4 @@ pub(super) mod error;
 mod indent;
 mod infix;
 pub(super) mod simulate_wrap;
-pub(super) mod sort;
 mod wrapping;

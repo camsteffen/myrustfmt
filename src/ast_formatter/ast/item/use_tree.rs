@@ -1,6 +1,3 @@
-pub mod order;
-
-use self::order::use_tree_order;
 use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::options::{
@@ -21,7 +18,7 @@ impl AstFormatter {
                 self.out.token("*")?;
                 self.tail(tail)?;
             }
-            ast::UseTreeKind::Nested { ref items, span: _ } => {
+            ast::UseTreeKind::Nested { ref items, span } => {
                 self.out.token("::")?;
                 if let [(item, _)] = &items[..] {
                     self.out.token_skip("{")?;
@@ -36,22 +33,22 @@ impl AstFormatter {
                     )?;
                 } else {
                     self.out.token("{")?;
-                    let mut sorted = Vec::from_iter(items.iter().enumerate().map(|(i, (ut, _))| {
-                        let start = if i == 0 {
-                            self.out.source_reader.pos()
-                        } else {
-                            self.nested_item_preceding_comma(items, i) + BytePos(1)
-                        };
-                        (ut, start)
-                    }));
-                    sorted.sort_by(|(a, _), (b, _)| use_tree_order(a, b));
+                    let sorted = self.module.sorted_use_trees.get(&span.lo()).unwrap_or_else(
+                        || panic!("sorted_use_trees is missing {:?}", span.lo()),
+                    );
+                    let start_pos = self.out.source_reader.pos();
                     self.list(
                         Brackets::CurlyNoPad,
-                        &sorted,
-                        |af, &(use_tree, start), tail, lcx| {
+                        sorted,
+                        |af, &i, tail, lcx| {
+                            let start = if i == 0 {
+                                start_pos
+                            } else {
+                                self.nested_item_preceding_comma(items, i) + BytePos(1)
+                            };
                             af.out.source_reader.goto(start);
                             let owned_tail;
-                            let tail = if lcx.index == sorted.len() - 1 {
+                            let tail = if lcx.index == items.len() - 1 {
                                 owned_tail = self.tail_fn(|af| {
                                     af.out.source_reader.goto(items.last().unwrap().0.span.hi());
                                     af.tail(tail)?;
@@ -61,7 +58,7 @@ impl AstFormatter {
                             } else {
                                 tail
                             };
-                            af.use_tree(use_tree, tail)?;
+                            af.use_tree(&items[i].0, tail)?;
                             Ok(())
                         },
                         ListOptions {
@@ -69,12 +66,9 @@ impl AstFormatter {
                             tail,
                             strategies: ListStrategies::Flexible(FlexibleListStrategy {
                                 vertical: VerticalListStrategy {
-                                    item_requires_own_line: Some(Box::new(
-                                        |(use_tree, _): &(&ast::UseTree, _)| matches!(
-                                            use_tree.kind,
-                                            ast::UseTreeKind::Nested { .. },
-                                        ),
-                                    )),
+                                    item_requires_own_line: Some(Box::new(|&i| {
+                                        matches!(items[i].0.kind, ast::UseTreeKind::Nested { .. })
+                                    })),
                                     wrap_to_fit: Some(WrapToFit { .. }),
                                 },
                                 ..

@@ -1,3 +1,6 @@
+pub mod use_tree_order;
+pub mod version_sort;
+
 use rustc_ast::ast;
 use rustc_span::sym;
 

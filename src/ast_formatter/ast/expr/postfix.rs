@@ -168,7 +168,6 @@ impl AstFormatter {
             match args_horizontal(self) {
                 Ok(height) => Ok(Some(height)),
                 Err(e) => {
-                    // todo can we have a shared list_horizontal function that accepts a Recover?
                     // recover errors that might be avoided with vertical args or a vertical chain
                     let recovering = match e.kind {
                         FormatErrorKind::WidthLimitExceeded => true,

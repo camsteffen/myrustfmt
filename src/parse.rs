@@ -1,6 +1,6 @@
 use crate::CrateSource;
 use crate::ast_module::AstModule;
-use crate::module_extras::get_module_extras;
+use crate::module_extras::{ModuleExtras, get_module_extras};
 use crate::submodules::Submodule;
 use rustc_errors::ColorConfig;
 use rustc_errors::DiagCtxt;
@@ -46,7 +46,12 @@ pub fn parse_module(
         })?;
 
         let macro_args;
-        (submodules, macro_args) = get_module_extras(&psess, &items, crate_source.path(), relative);
+        let sorted_use_trees;
+        ModuleExtras {
+            macro_args,
+            sorted_use_trees,
+            submodules,
+        } = get_module_extras(&psess, &items, crate_source.path(), relative);
 
         if let Some(e) = psess.dcx().has_errors() {
             return Err(e);
@@ -56,6 +61,7 @@ pub fn parse_module(
             attrs,
             items,
             macro_args,
+            sorted_use_trees,
             spans,
         };
 

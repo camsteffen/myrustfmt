@@ -3,13 +3,13 @@ use crate::ast_formatter::tail::Tail;
 use crate::num::HSize;
 use std::num::NonZero;
 
-pub enum ListStrategies<Item> {
+pub enum ListStrategies<'a, Item> {
     Horizontal(HorizontalListStrategy),
-    Vertical(VerticalListStrategy<Item>),
-    Flexible(FlexibleListStrategy<Item>),
+    Vertical(VerticalListStrategy<'a, Item>),
+    Flexible(FlexibleListStrategy<'a, Item>),
 }
 
-impl<Item> ListStrategies<Item> {
+impl<Item> ListStrategies<'_, Item> {
     pub fn horizontal() -> Self {
         ListStrategies::Horizontal(HorizontalListStrategy { .. })
     }
@@ -37,7 +37,7 @@ impl<Item> ListStrategies<Item> {
         }
     }
 
-    pub fn get_vertical(&self) -> Option<&VerticalListStrategy<Item>> {
+    pub fn get_vertical(&self) -> Option<&VerticalListStrategy<'_, Item>> {
         match self {
             ListStrategies::Horizontal(_) => None,
             ListStrategies::Vertical(vertical)
@@ -52,12 +52,12 @@ pub struct HorizontalListStrategy {
     pub overflow: bool = false,
 }
 
-pub struct VerticalListStrategy<Item> {
-    pub item_requires_own_line: Option<Box<dyn Fn(&Item) -> bool>> = None,
+pub struct VerticalListStrategy<'a, Item> {
+    pub item_requires_own_line: Option<Box<dyn Fn(&Item) -> bool + 'a>> = None,
     pub wrap_to_fit: Option<WrapToFit> = None,
 }
 
-impl<Item> VerticalListStrategy<Item> {
+impl<Item> VerticalListStrategy<'_, Item> {
     pub fn wrap_to_fit(max_element_width: Option<HSize>) -> Self {
         VerticalListStrategy {
             wrap_to_fit: Some(WrapToFit {
@@ -70,9 +70,9 @@ impl<Item> VerticalListStrategy<Item> {
     }
 }
 
-pub struct FlexibleListStrategy<Item> {
+pub struct FlexibleListStrategy<'a, Item> {
     pub horizontal: HorizontalListStrategy = HorizontalListStrategy{..},
-    pub vertical: VerticalListStrategy<Item> = VerticalListStrategy {..},
+    pub vertical: VerticalListStrategy<'a, Item> = VerticalListStrategy {..},
 }
 
 #[derive(Clone, Copy)]
@@ -86,6 +86,6 @@ pub struct ListOptions<'ast, 'tail, Item> {
     pub is_struct: bool = false,
     pub omit_open_bracket: bool = false,
     pub rest: Option<ListRest<'ast>> = None,
-    pub strategies: ListStrategies<Item> = ListStrategies::Flexible(FlexibleListStrategy{..}),
+    pub strategies: ListStrategies<'ast, Item> = ListStrategies::Flexible(FlexibleListStrategy{..}),
     pub tail: Tail<'tail, 'ast> = None,
 }
