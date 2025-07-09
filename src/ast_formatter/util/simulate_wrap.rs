@@ -3,7 +3,6 @@ use crate::constraints::{WidthLimit, WidthLimitSimulate};
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::HSize;
 use crate::util::cell_ext::CellExt;
-use std::cell::Cell;
 use std::rc::Rc;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -56,7 +55,7 @@ impl AstFormatter {
             let _guard = self.constraints().single_line.replace_guard(true);
             let _guard = self.constraints().width_limit().map(|width_limit| {
                 let new_width_limit = WidthLimit {
-                    simulate: Some(Cell::new(WidthLimitSimulate::default())),
+                    simulate: Some(WidthLimitSimulate::default()),
                     ..*width_limit
                 };
                 self.constraints()
@@ -72,7 +71,7 @@ impl AstFormatter {
                 .width_limit()
                 .map_or(false, |width_limit| {
                     width_limit.simulate.as_ref().is_some_and(|s| {
-                        s.get().exceeded
+                        s.exceeded.get()
                     })
                 });
             used_extra_width = self.out.col() > max_width;

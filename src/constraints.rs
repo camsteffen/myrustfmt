@@ -34,19 +34,23 @@ pub struct Constraints {
 
 #[derive(Debug)]
 pub struct ConstraintsCheckpoint {
-    width_limit_simulate: WidthLimitSimulate,
+    width_limit_simulate_exceeded: bool,
 }
 
 /// Width limit imposed on a specific node or range as part of formatting logic.
 pub struct WidthLimit {
     pub end_col: NonZero<HSize>,
     pub line: VSize,
-    pub simulate: Option<Cell<WidthLimitSimulate>>,
+    pub simulate: Option<WidthLimitSimulate>,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+/// Used to track whether a width limit is exceeded without enforcing the width limit.
+///
+/// We cannot simply measure the width of the output from a given function because it might include
+/// a [`Tail`] where some of the code is not applicable to the width limit.
+#[derive(Clone, Debug, Default)]
 pub struct WidthLimitSimulate {
-    pub exceeded: bool,
+    pub exceeded: Cell<bool>,
 }
 
 pub type VStructSet = EnumSet<VStruct>;
@@ -95,21 +99,22 @@ impl Constraints {
 
     pub fn checkpoint(&self) -> ConstraintsCheckpoint {
         ConstraintsCheckpoint {
-            width_limit_simulate: self
+            width_limit_simulate_exceeded: self
                 .width_limit()
-                .and_then(|wl| wl.simulate.as_ref().map(Cell::get))
-                .unwrap_or_default(),
+                .as_ref()
+                .and_then(|wl| wl.simulate.as_ref())
+                .map_or(false, |WidthLimitSimulate { exceeded }| exceeded.get()),
         }
     }
 
     pub fn restore_checkpoint(&self, checkpoint: &ConstraintsCheckpoint) {
         let ConstraintsCheckpoint {
-            width_limit_simulate,
+            width_limit_simulate_exceeded,
         } = *checkpoint;
         if let Some(width_limit) = self.width_limit()
             && let Some(simulate) = &width_limit.simulate
         {
-            simulate.set(width_limit_simulate);
+            simulate.exceeded.set(width_limit_simulate_exceeded);
         }
     }
 
@@ -132,10 +137,7 @@ impl Constraints {
         {
             if let Some(simulate) = &width_limit.simulate {
                 if col > width_limit.end_col.get() {
-                    simulate.update(|mut s| {
-                        s.exceeded = true;
-                        s
-                    });
+                    simulate.exceeded.set(true);
                 }
                 self.max_width.get()
             } else {
