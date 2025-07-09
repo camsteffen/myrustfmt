@@ -1,4 +1,5 @@
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
+use crate::constraints::WidthLimitSimulate;
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::HSize;
 use crate::util::cell_ext::CellExt;
@@ -39,33 +40,40 @@ impl AstFormatter {
         offset: HSize,
         scope: impl FnOnce() -> FormatResult,
     ) -> FormatResult<SimulateWrapResult> {
-        let with_single_line_and_no_width_limit = || {
+        let run = || {
             let _guard = self.constraints().single_line.replace_guard(true);
-            let _guard = self.constraints().width_limit.replace_guard(None);
-            scope()
+            let _guard = self.constraints().width_limit.get().map(|mut width_limit| {
+                width_limit.simulate = Some(WidthLimitSimulate::default());
+                self.constraints()
+                    .width_limit
+                    .replace_guard(Some(width_limit))
+            });
+            let result = scope();
+            let exceeded_width_limit = self.constraints().width_limit.get().map_or(
+                false,
+                |width_limit| width_limit.simulate.is_some_and(|s| s.exceeded),
+            );
+            (result, exceeded_width_limit)
         };
-        let (result, used_extra_width) = self.out.with_recover_width(|| {
+        let (result, used_extra_width, exceeded_width_limit) = self.out.with_recover_width(|| {
             let col = self.out.col();
             let wrap_indent_col = self.out.total_indent.get() + INDENT_WIDTH + offset;
             match col.checked_sub(wrap_indent_col) {
                 None | Some(0) => {
-                    let result = with_single_line_and_no_width_limit();
-                    (result, false)
+                    let (result, exceeded_width_limit) = run();
+                    (result, false, exceeded_width_limit)
                 }
                 Some(extra_width) => {
                     let max_width = self.constraints().max_width.get();
                     let max_width_extra = max_width.saturating_add(extra_width);
-                    let result = self
+                    let (result, exceeded_width_limit) = self
                         .constraints()
                         .max_width
-                        .with_replaced(max_width_extra, with_single_line_and_no_width_limit);
+                        .with_replaced(max_width_extra, run);
                     let used_extra_width = self.out.col() > max_width;
-                    (result, used_extra_width)
+                    (result, used_extra_width, exceeded_width_limit)
                 }
             }
-        });
-        let exceeded_width_limit = self.constraints().width_limit.get().is_some_and(|wl| {
-            wl.line == self.out.line() && self.out.col() > wl.end_col.get()
         });
         let simulate_result = match result {
             Ok(()) => {

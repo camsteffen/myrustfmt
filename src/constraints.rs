@@ -1,5 +1,5 @@
 use crate::Recover;
-use crate::error::{FormatError, FormatErrorKind, FormatResult};
+use crate::error::{FormatError, FormatErrorKind, FormatResult, WidthLimitExceededError};
 use crate::num::{HSize, VSize};
 use crate::util::cell_ext::{CellExt, CellNumberExt};
 use enumset::{EnumSet, EnumSetType};
@@ -30,11 +30,22 @@ pub struct Constraints {
     pub version: Cell<u32>,
 }
 
+#[derive(Debug)]
+pub struct ConstraintsCheckpoint {
+    width_limit_simulate: WidthLimitSimulate,
+}
+
 /// Width limit imposed on a specific node or range as part of formatting logic.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WidthLimit {
     pub end_col: NonZero<HSize>,
     pub line: VSize,
+    pub simulate: Option<WidthLimitSimulate>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct WidthLimitSimulate {
+    pub exceeded: bool,
 }
 
 pub type VStructSet = EnumSet<VStruct>;
@@ -81,6 +92,28 @@ impl Constraints {
         }
     }
 
+    pub fn checkpoint(&self) -> ConstraintsCheckpoint {
+        ConstraintsCheckpoint {
+            width_limit_simulate: self
+                .width_limit
+                .get()
+                .and_then(|wl| wl.simulate)
+                .unwrap_or_default(),
+        }
+    }
+
+    pub fn restore_checkpoint(&self, checkpoint: &ConstraintsCheckpoint) {
+        let ConstraintsCheckpoint {
+            width_limit_simulate,
+        } = *checkpoint;
+        if let Some(mut width_limit) = self.width_limit.get()
+            && let Some(simulate) = &mut width_limit.simulate
+        {
+            *simulate = width_limit_simulate;
+            self.width_limit.set(Some(width_limit));
+        }
+    }
+
     pub fn err(&self, kind: FormatErrorKind) -> FormatError {
         FormatError {
             kind,
@@ -90,14 +123,27 @@ impl Constraints {
         }
     }
 
-    pub fn end_col(&self, line: VSize) -> HSize {
-        if let Some(width_limit) = self.width_limit.get()
+    pub fn require_remaining_width(
+        &self,
+        line: VSize,
+        col: HSize,
+    ) -> Result<HSize, WidthLimitExceededError> {
+        let effective_end_col = if let Some(mut width_limit) = self.width_limit.get()
             && width_limit.line == line
         {
-            self.max_width.get().min(width_limit.end_col.get())
+            if let Some(simulate) = &mut width_limit.simulate {
+                simulate.exceeded = true;
+                self.width_limit.set(Some(width_limit));
+                self.max_width.get()
+            } else {
+                self.max_width.get().min(width_limit.end_col.get())
+            }
         } else {
             self.max_width.get()
-        }
+        };
+        effective_end_col
+            .checked_sub(col)
+            .ok_or(WidthLimitExceededError)
     }
 
     // effects

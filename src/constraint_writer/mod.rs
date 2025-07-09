@@ -118,7 +118,7 @@ impl ConstraintWriter {
     }
 
     pub fn check_width_constraints(&self) -> FormatResult {
-        if self.remaining_width().is_ok() {
+        if self.require_remaining_width().is_ok() {
             return Ok(());
         }
         // If there is a fallback formatting strategy, then raise an error to trigger the
@@ -135,14 +135,8 @@ impl ConstraintWriter {
         }
     }
 
-    pub fn end_col(&self) -> HSize {
-        self.constraints.end_col(self.line())
-    }
-
-    pub fn remaining_width(&self) -> Result<HSize, WidthLimitExceededError> {
-        self.end_col()
-            .checked_sub(self.col())
-            .ok_or(WidthLimitExceededError)
+    pub fn require_remaining_width(&self) -> Result<HSize, WidthLimitExceededError> {
+        self.constraints.require_remaining_width(self.line(), self.col())
     }
 
     pub fn with_last_line<T>(&self, f: impl FnOnce(&str) -> T) -> T {

@@ -91,7 +91,11 @@ impl AstFormatter {
             return Err(self.err(FormatErrorKind::WidthLimitExceeded));
         }
         let end_col = NonZero::new(end_col).expect("width limit end should not be zero");
-        let limit = WidthLimit { end_col, line };
+        let limit = WidthLimit {
+            end_col,
+            line,
+            simulate: None,
+        };
         self.constraints().with_width_limit(limit, scope)
     }
 
