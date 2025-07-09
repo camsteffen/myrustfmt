@@ -62,9 +62,7 @@ impl ConstraintWriter {
     }
 
     pub fn is_enforcing_width(&self) -> bool {
-        if self.constraints.width_limit().is_some_and(|limit| {
-            limit.line == self.line()
-        }) {
+        if self.constraints.width_limit_end_col(self.line()).is_some() {
             return true;
         }
         if self.constraints.recover_width.get() == Some(self.line()) {

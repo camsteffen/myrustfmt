@@ -54,6 +54,10 @@ impl AstFormatter {
         )
     }
 
+    pub fn width_limit_end_col(&self) -> Option<NonZero<HSize>> {
+        self.constraints().width_limit_end_col(self.out.line())
+    }
+
     pub fn width_limit_guard(&self, width_limit: HSize) -> FormatResult<Option<impl Guard>> {
         let end_col = self.out.col() + width_limit;
         self.width_limit_end_guard(end_col)

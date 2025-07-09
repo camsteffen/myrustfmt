@@ -53,27 +53,28 @@ impl AstFormatter {
                 },
             );
             let _guard = self.constraints().single_line.replace_guard(true);
-            let _guard = self.constraints().width_limit().map(|width_limit| {
-                let new_width_limit = WidthLimit {
-                    simulate: Some(WidthLimitSimulate::default()),
-                    ..*width_limit
-                };
-                self.constraints()
-                    .width_limit
-                    .replace_guard(Some(Rc::new(new_width_limit)))
+            let width_limit_guard = self.width_limit_end_col().map(|end_col| {
+                self.constraints().width_limit.replace_guard(Some(Rc::new(
+                    WidthLimit {
+                        end_col,
+                        line: self.out.line(),
+                        simulate: Some(WidthLimitSimulate::default()),
+                    },
+                )))
             });
             let _guard = self.recover_width_guard();
 
             result = scope();
 
-            exceeded_width_limit = self
-                .constraints()
-                .width_limit()
-                .map_or(false, |width_limit| {
-                    width_limit.simulate.as_ref().is_some_and(|s| {
-                        s.exceeded.get()
-                    })
-                });
+            exceeded_width_limit = width_limit_guard.is_some()
+                && self
+                    .constraints()
+                    .width_limit()
+                    .map_or(false, |width_limit| {
+                        width_limit.simulate.as_ref().is_some_and(|s| {
+                            s.exceeded.get()
+                        })
+                    });
             used_extra_width = self.out.col() > max_width;
         };
 

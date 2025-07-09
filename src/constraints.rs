@@ -134,9 +134,7 @@ impl Constraints {
         line: VSize,
         col: HSize,
     ) -> Result<HSize, WidthLimitExceededError> {
-        let effective_end_col = if let Some(width_limit) = self.width_limit()
-            && width_limit.line == line
-        {
+        let effective_end_col = if let Some(width_limit) = self.width_limit_for_line(line) {
             if let Some(simulate) = &width_limit.simulate {
                 if col > width_limit.end_col.get() {
                     simulate.exceeded.set(true);
@@ -155,6 +153,14 @@ impl Constraints {
 
     pub fn width_limit(&self) -> Option<Rc<WidthLimit>> {
         self.width_limit.with_taken(|w| w.as_ref().map(Rc::clone))
+    }
+
+    pub fn width_limit_end_col(&self, line: VSize) -> Option<NonZero<HSize>> {
+        self.width_limit_for_line(line).map(|wl| wl.end_col)
+    }
+
+    pub fn width_limit_for_line(&self, line: VSize) -> Option<Rc<WidthLimit>> {
+        self.width_limit().filter(|wl| wl.line == line)
     }
 
     // effects
@@ -208,8 +214,7 @@ impl Constraints {
     }
 
     pub fn width_limit_guard(&self, width_limit: WidthLimit) -> Option<impl Guard> {
-        if let Some(wl) = self.width_limit()
-            && wl.line == width_limit.line
+        if let Some(wl) = self.width_limit_for_line(width_limit.line)
             && wl.end_col <= width_limit.end_col
         {
             return None;
