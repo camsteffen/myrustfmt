@@ -40,41 +40,30 @@ impl AstFormatter {
         offset: HSize,
         scope: impl FnOnce() -> FormatResult,
     ) -> FormatResult<SimulateWrapResult> {
-        let run = || {
-            let _guard = self.constraints().single_line.replace_guard(true);
-            let _guard = self.constraints().width_limit.get().map(|mut width_limit| {
-                width_limit.simulate = Some(WidthLimitSimulate::default());
+        let max_width = self.constraints().max_width.get();
+        let col = self.out.col();
+        let wrap_indent_col = self.out.total_indent.get() + INDENT_WIDTH + offset;
+        let _guard = col.checked_sub(wrap_indent_col).filter(|&w| w > 0).map(
+            |extra_width| {
+                let new_max_width = max_width.saturating_add(extra_width);
                 self.constraints()
-                    .width_limit
-                    .replace_guard(Some(width_limit))
-            });
-            let result = scope();
-            let exceeded_width_limit = self.constraints().width_limit.get().map_or(
-                false,
-                |width_limit| width_limit.simulate.is_some_and(|s| s.exceeded),
-            );
-            (result, exceeded_width_limit)
-        };
-        let (result, used_extra_width, exceeded_width_limit) = self.out.with_recover_width(|| {
-            let col = self.out.col();
-            let wrap_indent_col = self.out.total_indent.get() + INDENT_WIDTH + offset;
-            match col.checked_sub(wrap_indent_col) {
-                None | Some(0) => {
-                    let (result, exceeded_width_limit) = run();
-                    (result, false, exceeded_width_limit)
-                }
-                Some(extra_width) => {
-                    let max_width = self.constraints().max_width.get();
-                    let max_width_extra = max_width.saturating_add(extra_width);
-                    let (result, exceeded_width_limit) = self
-                        .constraints()
-                        .max_width
-                        .with_replaced(max_width_extra, run);
-                    let used_extra_width = self.out.col() > max_width;
-                    (result, used_extra_width, exceeded_width_limit)
-                }
-            }
+                    .max_width
+                    .replace_guard(new_max_width)
+            },
+        );
+        let _guard = self.constraints().single_line.replace_guard(true);
+        let _guard = self.constraints().width_limit.get().map(|mut width_limit| {
+            width_limit.simulate = Some(WidthLimitSimulate::default());
+            self.constraints()
+                .width_limit
+                .replace_guard(Some(width_limit))
         });
+        let result = self.out.with_recover_width(scope);
+        let exceeded_width_limit = self.constraints().width_limit.get().map_or(
+            false,
+            |width_limit| width_limit.simulate.is_some_and(|s| s.exceeded),
+        );
+        let used_extra_width = self.out.col() > max_width;
         let simulate_result = match result {
             Ok(()) => {
                 if used_extra_width || exceeded_width_limit {
