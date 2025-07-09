@@ -1,4 +1,6 @@
 use crate::Recover;
+#[cfg(doc)]
+use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatError, FormatErrorKind, FormatResult, WidthLimitExceededError};
 use crate::num::{HSize, VSize};
 use crate::util::cell_ext::CellExt;
