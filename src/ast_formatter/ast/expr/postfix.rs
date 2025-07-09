@@ -52,10 +52,9 @@ impl AstFormatter {
             let width_limit_end = (chain.len() > 1).then(|| start_col + POSTFIX_CHAIN_MAX_WIDTH);
             self.backtrack()
                 .next(|_| {
-                    self.out.with_recover_width(|| {
-                        let _guard = self.width_limit_end_opt_guard(width_limit_end)?;
-                        self.postfix_chain_horizontal(chain, tail)
-                    })
+                    let _guard = self.recover_width_guard();
+                    let _guard = self.width_limit_end_opt_guard(width_limit_end)?;
+                    self.postfix_chain_horizontal(chain, tail)
                 })
                 .next(|_| {
                     self.has_vstruct(VStruct::NonBlockIndent, || {
@@ -70,7 +69,8 @@ impl AstFormatter {
         let wrappable_items = chain.len();
         let (last, before_last) = chain.split_last().unwrap();
         let items = |items: &[PostfixItem]| {
-            self.with_single_line(|| items.iter().try_for_each(|item| self.postfix_item(item)))
+            let _guard = self.single_line_guard();
+            items.iter().try_for_each(|item| self.postfix_item(item))
         };
         match &last.root_or_dot_item.kind {
             ast::ExprKind::MethodCall(method_call) => {
@@ -351,12 +351,11 @@ impl AstFormatter {
                     self.out.token("[")?;
                     self.backtrack()
                         .next(|_| {
-                            self.with_single_line(|| {
-                                self.expr(index)?;
-                                self.out.token("]")?;
-                                self.tail(tail)?;
-                                Ok(())
-                            })
+                            let _guard = self.single_line_guard();
+                            self.expr(index)?;
+                            self.out.token("]")?;
+                            self.tail(tail)?;
+                            Ok(())
                         })
                         .next(|_| {
                             self.has_vstruct(VStruct::Index, || {

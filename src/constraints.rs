@@ -1,7 +1,8 @@
 use crate::Recover;
 use crate::error::{FormatError, FormatErrorKind, FormatResult, WidthLimitExceededError};
 use crate::num::{HSize, VSize};
-use crate::util::cell_ext::{CellExt, CellNumberExt};
+use crate::util::cell_ext::CellExt;
+use crate::util::drop::Guard;
 use enumset::{EnumSet, EnumSetType};
 #[cfg(debug_assertions)]
 use std::backtrace::Backtrace;
@@ -150,33 +151,21 @@ impl Constraints {
 
     // effects
 
-    pub fn allow_vstructs(
-        &self,
-        values: impl Into<VStructSet>,
-        scope: impl FnOnce() -> FormatResult,
-    ) -> FormatResult {
-        let mut next = self.disallowed_vstructs.get();
-        next.remove_all(values.into());
-        self.disallowed_vstructs.with_replaced(next, scope)
-    }
-
     pub fn disallow_vstructs(
         &self,
         values: impl Into<VStructSet>,
         recover: &Recover,
         scope: impl FnOnce() -> FormatResult,
     ) -> FormatResult {
-        let prev = self.disallowed_vstructs.get();
         let values = values.into();
-        self.disallowed_vstructs
-            .with_replaced(prev | values, scope)
-            .inspect_err(|e| {
-                if let FormatErrorKind::VStruct { vstruct, .. } = e.kind
-                    && values.contains(vstruct)
-                {
-                    recover.set(true);
-                }
-            })
+        let _guard = self.disallowed_vstructs.map_guard(|set| set | values);
+        scope().inspect_err(|e| {
+            if let FormatErrorKind::VStruct { vstruct, .. } = e.kind
+                && values.contains(vstruct)
+            {
+                recover.set(true);
+            }
+        })
     }
 
     /// Declares that the output in the given scope has the given VStruct.
@@ -197,7 +186,7 @@ impl Constraints {
         if !self.disallowed_vstructs.get().contains(vstruct) {
             return scope();
         }
-        let _guard = self.version.increment_guard();
+        let _guard = self.version.map_guard(|n| n + 1);
         let version = self.version.get();
         let _guard = self.single_line.replace_guard(true);
         scope().map_err(|mut err| {
@@ -210,17 +199,7 @@ impl Constraints {
         })
     }
 
-    pub fn with_width_limit<T>(&self, width_limit: WidthLimit, scope: impl FnOnce() -> T) -> T {
-        if let Some(wl) = self.width_limit()
-            && wl.line == width_limit.line
-            && wl.end_col <= width_limit.end_col
-        {
-            return scope();
-        }
-        self.with_replace_width_limit(Some(width_limit), scope)
-    }
-
-    pub fn width_limit_guard(&self, width_limit: WidthLimit) -> Option<impl Drop> {
+    pub fn width_limit_guard(&self, width_limit: WidthLimit) -> Option<impl Guard> {
         if let Some(wl) = self.width_limit()
             && wl.line == width_limit.line
             && wl.end_col <= width_limit.end_col
@@ -228,13 +207,5 @@ impl Constraints {
             return None;
         }
         Some(self.width_limit.replace_guard(Some(Rc::new(width_limit))))
-    }
-
-    pub fn with_replace_width_limit<T>(
-        &self,
-        width_limit: Option<WidthLimit>,
-        scope: impl FnOnce() -> T,
-    ) -> T {
-        self.width_limit.with_replaced(width_limit.map(Rc::new), scope)
     }
 }

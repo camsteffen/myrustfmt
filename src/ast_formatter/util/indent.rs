@@ -28,10 +28,10 @@ impl AstFormatter {
     }
 
     pub fn deindented<T>(&self, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        self.out.total_indent.with_replaced(
+        let _guard = self.out.total_indent.replace_guard(
             self.out.total_indent.get() - INDENT_WIDTH,
-            scope,
-        )
+        );
+        scope()
     }
 
     pub fn indented_optional(

@@ -1,25 +1,33 @@
-use crate::util::drop::drop_fn;
+use crate::util::drop::{Guard, drop_fn};
 use std::cell::Cell;
 
 pub trait CellExt<T> {
-    fn replace_guard(&self, value: T) -> impl Drop;
-    fn with_replaced<U>(&self, value: T, scope: impl FnOnce() -> U) -> U;
+    /// Updates the value and restores the previous value when the guard is dropped.
+    fn map_guard(&self, map: impl FnOnce(T) -> T) -> impl Guard
+    where
+        T: Copy;
+
+    /// Replaces the value and restores the previous value when the guard is dropped.
+    fn replace_guard(&self, value: T) -> impl Guard;
+
+    /// Takes the value, replacing it with the default value, and provides it to the given function.
+    /// After the function returns, the value is returned to the Cell.
     fn with_taken<U>(&self, scope: impl FnOnce(&mut T) -> U) -> U
     where
         T: Default;
 }
 
 impl<T> CellExt<T> for Cell<T> {
-    fn replace_guard(&self, value: T) -> impl Drop {
-        let prev = self.replace(value);
-        drop_fn(|| self.set(prev))
+    fn map_guard(&self, map: impl FnOnce(T) -> T) -> impl Guard
+    where
+        T: Copy,
+    {
+        self.replace_guard(map(self.get()))
     }
 
-    fn with_replaced<U>(&self, value: T, scope: impl FnOnce() -> U) -> U {
+    fn replace_guard(&self, value: T) -> impl Guard {
         let prev = self.replace(value);
-        let out = scope();
-        self.set(prev);
-        out
+        drop_fn(|| self.set(prev))
     }
 
     fn with_taken<U>(&self, scope: impl FnOnce(&mut T) -> U) -> U
@@ -30,26 +38,5 @@ impl<T> CellExt<T> for Cell<T> {
         let out = scope(&mut value);
         self.set(value);
         out
-    }
-}
-
-pub trait CellNumberExt {
-    fn decrement(&self);
-    fn increment(&self);
-    fn increment_guard(&self) -> impl Drop;
-}
-
-impl CellNumberExt for Cell<u32> {
-    fn decrement(&self) {
-        self.set(self.get() - 1);
-    }
-
-    fn increment(&self) {
-        self.set(self.get() + 1);
-    }
-
-    fn increment_guard(&self) -> impl Drop {
-        self.update(|n| n + 1);
-        drop_fn(|| self.update(|n| n - 1))
     }
 }

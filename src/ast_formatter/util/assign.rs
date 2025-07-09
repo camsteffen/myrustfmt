@@ -10,7 +10,11 @@ impl AstFormatter {
         self.out.space_token("=")?;
         let checkpoint_after_eq = self.out.checkpoint();
 
-        let force_wrap = if self.out.with_recover_width(|| self.out.space()).is_err() {
+        let result = {
+            let _guard = self.recover_width_guard();
+            self.out.space()
+        };
+        let force_wrap = if result.is_err() {
             true
         } else {
             match self.simulate_wrap_indent(0, || self.expr_tail(expr, tail))? {

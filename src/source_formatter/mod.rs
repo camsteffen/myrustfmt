@@ -40,7 +40,6 @@ macro_rules! delegate_to_constraint_writer {
 
 delegate_to_constraint_writer! {
     pub fn constraints(&self) -> &Constraints;
-    pub fn with_recover_width<T>(&self, scope: impl FnOnce() -> T) -> T;
     pub fn line(&self) -> VSize;
     pub fn col(&self) -> HSize;
     pub fn line_col(&self) -> (VSize, HSize);

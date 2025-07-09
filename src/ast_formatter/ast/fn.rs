@@ -6,6 +6,7 @@ use crate::error::{FormatErrorKind, FormatResult};
 
 use crate::ast_formatter::list::options::{ListOptions, ListStrategies};
 use crate::constraints::VStruct;
+use crate::util::cell_ext::CellExt;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::BindingMode;
 use rustc_ast::ast;
@@ -72,9 +73,10 @@ impl AstFormatter {
                     ast::FnRetTy::Ty(_) => true,
                 };
                 let single_line_header = af.out.line() == first_line;
-                self.allow_vstructs(VStruct::Block | VStruct::Match, || {
-                    af.closure_body(&closure.body, has_return_type, single_line_header, tail)
-                })?;
+                let _guard = af.constraints().disallowed_vstructs.map_guard(|set| {
+                    set - (VStruct::Block | VStruct::Match)
+                });
+                af.closure_body(&closure.body, has_return_type, single_line_header, tail)?;
                 Ok(())
             };
             let wrapped_return_type = self.fn_decl(
@@ -211,7 +213,8 @@ impl AstFormatter {
                 self.fn_ret_ty(&fn_decl.output, None)?;
             } else {
                 drop(indent_guard);
-                self.with_single_line_if(single_line, || self.fn_ret_ty(&fn_decl.output, tail))?;
+                let _guard = single_line.then(|| self.single_line_guard());
+                self.fn_ret_ty(&fn_decl.output, tail)?;
             }
             Ok(wrapped)
         };
@@ -246,7 +249,10 @@ impl AstFormatter {
             }
             return self
                 .backtrack()
-                .next(|_| self.out.with_recover_width(|| return_ty_tail(true, false)))
+                .next(|_| {
+                    let _guard = self.recover_width_guard();
+                    return_ty_tail(true, false)
+                })
                 .next(|_| return_ty_tail(false, true))
                 .result();
         }
@@ -254,10 +260,9 @@ impl AstFormatter {
         // there are one or more args
         self.backtrack()
             .next(|_| {
-                self.out.with_recover_width(|| {
-                    args(false)?;
-                    return_ty_tail(true, false)
-                })
+                let _guard = self.recover_width_guard();
+                args(false)?;
+                return_ty_tail(true, false)
             })
             .next(|_| {
                 args(true)?;

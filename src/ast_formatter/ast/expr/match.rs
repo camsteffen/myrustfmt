@@ -41,20 +41,20 @@ impl AstFormatter {
     fn arm_with_guard(&self, arm: &ast::Arm, guard: &ast::Expr) -> FormatResult {
         let first_line = self.out.line();
         self.pat(&arm.pat)?;
-        let single_line_guard = || {
-            self.with_single_line(|| -> FormatResult {
+        let single_line_arm_guard = || {
+            {
+                let _guard = self.single_line_guard();
                 self.out.space()?;
                 self.out.token_space("if")?;
                 self.expr(guard)?;
-                Ok(())
-            })?;
+            }
             if let Some(body) = arm.body.as_deref() {
                 self.out.space_token_space("=>")?;
                 self.arm_body_maybe_remove_block(body)?;
             }
             Ok(())
         };
-        let next_line_guard = || {
+        let next_line_arm_guard = || {
             self.indented(|| {
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 self.out.token_space("if")?;
@@ -82,9 +82,9 @@ impl AstFormatter {
         };
         self.backtrack()
             .next_if(self.out.line() == first_line, |_| {
-                self.could_wrap_indent(single_line_guard)
+                self.could_wrap_indent(single_line_arm_guard)
             })
-            .next(|_| next_line_guard())
+            .next(|_| next_line_arm_guard())
             .result()?;
         Ok(())
     }
@@ -103,11 +103,8 @@ impl AstFormatter {
         let checkpoint = self.out.checkpoint();
         let force_block = match self.simulate_wrap_indent(0, || self.expr(body))? {
             SimulateWrapResult::Ok => {
-                if self
-                    .out
-                    .with_recover_width(|| self.out.token_maybe_missing(","))
-                    .is_err()
-                {
+                let _guard = self.recover_width_guard();
+                if self.out.token_maybe_missing(",").is_err() {
                     true
                 } else {
                     return Ok(());

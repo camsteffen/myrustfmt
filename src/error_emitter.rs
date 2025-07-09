@@ -1,5 +1,5 @@
 use crate::num::{HSize, VSize};
-use crate::util::cell_ext::{CellExt, CellNumberExt};
+use crate::util::cell_ext::CellExt;
 use std::cell::Cell;
 use std::path::PathBuf;
 
@@ -51,13 +51,13 @@ impl BufferedErrorEmitter {
     pub fn checkpoint(&self) -> Checkpoint {
         let buffer_len = self.buffer.with_taken(|b| b.len());
         let index = self.checkpoint_count.get();
-        self.checkpoint_count.increment();
+        self.checkpoint_count.update(|n| n + 1);
         Checkpoint { buffer_len, index }
     }
 
     pub fn commit_checkpoint(&self, checkpoint: Checkpoint) {
         self.assert_last_checkpoint(&checkpoint);
-        self.checkpoint_count.decrement();
+        self.checkpoint_count.update(|n| n - 1);
         if !self.is_buffering() {
             self.flush();
         }
@@ -140,7 +140,7 @@ pub struct ErrorEmitter {
 
 macro_rules! emit {
     ($emitter:expr, $($t:tt)*) => {
-        $emitter.error_count.increment();
+        $emitter.error_count.update(|n| n + 1);
         eprintln!($($t)*);
     };
 }

@@ -215,11 +215,10 @@ impl AstFormatter {
         let indented = if self.out.line() == first_line {
             self.backtrack()
                 .next(|_| {
-                    self.with_single_line(|| {
-                        self.out.space()?;
-                        first_part()?;
-                        Ok(false)
-                    })
+                    let _guard = self.single_line_guard();
+                    self.out.space()?;
+                    first_part()?;
+                    Ok(false)
                 })
                 .next(|_| {
                     self.indented(|| {

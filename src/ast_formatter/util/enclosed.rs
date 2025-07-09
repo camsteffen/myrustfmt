@@ -14,9 +14,10 @@ impl AstFormatter {
             self.indented(|| {
                 self.out.newline(VerticalWhitespaceMode::Top)?;
                 self.out.indent();
-                self.constraints()
-                    .disallowed_vstructs
-                    .with_replaced(ENCLOSED_DISALLOWED_VSTRUCTS, scope)?;
+                let _guard = self.constraints().disallowed_vstructs.replace_guard(
+                    ENCLOSED_DISALLOWED_VSTRUCTS,
+                );
+                scope()?;
                 self.out.newline(VerticalWhitespaceMode::Bottom)?;
                 Ok(())
             })?;

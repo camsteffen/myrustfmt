@@ -4,7 +4,7 @@ use crate::constraints::Constraints;
 use crate::error::{FormatErrorKind, FormatResult, VerticalError, WidthLimitExceededError};
 use crate::error_emitter::BufferedErrorEmitter;
 use crate::num::{HSize, VSize};
-use crate::util::cell_ext::{CellExt, CellNumberExt};
+use crate::util::cell_ext::CellExt;
 use std::cell::Cell;
 use std::panic::Location;
 use std::rc::Rc;
@@ -61,13 +61,6 @@ impl ConstraintWriter {
         (self.line(), self.col())
     }
 
-    pub fn with_recover_width<T>(&self, scope: impl FnOnce() -> T) -> T {
-        self.constraints().recover_width.with_replaced(
-            Some(self.line()),
-            scope,
-        )
-    }
-
     pub fn is_enforcing_width(&self) -> bool {
         if self.constraints.width_limit().is_some_and(|limit| {
             limit.line == self.line()
@@ -110,7 +103,7 @@ impl ConstraintWriter {
         }
         self.buffer.with_taken(|b| b.push('\n'));
         self.last_line_start.set(self.len());
-        self.line.increment();
+        self.line.update(|n| n + 1);
         Ok(())
     }
 

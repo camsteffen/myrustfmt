@@ -7,11 +7,9 @@ impl AstFormatter {
     /// If the current position is farther right compared to the position if wrap-indented, then
     /// width is recoverable for the given scope.
     pub fn could_wrap_indent<T>(&self, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        if self.out.col() <= self.out.total_indent.get() + INDENT_WIDTH {
-            scope()
-        } else {
-            self.out.with_recover_width(scope)
-        }
+        let _guard = (self.out.col() > self.out.total_indent.get() + INDENT_WIDTH)
+            .then(|| self.recover_width_guard());
+        scope()
     }
 
     pub fn space_could_wrap_indent(&self, scope: impl Fn() -> FormatResult) -> FormatResult {
@@ -27,7 +25,11 @@ impl AstFormatter {
             return then();
         }
         self.backtrack()
-            .next(|_| self.out.with_recover_width(&then))
+            .next(|_| {
+                let _guard = self.recover_width_guard();
+                then()?;
+                Ok(())
+            })
             .next(|_| {
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 then()?;
@@ -57,7 +59,10 @@ impl AstFormatter {
             then()?;
             return Ok(None);
         }
-        let result = self.out.with_recover_width(&then);
+        let result = {
+            let _guard = self.recover_width_guard();
+            then()
+        };
         if self.out.line() != first_line {
             result?;
             return Ok(Some(self.begin_indent()));

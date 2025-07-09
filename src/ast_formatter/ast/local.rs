@@ -1,4 +1,3 @@
-use crate::Recover;
 use crate::ast_formatter::AstFormatter;
 use crate::error::FormatResult;
 use crate::num::{HSize, VSize};
@@ -72,17 +71,14 @@ impl AstFormatter {
             let else_block_horizontal = if is_single_line_init
                 && let Some(expr_only_else) = self.try_into_optional_block(else_)
             {
-                Some(move |_: &Recover| {
-                    self.with_single_line(|| {
-                        self.with_width_limit_end(
-                            start_col + RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
-                            || {
-                                self.optional_block_horizontal_after_open_brace(expr_only_else)?;
-                                self.out.token(";")?;
-                                Ok(())
-                            },
-                        )
-                    })
+                Some(move |_: &_| {
+                    let _guard = self.single_line_guard();
+                    let _guard = self.width_limit_end_guard(
+                        start_col + RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
+                    )?;
+                    self.optional_block_horizontal_after_open_brace(expr_only_else)?;
+                    self.out.token(";")?;
+                    Ok(())
                 })
             } else {
                 None
@@ -103,7 +99,11 @@ impl AstFormatter {
         self.backtrack()
             .next_if(
                 is_single_line_init || self.out.last_line_is_closers(),
-                |_| self.out.with_recover_width(same_line_else),
+                |_| {
+                    let _guard = self.recover_width_guard();
+                    same_line_else()?;
+                    Ok(())
+                },
             )
             .next(|_| next_line_else())
             .result()?;

@@ -4,6 +4,7 @@ use crate::constraints::{Constraints, VStruct, VStructSet, WidthLimit};
 use crate::error::{FormatError, FormatErrorKind, FormatResult};
 use crate::num::HSize;
 use crate::util::cell_ext::CellExt;
+use crate::util::drop::Guard;
 use std::num::NonZero;
 
 macro_rules! delegate_to_constraints {
@@ -18,10 +19,6 @@ macro_rules! delegate_to_constraints {
 
 delegate_to_constraints! {
     pub fn err(&self, kind: FormatErrorKind) -> FormatError;
-    pub fn with_replace_width_limit<T>(&self, width_limit: Option<WidthLimit>, scope: impl FnOnce() -> T) -> T;
-
-    // vertical structures
-    pub fn allow_vstructs(&self, values: impl Into<VStructSet>, scope: impl FnOnce() -> FormatResult) -> FormatResult;
     pub fn disallow_vstructs(&self, values: impl Into<VStructSet>, recover: &Recover, scope: impl FnOnce() -> FormatResult) -> FormatResult;
     pub fn has_vstruct<T>(&self, vstruct: VStruct, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T>;
 }
@@ -44,62 +41,36 @@ impl AstFormatter {
         }
     }
 
-    pub fn with_single_line<T>(&self, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        self.constraints().single_line.with_replaced(true, || {
-            self.out.with_recover_width(scope)
-        })
+    pub fn recover_width_guard(&self) -> impl Guard {
+        self.constraints().recover_width.replace_guard(Some(
+            self.out.line(),
+        ))
     }
 
-    pub fn with_single_line_if<T>(
-        &self,
-        condition: bool,
-        scope: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        if !condition {
-            return scope();
-        }
-        self.with_single_line(scope)
+    pub fn single_line_guard(&self) -> impl Guard {
+        (
+            self.constraints().single_line.replace_guard(true),
+            self.recover_width_guard(),
+        )
     }
 
-    pub fn with_width_limit<T>(
-        &self,
-        width_limit: HSize,
-        scope: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
+    pub fn width_limit_guard(&self, width_limit: HSize) -> FormatResult<Option<impl Guard>> {
         let end_col = self.out.col() + width_limit;
-        self.with_width_limit_end(end_col, scope)
+        self.width_limit_end_guard(end_col)
     }
 
-    pub fn with_width_limit_opt<T>(
+    pub fn width_limit_opt_guard(
         &self,
         width_limit: Option<HSize>,
-        scope: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        match width_limit {
-            None => scope(),
-            Some(width_limit) => self.with_width_limit(width_limit, scope),
-        }
-    }
-
-    pub fn with_width_limit_end<T>(
-        &self,
-        end_col: HSize,
-        scope: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
-        let line = self.out.line();
-        if self.out.col() > end_col {
-            return Err(self.err(FormatErrorKind::WidthLimitExceeded));
-        }
-        let end_col = NonZero::new(end_col).expect("width limit end should not be zero");
-        let limit = WidthLimit {
-            end_col,
-            line,
-            simulate: None,
+    ) -> FormatResult<Option<impl Guard>> {
+        let Some(width_limit) = width_limit else {
+            return Ok(None);
         };
-        self.constraints().with_width_limit(limit, scope)
+        let end_col = self.out.col() + width_limit;
+        self.width_limit_end_guard(end_col)
     }
 
-    pub fn width_limit_end_guard(&self, end_col: HSize) -> FormatResult<Option<impl Drop>> {
+    pub fn width_limit_end_guard(&self, end_col: HSize) -> FormatResult<Option<impl Guard>> {
         let line = self.out.line();
         if self.out.col() > end_col {
             return Err(self.err(FormatErrorKind::WidthLimitExceeded));
@@ -116,7 +87,7 @@ impl AstFormatter {
     pub fn width_limit_end_opt_guard(
         &self,
         end_col: Option<HSize>,
-    ) -> FormatResult<Option<impl Drop>> {
+    ) -> FormatResult<Option<impl Guard>> {
         let Some(end_col) = end_col else {
             return Ok(None);
         };

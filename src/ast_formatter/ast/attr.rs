@@ -9,6 +9,7 @@ use crate::constraints::VStruct;
 use crate::error::{FormatErrorKind, FormatResult, VerticalError};
 use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::span::Span;
+use crate::util::cell_ext::CellExt;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 
@@ -38,7 +39,8 @@ impl AstFormatter {
             // todo make my own attribute? or comment?
             // handle #[rustfmt::skip]
             if attrs.iter().any(is_rustfmt_skip) {
-                self.with_replace_width_limit(None, || self.out.copy_span(span))?;
+                let _guard = self.constraints().width_limit.replace_guard(None);
+                self.out.copy_span(span)?;
                 self.tail(tail)?;
             } else {
                 self.with_copy_span_fallback(span, format, tail)?;
@@ -87,7 +89,8 @@ impl AstFormatter {
             "an error should be emitted before copy fallback",
         );
         self.out.restore_checkpoint(&checkpoint);
-        self.with_replace_width_limit(None, || self.out.copy_span(span))?;
+        let _guard = self.constraints().width_limit.replace_guard(None);
+        self.out.copy_span(span)?;
         self.tail(tail)?;
         Ok(())
     }

@@ -160,22 +160,21 @@ impl AstFormatter {
     ) -> FormatResult {
         self.backtrack()
             .next(|_| {
-                self.with_single_line(|| {
-                    self.with_width_limit(RUSTFMT_CONFIG_DEFAULTS.fn_call_width, || {
-                        self.expr(expr)?;
-                        self.out.token_space(",")?;
-                        self.pat(pat)?;
-                        if let Some(guard) = guard {
-                            self.out.space_token_space("if")?;
-                            self.expr(guard)?;
-                        }
-                        Ok(())
-                    })?;
-                    self.out.token_skip_if_present(",")?;
-                    self.out.token_replace(")")?;
-                    self.tail(tail)?;
-                    Ok(())
-                })
+                let _guard = self.single_line_guard();
+                let width_limit_guard =
+                    self.width_limit_guard(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)?;
+                self.expr(expr)?;
+                self.out.token_space(",")?;
+                self.pat(pat)?;
+                if let Some(guard) = guard {
+                    self.out.space_token_space("if")?;
+                    self.expr(guard)?;
+                }
+                drop(width_limit_guard);
+                self.out.token_skip_if_present(",")?;
+                self.out.token_replace(")")?;
+                self.tail(tail)?;
+                Ok(())
             })
             .next(|_| {
                 self.indented(|| {

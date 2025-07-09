@@ -18,7 +18,7 @@ use crate::constraints::VStruct;
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::VSize;
 use crate::source_formatter::checkpoint::Checkpoint;
-use crate::util::cell_ext::CellNumberExt;
+use crate::util::cell_ext::CellExt;
 use crate::whitespace::VerticalWhitespaceMode;
 use std::cell::Cell;
 
@@ -91,9 +91,10 @@ where
         }
 
         let recover = Recover::default();
-        let horizontal_result = self.af.out.with_recover_width(|| {
+        let horizontal_result = {
+            let _guard = self.af.recover_width_guard();
             self.list_horizontal(strategy.horizontal, &recover, true)
-        });
+        };
         if let Err(e) = horizontal_result {
             let recovering = recover.get()
                 || match e.kind {
@@ -130,7 +131,7 @@ where
         let rest = opt.rest;
         let len = list.len();
         let first_line = self.af.out.line();
-        let _guard = self.af.constraints().version.increment_guard();
+        let _guard = self.af.constraints().version.map_guard(|n| n + 1);
         let version = self.af.constraints().version.get();
         let item = |index, tail| self.list_item(index, Some(recover), tail);
         let pad = |af: &AstFormatter| -> FormatResult {
@@ -172,38 +173,38 @@ where
         };
         (|| -> FormatResult {
             pad(af)?;
-            af.with_width_limit_opt(width_limit, || {
-                if len == 0 {
-                    if let Some(rest) = rest {
-                        list_rest(af, rest, Some(&end_tail))?;
-                    }
-                    return Ok(());
-                }
-
-                for index in 0..(len - 1) {
-                    af.with_single_line(|| item(index, None))?;
-                    af.out.token_maybe_missing(",")?;
-                    af.out.space()?;
-                }
-
-                if strategy.overflow {
-                    let result = if has_vertical_fallback {
-                        self.list_horizontal_overflowable(&height, recover, Some(&last_item_tail))
-                    } else {
-                        item(list.len() - 1, Some(&last_item_tail))
-                    };
-                    result.inspect_err(|_| {
-                        is_overflow_err = true;
-                    })?;
-                } else {
-                    af.with_single_line(|| item(list.len() - 1, Some(&last_item_tail)))?;
-                }
+            let _guard = af.width_limit_opt_guard(width_limit)?;
+            if len == 0 {
                 if let Some(rest) = rest {
-                    af.out.space()?;
                     list_rest(af, rest, Some(&end_tail))?;
                 }
-                Ok(())
-            })?;
+                return Ok(());
+            }
+
+            let single_line_guard = af.single_line_guard();
+            for index in 0..(len - 1) {
+                item(index, None)?;
+                af.out.token_maybe_missing(",")?;
+                af.out.space()?;
+            }
+
+            if strategy.overflow {
+                drop(single_line_guard);
+                let result = if has_vertical_fallback {
+                    self.list_horizontal_overflowable(&height, recover, Some(&last_item_tail))
+                } else {
+                    item(list.len() - 1, Some(&last_item_tail))
+                };
+                result.inspect_err(|_| {
+                    is_overflow_err = true;
+                })?;
+            } else {
+                item(list.len() - 1, Some(&last_item_tail))?;
+            }
+            if let Some(rest) = rest {
+                af.out.space()?;
+                list_rest(af, rest, Some(&end_tail))?;
+            }
             Ok(())
         })()
         .inspect_err(|e| {
@@ -289,13 +290,17 @@ where
         } = self;
         let item = |index| {
             let item = || self.list_item(index, None, None);
-            if let Some(max_width) = max_element_width
+            let _guard = if let Some(max_width) = max_element_width
                 && !format_string_pos.is_some_and(|i| index == i as usize)
             {
-                af.with_single_line(|| af.with_width_limit(max_width.get(), item))
+                Some((
+                    af.single_line_guard(),
+                    af.width_limit_guard(max_width.get())?,
+                ))
             } else {
-                item()
-            }
+                None
+            };
+            item()
         };
         af.enclosed_contents(|| {
             let (first, rest) = (0, 1..list.len());
@@ -318,11 +323,10 @@ where
                 }
                 af.backtrack()
                     .next_if(!is_own_line, |_| {
-                        af.out.with_recover_width(|| {
-                            af.out.space()?;
-                            item_comma()?;
-                            Ok(())
-                        })
+                        let _guard = af.recover_width_guard();
+                        af.out.space()?;
+                        item_comma()?;
+                        Ok(())
                     })
                     .next(|_| {
                         af.out.newline_indent(VerticalWhitespaceMode::Break)?;

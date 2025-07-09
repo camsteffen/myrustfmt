@@ -4,7 +4,6 @@ use crate::ast_formatter::ast::r#macro::MacCallSemi;
 use crate::ast_formatter::tail::Tail;
 use crate::ast_utils::{is_jump_expr, plain_block};
 use crate::error::FormatResult;
-use crate::util::cell_ext::CellExt;
 use crate::util::whitespace_utils::{is_whitespace, is_whitespace_or_semicolon};
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -35,7 +34,7 @@ impl AstFormatter {
             Some(expr_only_block) => {
                 self.backtrack()
                     .next(|_| {
-                        let _guard = self.constraints().single_line.replace_guard(true);
+                        let _guard = self.single_line_guard();
                         self.optional_block_horizontal_after_open_brace(expr_only_block)?;
                         self.tail(tail)?;
                         Ok(())

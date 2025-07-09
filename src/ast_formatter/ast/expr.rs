@@ -2,7 +2,6 @@ mod binary_expr;
 mod r#match;
 mod postfix;
 
-use crate::Recover;
 use crate::ast_formatter::ast::r#macro::MacCallSemi;
 use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::ListItemContext;
@@ -351,19 +350,16 @@ impl AstFormatter {
                 let block_expr = self.try_into_optional_block(block)?;
                 let else_expr = self.try_into_optional_block(else_block)?;
 
-                Some(move |_: &Recover| {
-                    self.with_single_line(|| {
-                        self.with_width_limit_end(
-                            start_col + RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
-                            || {
-                                self.optional_block_horizontal_after_open_brace(block_expr)?;
-                                self.out.space_token_space("else")?;
-                                self.optional_block_horizontal(else_expr)?;
-                                self.tail(tail)?;
-                                Ok(())
-                            },
-                        )
-                    })
+                Some(move |_: &_| {
+                    let _guard = self.single_line_guard();
+                    let _guard = self.width_limit_end_guard(
+                        start_col + RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
+                    )?;
+                    self.optional_block_horizontal_after_open_brace(block_expr)?;
+                    self.out.space_token_space("else")?;
+                    self.optional_block_horizontal(else_expr)?;
+                    self.tail(tail)?;
+                    Ok(())
                 })
             })();
 
@@ -438,13 +434,13 @@ impl AstFormatter {
                         Some(&self.tail_fn(|af| {
                             let end_start = self.out.col();
                             let before_end = self.out.checkpoint();
-                            let Err(err) = self.out.with_recover_width(|| -> FormatResult {
+                            let result = (|| -> FormatResult {
+                                let _guard = self.recover_width_guard();
                                 af.out.token(")")?;
                                 af.tail(tail)?;
                                 Ok(())
-                            }) else {
-                                return Ok(());
-                            };
+                            })();
+                            let Err(err) = result else { return Ok(()) };
                             if err.kind != FormatErrorKind::WidthLimitExceeded {
                                 return Err(err);
                             }
@@ -621,7 +617,10 @@ impl AstFormatter {
             self.backtrack()
                 .next_if(
                     self.out.line() == first_line || self.out.last_line_is_closers(),
-                    |_| self.with_single_line(|| self.out.space_token("{")),
+                    |_| {
+                        let _guard = self.recover_width_guard();
+                        self.out.space_token("{")
+                    },
                 )
                 .next(|_| {
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
