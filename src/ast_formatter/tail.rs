@@ -2,6 +2,7 @@ use crate::ast_formatter::AstFormatter;
 use crate::constraints::{VStructSet, WidthLimit};
 use crate::error::FormatResult;
 use crate::util::cell_ext::CellExt;
+use std::rc::Rc;
 
 pub type Tail<'a, 'b> = Option<&'a TailS<'b>>;
 
@@ -26,7 +27,7 @@ pub struct TailS<'a> {
     // todo what about disallowed vstructs?
     disallowed_vstructs: VStructSet,
     single_line: bool,
-    width_limit: Option<WidthLimit>,
+    width_limit: Option<Rc<WidthLimit>>,
     constraint_version: u32,
 }
 
@@ -37,7 +38,7 @@ impl AstFormatter {
             func: Box::new(tail),
             disallowed_vstructs: self.constraints().disallowed_vstructs.get(),
             single_line: self.constraints().single_line.get(),
-            width_limit: self.constraints().width_limit.get(),
+            width_limit: self.constraints().width_limit(),
             constraint_version: self.constraints().version.get(),
         }
     }
@@ -60,7 +61,7 @@ impl AstFormatter {
             tail.single_line,
         );
         let _guard = self.constraints().width_limit.replace_guard(
-            tail.width_limit,
+            tail.width_limit.as_ref().map(Rc::clone),
         );
         (tail.func)(self)
     }

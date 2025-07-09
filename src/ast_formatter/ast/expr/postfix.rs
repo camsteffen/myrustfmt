@@ -53,7 +53,8 @@ impl AstFormatter {
             self.backtrack()
                 .next(|_| {
                     self.out.with_recover_width(|| {
-                        self.postfix_chain_horizontal(chain, width_limit_end, tail)
+                        let _guard = self.width_limit_end_opt_guard(width_limit_end)?;
+                        self.postfix_chain_horizontal(chain, tail)
                     })
                 })
                 .next(|_| {
@@ -65,20 +66,11 @@ impl AstFormatter {
         }
     }
 
-    fn postfix_chain_horizontal(
-        &self,
-        chain: &[PostfixItem],
-        width_limit_end: Option<HSize>,
-        tail: Tail,
-    ) -> FormatResult {
+    fn postfix_chain_horizontal(&self, chain: &[PostfixItem], tail: Tail) -> FormatResult {
         let wrappable_items = chain.len();
         let (last, before_last) = chain.split_last().unwrap();
         let items = |items: &[PostfixItem]| {
-            self.with_single_line(|| {
-                items.iter().try_for_each(|item| {
-                    self.with_width_limit_end_opt(width_limit_end, || self.postfix_item(item))
-                })
-            })
+            self.with_single_line(|| items.iter().try_for_each(|item| self.postfix_item(item)))
         };
         match &last.root_or_dot_item.kind {
             ast::ExprKind::MethodCall(method_call) => {
@@ -86,7 +78,6 @@ impl AstFormatter {
                 self.postfix_chain_horizontal_last_method_call(
                     method_call,
                     last,
-                    width_limit_end,
                     wrappable_items,
                     tail,
                 )?;
@@ -104,53 +95,81 @@ impl AstFormatter {
         &self,
         method_call: &ast::MethodCall,
         postfix_item: &PostfixItem,
-        width_limit_end: Option<HSize>,
         wrappable_items: usize,
         tail: Tail,
     ) -> FormatResult {
         let method_col_start = self.out.col();
-        let args_horizontal_tail = || {
-            self.method_call_args_postfix_tail(
+        let checkpoint = self.out.checkpoint();
+        let args_horizontal = |af: &Self| {
+            af.method_call_args_postfix_tail(
                 method_call,
                 ListStrategies::horizontal_overflow(),
                 postfix_item,
                 tail,
             )
         };
-        self.with_width_limit_end_opt(width_limit_end, || {
-            // todo single line?
-            self.method_call_dot_path(method_call)
+        let path_tail = self.tail_fn(|af| {
+            // If there are any arguments, then they can be formatted vertically, and then the
+            // arguments and tail do not affect whether the path fits in one line.
+            if method_call.args.is_empty() {
+                args_horizontal(af)?;
+            }
+            Ok(())
+        });
+        let path_wrap_result = self.simulate_wrap_indent(0, || {
+            self.method_call_dot_path(method_call, Some(&path_tail))
         })?;
+        match path_wrap_result {
+            // the path fits in one line
+            SimulateWrapResult::Ok => {}
+
+            // A vertical chain wouldn't prevent vertical path generics
+            SimulateWrapResult::NoWrap => {
+                self.out.restore_checkpoint(&checkpoint);
+                self.method_call_dot_path(method_call, Some(&path_tail))?;
+                if !method_call.args.is_empty() {
+                    self.method_call_args_postfix_tail(
+                        method_call,
+                        ListStrategies::flexible_overflow(),
+                        postfix_item,
+                        tail,
+                    )?;
+                }
+                return Ok(());
+            }
+
+            // A vertical chain prevents vertical path generics
+            SimulateWrapResult::WrapForSingleLine
+            | SimulateWrapResult::WrapForLongerFirstLine
+            | SimulateWrapResult::WrapForLessExcessWidth => {
+                return Err(self.err(FormatErrorKind::Logical));
+            }
+        }
         if method_call.args.is_empty() {
-            self.with_width_limit_end_opt(width_limit_end, args_horizontal_tail)?;
             return Ok(());
         }
+
         let checkpoint = self.out.checkpoint();
 
-        // todo what if path segment is multi-line?
+        // Simulate wrapping the method call as if in a vertical chain.
         let width_before_args = self.out.col() - method_col_start;
-
-        // We may or may not have been able to format the method call horizontally. Either way,
-        // next we'll simulate wrapping the method call as if in a vertical chain.
-        let wrap_result = self.with_width_limit_end_opt(width_limit_end, || {
-            self.simulate_wrap_indent(width_before_args, || {
-                self.method_call_args_postfix_tail(
-                    method_call,
-                    ListStrategies::flexible_overflow(),
-                    postfix_item,
-                    tail,
-                )?;
-                Ok(())
-            })
+        let wrap_result = self.simulate_wrap_indent(width_before_args, || {
+            self.method_call_args_postfix_tail(
+                method_call,
+                ListStrategies::flexible_overflow(),
+                postfix_item,
+                tail,
+            )?;
+            Ok(())
         })?;
 
         let args_horizontal_or_recover = || {
             self.out.restore_checkpoint(&checkpoint);
-            let result = self.with_width_limit_end_opt(width_limit_end, args_horizontal_tail);
-            match result {
+            match args_horizontal(self) {
                 Ok(height) => Ok(Some(height)),
                 Err(e) => {
                     // todo can we have a shared list_horizontal function that accepts a Recover?
+                    // recover errors that might be avoided with vertical args or a vertical chain
                     let recovering = match e.kind {
                         FormatErrorKind::WidthLimitExceeded => true,
                         FormatErrorKind::Vertical(_) => true,
@@ -164,9 +183,6 @@ impl AstFormatter {
             }
         };
 
-        // This is a very complex decision tree! One unifying theme is that vertical chains are
-        // preferred when they do not increase the overall height. The principle is to prefer
-        // splitting outer structures over inner structures.
         match wrap_result {
             SimulateWrapResult::Ok => Ok(()),
 
@@ -207,7 +223,6 @@ impl AstFormatter {
                 if args_horizontal_or_recover()?.is_some() {
                     Ok(())
                 } else if wrap_result == SimulateWrapResult::WrapForLongerFirstLine
-                    // todo account for multi-line turbofish
                     && wrappable_items <= method_call.args.len() + 1
                 {
                     // We have a choice between vertical method call arguments or a vertical chain.
@@ -275,20 +290,32 @@ impl AstFormatter {
         method_call: &ast::MethodCall,
         postfix_item: &PostfixItem,
         tail: Tail,
-    ) -> FormatResult<VSize> {
-        self.method_call_dot_path(method_call)?;
-        let args_height = self.method_call_args_postfix_tail(
+    ) -> FormatResult {
+        self.method_call_dot_path(
             method_call,
-            ListStrategies::flexible_overflow(),
-            postfix_item,
-            tail,
-        )?;
-        Ok(args_height)
+            Some(&self.tail_fn(|af| {
+                af.method_call_args_postfix_tail(
+                    method_call,
+                    ListStrategies::flexible_overflow(),
+                    postfix_item,
+                    tail,
+                )?;
+                Ok(())
+            })),
+        )
     }
 
-    fn method_call_dot_path(&self, method_call: &ast::MethodCall) -> FormatResult {
+    fn method_call_dot_path(&self, method_call: &ast::MethodCall, tail: Tail) -> FormatResult {
         self.out.token(".")?;
-        self.path_segment(&method_call.seg, true, Some(&self.tail_token("(")))?;
+        self.path_segment(
+            &method_call.seg,
+            true,
+            Some(&self.tail_fn(|af| {
+                af.out.token("(")?;
+                af.tail(tail)?;
+                Ok(())
+            })),
+        )?;
         Ok(())
     }
 

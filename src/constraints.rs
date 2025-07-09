@@ -5,10 +5,10 @@ use crate::util::cell_ext::{CellExt, CellNumberExt};
 use enumset::{EnumSet, EnumSetType};
 #[cfg(debug_assertions)]
 use std::backtrace::Backtrace;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::num::NonZero;
+use std::rc::Rc;
 
-#[derive(Clone, Debug, PartialEq)]
 pub struct Constraints {
     pub disallowed_vstructs: Cell<VStructSet>,
     // max_width and width_limit are very similar in effect, but they need to be separate values for
@@ -26,7 +26,7 @@ pub struct Constraints {
     // todo using SingleLine to measure the width of the first line should ignore trailing line comments
     pub single_line: Cell<bool>,
     // todo add function to get width limit only if current line
-    pub width_limit: Cell<Option<WidthLimit>>,
+    pub width_limit: Cell<Option<Rc<WidthLimit>>>,
     pub version: Cell<u32>,
 }
 
@@ -36,11 +36,10 @@ pub struct ConstraintsCheckpoint {
 }
 
 /// Width limit imposed on a specific node or range as part of formatting logic.
-#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WidthLimit {
     pub end_col: NonZero<HSize>,
     pub line: VSize,
-    pub simulate: Option<WidthLimitSimulate>,
+    pub simulate: Option<RefCell<WidthLimitSimulate>>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -95,9 +94,8 @@ impl Constraints {
     pub fn checkpoint(&self) -> ConstraintsCheckpoint {
         ConstraintsCheckpoint {
             width_limit_simulate: self
-                .width_limit
-                .get()
-                .and_then(|wl| wl.simulate)
+                .width_limit()
+                .and_then(|wl| wl.simulate.as_ref().map(|s| *s.borrow()))
                 .unwrap_or_default(),
         }
     }
@@ -106,11 +104,10 @@ impl Constraints {
         let ConstraintsCheckpoint {
             width_limit_simulate,
         } = *checkpoint;
-        if let Some(mut width_limit) = self.width_limit.get()
-            && let Some(simulate) = &mut width_limit.simulate
+        if let Some(width_limit) = self.width_limit()
+            && let Some(simulate) = &width_limit.simulate
         {
-            *simulate = width_limit_simulate;
-            self.width_limit.set(Some(width_limit));
+            *simulate.borrow_mut() = width_limit_simulate;
         }
     }
 
@@ -128,12 +125,13 @@ impl Constraints {
         line: VSize,
         col: HSize,
     ) -> Result<HSize, WidthLimitExceededError> {
-        let effective_end_col = if let Some(mut width_limit) = self.width_limit.get()
+        let effective_end_col = if let Some(width_limit) = self.width_limit()
             && width_limit.line == line
         {
-            if let Some(simulate) = &mut width_limit.simulate {
-                simulate.exceeded = true;
-                self.width_limit.set(Some(width_limit));
+            if let Some(simulate) = &width_limit.simulate {
+                if col > width_limit.end_col.get() {
+                    simulate.borrow_mut().exceeded = true;
+                }
                 self.max_width.get()
             } else {
                 self.max_width.get().min(width_limit.end_col.get())
@@ -144,6 +142,10 @@ impl Constraints {
         effective_end_col
             .checked_sub(col)
             .ok_or(WidthLimitExceededError)
+    }
+
+    pub fn width_limit(&self) -> Option<Rc<WidthLimit>> {
+        self.width_limit.with_taken(|w| w.as_ref().map(Rc::clone))
     }
 
     // effects
@@ -209,7 +211,7 @@ impl Constraints {
     }
 
     pub fn with_width_limit<T>(&self, width_limit: WidthLimit, scope: impl FnOnce() -> T) -> T {
-        if let Some(wl) = self.width_limit.get()
+        if let Some(wl) = self.width_limit()
             && wl.line == width_limit.line
             && wl.end_col <= width_limit.end_col
         {
@@ -218,11 +220,21 @@ impl Constraints {
         self.with_replace_width_limit(Some(width_limit), scope)
     }
 
+    pub fn width_limit_guard(&self, width_limit: WidthLimit) -> Option<impl Drop> {
+        if let Some(wl) = self.width_limit()
+            && wl.line == width_limit.line
+            && wl.end_col <= width_limit.end_col
+        {
+            return None;
+        }
+        Some(self.width_limit.replace_guard(Some(Rc::new(width_limit))))
+    }
+
     pub fn with_replace_width_limit<T>(
         &self,
         width_limit: Option<WidthLimit>,
         scope: impl FnOnce() -> T,
     ) -> T {
-        self.width_limit.with_replaced(width_limit, scope)
+        self.width_limit.with_replaced(width_limit.map(Rc::new), scope)
     }
 }

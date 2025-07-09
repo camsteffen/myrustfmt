@@ -62,13 +62,14 @@ impl ConstraintWriter {
     }
 
     pub fn with_recover_width<T>(&self, scope: impl FnOnce() -> T) -> T {
-        self.constraints()
-            .recover_width
-            .with_replaced(Some(self.line()), scope)
+        self.constraints().recover_width.with_replaced(
+            Some(self.line()),
+            scope,
+        )
     }
 
     pub fn is_enforcing_width(&self) -> bool {
-        if self.constraints.width_limit.get().is_some_and(|limit| {
+        if self.constraints.width_limit().is_some_and(|limit| {
             limit.line == self.line()
         }) {
             return true;

@@ -1,8 +1,10 @@
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
-use crate::constraints::WidthLimitSimulate;
+use crate::constraints::{WidthLimit, WidthLimitSimulate};
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::HSize;
 use crate::util::cell_ext::CellExt;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SimulateWrapResult {
@@ -46,23 +48,28 @@ impl AstFormatter {
         let _guard = col.checked_sub(wrap_indent_col).filter(|&w| w > 0).map(
             |extra_width| {
                 let new_max_width = max_width.saturating_add(extra_width);
-                self.constraints()
-                    .max_width
-                    .replace_guard(new_max_width)
+                self.constraints().max_width.replace_guard(new_max_width)
             },
         );
         let _guard = self.constraints().single_line.replace_guard(true);
-        let _guard = self.constraints().width_limit.get().map(|mut width_limit| {
-            width_limit.simulate = Some(WidthLimitSimulate::default());
+        let _guard = self.constraints().width_limit().map(|width_limit| {
+            let new_width_limit = WidthLimit {
+                simulate: Some(RefCell::new(WidthLimitSimulate::default())),
+                ..*width_limit
+            };
             self.constraints()
                 .width_limit
-                .replace_guard(Some(width_limit))
+                .replace_guard(Some(Rc::new(new_width_limit)))
         });
         let result = self.out.with_recover_width(scope);
-        let exceeded_width_limit = self.constraints().width_limit.get().map_or(
-            false,
-            |width_limit| width_limit.simulate.is_some_and(|s| s.exceeded),
-        );
+        let exceeded_width_limit = self
+            .constraints()
+            .width_limit()
+            .map_or(false, |width_limit| {
+                width_limit.simulate.as_ref().is_some_and(|s| {
+                    s.borrow().exceeded
+                })
+            });
         let used_extra_width = self.out.col() > max_width;
         let simulate_result = match result {
             Ok(()) => {

@@ -62,9 +62,9 @@ fn read_config_values(file_name: &Path) -> Vec<(String, String)> {
     BufReader::new(fs::File::open(file_name).unwrap())
         .lines()
         .map_while(|line| {
-            regex
-                .captures(&line.unwrap())
-                .map(|capture| (capture[1].to_owned(), capture[2].to_owned()))
+            regex.captures(&line.unwrap()).map(|capture| {
+                (capture[1].to_owned(), capture[2].to_owned())
+            })
         })
         .collect()
 }

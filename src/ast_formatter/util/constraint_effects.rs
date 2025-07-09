@@ -45,9 +45,9 @@ impl AstFormatter {
     }
 
     pub fn with_single_line<T>(&self, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        self.constraints()
-            .single_line
-            .with_replaced(true, || self.out.with_recover_width(scope))
+        self.constraints().single_line.with_replaced(true, || {
+            self.out.with_recover_width(scope)
+        })
     }
 
     pub fn with_single_line_if<T>(
@@ -99,14 +99,27 @@ impl AstFormatter {
         self.constraints().with_width_limit(limit, scope)
     }
 
-    pub fn with_width_limit_end_opt<T>(
+    pub fn width_limit_end_guard(&self, end_col: HSize) -> FormatResult<Option<impl Drop>> {
+        let line = self.out.line();
+        if self.out.col() > end_col {
+            return Err(self.err(FormatErrorKind::WidthLimitExceeded));
+        }
+        let end_col = NonZero::new(end_col).expect("width limit end should not be zero");
+        let limit = WidthLimit {
+            end_col,
+            line,
+            simulate: None,
+        };
+        Ok(self.constraints().width_limit_guard(limit))
+    }
+
+    pub fn width_limit_end_opt_guard(
         &self,
         end_col: Option<HSize>,
-        scope: impl FnOnce() -> FormatResult<T>,
-    ) -> FormatResult<T> {
+    ) -> FormatResult<Option<impl Drop>> {
         let Some(end_col) = end_col else {
-            return scope();
+            return Ok(None);
         };
-        self.with_width_limit_end(end_col, scope)
+        self.width_limit_end_guard(end_col)
     }
 }
