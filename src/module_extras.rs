@@ -80,7 +80,9 @@ impl Visitor<'_> for ModuleExtrasVisitor<'_> {
     }
 
     fn visit_use_tree(&mut self, use_tree: &ast::UseTree) {
+        // must walk first since ordering of this tree might depend on nested trees
         visit::walk_use_tree(self, use_tree);
+
         if let ast::UseTreeKind::Nested { items, span } = &use_tree.kind {
             let mut sorted = Vec::from_iter(0..items.len());
             sorted

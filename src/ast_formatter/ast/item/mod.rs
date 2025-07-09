@@ -353,7 +353,6 @@ impl AstFormatter {
     fn trait_(&self, trait_: &ast::Trait) -> FormatResult {
         self.token_ident_generic_params("trait", trait_.ident, &trait_.generics)?;
         let wrapped_bounds = self.generic_bounds_optional(&trait_.bounds)?;
-        // todo share this code with other constructs
         let has_where = self.where_clause(&trait_.generics.where_clause, true)?;
         let body = || self.block(false, &trait_.items, |item| self.assoc_item(item));
         if wrapped_bounds || has_where {
