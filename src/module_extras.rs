@@ -84,10 +84,13 @@ impl Visitor<'_> for ModuleExtrasVisitor<'_> {
         visit::walk_use_tree(self, use_tree);
 
         if let ast::UseTreeKind::Nested { items, span } = &use_tree.kind {
-            let mut sorted = Vec::from_iter(0..items.len());
-            sorted
-                .sort_by(|&a, &b| use_tree_order(&items[a].0, &items[b].0, &self.sorted_use_trees));
-            self.sorted_use_trees.insert(span.lo(), sorted);
+            if items.len() > 1 {
+                let mut sorted = Vec::from_iter(0..items.len());
+                sorted.sort_by(|&a, &b| {
+                    use_tree_order(&items[a].0, &items[b].0, &self.sorted_use_trees)
+                });
+                self.sorted_use_trees.insert(span.lo(), sorted);
+            }
         }
     }
 }

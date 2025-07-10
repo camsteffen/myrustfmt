@@ -4,6 +4,7 @@ use crate::ast_formatter::list::options::{
     FlexibleListStrategy, ListOptions, ListStrategies, VerticalListStrategy, WrapToFit,
 };
 use crate::ast_formatter::tail::Tail;
+use crate::ast_utils::use_tree_order::get_sorted_use_tree;
 use crate::error::FormatResult;
 use rustc_ast::ast;
 use rustc_lexer::TokenKind;
@@ -33,9 +34,7 @@ impl AstFormatter {
                     )?;
                 } else {
                     self.out.token("{")?;
-                    let sorted = self.module.sorted_use_trees.get(&span.lo()).unwrap_or_else(
-                        || panic!("sorted_use_trees is missing {:?}", span.lo()),
-                    );
+                    let sorted = get_sorted_use_tree(&self.module.sorted_use_trees, items, span);
                     let start_pos = self.out.source_reader.pos();
                     self.list(
                         Brackets::CurlyNoPad,
