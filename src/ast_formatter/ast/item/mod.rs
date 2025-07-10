@@ -206,6 +206,7 @@ impl AstFormatter {
 
     fn impl_(&self, impl_: &ast::Impl) -> FormatResult {
         let first_line = self.out.line();
+        self.safety(impl_.safety)?;
         self.out.token("impl")?;
         self.generic_params(&impl_.generics.params)?;
         let first_part = || match &impl_.of_trait {

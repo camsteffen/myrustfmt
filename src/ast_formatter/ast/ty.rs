@@ -43,8 +43,12 @@ impl AstFormatter {
             }
             ast::TyKind::Path(qself, path) => self.qpath(qself, path, false, take_tail())?,
             ast::TyKind::Ptr(mut_ty) => {
-                self.out.token_space("*const")?;
-                self.mut_ty(mut_ty)?
+                let prefix = match mut_ty.mutbl {
+                    ast::Mutability::Mut => "*mut",
+                    ast::Mutability::Not => "*const",
+                };
+                self.out.token_space(prefix)?;
+                self.ty(&mut_ty.ty)?
             }
             ast::TyKind::Ref(lifetime, mut_ty) => {
                 self.out.token("&")?;
@@ -52,7 +56,8 @@ impl AstFormatter {
                     self.lifetime(lifetime)?;
                     self.out.space()?;
                 }
-                self.mut_ty(mut_ty)?;
+                self.mutability(mut_ty.mutbl)?;
+                self.ty(&mut_ty.ty)?;
             }
             ast::TyKind::Slice(elem) => {
                 self.out.token("[")?;
@@ -93,12 +98,6 @@ impl AstFormatter {
 
     pub fn lifetime(&self, lifetime: &ast::Lifetime) -> FormatResult {
         self.ident(lifetime.ident)
-    }
-
-    fn mut_ty(&self, mut_ty: &ast::MutTy) -> FormatResult {
-        self.mutability(mut_ty.mutbl)?;
-        self.ty(&mut_ty.ty)?;
-        Ok(())
     }
 
     pub fn generic_bounds_optional(&self, bounds: &[ast::GenericBound]) -> FormatResult<bool> {
