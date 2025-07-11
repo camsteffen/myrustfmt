@@ -69,6 +69,7 @@ impl AstFormatter {
                                         matches!(items[i].0.kind, ast::UseTreeKind::Nested { .. })
                                     })),
                                     wrap_to_fit: Some(WrapToFit { .. }),
+                                    ..
                                 },
                                 ..
                             }),

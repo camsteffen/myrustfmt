@@ -65,14 +65,14 @@ where
                 self.af.tail(self.opt.tail)?;
                 return Ok(());
             }
-            match self.opt.strategies {
+            match &self.opt.strategies {
                 ListStrategies::Horizontal(horizontal) => {
                     self.list_horizontal(horizontal, &Recover::default(), false)?
                 }
-                ListStrategies::Vertical(_) => {
-                    self.list_vertical(None)?;
+                ListStrategies::Vertical(vertical) => {
+                    self.list_vertical(vertical, None)?;
                 }
-                ListStrategies::Flexible(ref flexible) => self.list_flexible(flexible)?,
+                ListStrategies::Flexible(flexible) => self.list_flexible(flexible)?,
             }
             Ok(())
         })
@@ -87,13 +87,13 @@ where
             .as_ref()
             .is_some_and(|f| self.list.iter().any(f))
         {
-            return self.list_vertical(Some(&checkpoint));
+            return self.list_vertical(&strategy.vertical, Some(&checkpoint));
         }
 
         let recover = Recover::default();
         let horizontal_result = {
             let _guard = self.af.recover_width_guard();
-            self.list_horizontal(strategy.horizontal, &recover, true)
+            self.list_horizontal(&strategy.horizontal, &recover, true)
         };
         if let Err(e) = horizontal_result {
             let recovering = recover.get()
@@ -106,7 +106,7 @@ where
                 };
             if recovering {
                 self.af.out.restore_checkpoint(&checkpoint);
-                self.list_vertical(Some(&checkpoint))?;
+                self.list_vertical(&strategy.vertical, Some(&checkpoint))?;
                 return Ok(());
             }
             return Err(e);
@@ -117,7 +117,7 @@ where
 
     fn list_horizontal(
         &self,
-        strategy: HorizontalListStrategy,
+        strategy: &HorizontalListStrategy,
         recover: &Recover,
         has_vertical_fallback: bool,
     ) -> FormatResult {
@@ -342,15 +342,19 @@ where
         Ok(())
     }
 
-    fn list_vertical(&self, checkpoint: Option<&Checkpoint>) -> FormatResult {
+    fn list_vertical(
+        &self,
+        vertical: &VerticalListStrategy<Item>,
+        checkpoint: Option<&Checkpoint>,
+    ) -> FormatResult {
         self.af
             .backtrack()
             .next_opt(self.list_wrap_to_fit_fn_opt())
-            .next(|_| self.list_vertical_simple())
+            .next(|_| self.list_vertical_simple(vertical))
             .result_opt_checkpoint(checkpoint)
     }
 
-    fn list_vertical_simple(&self) -> FormatResult {
+    fn list_vertical_simple(&self, vertical: &VerticalListStrategy<Item>) -> FormatResult {
         let Self {
             af,
             opt,
@@ -367,20 +371,20 @@ where
             )
         };
         af.enclosed_contents(|| {
+            let items = |range| {
+                for index in range {
+                    item_comma(index)?;
+                    af.out.newline_indent(vertical.whitespace_between)?;
+                }
+                Ok(())
+            };
             match opt.rest {
                 None => {
-                    for index in 0..len - 1 {
-                        item_comma(index)?;
-                        // todo should this be "between"?
-                        af.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                    }
+                    items(0..len - 1)?;
                     item_comma(len - 1)?;
                 }
                 Some(rest) => {
-                    for index in 0..len {
-                        item_comma(index)?;
-                        af.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                    }
+                    items(0..len)?;
                     list_rest(af, rest, None)?;
                 }
             }

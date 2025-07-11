@@ -1,6 +1,7 @@
 use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::tail::Tail;
 use crate::num::HSize;
+use crate::whitespace::VerticalWhitespaceMode;
 use std::num::NonZero;
 
 pub enum ListStrategies<'a, Item> {
@@ -46,7 +47,6 @@ impl<Item> ListStrategies<'_, Item> {
     }
 }
 
-#[derive(Clone, Copy, Default)]
 pub struct HorizontalListStrategy {
     pub contents_max_width: Option<HSize> = None,
     pub overflow: bool = false,
@@ -54,6 +54,7 @@ pub struct HorizontalListStrategy {
 
 pub struct VerticalListStrategy<'a, Item> {
     pub item_requires_own_line: Option<Box<dyn Fn(&Item) -> bool + 'a>> = None,
+    pub whitespace_between: VerticalWhitespaceMode = VerticalWhitespaceMode::Break,
     pub wrap_to_fit: Option<WrapToFit> = None,
 }
 

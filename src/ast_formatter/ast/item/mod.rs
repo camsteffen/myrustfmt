@@ -6,7 +6,7 @@ use crate::ast_formatter::ast::r#macro::MacCallSemi;
 use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::ListItemContext;
 use crate::ast_formatter::list::options::{
-    FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies,
+    FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy,
 };
 use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatErrorKind, FormatResult};
@@ -156,7 +156,10 @@ impl AstFormatter {
             variants,
             Self::variant,
             ListOptions {
-                strategies: ListStrategies::vertical(),
+                strategies: ListStrategies::Vertical(VerticalListStrategy {
+                    whitespace_between: VerticalWhitespaceMode::Between,
+                    ..
+                }),
                 ..
             },
         )?;
@@ -392,7 +395,10 @@ impl AstFormatter {
                                 ..
                             })
                         } else {
-                            ListStrategies::vertical()
+                            ListStrategies::Vertical(VerticalListStrategy {
+                                whitespace_between: VerticalWhitespaceMode::Between,
+                                ..
+                            })
                         },
                         ..
                     },
