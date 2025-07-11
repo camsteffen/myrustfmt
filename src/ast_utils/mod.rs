@@ -1,3 +1,4 @@
+pub mod spans;
 pub mod use_tree_order;
 pub mod version_sort;
 

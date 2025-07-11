@@ -2,8 +2,10 @@ use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::ast::item::MaybeItem;
 use crate::ast_formatter::ast::r#macro::MacCallSemi;
 use crate::ast_formatter::tail::Tail;
+use crate::ast_utils::spans::block_inside_span;
 use crate::ast_utils::{is_jump_expr, plain_block};
 use crate::error::FormatResult;
+use crate::span::{Span, get_span};
 use crate::util::whitespace_utils::{is_whitespace, is_whitespace_or_semicolon};
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -26,7 +28,7 @@ impl AstFormatter {
             ast::BlockCheckMode::Unsafe(_) => self.out.token_space("unsafe")?,
         }
         self.out.token("{")?;
-        match self.try_into_optional_block(block) {
+        match self.try_into_expr_only_block(block) {
             None => {
                 self.block_expr(true, block)?;
                 self.tail(tail)?;
@@ -152,12 +154,12 @@ impl AstFormatter {
         format: impl FnOnce(&ast::Expr, Tail) -> FormatResult,
     ) -> FormatResult {
         if let Some(block) = plain_block(expr)
-            && let Some(opt_block) = self.try_into_optional_block(block)
+            && let Some(expr_only_block) = self.try_into_expr_only_block(block)
         {
             self.out.token_skip("{")?;
-            let (inner, semi) = match opt_block {
-                OptionalBlock::Expr(inner) => (inner, false),
-                OptionalBlock::JumpExprSemi(inner) => (inner, true),
+            let (inner, semi) = match expr_only_block {
+                ExprOnlyBlock::Expr(inner) => (inner, false),
+                ExprOnlyBlock::JumpExprSemi(inner) => (inner, true),
             };
             self.skip_single_expr_blocks_tail(
                 inner,
@@ -191,18 +193,14 @@ impl AstFormatter {
 /// A block that contains only a single expression, no semicolon, and no comments.
 /// This may be written on one line.
 #[derive(Clone, Copy)]
-pub enum OptionalBlock<'a> {
+pub enum ExprOnlyBlock<'a> {
     Expr(&'a ast::Expr),
     /// like `return x;`
     JumpExprSemi(&'a ast::Expr),
 }
 
 impl AstFormatter {
-    /// `{ expr }` -> `expr`
-    ///
-    /// If a block contains only an expression, return the expression.
-    /// This may be used together with `plain_block`.
-    pub fn try_into_optional_block<'a>(&self, block: &'a ast::Block) -> Option<OptionalBlock<'a>> {
+    pub fn try_into_expr_only_block<'a>(&self, block: &'a ast::Block) -> Option<ExprOnlyBlock<'a>> {
         let [stmt] = &block.stmts[..] else {
             return None;
         };
@@ -216,21 +214,24 @@ impl AstFormatter {
             return None;
         }
         let source = self.out.source_reader.source();
-        let before_expr = &source[block.span.lo().to_usize() + 1..expr.span.lo().to_usize()];
-        let after_expr = &source[expr.span.hi().to_usize()..block.span.hi().to_usize() - 1];
-        if !(is_whitespace(before_expr) && is_whitespace_or_semicolon(after_expr)) {
+        let inside_span = block_inside_span(block, source);
+        let (before_expr, after_expr) = inside_span.split(Span::from(expr.span));
+        if !(
+            is_whitespace(get_span(source, before_expr))
+                && is_whitespace_or_semicolon(get_span(source, after_expr))
+        ) {
             // there are comments before or after the expression
             return None;
         }
         let opt_block = if is_jump_semi {
-            OptionalBlock::JumpExprSemi(expr)
+            ExprOnlyBlock::JumpExprSemi(expr)
         } else {
-            OptionalBlock::Expr(expr)
+            ExprOnlyBlock::Expr(expr)
         };
         Some(opt_block)
     }
 
-    pub fn optional_block_horizontal(&self, opt_block: OptionalBlock) -> FormatResult {
+    pub fn optional_block_horizontal(&self, opt_block: ExprOnlyBlock) -> FormatResult {
         self.out.token("{")?;
         self.optional_block_horizontal_after_open_brace(opt_block)?;
         Ok(())
@@ -238,12 +239,12 @@ impl AstFormatter {
 
     pub fn optional_block_horizontal_after_open_brace(
         &self,
-        opt_block: OptionalBlock,
+        opt_block: ExprOnlyBlock,
     ) -> FormatResult {
         self.out.space()?;
         match opt_block {
-            OptionalBlock::Expr(expr) => self.expr(expr)?,
-            OptionalBlock::JumpExprSemi(expr) => {
+            ExprOnlyBlock::Expr(expr) => self.expr(expr)?,
+            ExprOnlyBlock::JumpExprSemi(expr) => {
                 self.expr(expr)?;
                 self.out.token_skip(";")?;
             }

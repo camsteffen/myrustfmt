@@ -6,6 +6,7 @@ use crate::ast_formatter::list::options::{
 use crate::ast_formatter::tail::Tail;
 use crate::ast_utils::use_tree_order::get_sorted_use_tree;
 use crate::error::FormatResult;
+use crate::util::whitespace_utils::expect_first_token_after_whitespace_and_comments;
 use rustc_ast::ast;
 use rustc_lexer::TokenKind;
 use rustc_span::{BytePos, Pos};
@@ -95,17 +96,10 @@ impl AstFormatter {
         index: usize,
     ) -> BytePos {
         let prev_item_end = items[index - 1].0.span.hi();
-        let distance_to_comma = rustc_lexer::tokenize(
+        let distance_to_comma = expect_first_token_after_whitespace_and_comments(
             &self.out.source_reader.source()[prev_item_end.to_usize()..],
-        )
-        .map_while(|token| match token.kind {
-            TokenKind::BlockComment { .. }
-            | TokenKind::LineComment { .. }
-            | TokenKind::Whitespace => Some(token.len),
-            TokenKind::Comma => None,
-            _ => panic!("Could not find preceding comma in nested use tree"),
-        })
-        .sum::<u32>();
+            TokenKind::Comma,
+        );
         BytePos(prev_item_end.to_u32() + distance_to_comma)
     }
 }

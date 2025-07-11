@@ -69,7 +69,7 @@ impl AstFormatter {
             self.out.space_token_space("else")?;
             self.out.token("{")?;
             let else_block_horizontal = if is_single_line_init
-                && let Some(expr_only_else) = self.try_into_optional_block(else_)
+                && let Some(expr_only_else) = self.try_into_expr_only_block(else_)
             {
                 Some(move |_: &_| {
                     let _guard = self.single_line_guard();

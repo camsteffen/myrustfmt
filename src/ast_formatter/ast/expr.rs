@@ -347,8 +347,8 @@ impl AstFormatter {
                 let ast::ExprKind::Block(else_block, _) = &else_.kind else {
                     return None;
                 };
-                let block_expr = self.try_into_optional_block(block)?;
-                let else_expr = self.try_into_optional_block(else_block)?;
+                let block_expr = self.try_into_expr_only_block(block)?;
+                let else_expr = self.try_into_expr_only_block(else_block)?;
 
                 Some(move |_: &_| {
                     let _guard = self.single_line_guard();
