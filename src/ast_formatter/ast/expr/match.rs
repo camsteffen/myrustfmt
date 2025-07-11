@@ -16,7 +16,15 @@ impl AstFormatter {
     }
 
     fn arm(&self, arm: &ast::Arm) -> FormatResult {
-        self.with_attrs(&arm.attrs, arm.span.into(), || self.arm_after_attrs(arm))?;
+        self.with_attrs_tail(
+            &arm.attrs,
+            arm.span.into(),
+            Some(&self.tail_fn(|af| {
+                af.out.token_if_present(",")?;
+                Ok(())
+            })),
+            || self.arm_after_attrs(arm),
+        )?;
         // N.B. the span does not include the comma
         self.out.token_skip_if_present(",")?;
         Ok(())

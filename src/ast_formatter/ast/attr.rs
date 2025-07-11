@@ -38,12 +38,11 @@ impl AstFormatter {
             attrs.iter().try_for_each(|attr| self.attr(attr))?;
             // todo make my own attribute? or comment?
             // handle #[rustfmt::skip]
-            if attrs.iter().any(is_rustfmt_skip) {
+            let did_format = !attrs.iter().any(is_rustfmt_skip) && self.format_or_emit(format)?;
+            if !did_format {
                 let _guard = self.constraints().width_limit.replace_guard(None);
                 self.out.copy_span(span)?;
                 self.tail(tail)?;
-            } else {
-                self.with_copy_span_fallback(span, format, tail)?;
             }
             Ok(())
         })
@@ -53,15 +52,10 @@ impl AstFormatter {
     /// formatting strategy to try next. This means we have no way of formatting the user's code
     /// with the given constraints. So the error should be reported to the user, and we'll just copy
     /// the source as-is.
-    fn with_copy_span_fallback(
-        &self,
-        span: Span,
-        format: impl FnOnce() -> FormatResult,
-        tail: Tail,
-    ) -> FormatResult {
+    fn format_or_emit(&self, format: impl FnOnce() -> FormatResult) -> FormatResult<bool> {
         let checkpoint = self.out.checkpoint_without_buffer_errors();
         let error_count_before = self.errors.error_count();
-        let Err(err) = format() else { return Ok(()) };
+        let Err(err) = format() else { return Ok(true) };
         let (line, col) = self.out.line_col();
         match err.kind {
             // todo test all these outputs
@@ -89,10 +83,7 @@ impl AstFormatter {
             "an error should be emitted before copy fallback",
         );
         self.out.restore_checkpoint(&checkpoint);
-        let _guard = self.constraints().width_limit.replace_guard(None);
-        self.out.copy_span(span)?;
-        self.tail(tail)?;
-        Ok(())
+        Ok(false)
     }
 
     fn attr(&self, attr: &ast::Attribute) -> FormatResult {

@@ -8,6 +8,7 @@ use std::error::Error;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::LazyLock;
 use std::{fs, io};
 use tracing_subscriber::EnvFilter;
 
@@ -16,6 +17,8 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 datatest_stable::harness! {
     { test = output_test, root = "tests/output_tests", pattern = r".rs" },
 }
+
+static IS_BLESS: LazyLock<bool> = LazyLock::new(|| std::env::var("BLESS").as_deref() == Ok("1"));
 
 fn init_tracing() {
     let _ = tracing_subscriber::fmt()
@@ -321,16 +324,19 @@ fn format_max_width_expected(
         println!("Stderr:\n{}", &output.stderr);
     })?;
     let errors_expected = expected_stderr.is_some();
-    handle_format_errors(&output.stderr, expected_stderr, expected_stderr_path).inspect_err(|_| {
-        // todo dedupe
-        println!("Stderr:\n{}", &output.stderr);
-    })?;
-    if output.code == 0 {
-        if errors_expected {
-            return Err("expected errors but status code was success".into());
+    let blessed = handle_format_errors(&output.stderr, expected_stderr, expected_stderr_path)
+        .inspect_err(|_| {
+            // todo dedupe
+            println!("Stderr:\n{}", &output.stderr);
+        })?;
+    if !blessed {
+        if output.code == 0 {
+            if errors_expected {
+                return Err("expected errors but status code was success".into());
+            }
+        } else if !errors_expected {
+            return Err("No errors expected but status code was success".into());
         }
-    } else if !errors_expected {
-        return Err("No errors expected but status code was success".into());
     }
     Ok(())
 }
@@ -339,10 +345,10 @@ fn handle_format_errors(
     error_output: &str,
     expected_stderr: Option<&str>,
     expected_stderr_path: Option<&Path>,
-) -> TestResult {
+) -> TestResult<bool> {
     let bless_path = || {
         if let Some(expected_stderr_path) = expected_stderr_path
-            && std::env::var("BLESS").as_deref() == Ok("1")
+            && *IS_BLESS
         {
             Some(expected_stderr_path)
         } else {
@@ -354,14 +360,14 @@ fn handle_format_errors(
         ("", Some(_)) => {
             if let Some(expected_stderr_path) = bless_path() {
                 fs::remove_file(expected_stderr_path).unwrap();
-                return Ok(());
+                return Ok(true);
             }
             return Err("Expected errors but no errors occurred.".into());
         }
         (_, None) => {
             if let Some(expected_stderr_path) = bless_path() {
                 fs::write(expected_stderr_path, error_output).unwrap();
-                return Ok(());
+                return Ok(true);
             }
             return Err("Errors occurred".into());
         }
@@ -369,14 +375,14 @@ fn handle_format_errors(
             if error_output != expected_stderr {
                 if let Some(expected_stderr_path) = bless_path() {
                     fs::write(expected_stderr_path, error_output).unwrap();
-                    return Ok(());
+                    return Ok(true);
                 }
                 print_diff(expected_stderr, error_output);
                 return Err("Error output does not match".into());
             }
         }
     }
-    Ok(())
+    Ok(false)
 }
 
 fn expect_formatted_equals(formatted: &str, expected: &str, name: &str) -> TestResult {

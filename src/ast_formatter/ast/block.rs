@@ -151,29 +151,30 @@ impl AstFormatter {
         tail: Tail,
         format: impl FnOnce(&ast::Expr, Tail) -> FormatResult,
     ) -> FormatResult {
-        match plain_block(expr).and_then(|b| self.try_into_optional_block(b)) {
-            None => format(expr, tail),
-            Some(opt_block) => {
-                self.out.token_skip("{")?;
-                let (inner, semi) = match opt_block {
-                    OptionalBlock::Expr(inner) => (inner, false),
-                    OptionalBlock::JumpExprSemi(inner) => (inner, true),
-                };
-                self.skip_single_expr_blocks_tail(
-                    inner,
-                    Some(&self.tail_fn(|af| {
-                        if semi {
-                            af.out.token_skip(";")?;
-                        }
-                        af.out.token_skip("}")?;
-                        self.tail(tail)?;
-                        Ok(())
-                    })),
-                    format,
-                )?;
-                Ok(())
-            }
+        if let Some(block) = plain_block(expr)
+            && let Some(opt_block) = self.try_into_optional_block(block)
+        {
+            self.out.token_skip("{")?;
+            let (inner, semi) = match opt_block {
+                OptionalBlock::Expr(inner) => (inner, false),
+                OptionalBlock::JumpExprSemi(inner) => (inner, true),
+            };
+            self.skip_single_expr_blocks_tail(
+                inner,
+                Some(&self.tail_fn(|af| {
+                    if semi {
+                        af.out.token_skip(";")?;
+                    }
+                    af.out.token_skip("}")?;
+                    self.tail(tail)?;
+                    Ok(())
+                })),
+                format,
+            )?;
+        } else {
+            format(expr, tail)?;
         }
+        Ok(())
     }
 
     pub fn is_block_empty(&self, block: &ast::Block) -> bool {

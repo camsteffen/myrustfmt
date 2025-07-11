@@ -145,6 +145,15 @@ impl SourceFormatter {
         Ok(())
     }
 
+    pub fn token_if_present(&self, token: &str) -> FormatResult<bool> {
+        self.horizontal_whitespace()?;
+        let found = self.source_reader.try_eat_token(token);
+        if found {
+            self.out.token(token)?;
+        }
+        Ok(found)
+    }
+
     pub fn token_skip_if_present(&self, token: &str) -> FormatResult<bool> {
         // todo is this checkpoint avoidable?
         let checkpoint = self.checkpoint();
