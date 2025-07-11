@@ -11,11 +11,11 @@ use crate::ast_formatter::list::options::{
 };
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
+use crate::ast_formatter::width_thresholds::WIDTH_THRESHOLDS;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::ast_utils::{is_jump_expr, plain_block, postfix_expr_kind};
 use crate::constraints::VStruct;
 use crate::error::{FormatErrorKind, FormatResult};
-use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
@@ -161,11 +161,11 @@ impl AstFormatter {
             ListOptions {
                 strategies: ListStrategies::Flexible(FlexibleListStrategy {
                     horizontal: HorizontalListStrategy {
-                        contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.array_width),
+                        contents_max_width: Some(WIDTH_THRESHOLDS.array_width),
                         ..
                     },
                     vertical: VerticalListStrategy::wrap_to_fit(Some(
-                        RUSTFMT_CONFIG_DEFAULTS.short_array_element_width_threshold,
+                        WIDTH_THRESHOLDS.short_array_element_width_threshold,
                     )),
                     ..
                 }),
@@ -216,7 +216,7 @@ impl AstFormatter {
         tail: Tail,
     ) -> FormatResult {
         if let Some(horizontal) = list_strategies.get_horizontal_mut() {
-            horizontal.contents_max_width = Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width);
+            horizontal.contents_max_width = Some(WIDTH_THRESHOLDS.fn_call_width);
         }
         self.list(
             Brackets::Parens,
@@ -353,7 +353,7 @@ impl AstFormatter {
                 Some(move |_: &_| {
                     let _guard = self.single_line_guard();
                     let _guard = self.width_limit_end_guard(
-                        start_col + RUSTFMT_CONFIG_DEFAULTS.single_line_if_else_max_width,
+                        start_col + WIDTH_THRESHOLDS.single_line_if_else_max_width,
                     )?;
                     self.optional_block_horizontal_after_open_brace(block_expr)?;
                     self.out.space_token_space("else")?;
@@ -545,7 +545,7 @@ impl AstFormatter {
                         ListStrategies::Flexible(FlexibleListStrategy {
                             horizontal: HorizontalListStrategy {
                                 // todo not wide enough?
-                                contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
+                                contents_max_width: Some(WIDTH_THRESHOLDS.struct_lit_width),
                                 ..
                             },
                             ..
@@ -587,7 +587,7 @@ impl AstFormatter {
                 force_trailing_comma: items.len() == 1,
                 strategies: ListStrategies::Flexible(FlexibleListStrategy {
                     horizontal: HorizontalListStrategy {
-                        contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
+                        contents_max_width: Some(WIDTH_THRESHOLDS.fn_call_width),
                         ..
                     },
                     ..

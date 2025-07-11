@@ -6,9 +6,9 @@ use crate::ast_formatter::list::options::{
 };
 use crate::ast_formatter::std_macro::std_macro;
 use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::width_thresholds::WIDTH_THRESHOLDS;
 use crate::error::FormatResult;
 use crate::macro_args::{MacroArgs, mac_call_id};
-use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::span::Span;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -125,7 +125,7 @@ impl AstFormatter {
                 omit_open_bracket: true,
                 strategies: ListStrategies::Flexible(FlexibleListStrategy {
                     horizontal: HorizontalListStrategy {
-                        contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.fn_call_width),
+                        contents_max_width: Some(WIDTH_THRESHOLDS.fn_call_width),
                         ..
                     },
                     vertical: VerticalListStrategy {
@@ -135,7 +135,7 @@ impl AstFormatter {
                                 // todo rename/consolidate this variable
                                 max_element_width: Some(
                                     NonZero::new(
-                                        RUSTFMT_CONFIG_DEFAULTS.short_array_element_width_threshold,
+                                        WIDTH_THRESHOLDS.short_array_element_width_threshold,
                                     )
                                     .unwrap(),
                                 ),
@@ -161,8 +161,7 @@ impl AstFormatter {
         self.backtrack()
             .next(|_| {
                 let _guard = self.single_line_guard();
-                let width_limit_guard =
-                    self.width_limit_guard(RUSTFMT_CONFIG_DEFAULTS.fn_call_width)?;
+                let width_limit_guard = self.width_limit_guard(WIDTH_THRESHOLDS.fn_call_width)?;
                 self.expr(expr)?;
                 self.out.token_space(",")?;
                 self.pat(pat)?;

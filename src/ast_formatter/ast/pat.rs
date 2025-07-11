@@ -7,8 +7,8 @@ use crate::ast_formatter::list::options::{
     FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies,
 };
 use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::width_thresholds::WIDTH_THRESHOLDS;
 use crate::error::{FormatErrorKind, FormatResult};
-use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 
@@ -141,7 +141,7 @@ impl AstFormatter {
                 rest: ListRest::from_pat_fields_rest(rest),
                 strategies: ListStrategies::Flexible(FlexibleListStrategy {
                     horizontal: HorizontalListStrategy {
-                        contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.struct_lit_width),
+                        contents_max_width: Some(WIDTH_THRESHOLDS.struct_lit_width),
                         ..
                     },
                     ..

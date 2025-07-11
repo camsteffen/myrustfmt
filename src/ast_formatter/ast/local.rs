@@ -1,7 +1,7 @@
 use crate::ast_formatter::AstFormatter;
+use crate::ast_formatter::width_thresholds::WIDTH_THRESHOLDS;
 use crate::error::FormatResult;
 use crate::num::{HSize, VSize};
-use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 
@@ -74,7 +74,7 @@ impl AstFormatter {
                 Some(move |_: &_| {
                     let _guard = self.single_line_guard();
                     let _guard = self.width_limit_end_guard(
-                        start_col + RUSTFMT_CONFIG_DEFAULTS.single_line_let_else_max_width,
+                        start_col + WIDTH_THRESHOLDS.single_line_let_else_max_width,
                     )?;
                     self.optional_block_horizontal_after_open_brace(expr_only_else)?;
                     self.out.token(";")?;

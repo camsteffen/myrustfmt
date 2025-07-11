@@ -2,18 +2,16 @@ use crate::ast_formatter::list::options::ListStrategies;
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::enclosed::ENCLOSED_DISALLOWED_VSTRUCTS;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
+use crate::ast_formatter::width_thresholds::WIDTH_THRESHOLDS;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::ast_utils::{is_postfix_expr, postfix_expr_is_dot, postfix_expr_receiver};
 use crate::constraints::VStruct;
 use crate::error::{FormatErrorKind, FormatResult};
-use crate::num::{HSize, VSize};
+use crate::num::VSize;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
 use std::cell::Cell;
-
-// In rustfmt, this is called chain_width, and is 60 by default
-const POSTFIX_CHAIN_MAX_WIDTH: HSize = 60;
 
 struct PostfixItem<'a> {
     /// The first item in the chain has the root expression, which is not a postfix expression.
@@ -49,7 +47,8 @@ impl AstFormatter {
             // no indent
             self.postfix_chain_vertical(chain, tail)
         } else {
-            let width_limit_end = (chain.len() > 1).then(|| start_col + POSTFIX_CHAIN_MAX_WIDTH);
+            let width_limit_end =
+                (chain.len() > 1).then(|| start_col + WIDTH_THRESHOLDS.chain_width);
             self.backtrack()
                 .next(|_| {
                     let _guard = self.recover_width_guard();

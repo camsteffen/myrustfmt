@@ -19,6 +19,7 @@ mod list;
 pub mod std_macro;
 pub mod tail;
 pub mod util;
+mod width_thresholds;
 
 pub const INDENT_WIDTH: HSize = 4;
 

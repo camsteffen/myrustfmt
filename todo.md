@@ -22,3 +22,5 @@ imports_granularity default?
 group_imports?
 merge_derives? (probably false by default unlike rustfmt)
 use_small_heuristics?
+
+Consider not counting the final method call argument list for chain max width.

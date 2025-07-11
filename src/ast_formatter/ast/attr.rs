@@ -4,10 +4,10 @@ use crate::ast_formatter::list::options::{
     FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies,
 };
 use crate::ast_formatter::tail::Tail;
+use crate::ast_formatter::width_thresholds::WIDTH_THRESHOLDS;
 use crate::ast_utils::is_rustfmt_skip;
 use crate::constraints::VStruct;
 use crate::error::{FormatErrorKind, FormatResult, VerticalError};
-use crate::rustfmt_config_defaults::RUSTFMT_CONFIG_DEFAULTS;
 use crate::span::Span;
 use crate::util::cell_ext::CellExt;
 use crate::whitespace::VerticalWhitespaceMode;
@@ -136,7 +136,7 @@ impl AstFormatter {
                     strategies: ListStrategies::Flexible(FlexibleListStrategy {
                         horizontal: HorizontalListStrategy {
                             // todo test
-                            contents_max_width: Some(RUSTFMT_CONFIG_DEFAULTS.attr_fn_like_width),
+                            contents_max_width: Some(WIDTH_THRESHOLDS.attr_fn_like_width),
                             ..
                         },
                         ..
