@@ -1,5 +1,3 @@
-std macros
-
 binary expression width limit?
 
 block statements must be vertical
@@ -18,3 +16,9 @@ otherwise don't support the extra parameters
 
 
 use more guards instead of closures
+
+enable use_field_init_shorthand by default?
+imports_granularity default?
+group_imports?
+merge_derives? (probably false by default unlike rustfmt)
+use_small_heuristics?

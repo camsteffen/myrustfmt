@@ -4,7 +4,7 @@ extern crate rustc_span;
 
 use getopts::Options;
 use myrustfmt::config::Config;
-use myrustfmt::{FormatModuleResult, format_module_file_roots, format_str};
+use myrustfmt::{FormatModuleResult, USE_TREE_ORDER_COUNT, format_module_file_roots, format_str};
 use rustc_span::ErrorGuaranteed;
 use std::io::{Write, stdin, stdout};
 use std::process::ExitCode;
@@ -41,10 +41,12 @@ fn main() -> ExitCode {
     {
         return do_stdin(config);
     }
-    match format_module_file_roots(paths, config, is_check, is_verbose) {
+    let exit_code = match format_module_file_roots(paths, config, is_check, is_verbose) {
         Ok(()) => ExitCode::SUCCESS,
         Err(()) => ExitCode::FAILURE,
-    }
+    };
+    println!("use tree order: {}", USE_TREE_ORDER_COUNT.get());
+    exit_code
 }
 
 fn do_stdin(config: Config) -> ExitCode {

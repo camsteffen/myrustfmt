@@ -1,3 +1,4 @@
+use crate::USE_TREE_ORDER_COUNT;
 use crate::ast_utils::version_sort::version_sort;
 use crate::util::cmp::{cmp_by_key, cmp_iter_by};
 use rustc_ast::ast;
@@ -27,6 +28,7 @@ pub fn get_sorted_use_tree<'a>(
 }
 
 pub fn use_tree_order(a: &ast::UseTree, b: &ast::UseTree, sort_map: &SortedUseTreeMap) -> Ordering {
+    USE_TREE_ORDER_COUNT.with(|c| c.update(|n| n + 1));
     cmp_iter_by(iter_elements(a), iter_elements(b), |element_a, element_b| {
         use_tree_element_order(element_a, element_b, sort_map)
     })

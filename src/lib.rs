@@ -52,6 +52,10 @@ mod submodules;
 mod util;
 mod whitespace;
 
+thread_local! {
+    pub static USE_TREE_ORDER_COUNT: Cell<u32> = Cell::new(0);
+}
+
 use crate::ast_formatter::format_module;
 use crate::config::Config;
 use crate::parse::{ParseModuleResult, parse_module};
