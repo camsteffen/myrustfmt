@@ -3,6 +3,7 @@ use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
 use crate::ast_utils::plain_block;
 use crate::constraints::VStruct;
 use crate::error::FormatResult;
+use crate::util::cell_ext::CellExt;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
 
@@ -63,6 +64,7 @@ impl AstFormatter {
             Ok(())
         };
         let next_line_arm_guard = || {
+            let arm_indent = self.out.total_indent.get();
             self.indented(|| {
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 self.out.token_space("if")?;
@@ -73,16 +75,15 @@ impl AstFormatter {
                             return Ok(());
                         };
                         af.out.space_token("=>")?;
-                        af.deindented(|| {
-                            if plain_block(body).is_some_and(|block| af.is_block_empty(block)) {
-                                af.out.space_allow_newlines()?;
-                                af.expr(body)?;
-                            } else {
-                                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                                self.expr_force_plain_block(body)?;
-                            }
-                            Ok(())
-                        })
+                        let _guard = self.out.total_indent.replace_guard(arm_indent);
+                        if plain_block(body).is_some_and(|block| af.is_block_empty(block)) {
+                            af.out.space_allow_newlines()?;
+                            af.expr(body)?;
+                        } else {
+                            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                            self.expr_force_plain_block(body)?;
+                        }
+                        Ok(())
                     })),
                 )?;
                 Ok(())
