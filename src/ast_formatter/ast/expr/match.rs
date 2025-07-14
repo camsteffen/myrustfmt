@@ -100,7 +100,9 @@ impl AstFormatter {
         };
         self.backtrack()
             .next_if(self.out.line() == first_line, |_| {
-                self.could_wrap_indent(single_line_arm_guard)
+                let _guard = self.could_wrap_indent_guard();
+                single_line_arm_guard()?;
+                Ok(())
             })
             .next(|_| next_line_arm_guard())
             .result()?;

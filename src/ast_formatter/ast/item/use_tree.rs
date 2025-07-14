@@ -47,18 +47,14 @@ impl AstFormatter {
                                 self.nested_item_preceding_comma(items, i) + BytePos(1)
                             };
                             af.out.source_reader.goto(start);
-                            let owned_tail;
-                            let tail = if lcx.index == items.len() - 1 {
-                                owned_tail = self.tail_fn(|af| {
+                            let last_tail = (lcx.index == items.len() - 1).then(|| {
+                                self.tail_fn(|af| {
                                     af.out.source_reader.goto(items.last().unwrap().0.span.hi());
                                     af.tail(tail)?;
                                     Ok(())
-                                });
-                                Some(&owned_tail)
-                            } else {
-                                tail
-                            };
-                            af.use_tree(&items[i].0, tail)?;
+                                })
+                            });
+                            af.use_tree(&items[i].0, last_tail.as_ref().or(tail))?;
                             Ok(())
                         },
                         ListOptions {

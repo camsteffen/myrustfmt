@@ -115,14 +115,13 @@ impl AstFormatter {
         self.skip_single_expr_blocks_tail(body, tail, |body, tail| {
             self.backtrack()
                 .next(|recover| {
-                    self.could_wrap_indent(|| {
-                        let disallowed_vstructs = VStruct::Closure
-                            | VStruct::ControlFlow
-                            | VStruct::List
-                            | VStruct::NonBlockIndent;
-                        self.disallow_vstructs(disallowed_vstructs, recover, || {
-                            self.expr_tail(body, tail)
-                        })
+                    let _guard = self.could_wrap_indent_guard();
+                    let disallowed_vstructs = VStruct::Closure
+                        | VStruct::ControlFlow
+                        | VStruct::List
+                        | VStruct::NonBlockIndent;
+                    self.disallow_vstructs(disallowed_vstructs, recover, || {
+                        self.expr_tail(body, tail)
                     })
                 })
                 .next(|_| {

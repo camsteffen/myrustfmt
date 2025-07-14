@@ -253,12 +253,12 @@ impl AstFormatter {
         self.expr(target)?;
         self.backtrack()
             .next(|_| {
-                self.space_could_wrap_indent(|| {
-                    self.out.token_space("as")?;
-                    self.ty(ty)?;
-                    self.tail(tail)?;
-                    Ok(())
-                })
+                self.out.space()?;
+                let _guard = self.could_wrap_indent_guard();
+                self.out.token_space("as")?;
+                self.ty(ty)?;
+                self.tail(tail)?;
+                Ok(())
             })
             .next(|_| {
                 self.has_vstruct(VStruct::NonBlockIndent, || {
@@ -299,18 +299,17 @@ impl AstFormatter {
             let wrapped_iter = self
                 .backtrack()
                 .next(|_| {
-                    self.could_wrap_indent(|| {
-                        self.out.space_token_space("in")?;
-                        self.expr_tail(
-                            iter,
-                            Some(&self.tail_fn(|af| {
-                                af.out.space()?;
-                                af.out.token("{")?;
-                                Ok(())
-                            })),
-                        )?;
-                        Ok(false)
-                    })
+                    let _guard = self.could_wrap_indent_guard();
+                    self.out.space_token_space("in")?;
+                    self.expr_tail(
+                        iter,
+                        Some(&self.tail_fn(|af| {
+                            af.out.space()?;
+                            af.out.token("{")?;
+                            Ok(())
+                        })),
+                    )?;
+                    Ok(false)
                 })
                 .next(|_| {
                     self.indented(|| {

@@ -191,12 +191,11 @@ impl AstFormatter {
                         let allow_same_line = pat_width.is_some_and(|w| w <= 40);
                         self.backtrack()
                             .next_if(allow_same_line, |_| {
-                                self.could_wrap_indent(|| {
-                                    self.out.space_token_space("if")?;
-                                    self.expr(guard)?;
-                                    self.out.token_maybe_missing(",")?;
-                                    Ok(())
-                                })
+                                let _guard = self.could_wrap_indent_guard();
+                                self.out.space_token_space("if")?;
+                                self.expr(guard)?;
+                                self.out.token_maybe_missing(",")?;
+                                Ok(())
                             })
                             .next(|_| {
                                 self.indented(|| {

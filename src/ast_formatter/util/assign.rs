@@ -28,11 +28,11 @@ impl AstFormatter {
         self.out.restore_checkpoint(&checkpoint_after_eq);
         self.backtrack()
             .next_if(!force_wrap, |_| {
-                self.space_could_wrap_indent(|| {
-                    self.expr(expr)?;
-                    self.tail(tail)?;
-                    Ok(())
-                })
+                self.out.space()?;
+                let _guard = self.could_wrap_indent_guard();
+                self.expr(expr)?;
+                self.tail(tail)?;
+                Ok(())
             })
             .next(|_| {
                 self.indented(|| {

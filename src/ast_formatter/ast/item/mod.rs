@@ -240,11 +240,11 @@ impl AstFormatter {
         if impl_.of_trait.is_some() {
             self.backtrack()
                 .next(|_| {
-                    self.space_could_wrap_indent(|| {
-                        self.out.token_space("for")?;
-                        self.ty(&impl_.self_ty)?;
-                        Ok(())
-                    })
+                    self.out.space()?;
+                    let _guard = self.could_wrap_indent_guard();
+                    self.out.token_space("for")?;
+                    self.ty(&impl_.self_ty)?;
+                    Ok(())
                 })
                 .next(|_| {
                     self.indented_optional(!indented, || {

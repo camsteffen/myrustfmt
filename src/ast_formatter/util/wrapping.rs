@@ -1,21 +1,15 @@
 use crate::ast_formatter::util::indent::IndentGuard;
 use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::error::{FormatErrorKind, FormatResult};
+use crate::util::drop::Guard;
 use crate::whitespace::VerticalWhitespaceMode;
 
 impl AstFormatter {
     /// If the current position is farther right compared to the position if wrap-indented, then
-    /// width is recoverable for the given scope.
-    pub fn could_wrap_indent<T>(&self, scope: impl FnOnce() -> FormatResult<T>) -> FormatResult<T> {
-        let _guard = (self.out.col() > self.out.total_indent.get() + INDENT_WIDTH)
-            .then(|| self.recover_width_guard());
-        scope()
-    }
-
-    pub fn space_could_wrap_indent(&self, scope: impl Fn() -> FormatResult) -> FormatResult {
-        self.out.space()?;
-        self.could_wrap_indent(scope)?;
-        Ok(())
+    /// width is recoverable.
+    pub fn could_wrap_indent_guard(&self) -> impl Guard {
+        (self.out.col() > self.out.total_indent.get() + INDENT_WIDTH)
+            .then(|| self.recover_width_guard())
     }
 
     // todo test
