@@ -65,29 +65,38 @@ impl AstFormatter {
         };
         let next_line_arm_guard = || {
             let arm_indent = self.out.total_indent.get();
+            let empty_body = arm.body.as_deref().and_then(plain_block).is_some_and(
+                |block| self.is_block_empty(block),
+            );
             self.indented(|| {
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 self.out.token_space("if")?;
                 self.expr_tail(
                     guard,
-                    Some(&self.tail_fn(|af| {
-                        let Some(body) = arm.body.as_deref() else {
-                            return Ok(());
-                        };
-                        af.out.space_token("=>")?;
-                        let _guard = self.out.total_indent.replace_guard(arm_indent);
-                        if plain_block(body).is_some_and(|block| af.is_block_empty(block)) {
-                            af.out.space_allow_newlines()?;
-                            af.expr(body)?;
-                        } else {
-                            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                            self.expr_force_plain_block(body)?;
-                        }
-                        Ok(())
-                    })),
+                    arm.body
+                        .as_deref()
+                        .map(|body| {
+                            self.tail_fn(|af| {
+                                af.out.space_token("=>")?;
+                                if empty_body {
+                                    let _guard = self.out.total_indent.replace_guard(arm_indent);
+                                    af.out.space_allow_newlines()?;
+                                    af.expr(body)?;
+                                }
+                                Ok(())
+                            })
+                        })
+                        .as_ref(),
                 )?;
                 Ok(())
-            })
+            })?;
+            if let Some(body) = arm.body.as_deref()
+                && !empty_body
+            {
+                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                self.expr_force_plain_block(body)?;
+            }
+            Ok(())
         };
         self.backtrack()
             .next_if(self.out.line() == first_line, |_| {
