@@ -74,7 +74,7 @@ impl AstFormatter {
                 Some(move |_: &_| {
                     let _guard = self.single_line_guard();
                     let _guard = self.width_limit_end_guard(
-                        start_col + WIDTH_THRESHOLDS.single_line_let_else_max_width,
+                        start_col.saturating_add(WIDTH_THRESHOLDS.single_line_let_else_max_width),
                     )?;
                     self.optional_block_horizontal_after_open_brace(expr_only_else)?;
                     self.out.token(";")?;

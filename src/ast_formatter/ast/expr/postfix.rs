@@ -48,7 +48,7 @@ impl AstFormatter {
             self.postfix_chain_vertical(chain, tail)
         } else {
             let width_limit_end =
-                (chain.len() > 1).then(|| start_col + WIDTH_THRESHOLDS.chain_width);
+                (chain.len() > 1).then(|| start_col.saturating_add(WIDTH_THRESHOLDS.chain_width));
             self.backtrack()
                 .next(|_| {
                     let _guard = self.recover_width_guard();

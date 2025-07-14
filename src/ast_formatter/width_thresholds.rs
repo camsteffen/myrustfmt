@@ -25,15 +25,3 @@ pub const WIDTH_THRESHOLDS: WidthThresholds = WidthThresholds {
     struct_lit_width: RUSTFMT_CONFIG_DEFAULTS.struct_lit_width,
     struct_variant_width: RUSTFMT_CONFIG_DEFAULTS.struct_variant_width,
 };
-
-// pub const WIDTH_THRESHOLDS: WidthThresholds = WidthThresholds {
-//     array_width: HSize::MAX,
-//     attr_fn_like_width: HSize::MAX,
-//     chain_width: HSize::MAX,
-//     fn_call_width: HSize::MAX,
-//     short_array_element_width_threshold: HSize::MAX,
-//     single_line_if_else_max_width: HSize::MAX,
-//     single_line_let_else_max_width: HSize::MAX,
-//     struct_lit_width: HSize::MAX,
-//     struct_variant_width: HSize::MAX,
-// };

@@ -59,7 +59,7 @@ impl AstFormatter {
     }
 
     pub fn width_limit_guard(&self, width_limit: HSize) -> FormatResult<Option<impl Guard>> {
-        let end_col = self.out.col() + width_limit;
+        let end_col = self.out.col().saturating_add(width_limit);
         self.width_limit_end_guard(end_col)
     }
 
@@ -70,8 +70,7 @@ impl AstFormatter {
         let Some(width_limit) = width_limit else {
             return Ok(None);
         };
-        let end_col = self.out.col() + width_limit;
-        self.width_limit_end_guard(end_col)
+        self.width_limit_guard(width_limit)
     }
 
     pub fn width_limit_end_guard(&self, end_col: HSize) -> FormatResult<Option<impl Guard>> {
