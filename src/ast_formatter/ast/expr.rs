@@ -431,7 +431,7 @@ impl AstFormatter {
                     self.expr_tail(
                         inner,
                         Some(&self.tail_fn(|af| {
-                            let end_start = self.out.col();
+                            let end_paren_start = self.out.col();
                             let before_end = self.out.checkpoint();
                             let result = (|| -> FormatResult {
                                 let _guard = self.recover_width_guard();
@@ -443,16 +443,20 @@ impl AstFormatter {
                             if err.kind != FormatErrorKind::WidthLimitExceeded {
                                 return Err(err);
                             }
-                            let expr_width = end_start - expr_start;
-                            let end_end = self.out.col();
-                            let end_width = end_end - end_start;
-                            let next_inside_end = INDENT_WIDTH + expr_width;
-                            if next_inside_end.max(end_width)
-                                < end_end - self.out.total_indent.get()
+                            // The vertical strategy may or may not use less width. This depends
+                            // on the starting horizontal offset and also the width of the tail.
+                            let expr_width = end_paren_start - expr_start;
+                            let end_paren_end = self.out.col();
+                            let end_width = end_paren_end - end_paren_start;
+                            let vertical_inside_end = INDENT_WIDTH + expr_width;
+                            if vertical_inside_end.max(end_width)
+                                < end_paren_end - self.out.total_indent.get()
                             {
-                                // multi-line strategy
+                                // Prefer the vertical strategy to use less width.
                                 return Err(err);
                             }
+
+                            // Stick with horizontal (without recover width this time).
                             self.out.restore_checkpoint(&before_end);
                             af.out.token(")")?;
                             self.tail(tail)?;
