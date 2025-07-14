@@ -168,7 +168,7 @@ impl SourceFormatter {
         // If there is any whitespace next, if it is part of the span, we want to copy it with the
         // rest of the span. If it is not part of the span, we should consume it as normal
         // whitespace.
-        if self.source_reader.pos.get() < span.lo {
+        if self.source_reader.pos() < span.lo {
             self.horizontal_whitespace()?;
         }
         let segment = self.source_reader.eat_span(span);

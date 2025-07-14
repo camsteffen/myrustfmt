@@ -88,7 +88,7 @@ impl AstFormatter {
         filter: fn(&ast::Item) -> bool,
     ) -> &'a [T] {
         let first = slice.first().unwrap().as_item().unwrap();
-        let source_file = &self.out.source_reader.source_file;
+        let source_file = self.out.source_reader.source_file();
         let mut line_hi = source_file
             .lookup_line(source_file.relative_position(first.span.hi()))
             .unwrap();

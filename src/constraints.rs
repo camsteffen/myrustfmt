@@ -24,7 +24,8 @@ pub struct Constraints {
     pub max_width: Cell<HSize>,
     /// When Some, we consider width to be recoverable. This means that if a width limit is
     /// exceeded, we may fall back to another formatting strategy that is known to take less width.
-    /// The contained value is the line number.
+    /// The contained value is the output line number - for multi-line output, this constraint falls
+    /// out of scope after the first line.
     pub recover_width: Cell<Option<VSize>>,
     // todo using SingleLine to measure the width of the first line should ignore trailing line comments
     pub single_line: Cell<bool>,

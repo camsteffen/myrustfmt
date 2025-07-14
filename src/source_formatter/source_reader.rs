@@ -3,14 +3,17 @@ use crate::span::Span;
 use crate::util::line_col::line_col;
 use rustc_span::{BytePos, Pos, SourceFile};
 use std::cell::Cell;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-// todo encapsulate more - AstFormatter probably shouldn't be accessing fields
 pub struct SourceReader {
-    pub path: Option<PathBuf>,
-    pub pos: Cell<BytePos>,
-    pub source_file: Arc<SourceFile>,
+    path: Option<PathBuf>,
+    pos: Cell<BytePos>,
+    source_file: Arc<SourceFile>,
+}
+
+pub struct SourceReaderCheckpoint {
+    pos: BytePos,
 }
 
 impl SourceReader {
@@ -28,6 +31,20 @@ impl SourceReader {
         }
     }
 
+    pub fn checkpoint(&self) -> SourceReaderCheckpoint {
+        SourceReaderCheckpoint {
+            pos: self.pos.get(),
+        }
+    }
+
+    pub fn restore_checkpoint(&self, checkpoint: &SourceReaderCheckpoint) {
+        self.pos.set(checkpoint.pos);
+    }
+
+    pub fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
+    }
+
     pub fn pos(&self) -> BytePos {
         self.pos.get()
     }
@@ -36,6 +53,10 @@ impl SourceReader {
         self.source_file.src.as_ref().expect(
             "SourceFile should have src",
         )
+    }
+
+    pub fn source_file(&self) -> &SourceFile {
+        &self.source_file
     }
 
     pub fn advance(&self, len: u32) {

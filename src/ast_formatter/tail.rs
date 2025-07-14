@@ -22,9 +22,6 @@ pub type Tail<'a, 'b> = Option<&'a TailS<'b>>;
 pub struct TailS<'a> {
     func: Box<dyn Fn(&AstFormatter) -> FormatResult + 'a>,
     // captured constraints
-    // todo would it be better to explicitly capture and apply constraints where needed?
-    // todo what about RecoverableConstraints?
-    // todo what about disallowed vstructs?
     disallowed_vstructs: VStructSet,
     single_line: bool,
     width_limit: Option<Rc<WidthLimit>>,

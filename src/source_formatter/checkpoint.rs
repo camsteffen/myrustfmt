@@ -1,12 +1,12 @@
 use crate::constraint_writer::checkpoint::ConstraintWriterCheckpoint;
 use crate::error_emitter::Checkpoint as BufferedErrorEmitterCheckpoint;
 use crate::source_formatter::SourceFormatter;
-use rustc_span::BytePos;
+use crate::source_formatter::source_reader::SourceReaderCheckpoint;
 
 pub struct Checkpoint<'a> {
     error_emitter_checkpoint: Option<BufferedErrorEmitterCheckpoint>,
     owner: &'a SourceFormatter,
-    source_pos: BytePos,
+    source_reader_checkpoint: SourceReaderCheckpoint,
     writer_checkpoint: ConstraintWriterCheckpoint,
 }
 
@@ -34,7 +34,7 @@ impl SourceFormatter {
         Checkpoint {
             error_emitter_checkpoint,
             owner: self,
-            source_pos: self.source_reader.pos.get(),
+            source_reader_checkpoint: self.source_reader.checkpoint(),
             writer_checkpoint: self.out.checkpoint(),
         }
     }
@@ -43,13 +43,13 @@ impl SourceFormatter {
         let Checkpoint {
             ref error_emitter_checkpoint,
             owner: _,
-            source_pos,
+            ref source_reader_checkpoint,
             ref writer_checkpoint,
         } = *checkpoint;
         if let Some(error_emitter_checkpoint) = error_emitter_checkpoint {
             self.error_emitter.restore_checkpoint(error_emitter_checkpoint);
         }
         self.out.restore_checkpoint(writer_checkpoint);
-        self.source_reader.pos.set(source_pos);
+        self.source_reader.restore_checkpoint(source_reader_checkpoint);
     }
 }

@@ -65,7 +65,7 @@ impl AstFormatter {
                     e.display(
                         self.out.source_reader.source(),
                         self.out.source_reader.pos(),
-                        self.out.source_reader.path.as_deref(),
+                        self.out.source_reader.path(),
                     ),
                 );
             }
@@ -112,7 +112,7 @@ impl AstFormatter {
             error_formatting_at(
                 self.out.source_reader.source(),
                 self.out.source_reader.pos(),
-                self.out.source_reader.path.as_deref(),
+                self.out.source_reader.path(),
             ),
         );
     }
