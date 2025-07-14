@@ -99,33 +99,21 @@ impl AstFormatter {
     ) -> FormatResult {
         let method_col_start = self.out.col();
         let checkpoint = self.out.checkpoint();
-        let args_horizontal = |af: &Self| {
-            af.method_call_args_postfix_tail(
-                method_call,
-                ListStrategies::horizontal_overflow(),
-                postfix_item,
-                tail,
-            )
-        };
-        let path_tail = self.tail_fn(|af| {
-            // If there are any arguments, then they can be formatted vertically, and then the
-            // arguments and tail do not affect whether the path fits in one line.
-            if method_call.args.is_empty() {
-                args_horizontal(af)?;
-            }
-            Ok(())
-        });
         let path_wrap_result = self.simulate_wrap_indent(0, || {
-            self.method_call_dot_path(method_call, Some(&path_tail))
+            self.method_call_with_args_if_empty(method_call, postfix_item, tail)
         })?;
         match path_wrap_result {
             // the path fits in one line
-            SimulateWrapResult::Ok => {}
+            SimulateWrapResult::Ok => {
+                if method_call.args.is_empty() {
+                    return Ok(());
+                }
+            }
 
             // A vertical chain wouldn't prevent vertical path generics
             SimulateWrapResult::NoWrap => {
                 self.out.restore_checkpoint(&checkpoint);
-                self.method_call_dot_path(method_call, Some(&path_tail))?;
+                self.method_call_with_args_if_empty(method_call, postfix_item, tail)?;
                 if !method_call.args.is_empty() {
                     self.method_call_args_postfix_tail(
                         method_call,
@@ -137,16 +125,16 @@ impl AstFormatter {
                 return Ok(());
             }
 
-            // A vertical chain prevents vertical path generics
+            // Prefer a vertical chain to avoid vertical path generics
             SimulateWrapResult::WrapForSingleLine
             | SimulateWrapResult::WrapForLongerFirstLine
             | SimulateWrapResult::WrapForLessExcessWidth => {
                 return Err(self.err(FormatErrorKind::Logical));
             }
         }
-        if method_call.args.is_empty() {
-            return Ok(());
-        }
+
+        // You are here: x.method(args)?
+        //                        ^
 
         let checkpoint = self.out.checkpoint();
 
@@ -164,7 +152,13 @@ impl AstFormatter {
 
         let args_horizontal_or_recover = || {
             self.out.restore_checkpoint(&checkpoint);
-            match args_horizontal(self) {
+            let result = self.method_call_args_postfix_tail(
+                method_call,
+                ListStrategies::horizontal_overflow(),
+                postfix_item,
+                tail,
+            );
+            match result {
                 Ok(height) => Ok(Some(height)),
                 Err(e) => {
                     // recover errors that might be avoided with vertical args or a vertical chain
@@ -179,6 +173,17 @@ impl AstFormatter {
                     if recovering { Ok(None) } else { Err(e) }
                 }
             }
+        };
+
+        let vertical_args = || {
+            self.out.restore_checkpoint(&checkpoint);
+            self.method_call_args_postfix_tail(
+                method_call,
+                ListStrategies::vertical(),
+                postfix_item,
+                tail,
+            )?;
+            Ok(())
         };
 
         match wrap_result {
@@ -201,13 +206,7 @@ impl AstFormatter {
                         return Err(self.err(FormatErrorKind::Logical));
                     }
                     // Use a horizontal chain with vertical method call arguments.
-                    self.out.restore_checkpoint(&checkpoint);
-                    self.method_call_args_postfix_tail(
-                        method_call,
-                        ListStrategies::vertical(),
-                        postfix_item,
-                        tail,
-                    )?;
+                    vertical_args()?;
                     Ok(())
                 }
             }
@@ -230,13 +229,7 @@ impl AstFormatter {
                     Err(self.err(FormatErrorKind::Logical))
                 } else {
                     // At this point we want vertical method call arguments if possible
-                    self.out.restore_checkpoint(&checkpoint);
-                    self.method_call_args_postfix_tail(
-                        method_call,
-                        ListStrategies::vertical(),
-                        postfix_item,
-                        tail,
-                    )?;
+                    vertical_args()?;
                     Ok(())
                 }
             }
@@ -273,7 +266,21 @@ impl AstFormatter {
                 postfix_tail(self)?;
             }
             ast::ExprKind::MethodCall(ref method_call) => {
-                self.method_call(method_call, item, tail)?;
+                self.out.token(".")?;
+                self.path_segment(
+                    &method_call.seg,
+                    true,
+                    Some(&self.tail_fn(|af| {
+                        af.out.token("(")?;
+                        af.method_call_args_postfix_tail(
+                            method_call,
+                            ListStrategies::flexible_overflow(),
+                            item,
+                            tail,
+                        )?;
+                        Ok(())
+                    })),
+                )?;
             }
             // root expression
             _ => {
@@ -283,40 +290,34 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn method_call(
+    fn method_call_with_args_if_empty(
         &self,
         method_call: &ast::MethodCall,
         postfix_item: &PostfixItem,
         tail: Tail,
     ) -> FormatResult {
-        self.method_call_dot_path(
-            method_call,
-            Some(&self.tail_fn(|af| {
-                af.method_call_args_postfix_tail(
-                    method_call,
-                    ListStrategies::flexible_overflow(),
-                    postfix_item,
-                    tail,
-                )?;
-                Ok(())
-            })),
-        )
-    }
-
-    fn method_call_dot_path(&self, method_call: &ast::MethodCall, tail: Tail) -> FormatResult {
         self.out.token(".")?;
         self.path_segment(
             &method_call.seg,
             true,
             Some(&self.tail_fn(|af| {
                 af.out.token("(")?;
-                af.tail(tail)?;
+                if method_call.args.is_empty() {
+                    af.method_call_args_postfix_tail(
+                        method_call,
+                        ListStrategies::horizontal_overflow(),
+                        postfix_item,
+                        tail,
+                    )?;
+                }
                 Ok(())
             })),
         )?;
         Ok(())
     }
 
+    // x.method(args)[0]?
+    //          ‾‾‾‾‾‾‾‾‾
     fn method_call_args_postfix_tail(
         &self,
         method_call: &ast::MethodCall,
