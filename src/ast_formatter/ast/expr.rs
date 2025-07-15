@@ -439,24 +439,34 @@ impl AstFormatter {
                                 af.tail(tail)?;
                                 Ok(())
                             })();
+
                             let Err(err) = result else { return Ok(()) };
-                            if err.kind != FormatErrorKind::WidthLimitExceeded {
+
+                            // This error kind implies that the output is single-line.
+                            let FormatErrorKind::WidthLimitExceeded = err.kind else {
                                 return Err(err);
-                            }
+                            };
+
                             // The vertical strategy may or may not use less width. This depends
                             // on the starting horizontal offset and also the width of the tail.
                             let expr_width = end_paren_start - expr_start;
-                            let end_paren_end = self.out.col();
-                            let end_width = end_paren_end - end_paren_start;
-                            let vertical_inside_end = INDENT_WIDTH + expr_width;
-                            if vertical_inside_end.max(end_width)
-                                < end_paren_end - self.out.total_indent.get()
+                            let tail_end = self.out.col();
+                            // (
+                            //     expr      <- vertical_inside_width (includes margin)
+                            // );            <- end_width (includes tail)
+                            let end_width = tail_end - end_paren_start;
+                            let vertical_inside_width = INDENT_WIDTH + expr_width;
+
+                            // Check if both the middle line and end line will be shorter in the
+                            // vertical format.
+                            if vertical_inside_width.max(end_width)
+                                < tail_end - self.out.total_indent.get()
                             {
-                                // Prefer the vertical strategy to use less width.
+                                // prefer vertical strategy
                                 return Err(err);
                             }
 
-                            // Stick with horizontal (without recover width this time).
+                            // Stick with horizontal format (emit a width error this time).
                             self.out.restore_checkpoint(&before_end);
                             af.out.token(")")?;
                             self.tail(tail)?;
