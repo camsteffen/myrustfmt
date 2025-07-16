@@ -420,11 +420,28 @@ impl AstFormatter {
                 self.ident(ident)?;
                 self.out.token_space(":")?;
             }
-            self.ty_tail(&field.ty, tail)?;
-            if field.default.is_some() {
-                // todo
-                return Err(self.err(FormatErrorKind::UnsupportedSyntax));
-            }
+            let Some(default) = &field.default else {
+                self.ty_tail(&field.ty, tail)?;
+                return Ok(())
+            };
+            self.ty(&field.ty)?;
+            self.backtrack()
+                .next(|_| {
+                    let _guard = self.could_wrap_indent_guard();
+                    self.out.space_token_space("=")?;
+                    self.expr(&default.value)?;
+                    self.tail(tail)?;
+                    Ok(())
+                })
+                .next(|_| {
+                    let _guard = self.begin_indent();
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                    self.out.token_space("=")?;
+                    self.expr(&default.value)?;
+                    self.tail(tail)?;
+                    Ok(())
+                })
+                .result()?;
             Ok(())
         })
     }
