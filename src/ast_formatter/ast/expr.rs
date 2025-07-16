@@ -12,7 +12,7 @@ use crate::ast_formatter::list::options::{
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
 use crate::ast_formatter::width_thresholds::WIDTH_THRESHOLDS;
-use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
+use crate::ast_formatter::AstFormatter;
 use crate::ast_utils::{is_jump_expr, plain_block, postfix_expr_kind};
 use crate::constraints::VStruct;
 use crate::error::{FormatErrorKind, FormatResult};
@@ -427,52 +427,11 @@ impl AstFormatter {
         self.backtrack()
             .next(|recover| {
                 self.disallow_vstructs(VStruct::NonBlockIndent, recover, || {
-                    let expr_start = self.out.col();
-                    self.expr_tail(
-                        inner,
-                        Some(&self.tail_fn(|af| {
-                            let end_paren_start = self.out.col();
-                            let before_end = self.out.checkpoint();
-                            let result = (|| -> FormatResult {
-                                let _guard = self.recover_width_guard();
-                                af.out.token(")")?;
-                                af.tail(tail)?;
-                                Ok(())
-                            })();
-
-                            let Err(err) = result else { return Ok(()) };
-
-                            // This error kind implies that the output is single-line.
-                            let FormatErrorKind::WidthLimitExceeded = err.kind else {
-                                return Err(err);
-                            };
-
-                            // The vertical strategy may or may not use less width. This depends
-                            // on the starting horizontal offset and also the width of the tail.
-                            let expr_width = end_paren_start - expr_start;
-                            let tail_end = self.out.col();
-                            // (
-                            //     expr      <- vertical_inside_width (includes margin)
-                            // );            <- end_width (includes tail)
-                            let end_width = tail_end - end_paren_start;
-                            let vertical_inside_width = INDENT_WIDTH + expr_width;
-
-                            // Check if both the middle line and end line will be shorter in the
-                            // vertical format.
-                            if vertical_inside_width.max(end_width)
-                                < tail_end - self.out.total_indent.get()
-                            {
-                                // prefer vertical strategy
-                                return Err(err);
-                            }
-
-                            // Stick with horizontal format (emit a width error this time).
-                            self.out.restore_checkpoint(&before_end);
-                            af.out.token(")")?;
-                            self.tail(tail)?;
-                            Ok(())
-                        })),
-                    )
+                    let _guard = self.could_wrap_indent_guard();
+                    self.expr(inner)?;
+                    self.out.token(")")?;
+                    self.tail(tail)?;
+                    Ok(())
                 })
             })
             .next(|_| {

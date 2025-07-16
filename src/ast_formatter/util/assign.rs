@@ -1,6 +1,6 @@
-use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
+use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::error::FormatResult;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -17,7 +17,7 @@ impl AstFormatter {
         let force_wrap = if result.is_err() {
             true
         } else {
-            match self.simulate_wrap_indent(0, || self.expr_tail(expr, tail))? {
+            match self.simulate_wrap(INDENT_WIDTH, || self.expr_tail(expr, tail))? {
                 SimulateWrapResult::Ok => return Ok(()),
                 SimulateWrapResult::NoWrap | SimulateWrapResult::WrapForLongerFirstLine => false,
                 SimulateWrapResult::WrapForSingleLine

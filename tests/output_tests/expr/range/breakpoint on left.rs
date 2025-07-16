@@ -1,17 +1,15 @@
 // test-kind: breakpoint
 
 fn test() {
-    (aaaaa)..(
+    let _ = (aaaaa)..(
         bbbbb
-    )
+    );
 }
 
 // :after:
 
 fn test() {
-    (
+    let _ = (
         aaaaa
-    )..(
-        bbbbb
-    )
+    )..(bbbbb);
 }

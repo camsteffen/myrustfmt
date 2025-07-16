@@ -5,7 +5,6 @@ mod rest;
 pub use self::list_item_context::ListItemContext;
 pub use self::rest::ListRest;
 use crate::Recover;
-use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::options::{
     FlexibleListStrategy, HorizontalListStrategy, ListOptions, ListStrategies, VerticalListStrategy,
@@ -14,6 +13,7 @@ use crate::ast_formatter::list::options::{
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::enclosed::ENCLOSED_DISALLOWED_VSTRUCTS;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
+use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::constraints::VStruct;
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::VSize;
@@ -228,7 +228,7 @@ where
         let index = list.len() - 1;
         let item = || self.list_item(index, Some(recover), tail);
         let checkpoint = af.out.checkpoint();
-        let wrap_result = af.simulate_wrap_indent(0, item)?;
+        let wrap_result = af.simulate_wrap(INDENT_WIDTH, item)?;
         match wrap_result {
             SimulateWrapResult::Ok => {}
             SimulateWrapResult::NoWrap

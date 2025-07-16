@@ -1,4 +1,4 @@
-use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
+use crate::ast_formatter::AstFormatter;
 use crate::constraints::{WidthLimit, WidthLimitSimulate};
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::HSize;
@@ -21,11 +21,11 @@ pub enum SimulateWrapResult {
 
 impl AstFormatter {
     /// Format with this function when choosing between continuing on the same line or wrapping to
-    /// the next line and adding an indentation (think "ENTER, TAB").
+    /// the next line.
     ///
-    /// This will _not_ add a newline or indent, but will increase the max width by the amount of
-    /// extra horizontal space that _would_ be gained by wrapping. It also will turn off any width
-    /// limit that is enabled for the current line. Finally, it uses single line mode to limit the
+    /// This will _not_ add a newline, but will increase the max width by the amount of extra
+    /// horizontal space that _would_ be gained by wrapping. It also will turn off any width limit
+    /// that is enabled for the current line. Finally, it uses single line mode to limit the
     /// experiment to the first line.
     ///
     /// See [`SimulateWrapResult`] for possible outcomes.
@@ -33,26 +33,25 @@ impl AstFormatter {
     /// N.B. This function relies on a subtle invariant that the given formatting scope will emit
     /// the entire first line except for trailing comments before returning a newline-related error
     /// when applicable.
-    pub fn simulate_wrap_indent(
+    pub fn simulate_wrap(
         &self,
         offset: HSize,
         scope: impl FnOnce() -> FormatResult,
     ) -> FormatResult<SimulateWrapResult> {
         let max_width = self.constraints().max_width.get();
         let col = self.out.col();
-        let wrap_indent_col = self.out.total_indent.get() + INDENT_WIDTH + offset;
+        let wrap_indent_col = self.out.total_indent.get() + offset;
+        let extra_width = col.checked_sub(wrap_indent_col).filter(|&w| w > 0);
 
         let result;
         let exceeded_width_limit;
         let used_extra_width;
         {
-            let _guard = col.checked_sub(wrap_indent_col).filter(|&w| w > 0).map(
-                |extra_width| {
-                    let new_max_width = max_width.saturating_add(extra_width);
-                    self.constraints().max_width.replace_guard(new_max_width)
-                },
-            );
             let _guard = self.constraints().single_line.replace_guard(true);
+            let _guard = extra_width.map(|extra_width| {
+                let new_max_width = max_width.saturating_add(extra_width);
+                self.constraints().max_width.replace_guard(new_max_width)
+            });
             let width_limit_guard = self.width_limit_end_col().map(|end_col| {
                 self.constraints().width_limit.replace_guard(Some(Rc::new(
                     WidthLimit {

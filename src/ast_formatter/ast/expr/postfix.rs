@@ -99,7 +99,7 @@ impl AstFormatter {
     ) -> FormatResult {
         let method_col_start = self.out.col();
         let checkpoint = self.out.checkpoint();
-        let path_wrap_result = self.simulate_wrap_indent(0, || {
+        let path_wrap_result = self.simulate_wrap(INDENT_WIDTH, || {
             self.method_call_with_args_if_empty(method_call, postfix_item, tail)
         })?;
         match path_wrap_result {
@@ -140,7 +140,7 @@ impl AstFormatter {
 
         // Simulate wrapping the method call as if in a vertical chain.
         let width_before_args = self.out.col() - method_col_start;
-        let wrap_result = self.simulate_wrap_indent(width_before_args, || {
+        let wrap_result = self.simulate_wrap(INDENT_WIDTH + width_before_args, || {
             self.method_call_args_postfix_tail(
                 method_call,
                 ListStrategies::flexible_overflow(),

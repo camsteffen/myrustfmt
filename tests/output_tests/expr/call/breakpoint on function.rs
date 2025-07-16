@@ -1,7 +1,7 @@
 // test-kind: breakpoint
 
 fn test() {
-    (aaaaaaa + bbbbb)(
+    let _ = (aaaaaaa + bbbbb)(
         aaaaaaaaaa,
         aaaaaaaaaa,
         aaaaaaaaaa,
@@ -12,9 +12,8 @@ fn test() {
 // :after:
 
 fn test() {
-    (
-        aaaaaaa
-            + bbbbb
+    let _ = (
+        aaaaaaa + bbbbb
     )(
         aaaaaaaaaa,
         aaaaaaaaaa,

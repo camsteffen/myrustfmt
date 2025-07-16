@@ -1,5 +1,5 @@
-use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::util::simulate_wrap::SimulateWrapResult;
+use crate::ast_formatter::{AstFormatter, INDENT_WIDTH};
 use crate::ast_utils::plain_block;
 use crate::constraints::VStruct;
 use crate::error::FormatResult;
@@ -121,7 +121,7 @@ impl AstFormatter {
 
     fn arm_body_maybe_add_block(&self, body: &ast::Expr) -> FormatResult {
         let checkpoint = self.out.checkpoint();
-        let force_block = match self.simulate_wrap_indent(0, || self.expr(body))? {
+        let force_block = match self.simulate_wrap(INDENT_WIDTH, || self.expr(body))? {
             SimulateWrapResult::Ok => {
                 let _guard = self.recover_width_guard();
                 if self.out.token_maybe_missing(",").is_err() {

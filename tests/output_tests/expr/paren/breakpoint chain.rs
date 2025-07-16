@@ -1,14 +1,13 @@
 // test-kind: breakpoint
 
 fn test() {
-    (aaaaaaa + bbbbb)
+    break (aaaaaaa + bbbbb);
 }
 
 // :after:
 
 fn test() {
-    (
-        aaaaaaa
-            + bbbbb
-    )
+    break (
+        aaaaaaa + bbbbb
+    );
 }
