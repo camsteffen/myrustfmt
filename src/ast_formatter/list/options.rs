@@ -72,8 +72,8 @@ impl<Item> VerticalListStrategy<'_, Item> {
 }
 
 pub struct FlexibleListStrategy<'a, Item> {
-    pub horizontal: HorizontalListStrategy = HorizontalListStrategy{..},
-    pub vertical: VerticalListStrategy<'a, Item> = VerticalListStrategy {..},
+    pub horizontal: HorizontalListStrategy = HorizontalListStrategy { .. },
+    pub vertical: VerticalListStrategy<'a, Item> = VerticalListStrategy { .. },
 }
 
 #[derive(Clone, Copy)]
@@ -87,6 +87,8 @@ pub struct ListOptions<'ast, 'tail, Item> {
     pub is_struct: bool = false,
     pub omit_open_bracket: bool = false,
     pub rest: Option<ListRest<'ast>> = None,
-    pub strategies: ListStrategies<'ast, Item> = ListStrategies::Flexible(FlexibleListStrategy{..}),
+    pub strategies: ListStrategies<'ast, Item> = ListStrategies::Flexible(FlexibleListStrategy {
+        ..
+    }),
     pub tail: Tail<'tail, 'ast> = None,
 }

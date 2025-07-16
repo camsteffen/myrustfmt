@@ -2,6 +2,7 @@ mod binary_expr;
 mod r#match;
 mod postfix;
 
+use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::ast::r#macro::MacCallSemi;
 use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::ListItemContext;
@@ -12,7 +13,6 @@ use crate::ast_formatter::list::options::{
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::util::debug::expr_kind_name;
 use crate::ast_formatter::width_thresholds::WIDTH_THRESHOLDS;
-use crate::ast_formatter::AstFormatter;
 use crate::ast_utils::{is_jump_expr, plain_block, postfix_expr_kind};
 use crate::constraints::VStruct;
 use crate::error::{FormatErrorKind, FormatResult};

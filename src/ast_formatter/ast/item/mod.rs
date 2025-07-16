@@ -422,7 +422,7 @@ impl AstFormatter {
             }
             let Some(default) = &field.default else {
                 self.ty_tail(&field.ty, tail)?;
-                return Ok(())
+                return Ok(());
             };
             self.ty(&field.ty)?;
             self.backtrack()
