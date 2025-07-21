@@ -2,6 +2,7 @@ use crate::ast_formatter::list::ListRest;
 use crate::ast_formatter::tail::Tail;
 use crate::num::HSize;
 use crate::whitespace::VerticalWhitespaceMode;
+use Default::default;
 use std::num::NonZero;
 
 pub enum ListStrategies<'a, Item> {
@@ -10,9 +11,15 @@ pub enum ListStrategies<'a, Item> {
     Flexible(FlexibleListStrategy<'a, Item>),
 }
 
+impl<Item> const Default for ListStrategies<'_, Item> {
+    fn default() -> Self {
+        ListStrategies::Flexible(default())
+    }
+}
+
 impl<Item> ListStrategies<'_, Item> {
     pub fn horizontal() -> Self {
-        ListStrategies::Horizontal(HorizontalListStrategy { .. })
+        ListStrategies::Horizontal(default())
     }
 
     pub fn horizontal_overflow() -> Self {
@@ -27,7 +34,7 @@ impl<Item> ListStrategies<'_, Item> {
     }
 
     pub fn vertical() -> Self {
-        ListStrategies::Vertical(VerticalListStrategy { .. })
+        ListStrategies::Vertical(default())
     }
 
     pub fn get_horizontal_mut(&mut self) -> Option<&mut HorizontalListStrategy> {
@@ -47,6 +54,7 @@ impl<Item> ListStrategies<'_, Item> {
     }
 }
 
+#[derive_const(Default)]
 pub struct HorizontalListStrategy {
     pub contents_max_width: Option<HSize> = None,
     pub overflow: bool = false,
@@ -54,8 +62,14 @@ pub struct HorizontalListStrategy {
 
 pub struct VerticalListStrategy<'a, Item> {
     pub item_requires_own_line: Option<Box<dyn Fn(&Item) -> bool + 'a>> = None,
-    pub whitespace_between: VerticalWhitespaceMode = VerticalWhitespaceMode::Break,
+    pub whitespace_between: VerticalWhitespaceMode = default(),
     pub wrap_to_fit: Option<WrapToFit> = None,
+}
+
+impl<Item> const Default for VerticalListStrategy<'_, Item> {
+    fn default() -> Self {
+        VerticalListStrategy { .. }
+    }
 }
 
 impl<Item> VerticalListStrategy<'_, Item> {
@@ -72,8 +86,14 @@ impl<Item> VerticalListStrategy<'_, Item> {
 }
 
 pub struct FlexibleListStrategy<'a, Item> {
-    pub horizontal: HorizontalListStrategy = HorizontalListStrategy { .. },
-    pub vertical: VerticalListStrategy<'a, Item> = VerticalListStrategy { .. },
+    pub horizontal: HorizontalListStrategy = default(),
+    pub vertical: VerticalListStrategy<'a, Item> = default(),
+}
+
+impl<Item> const Default for FlexibleListStrategy<'_, Item> {
+    fn default() -> Self {
+        FlexibleListStrategy { .. }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -87,8 +107,6 @@ pub struct ListOptions<'ast, 'tail, Item> {
     pub is_struct: bool = false,
     pub omit_open_bracket: bool = false,
     pub rest: Option<ListRest<'ast>> = None,
-    pub strategies: ListStrategies<'ast, Item> = ListStrategies::Flexible(FlexibleListStrategy {
-        ..
-    }),
+    pub strategies: ListStrategies<'ast, Item> = default(),
     pub tail: Tail<'tail, 'ast> = None,
 }

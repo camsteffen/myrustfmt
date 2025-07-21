@@ -329,13 +329,6 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn constness(&self, constness: ast::Const) -> FormatResult {
-        match constness {
-            ast::Const::Yes(_) => self.out.token_space("const"),
-            ast::Const::No => Ok(()),
-        }
-    }
-
     fn extern_(&self, ext: &ast::Extern) -> FormatResult {
         match *ext {
             ast::Extern::None => {}

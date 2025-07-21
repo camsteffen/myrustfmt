@@ -1,4 +1,5 @@
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[derive_const(Default)]
 pub enum VerticalWhitespaceMode {
     /// "between items" where a blank line is allowed (e.g. between statements or items)
     Between,
@@ -8,6 +9,7 @@ pub enum VerticalWhitespaceMode {
     Bottom,
     /// a line break where blank lines should be removed, usually breaking a construct into
     /// multiple lines that could have been on one line
+    #[default]
     Break,
     /// Stop after one newline even if there is more whitespace or comments
     SingleNewline,

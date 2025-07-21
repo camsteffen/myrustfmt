@@ -61,6 +61,7 @@ impl AstFormatter {
             ast::ItemKind::ExternCrate(name, ident) => self.extern_crate(name, ident)?,
             ast::ItemKind::Fn(ref fn_) => self.fn_(fn_)?,
             ast::ItemKind::ForeignMod(ref foreign_mod) => {
+                self.safety(foreign_mod.safety)?;
                 self.out.token_space("extern")?;
                 if let Some(abi) = foreign_mod.abi {
                     self.strlit(abi)?;
@@ -221,6 +222,7 @@ impl AstFormatter {
             };
             match &impl_.of_trait {
                 Some(of_trait) => {
+                    self.constness(impl_.constness)?;
                     self.trait_ref(of_trait)?;
                     // todo tail
                     tail(self)?;
@@ -304,6 +306,13 @@ impl AstFormatter {
         })
     }
 
+    pub fn constness(&self, constness: ast::Const) -> FormatResult {
+        match constness {
+            ast::Const::Yes(_) => self.out.token_space("const"),
+            ast::Const::No => Ok(()),
+        }
+    }
+
     fn foreign_item(&self, foreign_item: &ast::ForeignItem) -> FormatResult {
         self.item_generic(foreign_item, |kind| {
             match kind {
@@ -330,6 +339,7 @@ impl AstFormatter {
     }
 
     fn static_item(&self, static_item: &ast::StaticItem) -> FormatResult {
+        self.safety(static_item.safety)?;
         self.out.token_space("static")?;
         self.ident(static_item.ident)?;
         self.out.token_space(":")?;
