@@ -21,7 +21,7 @@ getopts = "0.2.21"
 
 [dev-dependencies]
 datatest-stable = "0.3.2"
-diff = "0.1.13"
+prettydiff = "0.8.1"
 regex = "1.11.1"
 tracing-subscriber = "0.3.19"
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }

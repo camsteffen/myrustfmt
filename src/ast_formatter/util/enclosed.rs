@@ -11,7 +11,8 @@ impl AstFormatter {
     /// Writes contents between braces with indentation
     pub fn enclosed_contents(&self, scope: impl FnOnce() -> FormatResult) -> FormatResult {
         self.has_vstruct(VStruct::Block, || {
-            self.indented(|| {
+            {
+                let _guard = self.indent_guard();
                 self.out.newline(VerticalWhitespaceMode::Top)?;
                 self.out.indent();
                 let _guard = self.constraints().disallowed_vstructs.replace_guard(
@@ -19,8 +20,7 @@ impl AstFormatter {
                 );
                 scope()?;
                 self.out.newline(VerticalWhitespaceMode::Bottom)?;
-                Ok(())
-            })?;
+            }
             self.out.indent();
             Ok(())
         })
@@ -32,7 +32,10 @@ impl AstFormatter {
     /// )
     pub fn enclosed_empty_contents(&self) -> FormatResult {
         let first_line = self.out.line();
-        self.indented(|| self.out.comments(VerticalWhitespaceMode::Break))?;
+        {
+            let _guard = self.indent_guard();
+            self.out.comments(VerticalWhitespaceMode::Break)?;
+        }
         let multi_line = self.out.line() != first_line;
         if multi_line {
             self.out.indent();

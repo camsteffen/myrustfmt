@@ -57,7 +57,9 @@ impl AstFormatter {
                 })
                 .next(|_| {
                     self.has_vstruct(VStruct::NonBlockIndent, || {
-                        self.indented(|| self.postfix_chain_vertical(chain, tail))
+                        let _guard = self.indent_guard();
+                        self.postfix_chain_vertical(chain, tail)?;
+                        Ok(())
                     })
                 })
                 .result()

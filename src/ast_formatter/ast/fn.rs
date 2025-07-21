@@ -201,7 +201,7 @@ impl AstFormatter {
                 self.tail(tail)?;
                 return Ok(false);
             }
-            let indent_guard = self.begin_indent();
+            let indent_guard = self.indent_guard();
             let wrapped = if force_wrap {
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 true

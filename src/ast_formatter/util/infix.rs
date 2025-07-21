@@ -44,15 +44,13 @@ impl AstFormatter {
             })
             .next(|_| {
                 format_item(first)?;
-                self.indented_optional(should_indent, || {
-                    for item in rest {
-                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                        self.out.token_space(token)?;
-                        format_item(item)?;
-                    }
-                    self.tail(tail)?;
-                    Ok(())
-                })?;
+                let _guard = should_indent.then(|| self.indent_guard());
+                for item in rest {
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                    self.out.token_space(token)?;
+                    format_item(item)?;
+                }
+                self.tail(tail)?;
                 Ok(())
             })
             .result()

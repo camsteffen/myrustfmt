@@ -68,7 +68,8 @@ impl AstFormatter {
             let empty_body = arm.body.as_deref().and_then(plain_block).is_some_and(
                 |block| self.is_block_empty(block),
             );
-            self.indented(|| {
+            {
+                let _guard = self.indent_guard();
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 self.out.token_space("if")?;
                 self.expr_tail(
@@ -88,8 +89,7 @@ impl AstFormatter {
                         })
                         .as_ref(),
                 )?;
-                Ok(())
-            })?;
+            }
             if let Some(body) = arm.body.as_deref()
                 && !empty_body
             {

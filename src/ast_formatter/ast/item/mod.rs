@@ -1,7 +1,6 @@
 mod sort;
 pub mod use_tree;
 
-use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::ast::r#macro::MacCallSemi;
 use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::ListItemContext;
@@ -10,6 +9,7 @@ use crate::ast_formatter::list::options::{
 };
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::width_thresholds::WIDTH_THRESHOLDS;
+use crate::ast_formatter::AstFormatter;
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
@@ -212,54 +212,76 @@ impl AstFormatter {
         self.safety(impl_.safety)?;
         self.out.token("impl")?;
         self.generic_params(&impl_.generics.params)?;
-        let first_part = || match &impl_.of_trait {
-            Some(of_trait) => self.trait_ref(of_trait),
-            None => self.ty(&impl_.self_ty),
+        let has_where = !impl_.generics.where_clause.is_empty();
+        let first_part = |wrapped: bool| {
+            let tail = |af: &Self| {
+                if impl_.of_trait.is_none() && !has_where && !wrapped {
+                    af.out.space_token("{")?;
+                }
+                Ok(())
+            };
+            match &impl_.of_trait {
+                Some(of_trait) => {
+                    self.trait_ref(of_trait)?;
+                    // todo tail
+                    tail(self)?;
+                }
+                None => self.ty_tail(&impl_.self_ty, Some(&self.tail_fn(tail)))?,
+            };
+            Ok(())
         };
-        let indented = if self.out.line() == first_line {
+        let mut indent_guard = if self.out.line() == first_line {
             self.backtrack()
                 .next(|_| {
                     let _guard = self.single_line_guard();
                     self.out.space()?;
-                    first_part()?;
-                    Ok(false)
+                    first_part(false)?;
+                    Ok(None)
                 })
                 .next(|_| {
-                    self.indented(|| {
-                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                        first_part()?;
-                        Ok(true)
-                    })
+                    let indent_guard = self.indent_guard();
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                    first_part(true)?;
+                    Ok(Some(indent_guard))
                 })
                 .result()?
         } else {
             self.out.space()?;
-            first_part()?;
-            false
+            first_part(false)?;
+            None
         };
+        let wrapped_first_part = indent_guard.is_some();
         if impl_.of_trait.is_some() {
             self.backtrack()
                 .next(|_| {
+                    let _guard = self.recover_width_guard();
                     self.out.space()?;
-                    let _guard = self.could_wrap_indent_guard();
+                    self.out.token_space("for")?;
+                    self.ty(&impl_.self_ty)?;
+                    if !wrapped_first_part && !has_where {
+                        self.out.space_token("{")?;
+                    }
+                    Ok(())
+                })
+                .next(|_| {
+                    if indent_guard.is_none() {
+                        indent_guard = Some(self.indent_guard());
+                    }
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     self.out.token_space("for")?;
                     self.ty(&impl_.self_ty)?;
                     Ok(())
                 })
-                .next(|_| {
-                    self.indented_optional(!indented, || {
-                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                        self.out.token_space("for")?;
-                        self.ty(&impl_.self_ty)?;
-                        Ok(())
-                    })
-                })
                 .result()?;
         }
-        if !self.where_clause(&impl_.generics.where_clause, true)? {
-            self.out.space()?;
+        let wrapped = indent_guard.is_some();
+        drop(indent_guard);
+        if wrapped && impl_.generics.where_clause.is_empty() {
+            self.out.newline_indent(VerticalWhitespaceMode::Break)?;
         }
-        self.block(false, &impl_.items, |item| self.assoc_item(item))?;
+        self.where_clause(&impl_.generics.where_clause, true)?;
+        let omit_open_brace = !wrapped && !has_where;
+        self.block(omit_open_brace, &impl_.items, |item| self.assoc_item(item))?;
         Ok(())
     }
 
@@ -434,7 +456,7 @@ impl AstFormatter {
                     Ok(())
                 })
                 .next(|_| {
-                    let _guard = self.begin_indent();
+                    let _guard = self.indent_guard();
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     self.out.token_space("=")?;
                     self.expr(&default.value)?;

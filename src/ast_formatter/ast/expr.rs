@@ -262,13 +262,12 @@ impl AstFormatter {
             })
             .next(|_| {
                 self.has_vstruct(VStruct::NonBlockIndent, || {
-                    self.indented(|| {
-                        self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                        self.out.token_space("as")?;
-                        self.ty(ty)?;
-                        self.tail(tail)?;
-                        Ok(())
-                    })
+                    let _guard = self.indent_guard();
+                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                    self.out.token_space("as")?;
+                    self.ty(ty)?;
+                    self.tail(tail)?;
+                    Ok(())
                 })
             })
             .result()?;
@@ -312,12 +311,12 @@ impl AstFormatter {
                     Ok(false)
                 })
                 .next(|_| {
-                    self.indented(|| {
+                    {
+                        let _guard = self.indent_guard();
                         self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                         self.out.token_space("in")?;
                         self.expr(iter)?;
-                        Ok(())
-                    })?;
+                    }
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     Ok(true)
                 })

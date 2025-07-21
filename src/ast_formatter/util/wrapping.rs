@@ -39,7 +39,7 @@ impl AstFormatter {
     ) -> FormatResult<Option<IndentGuard<'_>>> {
         let checkpoint = self.out.checkpoint();
         let first_line = self.out.line();
-        let indent_guard = self.begin_indent();
+        let indent_guard = self.indent_guard();
         if self.out.space_allow_newlines()? {
             // wrap forced by comments
             then()?;
@@ -59,12 +59,12 @@ impl AstFormatter {
         };
         if self.out.line() != first_line {
             result?;
-            return Ok(Some(self.begin_indent()));
+            return Ok(Some(self.indent_guard()));
         }
         match result {
             Err(e) if matches!(e.kind, FormatErrorKind::WidthLimitExceeded) => {
                 self.out.restore_checkpoint(&checkpoint);
-                let indent_guard = self.begin_indent();
+                let indent_guard = self.indent_guard();
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 then()?;
                 Ok(Some(indent_guard))

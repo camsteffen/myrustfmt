@@ -35,11 +35,10 @@ impl AstFormatter {
                 Ok(())
             })
             .next(|_| {
-                self.indented(|| {
-                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                    self.expr_tail(expr, tail)?;
-                    Ok(())
-                })
+                let _guard = self.indent_guard();
+                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                self.expr_tail(expr, tail)?;
+                Ok(())
             })
             .result_with_checkpoint(&checkpoint_after_eq)?;
         Ok(())

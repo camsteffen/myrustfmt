@@ -394,11 +394,5 @@ fn expect_formatted_equals(formatted: &str, expected: &str, name: &str) -> TestR
 }
 
 fn print_diff(left: &str, right: &str) {
-    for line in diff::lines(left, right) {
-        match line {
-            diff::Result::Left(s) => println!("- {s}"),
-            diff::Result::Right(s) => println!("+ {s}"),
-            diff::Result::Both(s, _) => println!("  {s}"),
-        }
-    }
+    println!("{}", prettydiff::diff_lines(left, right));
 }

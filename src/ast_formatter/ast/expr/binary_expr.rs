@@ -29,7 +29,9 @@ impl AstFormatter {
         self.expr(first)?;
         self.has_vstruct(VStruct::NonBlockIndent, || {
             if force_multi_line {
-                return self.indented(|| self.binary_vertical(&chain, tail));
+                let _guard = self.indent_guard();
+                self.binary_vertical(&chain, tail)?;
+                return Ok(());
             }
             let mut chain = chain.as_slice();
             let indent_margin = self.out.total_indent.get() + INDENT_WIDTH;
@@ -66,7 +68,7 @@ impl AstFormatter {
                     Ok(())
                 })
                 .next(|_| {
-                    let _indent_guard = indent_guard.unwrap_or_else(|| self.begin_indent());
+                    let _indent_guard = indent_guard.unwrap_or_else(|| self.indent_guard());
                     self.binary_vertical(chain, tail)?;
                     Ok(())
                 })

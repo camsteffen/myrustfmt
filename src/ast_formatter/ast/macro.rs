@@ -176,7 +176,8 @@ impl AstFormatter {
                 Ok(())
             })
             .next(|_| {
-                self.indented(|| {
+                {
+                    let _guard = self.indent_guard();
                     self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                     self.expr(expr)?;
                     self.out.token(",")?;
@@ -198,20 +199,18 @@ impl AstFormatter {
                                 Ok(())
                             })
                             .next(|_| {
-                                self.indented(|| {
-                                    self.out.newline_indent(VerticalWhitespaceMode::Break)?;
-                                    self.out.token_space("if")?;
-                                    self.expr(guard)?;
-                                    self.out.token_maybe_missing(",")?;
-                                    Ok(())
-                                })
+                                let _guard = self.indent_guard();
+                                self.out.newline_indent(VerticalWhitespaceMode::Break)?;
+                                self.out.token_space("if")?;
+                                self.expr(guard)?;
+                                self.out.token_maybe_missing(",")?;
+                                Ok(())
                             })
                             .result()?;
                     } else {
                         self.out.token_maybe_missing(",")?;
                     }
-                    Ok(())
-                })?;
+                }
                 self.out.newline_indent(VerticalWhitespaceMode::Break)?;
                 self.out.token_replace(")")?;
                 self.tail(tail)?;
