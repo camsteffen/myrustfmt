@@ -133,13 +133,13 @@ impl AstFormatter {
         })
     }
 
-    pub fn bare_fn_ty(&self, bare_fn_ty: &ast::BareFnTy) -> FormatResult {
+    pub fn fn_ptr_ty(&self, fn_ptr_ty: &ast::FnPtrTy) -> FormatResult {
         // todo
         // self.safety(&bare_fn_ty.safety)?;
         // self.extern_(&bare_fn_ty.ext)?;
         // self.generic_params(&bare_fn_ty.generic_params)?;
         self.out.token("fn")?;
-        self.fn_decl(&bare_fn_ty.decl, Brackets::Parens, None)?;
+        self.fn_decl(&fn_ptr_ty.decl, Brackets::Parens, None)?;
         Ok(())
     }
 

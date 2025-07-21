@@ -18,7 +18,6 @@ use crate::constraints::VStruct;
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
-use rustc_ast::ptr::P;
 use tracing::instrument;
 
 impl AstFormatter {
@@ -137,6 +136,7 @@ impl AstFormatter {
         tail: Tail,
     ) -> FormatResult {
         match borrow_kind {
+            ast::BorrowKind::Pin => todo!(),
             ast::BorrowKind::Raw => {
                 self.out.token_space("&raw")?;
                 match mutability {
@@ -153,7 +153,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn array(&self, items: &[P<ast::Expr>], tail: Tail) -> FormatResult {
+    fn array(&self, items: &[Box<ast::Expr>], tail: Tail) -> FormatResult {
         self.list(
             Brackets::Square,
             items,
@@ -194,7 +194,7 @@ impl AstFormatter {
         Ok(())
     }
 
-    pub fn call(&self, func: &ast::Expr, args: &[P<ast::Expr>], tail: Tail) -> FormatResult {
+    pub fn call(&self, func: &ast::Expr, args: &[Box<ast::Expr>], tail: Tail) -> FormatResult {
         let first_line = self.out.line();
         self.expr_tail(
             func,
@@ -211,8 +211,8 @@ impl AstFormatter {
 
     pub fn call_args(
         &self,
-        args: &[P<ast::Expr>],
-        mut list_strategies: ListStrategies<P<ast::Expr>>,
+        args: &[Box<ast::Expr>],
+        mut list_strategies: ListStrategies<Box<ast::Expr>>,
         tail: Tail,
     ) -> FormatResult {
         if let Some(horizontal) = list_strategies.get_horizontal_mut() {
@@ -549,7 +549,7 @@ impl AstFormatter {
         })
     }
 
-    fn tuple(&self, items: &[P<ast::Expr>], tail: Tail) -> FormatResult {
+    fn tuple(&self, items: &[Box<ast::Expr>], tail: Tail) -> FormatResult {
         self.list(
             Brackets::Parens,
             items,

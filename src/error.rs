@@ -2,6 +2,7 @@ use crate::constraints::VStruct;
 use crate::rustc_span::Pos;
 use crate::util::display::display_from_fn;
 use crate::util::line_col::line_col;
+use rustc_lexer::FrontmatterAllowed;
 use rustc_span::BytePos;
 use std::backtrace::Backtrace;
 use std::fmt::{Display, Formatter};
@@ -108,7 +109,7 @@ fn write_parse_error(
     write!(f, "{}, ", error_formatting_at(source, pos, path))?;
     let next_token = |f: &mut Formatter| {
         let remaining = &source[pos.to_usize()..];
-        if let Some(token) = rustc_lexer::tokenize(remaining).next() {
+        if let Some(token) = rustc_lexer::tokenize(remaining, FrontmatterAllowed::Yes).next() {
             let token_str = &remaining[..token.len.try_into().unwrap()];
             write!(f, ". Next token is `{token_str}`")?;
         } else {

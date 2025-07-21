@@ -10,7 +10,6 @@ use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::width_thresholds::WIDTH_THRESHOLDS;
 use crate::error::{FormatErrorKind, FormatResult};
 use rustc_ast::ast;
-use rustc_ast::ptr::P;
 
 impl AstFormatter {
     pub fn pat(&self, pat: &ast::Pat) -> FormatResult {
@@ -117,13 +116,18 @@ impl AstFormatter {
         Ok(())
     }
 
-    fn pat_list_item(&self, pat: &P<ast::Pat>, tail: Tail, _lcx: ListItemContext) -> FormatResult {
+    fn pat_list_item(
+        &self,
+        pat: &Box<ast::Pat>,
+        tail: Tail,
+        _lcx: ListItemContext,
+    ) -> FormatResult {
         self.pat_tail(pat, tail)
     }
 
     fn struct_pat(
         &self,
-        qself: &Option<P<ast::QSelf>>,
+        qself: &Option<Box<ast::QSelf>>,
         path: &ast::Path,
         fields: &[ast::PatField],
         rest: ast::PatFieldsRest,

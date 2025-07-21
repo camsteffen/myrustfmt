@@ -10,7 +10,6 @@ use crate::error::{FormatErrorKind, FormatResult};
 use crate::num::VSize;
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
-use rustc_ast::ptr::P;
 use std::cell::Cell;
 
 struct PostfixItem<'a> {
@@ -323,7 +322,7 @@ impl AstFormatter {
     fn method_call_args_postfix_tail(
         &self,
         method_call: &ast::MethodCall,
-        list_strategies: ListStrategies<P<ast::Expr>>,
+        list_strategies: ListStrategies<Box<ast::Expr>>,
         postfix_item: &PostfixItem,
         tail: Tail,
     ) -> FormatResult<VSize> {

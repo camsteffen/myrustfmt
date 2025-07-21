@@ -1,3 +1,4 @@
+use rustc_lexer::FrontmatterAllowed;
 use rustc_lexer::TokenKind;
 
 pub fn is_whitespace(str: &str) -> bool {
@@ -18,7 +19,7 @@ pub fn expect_first_token_after_whitespace_and_comments(str: &str, token_kind: T
 
 pub fn first_token_after_whitespace_and_comments(str: &str) -> (u32, TokenKind) {
     let mut distance = 0;
-    let mut tokens = rustc_lexer::tokenize(str);
+    let mut tokens = rustc_lexer::tokenize(str, FrontmatterAllowed::No);
     let token = loop {
         let Some(token) = tokens.next() else {
             panic!("tokenize reached end without Eof");

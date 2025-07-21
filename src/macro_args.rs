@@ -1,7 +1,6 @@
 use crate::ast_formatter::std_macro::{StdMacro, std_macro};
 use crate::parse::parse_no_errors;
 use rustc_ast::ast;
-use rustc_ast::ptr::P;
 use rustc_ast::token;
 use rustc_ast::visit::Visitor;
 use rustc_ast::visit::walk_list;
@@ -58,12 +57,12 @@ impl Visitor<'_> for MacroArgsParser<'_> {
 pub enum MacroArgs {
     Cfg(ThinVec<ast::MetaItemInner>),
     /// Same as a function call. Optional trailing comma. Also used for macros with no args.
-    FnLike(ThinVec<P<ast::Expr>>),
+    FnLike(ThinVec<Box<ast::Expr>>),
     Format {
-        args: ThinVec<P<ast::Expr>>,
+        args: ThinVec<Box<ast::Expr>>,
         format_string_pos: u8,
     },
-    Matches(P<ast::Expr>, P<ast::Pat>, Option<P<ast::Expr>>),
+    Matches(Box<ast::Expr>, Box<ast::Pat>, Option<Box<ast::Expr>>),
     ThreadLocal(ThinVec<ast::Stmt>),
 }
 

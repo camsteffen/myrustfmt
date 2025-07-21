@@ -24,8 +24,8 @@ impl AstFormatter {
                 self.expr(&length.value)?;
                 self.out.token("]")?;
             }
-            ast::TyKind::BareFn(bare_fn_ty) => self.bare_fn_ty(bare_fn_ty)?,
             ast::TyKind::CVarArgs => self.out.token("...")?,
+            ast::TyKind::FnPtr(fn_ptr_ty) => self.fn_ptr_ty(fn_ptr_ty)?,
             ast::TyKind::ImplicitSelf => self.out.token("self")?,
             ast::TyKind::ImplTrait(_, bounds) => {
                 self.out.token_space("impl")?;
@@ -67,9 +67,6 @@ impl AstFormatter {
             ast::TyKind::TraitObject(bounds, syntax) => {
                 match syntax {
                     ast::TraitObjectSyntax::Dyn => self.out.token_space("dyn")?,
-                    ast::TraitObjectSyntax::DynStar => {
-                        return Err(self.err(FormatErrorKind::UnsupportedSyntax));
-                    }
                     ast::TraitObjectSyntax::None => {}
                 }
                 self.generic_bounds(bounds, take_tail())?;
@@ -170,6 +167,8 @@ impl AstFormatter {
         let ast::PolyTraitRef {
             bound_generic_params,
             modifiers,
+            // todo
+            parens: _,
             trait_ref,
             span: _,
         } = poly_trait_ref;

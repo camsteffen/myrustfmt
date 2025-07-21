@@ -1,6 +1,5 @@
 #![feature(default_field_values)]
 #![feature(if_let_guard)]
-#![feature(let_chains)]
 #![feature(result_option_map_or_default)]
 #![feature(rustc_private)]
 #![feature(unqualified_local_imports)]

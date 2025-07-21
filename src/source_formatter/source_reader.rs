@@ -1,6 +1,7 @@
 use crate::error::{ParseError, panic_parse_error};
 use crate::span::Span;
 use crate::util::line_col::line_col;
+use rustc_lexer::FrontmatterAllowed;
 use rustc_span::{BytePos, Pos, SourceFile};
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
@@ -107,7 +108,9 @@ impl SourceReader {
     }
 
     fn next_lexer_token(&self) -> rustc_lexer::Token {
-        rustc_lexer::tokenize(self.remaining()).next().unwrap()
+        rustc_lexer::tokenize(self.remaining(), FrontmatterAllowed::No)
+            .next()
+            .unwrap()
     }
 
     pub fn remaining(&self) -> &str {

@@ -1,6 +1,7 @@
 mod sort;
 pub mod use_tree;
 
+use crate::ast_formatter::AstFormatter;
 use crate::ast_formatter::ast::r#macro::MacCallSemi;
 use crate::ast_formatter::brackets::Brackets;
 use crate::ast_formatter::list::ListItemContext;
@@ -9,11 +10,9 @@ use crate::ast_formatter::list::options::{
 };
 use crate::ast_formatter::tail::Tail;
 use crate::ast_formatter::width_thresholds::WIDTH_THRESHOLDS;
-use crate::ast_formatter::AstFormatter;
 use crate::error::{FormatErrorKind, FormatResult};
 use crate::whitespace::VerticalWhitespaceMode;
 use rustc_ast::ast;
-use rustc_ast::ptr::P;
 use rustc_span::Symbol;
 use rustc_span::symbol::Ident;
 
@@ -21,7 +20,7 @@ pub trait MaybeItem {
     fn as_item(&self) -> Option<&ast::Item>;
 }
 
-impl MaybeItem for P<ast::Item> {
+impl MaybeItem for Box<ast::Item> {
     fn as_item(&self) -> Option<&ast::Item> {
         Some(self)
     }

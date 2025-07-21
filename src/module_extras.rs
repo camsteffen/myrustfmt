@@ -4,7 +4,6 @@ use crate::macro_args::MacroArgsMap;
 use crate::macro_args::MacroArgsParser;
 use crate::submodules::SubmoduleCollector;
 use rustc_ast::ast;
-use rustc_ast::ptr::P;
 use rustc_ast::visit;
 use rustc_ast::visit::Visitor;
 use rustc_data_structures::fx::FxHashMap;
@@ -22,7 +21,7 @@ pub struct ModuleExtras {
 ///   is ./foo/
 pub fn get_module_extras(
     psess: &ParseSess,
-    items: &[P<ast::Item>],
+    items: &[Box<ast::Item>],
     path: Option<&Path>,
     relative: Option<Ident>,
 ) -> ModuleExtras {

@@ -5,12 +5,11 @@ use crate::ast_formatter::list::options::ListOptions;
 use crate::ast_formatter::tail::Tail;
 use crate::error::{FormatErrorKind, FormatResult};
 use rustc_ast::ast;
-use rustc_ast::ptr::P;
 
 impl AstFormatter {
     pub fn qpath(
         &self,
-        qself: &Option<P<ast::QSelf>>,
+        qself: &Option<Box<ast::QSelf>>,
         path: &ast::Path,
         turbofish: bool,
         tail: Tail,
