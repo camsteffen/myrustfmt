@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-
-set -e
-
-cargo build --release --bin myrustfmt
-myrustfmt=$(realpath ./target/release/myrustfmt)
-cd /Users/csteffen/personal/rust/compiler/rustc_ast
-RUSTFMT="$myrustfmt" RUST_BACKTRACE=1 exec cargo +nightly-2025-06-25 fmt "$@"
