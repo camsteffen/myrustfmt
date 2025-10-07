@@ -54,13 +54,11 @@ impl AstFormatter {
         match segments {
             [] => panic!("empty path segments"),
             [segment] => self.path_segment(segment, turbofish, tail)?,
-            [first, middle @ .., last] => {
-                self.path_segment(first, turbofish, None)?;
-                for segment in middle {
-                    self.out.token("::")?;
+            [head @ .., last] => {
+                for segment in head {
                     self.path_segment(segment, turbofish, None)?;
+                    self.out.token("::")?;
                 }
-                self.out.token("::")?;
                 self.path_segment(last, turbofish, tail)?;
             }
         }
