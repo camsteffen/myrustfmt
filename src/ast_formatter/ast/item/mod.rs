@@ -187,7 +187,7 @@ impl AstFormatter {
                 self.out.space()?;
                 self.block_with_item_sorting(false, items, |item| self.item(item))?;
             }
-            ast::ModKind::Loaded(_, ast::Inline::No, ..) | ast::ModKind::Unloaded => {
+            ast::ModKind::Loaded(_, ast::Inline::No { .. }, ..) | ast::ModKind::Unloaded => {
                 self.out.token(";")?;
             }
         }
@@ -209,7 +209,9 @@ impl AstFormatter {
 
     fn impl_(&self, impl_: &ast::Impl) -> FormatResult {
         let first_line = self.out.line();
-        self.safety(impl_.safety)?;
+        if let Some(of_trait) = &impl_.of_trait {
+            self.safety(of_trait.safety)?;
+        }
         self.out.token("impl")?;
         self.generic_params(&impl_.generics.params)?;
         let has_where = !impl_.generics.where_clause.is_empty();
@@ -222,8 +224,8 @@ impl AstFormatter {
             };
             match &impl_.of_trait {
                 Some(of_trait) => {
-                    self.constness(impl_.constness)?;
-                    self.trait_ref(of_trait)?;
+                    self.constness(of_trait.constness)?;
+                    self.trait_ref(&of_trait.trait_ref)?;
                     // todo tail
                     tail(self)?;
                 }

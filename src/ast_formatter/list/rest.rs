@@ -9,7 +9,7 @@ impl<'a> ListRest<'a> {
     pub fn from_pat_fields_rest(rest: ast::PatFieldsRest) -> Option<Self> {
         match rest {
             ast::PatFieldsRest::None => None,
-            ast::PatFieldsRest::Rest => Some(ListRest { base: None }),
+            ast::PatFieldsRest::Rest(_) => Some(ListRest { base: None }),
             ast::PatFieldsRest::Recovered(_) => panic!("unexpected PatFieldsRest::Recovered"),
         }
     }

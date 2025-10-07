@@ -116,7 +116,7 @@ impl SubmoduleCollector {
 
 fn is_mod_inline(kind: &ModKind) -> bool {
     match kind {
-        ast::ModKind::Loaded(_, ast::Inline::No, ..) | ast::ModKind::Unloaded => false,
+        ast::ModKind::Loaded(_, ast::Inline::No { .. }, ..) | ast::ModKind::Unloaded => false,
         ast::ModKind::Loaded(_, ast::Inline::Yes, ..) => true,
     }
 }

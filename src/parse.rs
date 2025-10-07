@@ -8,6 +8,7 @@ use rustc_errors::ErrorGuaranteed;
 use rustc_errors::PResult;
 use rustc_errors::emitter::HumanEmitter;
 use rustc_errors::emitter::stderr_destination;
+use rustc_parse::lexer::StripTokens;
 use rustc_parse::parser::ExpTokenPair;
 use rustc_parse::parser::Parser;
 use rustc_session::parse::ParseSess;
@@ -40,7 +41,7 @@ pub fn parse_module(
         let parser = module_parser(&psess, crate_source);
         let (attrs, items, spans) = parse_no_errors(parser, |parser| {
             parser.parse_mod(ExpTokenPair {
-                tok: &rustc_ast::token::Eof,
+                tok: rustc_ast::token::Eof,
                 token_type: rustc_parse::parser::token_type::TokenType::Eof,
             })
         })?;
@@ -112,11 +113,14 @@ fn build_diag_ctxt(source_map: Arc<SourceMap>) -> DiagCtxt {
 fn module_parser<'a>(psess: &'a ParseSess, source: CrateSource) -> Parser<'a> {
     let parser = match source {
         // todo provide span when the file is found from a mod
-        CrateSource::File(path) => rustc_parse::new_parser_from_file(psess, path, None),
+        CrateSource::File(path) => {
+            rustc_parse::new_parser_from_file(psess, path, StripTokens::Nothing, None)
+        }
         CrateSource::Source(source) => rustc_parse::new_parser_from_source_str(
             psess,
             FileName::anon_source_code(source),
             source.to_owned(),
+            StripTokens::Nothing,
         ),
     };
     // todo is this unwrap okay?
